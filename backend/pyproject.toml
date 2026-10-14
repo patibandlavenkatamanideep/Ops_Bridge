@@ -1,0 +1,84 @@
+[project]
+name = "opsbridge"
+version = "0.1.0"
+description = "OpsBridge: evidence-backed investigation of blocked procurement exceptions"
+requires-python = ">=3.12,<3.13"
+license = "MIT"
+authors = [{ name = "Venkata Manideep Patibandla" }]
+dependencies = [
+    "fastapi==0.143.1",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.14.1",
+    "pydantic-settings==2.16.0",
+    "sqlalchemy==2.1.4",
+    "alembic==1.20.0",
+    "psycopg[binary]==3.3.6",
+    "authlib==1.9.1",
+    "itsdangerous==2.2.0",
+    "httpx==0.28.1",
+    "python-multipart==0.0.32",
+    "pyyaml>=6.0.2",
+    "pypdf==6.20.1",
+    "mcp==2.3.0",
+    "anthropic==1.13.0",
+    "pyjwt[crypto]==2.15.1",
+    "cryptography==50.0.2",
+    "opentelemetry-api==1.45.1",
+    "opentelemetry-sdk==1.45.1",
+    "prometheus-client==0.26.0",
+    "evalseal==2.2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.17.0",
+    "mypy==2.4.0",
+    "hypothesis==6.169.1",
+    "types-PyYAML",
+    "pillow>=11",
+]
+
+[project.scripts]
+opsbridge = "opsbridge.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/opsbridge"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "DTZ"]
+ignore = ["S101", "RUF012", "B008", "S105", "S106", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "DTZ"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["opsbridge"]
+mypy_path = "src"
+plugins = ["pydantic.mypy"]
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = ["authlib.*", "evalseal.*", "pypdf.*"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra --strict-markers"
+markers = [
+    "integration: needs PostgreSQL (and other local services) from the compose stack",
+    "keycloak: needs the local Keycloak container",
+    "live: contacts a real external provider; never runs by default",
+]
+filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
