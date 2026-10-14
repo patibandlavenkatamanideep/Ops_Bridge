@@ -44,6 +44,90 @@ def _api(args: argparse.Namespace) -> int:
     return 0
 
 
+def _worker(_args: argparse.Namespace) -> int:
+    from opsbridge.workflow.worker import main as worker_main
+
+    worker_main()
+    return 0
+
+
+def _simulator(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    from opsbridge.simulator.app import app_from_env
+
+    uvicorn.run(app_from_env(), host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
+def _simulator_seed(args: argparse.Namespace) -> int:
+    import os
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.simulator.scenarios import load_corpus, seed_simulator
+    from opsbridge.simulator.store import SimStore
+
+    db = Path(os.environ.get("OPSBRIDGE_SIM_DB", str(REPO_ROOT / "var" / "simulator.sqlite3")))
+    store = SimStore(db)
+    total = 0
+    for path in args.corpus or sorted((REPO_ROOT / "fixtures" / "scenarios").glob("*.yaml")):
+        total += seed_simulator(store, load_corpus(Path(path)))
+    print(f"simulator records written: {total} ({db})")
+    return 0
+
+
+def _eval_rules(args: argparse.Namespace) -> int:
+    import platform
+    from collections import Counter
+    from datetime import UTC, datetime
+
+    from opsbridge import __version__
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation.rules_baseline import PolicyBook, evaluate
+    from opsbridge.simulator.scenarios import load_corpus
+
+    corpus_path = Path(args.corpus)
+    corpus = load_corpus(corpus_path)
+    book = PolicyBook(REPO_ROOT / "packs")
+    verdicts = [evaluate(s, book) for s in corpus.scenarios]
+    n = len(verdicts)
+    summary = {
+        "cases": n,
+        "case_correct": sum(v.case_correct for v in verdicts),
+        "outcome_correct": sum(v.outcome_correct for v in verdicts),
+        "types_correct": sum(v.types_correct for v in verdicts),
+        "action_correct": sum(v.action_correct for v in verdicts),
+        "by_split": dict(Counter(v.split for v in verdicts)),
+    }
+    result = {
+        "schema_version": 1,
+        "mode": "rules_only",
+        "evidence_level": "engineering verification on synthetic data (no model, no live services)",
+        "corpus_id": corpus.corpus_id,
+        "corpus_file": str(corpus_path.relative_to(REPO_ROOT))
+        if corpus_path.is_relative_to(REPO_ROOT)
+        else str(corpus_path),
+        "unit": "case (one invoice); labels hand-written; single deterministic run per case",
+        "generated_at": datetime.now(UTC).isoformat(),
+        "code_version": __version__,
+        "python": platform.python_version(),
+        "summary": summary,
+        "verdicts": [v.to_dict() for v in verdicts],
+    }
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"rules-only baseline: {summary['case_correct']}/{n} case-correct "
+        f"(outcome {summary['outcome_correct']}, types {summary['types_correct']}, action {summary['action_correct']})"
+    )
+    for v in verdicts:
+        if not v.case_correct:
+            print(f"  MISS {v.case_id}: got {v.outcome}/{v.types}/{v.next_action}")
+    print(f"wrote {out}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="opsbridge")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -61,6 +145,23 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--serve-frontend", action="store_true", help="also serve the built UI")
     p.add_argument("--static", default=None)
     p.set_defaults(func=_api)
+
+    p = sub.add_parser("worker", help="run the background worker")
+    p.set_defaults(func=_worker)
+
+    p = sub.add_parser("simulator", help="run the purchasing-system simulator")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8090)
+    p.set_defaults(func=_simulator)
+
+    p = sub.add_parser("simulator-seed", help="load scenario corpora into the simulator store")
+    p.add_argument("corpus", nargs="*")
+    p.set_defaults(func=_simulator_seed)
+
+    p = sub.add_parser("eval-rules", help="run the rules-only baseline on a scenario corpus")
+    p.add_argument("--corpus", default="../fixtures/scenarios/dev.yaml")
+    p.add_argument("--out", default="../evals/results/rules-baseline-dev.json")
+    p.set_defaults(func=_eval_rules)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)

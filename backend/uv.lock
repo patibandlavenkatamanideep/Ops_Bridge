@@ -719,6 +719,7 @@ dependencies = [
     { name = "mcp" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-sdk" },
+    { name = "pillow" },
     { name = "prometheus-client" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic" },
@@ -735,7 +736,6 @@ dependencies = [
 dev = [
     { name = "hypothesis" },
     { name = "mypy" },
-    { name = "pillow" },
     { name = "pytest" },
     { name = "ruff" },
     { name = "types-pyyaml" },
@@ -754,6 +754,7 @@ requires-dist = [
     { name = "mcp", specifier = "==2.3.0" },
     { name = "opentelemetry-api", specifier = "==1.45.1" },
     { name = "opentelemetry-sdk", specifier = "==1.45.1" },
+    { name = "pillow", specifier = "==12.3.0" },
     { name = "prometheus-client", specifier = "==0.26.0" },
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
     { name = "pydantic", specifier = "==2.14.1" },
@@ -770,7 +771,6 @@ requires-dist = [
 dev = [
     { name = "hypothesis", specifier = "==6.169.1" },
     { name = "mypy", specifier = "==2.4.0" },
-    { name = "pillow", specifier = ">=11" },
     { name = "pytest", specifier = "==9.1.1" },
     { name = "ruff", specifier = "==0.17.0" },
     { name = "types-pyyaml" },

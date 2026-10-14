@@ -53,6 +53,7 @@ CASE_TRANSITIONS: dict[str, frozenset[str]] = {
             "follow_up_pending",
             "collecting_evidence",
             "needs_information",
+            "resolved",
             "closed_without_resolution",
         }
     ),

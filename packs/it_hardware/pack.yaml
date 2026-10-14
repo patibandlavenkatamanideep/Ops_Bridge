@@ -1,0 +1,82 @@
+# IT hardware purchasing pack. Source system: camelCase JSON for purchase orders,
+# invoices, goods-received notes and allocations; vendor messages as plain text with
+# different phrasing. Same core, different mapping.
+schema_version: 1
+pack_id: it_hardware
+version: 1
+display_name: IT hardware purchasing
+policy_id: it-procurement
+sources:
+  purchase_order:
+    format: json
+    collection: purchase_orders
+    record:
+      po_number: {path: purchaseOrderId, transform: upper}
+      supplier_id: {path: vendor.vendorCode, transform: upper}
+      supplier_name: {path: vendor.legalName}
+      currency: {path: currencyCode, transform: upper}
+      status: {path: state, map: {Active: open, Completed: closed, Voided: cancelled}}
+    lines:
+      path: items
+      record:
+        line_number: {path: lineId}
+        item_code: {path: partNumber, optional: true}
+        description: {path: desc, optional: true}
+        quantity: {path: quantity, transform: decimal}
+        unit: {path: unitOfMeasure}
+        unit_price: {path: unitCost, transform: decimal}
+        discount_amount: {path: discountTotal, transform: decimal, default: "0"}
+  invoice:
+    format: json
+    collection: invoices
+    record:
+      invoice_number: {path: invoiceId, transform: upper}
+      invoice_date: {path: issuedOn, transform: date}
+      supplier_id: {path: vendorCode, transform: upper, optional: true}
+      supplier_name: {path: vendorName}
+      po_number: {path: purchaseOrderRef, transform: upper, optional: true}
+      currency: {path: currencyCode, transform: upper}
+      status: {path: state, map: {Open: open, Voided: cancelled}}
+    lines:
+      path: items
+      record:
+        line_number: {path: lineId}
+        po_line_number: {path: poLineRef, optional: true}
+        item_code: {path: partNumber, optional: true}
+        description: {path: desc, optional: true}
+        quantity: {path: quantity, transform: decimal}
+        unit: {path: unitOfMeasure}
+        unit_price: {path: unitCost, transform: decimal}
+        discount_amount: {path: discountTotal, transform: decimal, default: "0"}
+        kind: {path: lineType, map: {Hardware: goods, Shipping: charge, Service: charge}}
+  goods_receipt:
+    format: json
+    collection: receipts
+    record:
+      receipt_number: {path: grnNumber, transform: upper}
+      po_number: {path: poRef, transform: upper}
+      received_date: {path: receivedDate, transform: date}
+    lines:
+      path: items
+      record:
+        po_line_number: {path: poLineId}
+        quantity: {path: qtyReceived, transform: decimal}
+        unit: {path: uom}
+        kind: {path: movementType, map: {Inbound: receipt, RMA: return}}
+        status: {path: condition, map: {Accepted: accepted, Rejected: rejected, Reversed: reversed}}
+  allocation_history:
+    format: json
+    collection: allocations
+    root: matches
+    record:
+      invoice_number: {path: invoiceId, transform: upper}
+      po_number: {path: purchaseOrderId, transform: upper}
+      po_line_number: {path: poLineId}
+      quantity: {path: matchedQty, transform: decimal}
+      status: {path: matchState, map: {Matched: active, Reversed: cancelled}}
+  supplier_message:
+    format: text
+    collection: messages
+    assertion_patterns:
+      - '(?i)\b(?P<po_number>PO-\d+)\b.*?\b(?P<quantity>\d+(?:\.\d+)?)\s+(?P<unit>devices|units|laptops|monitors)\b.*?\b(?:were\s+)?(?:delivered|handed over|dispatched)'
+      - '(?i)\b(?:delivered|dispatched)\s+(?P<quantity>\d+(?:\.\d+)?)\s+(?P<unit>devices|units|laptops|monitors)\b.*?\b(?P<po_number>PO-\d+)'

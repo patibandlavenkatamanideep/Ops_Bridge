@@ -65,6 +65,7 @@ class Settings(BaseSettings):
 
     simulator_url: str = "http://localhost:8090"
     simulator_fault_controls: bool = False
+    sim_master_secret: SecretStr = SecretStr("")
 
     records_mcp_url: str = "http://localhost:8101/mcp"
     casework_mcp_url: str = "http://localhost:8102/mcp"

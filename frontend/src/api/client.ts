@@ -7,6 +7,40 @@ export type CaseOut = components["schemas"]["CaseOut"];
 export type QueuePage = components["schemas"]["QueuePage"];
 export type QueueItem = components["schemas"]["QueueItemOut"];
 export type CaseCreate = components["schemas"]["CaseCreateIn"];
+export type Investigation = components["schemas"]["InvestigationOut"];
+export type Run = components["schemas"]["RunOut"];
+export type DocumentList = components["schemas"]["DocumentList"];
+export type DocumentItem = components["schemas"]["DocumentOut"];
+export type VersionDetail = components["schemas"]["VersionDetailOut"];
+export type FieldItem = components["schemas"]["FieldOut"];
+
+/** A finding as stored in an investigation version (fields omitted for requesters). */
+export interface Finding {
+  finding_id: string;
+  finding_type: string;
+  status: string;
+  reason_code: string;
+  summary: string;
+  po_line_number: string | null;
+  invoice_line_numbers: string[];
+  values?: Record<string, string>;
+  evidence?: Citation[];
+}
+
+export interface Citation {
+  document_id: string;
+  version_id: string;
+  sha256: string;
+  locator: string;
+  field: string;
+  classification: string;
+  status?: string;
+  document_title?: string | null;
+  version_no?: number | null;
+  value?: string | null;
+  field_status?: string | null;
+  excerpt?: string | null;
+}
 
 export class ApiError extends Error {
   readonly status: number;

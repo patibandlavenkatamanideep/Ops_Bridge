@@ -8,7 +8,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–1 done; Phase 2 next |
+| Local application complete | no — Phases 0–2 done; Phase 3 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
 | External connector (GitHub sandbox) validated | not evaluated (no sandbox repo/token/authorization for writes) |
 | Hosted CI | not run (no workflow pushed yet) |
@@ -58,6 +58,35 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   docs/developer-commands.md. `eval-offline` and `demo --seed-records` targets exist but
   depend on Phase 2/7 commands not yet implemented.
 
+### Phase 2 — deterministic investigation (exit gate passed locally)
+- Purchasing simulator (`backend/src/opsbridge/simulator/`): separate FastAPI service, SQLite
+  store, per-org HMAC credentials, native record formats per organization, task tracker and
+  fault-injection controls (refused in production mode).
+- Bounded parsers (`evidence/parsers.py`): JSON/CSV/text/PDF with type sniffing, size/depth/
+  row/page limits; PDFs parsed in a killable subprocess (`evidence/pdf_worker.py`); image-only
+  PDFs → `needs_review` (OCR unavailable, never invented); active PDF content flagged.
+- Ingestion (`evidence/ingest.py`): raw bytes + raw SHA-256 in tenant-scoped artifact storage,
+  separate normalized digest (`opsbridge-norm/1`), versioning only when bytes change, chunks
+  with page/line/row locators, extracted fields, canonical records with superseding.
+- Pack mappings (`packs/*/pack.yaml`, `mapping.py`): furniture (snake_case JSON, CSV, PDF
+  text patterns with amount checks, email assertions) and IT (camelCase JSON) through one
+  generic engine.
+- Investigation workflow (`workflow/investigation.py`) with durable steps
+  collect_context → retrieve_policy → reconcile_records → explain_findings; leased job queue
+  with fencing tokens (`workflow/jobs.py`); worker (`workflow/worker.py`).
+- Citations (`evidence/citations.py`) resolved against tenant, version, digest and locator.
+- Corrections keep the original extraction; latest correction applied as an overlay and
+  bound into the investigation's source manifest. Evidence-based resolution guard.
+- UI: investigation tab (outcome, explanation, uncertainty, cited findings, run progress)
+  and evidence tab (documents/versions, fields beside source text, highlighted citation,
+  correction form, original download).
+- Corpus: `fixtures/scenarios/dev.yaml` — 37 hand-labelled synthetic scenarios (25
+  furniture, 12 IT) authored in `author_dev.py`. Rules-only baseline:
+  `uv --directory backend run python -m opsbridge.cli eval-rules` →
+  `evals/results/rules-baseline-dev.json`: **37/37 case-correct on the development split**.
+  This is development verification: the labels and rules were written together; it is not
+  held-out evidence and says nothing about model quality.
+
 ## Verification evidence (local, macOS arm64, 2026-10-14)
 
 `make verify` → **10 passed, 0 failed, 0 skipped**:
@@ -65,13 +94,24 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (37 files) | passed |
-| backend unit tests | 51 passed |
+| backend mypy --strict (61 files) | passed |
+| backend unit tests | 114 passed |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 7 passed |
-| integration tests (real PostgreSQL roles + real Keycloak) | 32 passed |
-| browser tests (Playwright Chromium 156 → Vite → API → Keycloak) | 3 passed |
+| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP) | 39 passed |
+| browser tests (Playwright Chromium 156 → Vite → API → worker → simulator, Keycloak login) | 6 passed |
 | frontend production build | passed |
+
+Phase 2 exit gate evidence:
+- 20 ordered / 18 received: `tests/integration/test_investigation_stack.py::test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch`
+  (citations to PO JSON pointer, receipt CSV row and invoice PDF line, all `valid`) and
+  `frontend/e2e/phase2.spec.ts` (citation opens highlighted source line).
+- Missing/unsupported inputs → needs_information/manual_review: `test_missing_receipt_is_needs_information_without_asserting_non_delivery`,
+  dev corpus cases fur-dev-012/013/015/019/020/021/024, it-dev-006/007/012.
+- Unreachable source retried, not treated as missing: `test_unreachable_source_is_retried_not_treated_as_missing`.
+- Worker restart resumes without re-running completed steps; stale worker cannot complete:
+  `test_worker_restart_resumes_from_durable_steps`.
+- Rules-only baseline on the seed corpus: `tests/evaluation/test_rules_baseline.py` (37 cases).
 
 Phase 1 exit gate evidence:
 - Logged-in user creates/reads own case: `tests/integration/test_api_cases.py::test_requester_creates_and_reads_own_case`, `frontend/e2e/phase1.spec.ts` (real login).
@@ -99,12 +139,16 @@ Phase 1 exit gate evidence:
 - Rate limiting is per process and in memory; not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
 - The "Evaluation" navigation entry has no page yet (Phase 7).
+- No genuine scanned paper document is in the fixtures; the scanned case is a synthetic
+  image-only PDF. OCR is unverified (tesseract not installed) and routes to needs_review.
+- Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
+  route to needs_review rather than parse.
+- Evidence retrieval is by case linkage and locator; full-text search ranking is Phase 3/6.
 - Development `.env` from the original Desktop location was uploaded to iCloud before
   eviction (ADR 0009); values are local-only development secrets.
 
 ## Next executable task
 
-Phase 2: purchasing simulator (HTTP + persisted records), pack field mappings, ingestion
-of JSON/CSV/PDF/text with raw and normalized digests, evidence references and chunks,
-correction history, deterministic investigation run producing a versioned investigation
-with citations, case detail evidence UI, rules-only baseline on the seed corpus.
+Phase 3: model adapter contract (mock, Anthropic, Ollama) with capability declarations and
+budgets, prompt registry, structured explanation/proposal steps with source validation,
+authorized lexical retrieval, injection and malformed-output tests.

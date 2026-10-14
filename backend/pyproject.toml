@@ -27,6 +27,7 @@ dependencies = [
     "opentelemetry-sdk==1.45.1",
     "prometheus-client==0.26.0",
     "evalseal==2.2.0",
+    "pillow==12.3.0",
 ]
 
 [dependency-groups]
@@ -36,7 +37,6 @@ dev = [
     "mypy==2.4.0",
     "hypothesis==6.169.1",
     "types-PyYAML",
-    "pillow>=11",
 ]
 
 [project.scripts]

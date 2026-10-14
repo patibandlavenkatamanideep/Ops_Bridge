@@ -1,19 +1,49 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useRef, useState, type KeyboardEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type CaseOut } from "../api/client";
+import { ApiError, api, tenantPath, type CaseOut, type Citation } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { StatusBadge, statusLabel } from "../components/StatusBadge";
+import { useSession } from "../session";
+import { EvidencePanel } from "./case/EvidencePanel";
+import { InvestigationPanel } from "./case/InvestigationPanel";
+
+type Tab = "investigation" | "evidence";
+const TABS: { id: Tab; label: string; permission?: string }[] = [
+  { id: "investigation", label: "Investigation" },
+  { id: "evidence", label: "Evidence", permission: "evidence.read" },
+];
 
 export function CaseDetail() {
   const { tenant = "", caseId = "" } = useParams();
+  const { can } = useSession();
+  const qc = useQueryClient();
+  const [tab, setTab] = useState<Tab>("investigation");
+  const [focus, setFocus] = useState<Citation | null>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const query = useQuery<CaseOut, ApiError>({
     queryKey: ["case", tenant, caseId],
     queryFn: ({ signal }) => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}`), { signal }),
+  });
+  const resolve = useMutation<CaseOut, ApiError>({
+    mutationFn: () => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}/resolve`), { method: "POST", body: {} }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["case", tenant, caseId] }),
   });
 
   if (query.isPending) return <Loading label="Loading case" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   const c = query.data;
+  const visibleTabs = TABS.filter((t) => !t.permission || can(tenant, t.permission));
+
+  function onKey(e: KeyboardEvent<HTMLButtonElement>) {
+    const idx = visibleTabs.findIndex((t) => t.id === tab);
+    const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+    if (!delta) return;
+    const next = visibleTabs[(idx + delta + visibleTabs.length) % visibleTabs.length]!;
+    setTab(next.id);
+    tabRefs.current[next.id]?.focus();
+  }
+
   return (
     <article aria-labelledby="case-title">
       <p>
@@ -30,12 +60,44 @@ export function CaseDetail() {
         <dd className="mono">{c.invoice_number ?? "—"}</dd>
         <dt>Purchase order</dt>
         <dd className="mono">{c.po_number ?? "—"}</dd>
+        <dt>Discrepancies</dt>
+        <dd>{c.discrepancy_types.length ? c.discrepancy_types.map(statusLabel).join(", ") : "—"}</dd>
         <dt>Evidence</dt>
         <dd>{statusLabel(c.evidence_readiness)}</dd>
+        <dt>Assigned group</dt>
+        <dd>{c.assignee_group ?? "—"}</dd>
         <dt>Opened</dt>
         <dd>{new Date(c.created_at).toLocaleString()}</dd>
       </dl>
       {c.description && <p className="description">{c.description}</p>}
+      {/* Offered only when the latest investigation found no discrepancy; the server enforces this too. */}
+      {can(tenant, "investigation.run") && ["awaiting_review", "follow_up_pending"].includes(c.status) &&
+        c.discrepancy_types.length === 0 && c.evidence_readiness === "complete" && (
+        <div className="actions">
+          <button type="button" className="button secondary" onClick={() => resolve.mutate()} disabled={resolve.isPending}>
+            Mark business exception resolved
+          </button>
+        </div>
+      )}
+      {resolve.isError && <ErrorState error={resolve.error} />}
+
+      <div role="tablist" aria-label="Case sections" className="tabs">
+        {visibleTabs.map((t) => (
+          <button key={t.id} type="button" role="tab" id={`tab-${t.id}`} aria-controls={`panel-${t.id}`}
+                  aria-selected={tab === t.id} tabIndex={tab === t.id ? 0 : -1}
+                  ref={(el) => { tabRefs.current[t.id] = el; }} onClick={() => setTab(t.id)} onKeyDown={onKey}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`} className="tabpanel">
+        {tab === "investigation" ? (
+          <InvestigationPanel tenant={tenant} caseId={caseId}
+                              onCite={(cite) => { setFocus(cite); if (can(tenant, "evidence.read")) setTab("evidence"); }} />
+        ) : (
+          <EvidencePanel tenant={tenant} caseId={caseId} focus={focus} />
+        )}
+      </div>
     </article>
   );
 }

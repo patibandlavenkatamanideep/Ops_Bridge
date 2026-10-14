@@ -17,7 +17,7 @@ from opsbridge.persistence.db import Database, get_database
 from . import errors
 from .deps import AppState
 from .middleware import PerimeterMiddleware
-from .routes import auth, cases, health
+from .routes import auth, cases, health, investigations
 
 
 def create_app(
@@ -70,6 +70,7 @@ def create_app(
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(cases.router)
+    app.include_router(investigations.router)
 
     if static_dir is not None and static_dir.is_dir():
         _mount_spa(app, static_dir)
