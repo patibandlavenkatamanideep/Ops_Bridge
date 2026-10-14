@@ -41,6 +41,7 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
         store=LocalArtifactStore(settings.artifact_dir),
         pack_for=packs.get,
         purchasing_for=purchasing_for,
+        settings=settings,
     )
 
 

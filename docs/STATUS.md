@@ -8,7 +8,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–2 done; Phase 3 next |
+| Local application complete | no — Phases 0–3 done; Phase 4 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
 | External connector (GitHub sandbox) validated | not evaluated (no sandbox repo/token/authorization for writes) |
 | Hosted CI | not run (no workflow pushed yet) |
@@ -87,19 +87,42 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   This is development verification: the labels and rules were written together; it is not
   held-out evidence and says nothing about model quality.
 
+### Phase 3 — bounded agent assistance and model adapters (exit gate passed locally)
+- Model contract and adapters (`agents/contracts.py`, `agents/adapters.py`): deterministic
+  mock (labelled mocked), Anthropic via official SDK 1.13.0 (`output_config` JSON schema),
+  Ollama via `/api/chat` (`format` schema); unsupported parameters rejected.
+- Routing, budgets, spend ceiling and recording (`agents/runtime.py`); prompt registry with
+  digests (`agents/prompts.py`); validators and capped read-only evidence search
+  (`agents/steps.py`); pattern redaction (`privacy/redaction.py`); authorized PostgreSQL
+  full-text retrieval (`evidence/retrieval.py`, lexical only).
+- Workflow now: collect_context → retrieve_policy → reconcile_records → explain_findings →
+  propose_follow_up → validate_proposal (`investigation/1.1.0`). Tenant settings
+  (migration 0003) hold the default model mode; furniture = mock, IT = ollama.
+- UI: model-mode selector (tier-limited), explanation origin, gated draft follow-up.
+- Details and limits: docs/agents-and-models.md.
+
+Phase 3 exit gate evidence:
+- Mock-backed full flow: `tests/integration/test_agent_flow.py::test_mock_backed_full_flow_records_model_and_tool_calls`, `frontend/e2e/phase3.spec.ts`.
+- Malformed output / injected instructions cannot act: `test_injected_document_instructions_cannot_change_authority`
+  (compromised scripted model), `test_model_failure_preserves_deterministic_findings`,
+  `tests/agents/test_routing_and_validation.py` (15 rejection cases).
+- Local-required with no local model → blocked, no hosted fallback: `test_local_required_policy_blocks_model_without_hosted_fallback`.
+- Hosted/local live checks: **blocked** (no key/opt-in; Ollama not installed). Adapter
+  contracts verified against local fakes only.
+
 ## Verification evidence (local, macOS arm64, 2026-10-14)
 
-`make verify` → **10 passed, 0 failed, 0 skipped**:
+`make verify` → **10 passed, 0 failed, 0 skipped** (after Phase 3):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (61 files) | passed |
-| backend unit tests | 114 passed |
+| backend mypy --strict (71 files) | passed |
+| backend unit tests | 141 passed |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 7 passed |
-| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP) | 39 passed |
-| browser tests (Playwright Chromium 156 → Vite → API → worker → simulator, Keycloak login) | 6 passed |
+| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP) | 45 passed |
+| browser tests (Playwright Chromium 156, real login, real worker) | 8 passed |
 | frontend production build | passed |
 
 Phase 2 exit gate evidence:
@@ -143,12 +166,16 @@ Phase 1 exit gate evidence:
   image-only PDF. OCR is unverified (tesseract not installed) and routes to needs_review.
 - Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
   route to needs_review rather than parse.
-- Evidence retrieval is by case linkage and locator; full-text search ranking is Phase 3/6.
+- Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
+- A run of a different model mode is refused (409) while another run is active, instead of
+  silently returning the active run (found by a browser test; fixed in Phase 3).
 - Development `.env` from the original Desktop location was uploaded to iCloud before
   eviction (ADR 0009); values are local-only development secrets.
 
 ## Next executable task
 
-Phase 3: model adapter contract (mock, Anthropic, Ollama) with capability declarations and
-budgets, prompt registry, structured explanation/proposal steps with source validation,
-authorized lexical retrieval, injection and malformed-output tests.
+Phase 4: versioned proposals with canonical payload digests, approval binding (actor,
+version, digest, policy, source manifest, expiry, separation of duties), transactional
+operation + outbox, leased dispatch with attempt ledger, sim task connector with
+idempotency/reconciliation capabilities, timeout-after-commit and duplicate-delivery tests,
+review and execution-timeline UI.

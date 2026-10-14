@@ -150,6 +150,7 @@ class MembershipOut(BaseModel):
     approval_scope: list[str]
     permissions: list[str]
     synthetic_demo: bool
+    model_modes: list[str]
 
 
 class MeOut(BaseModel):
@@ -181,6 +182,7 @@ def me(info: CurrentSession, state: State) -> MeOut:
                 approval_scope=list(m.approval_scope or []),
                 permissions=sorted(permissions_for(list(m.roles))),
                 synthetic_demo=t.synthetic_demo,
+                model_modes=["rules_only", *sorted(TIERS[t.tier].model_modes - {"rules_only"})],
             )
             for t, m in rows
         ]

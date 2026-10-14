@@ -22,6 +22,7 @@ export const me: Me = {
       approval_scope: [],
       permissions: ["case.create", "case.read_all", "evidence.read"],
       synthetic_demo: true,
+      model_modes: ["rules_only", "mock"],
     },
   ],
 };

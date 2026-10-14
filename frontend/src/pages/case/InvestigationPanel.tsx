@@ -5,6 +5,13 @@ import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
 import { useSession } from "../../session";
 
+const MODE_LABEL: Record<string, string> = {
+  rules_only: "Rules only (no model)",
+  mock: "Deterministic mock model (mocked)",
+  anthropic: "Hosted model (live, requires opt-in)",
+  ollama: "Local model (Ollama)",
+};
+
 const FINDING_LABEL: Record<string, string> = {
   quantity_mismatch: "Quantity mismatch",
   price_mismatch: "Price mismatch",
@@ -30,8 +37,14 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
     enabled: runId !== null,
     refetchInterval: (q) => (q.state.data && ["completed", "failed"].includes(q.state.data.status) ? false : 1000),
   });
+  const { membership } = useSession();
+  const modes = membership(tenant)?.model_modes ?? ["rules_only"];
+  const [mode, setMode] = useState<string>("");
   const start = useMutation<Run, ApiError>({
-    mutationFn: () => api<Run>(tenantPath(tenant, `/cases/${caseId}/investigations`), { method: "POST" }),
+    mutationFn: () => api<Run>(tenantPath(tenant, `/cases/${caseId}/investigations`), {
+      method: "POST",
+      body: mode ? { model_mode: mode } : {},
+    }),
     onSuccess: (r) => setRunId(r.run_id),
   });
   const refreshedFor = useRef<string | null>(null);
@@ -51,6 +64,17 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
       <button type="button" className="button primary" onClick={() => start.mutate()} disabled={running || start.isPending}>
         {running ? "Investigating…" : inv.data ? "Re-run investigation" : "Run investigation"}
       </button>
+      <label className="small">
+        Model{" "}
+        <select value={mode} onChange={(e) => setMode(e.target.value)}>
+          <option value="">Organization default</option>
+          {modes.map((m) => (
+            <option key={m} value={m}>
+              {MODE_LABEL[m] ?? m}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 
@@ -124,6 +148,7 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
           <p className="muted small">A follow-up task is not a resolution. The case stays open until new evidence matches policy.</p>
         </div>
       ) : null}
+      <ProposalDraft rec={rec} />
       {inv.uncertainty.length > 0 && (
         <div className="state state-denied">
           <h3>Uncertainty</h3>
@@ -180,6 +205,34 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function ProposalDraft({ rec }: { rec: Record<string, unknown> }) {
+  const draft = rec?.proposal_draft as Record<string, unknown> | undefined;
+  if (!draft || !draft.action_type) return null;
+  const gate = draft.gate as { passed: boolean; problems: string[] } | undefined;
+  const validation = draft.validation as { accepted: boolean; problems: string[] } | undefined;
+  return (
+    <div className="state">
+      <h3>Draft follow-up (not yet a proposal)</h3>
+      <dl className="facts">
+        <dt>Action</dt>
+        <dd className="mono">{String(draft.action_type)}</dd>
+        <dt>Assignee group</dt>
+        <dd>{String(draft.assignee_group ?? "—")}</dd>
+        <dt>Title</dt>
+        <dd>{String(draft.title)}</dd>
+        <dt>Drafted by</dt>
+        <dd>{String(draft.origin)}</dd>
+        <dt>Policy gate</dt>
+        <dd>{gate?.passed ? "passed" : `failed: ${(gate?.problems ?? []).join("; ")}`}</dd>
+      </dl>
+      {draft.body ? <pre className="explanation draft-body">{String(draft.body)}</pre> : null}
+      {validation && !validation.accepted && (
+        <p className="muted small">Model draft rejected ({validation.problems.join("; ")}); rule-based text used.</p>
+      )}
     </div>
   );
 }

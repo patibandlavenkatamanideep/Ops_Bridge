@@ -794,6 +794,13 @@
             "title": "Approval Scope",
             "type": "array"
           },
+          "model_modes": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Model Modes",
+            "type": "array"
+          },
           "pack_id": {
             "title": "Pack Id",
             "type": "string"
@@ -837,7 +844,8 @@
           "roles",
           "approval_scope",
           "permissions",
-          "synthetic_demo"
+          "synthetic_demo",
+          "model_modes"
         ],
         "title": "MembershipOut",
         "type": "object"
@@ -1032,6 +1040,29 @@
           "error"
         ],
         "title": "RunOut",
+        "type": "object"
+      },
+      "StartIn": {
+        "properties": {
+          "model_mode": {
+            "anyOf": [
+              {
+                "enum": [
+                  "rules_only",
+                  "mock",
+                  "anthropic",
+                  "ollama"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Mode"
+          }
+        },
+        "title": "StartIn",
         "type": "object"
       },
       "ValidationError": {
@@ -1714,6 +1745,23 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/StartIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "content": {

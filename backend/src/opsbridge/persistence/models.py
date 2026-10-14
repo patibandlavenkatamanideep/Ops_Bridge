@@ -152,6 +152,26 @@ class ServiceIdentity(Base):
     created_at: Mapped[datetime] = created()
 
 
+class TenantSettings(Base):
+    """Per-tenant operational configuration (model mode, task connector, retention)."""
+
+    __tablename__ = "tenant_settings"
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    model_mode: Mapped[str] = mapped_column(String(24), default="mock")
+    task_connector: Mapped[str] = mapped_column(String(32), default="sim_tasks")
+    retention: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
+    __table_args__ = (
+        CheckConstraint(
+            "model_mode in ('rules_only','mock','anthropic','ollama')",
+            name="ck_tenant_settings_mode",
+        ),
+    )
+
+
 class TenantCounter(Base):
     """Per-tenant monotonically increasing counters (e.g. case numbers)."""
 
@@ -1014,6 +1034,7 @@ class EvaluationTrial(Base):
 
 # Tables whose rows belong to one tenant and are protected by the standard RLS policy.
 TENANT_TABLES: tuple[str, ...] = (
+    "tenant_settings",
     "tenant_counters",
     "policy_versions",
     "pack_versions",

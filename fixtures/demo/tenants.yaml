@@ -7,6 +7,7 @@ tenants:
     name: Demo Furniture Org (synthetic)
     tier: standard
     pack: furniture
+    model_mode: mock
     policies:
       - furniture/policies/furniture-ap-v1.yaml
       - furniture/policies/furniture-ap-v2.yaml
@@ -25,6 +26,7 @@ tenants:
     name: Demo IT Hardware Org (synthetic)
     tier: enhanced
     pack: it_hardware
+    model_mode: ollama  # IT policy requires local inference; without Ollama the model path is blocked
     policies:
       - it_hardware/policies/it-procurement-v1.yaml
     members:

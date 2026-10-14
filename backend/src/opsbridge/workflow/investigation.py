@@ -44,7 +44,7 @@ from opsbridge.persistence.models import (
 )
 from opsbridge.services.cases import transition
 
-WORKFLOW_VERSION = "investigation/1.0.0"
+WORKFLOW_VERSION = "investigation/1.1.0"
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -54,7 +54,8 @@ class InvestigationDeps:
     store: ArtifactStore
     pack_for: Callable[[str], PackSpec]
     purchasing_for: Callable[[str], PurchasingClient]
-    explain: Callable[..., dict[str, Any]] | None = None  # Phase 3 hook; default template
+    settings: Any = None
+    adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
 
 
 class StepFailed(Exception):
@@ -182,16 +183,47 @@ def run_investigation(
         {"policy": policy_out, "collected": collected},
         lambda: _reconcile(deps, tenant_id, case_snapshot, policy_out, collected),
     )
+    agent = _agent_runtime(deps, tenant_id, run_id, policy_out)
     explained = _run_step(
         deps,
         run,
         4,
         "explain_findings",
-        recon,
-        lambda: (deps.explain or template_explanation)(
-            recon=recon, policy=policy_out, case=case_snapshot
-        ),
+        {"recon": recon, "mode": agent["mode"]},
+        lambda: _explain(deps, tenant_id, agent, case_snapshot, recon, policy_out, collected),
     )
+    proposed = _run_step(
+        deps,
+        run,
+        5,
+        "propose_follow_up",
+        {"recon": recon, "mode": agent["mode"]},
+        lambda: _propose(deps, tenant_id, agent, case_snapshot, recon, policy_out),
+    )
+    validated = _run_step(
+        deps,
+        run,
+        6,
+        "validate_proposal",
+        proposed,
+        lambda: _validate_draft(deps, tenant_id, proposed, recon, policy_out),
+    )
+    recon = {
+        **recon,
+        "recommendation": {**(recon.get("recommendation") or {}), "proposal_draft": validated}
+        if recon.get("recommendation")
+        else None,
+    }
+    if agent["blocked_reason"]:
+        recon["uncertainty"] = [
+            *recon.get("uncertainty", []),
+            f"model step not used: {agent['blocked_reason']}",
+        ]
+    for problem in explained.get("rejected", []):
+        recon["uncertainty"] = [
+            *recon.get("uncertainty", []),
+            f"model explanation rejected: {problem}",
+        ]
     return _finalize(
         deps, tenant_id, run_id, case_snapshot, collected, policy_out, recon, explained
     )
@@ -501,6 +533,222 @@ def _rec_for(outcome: str, policy: ReconciliationPolicy, case: dict[str, Any]) -
         "title": spec.title_template.format(case=case["case_number"], po="unknown PO", count=1),
         "finding_ids": [],
     }
+
+
+# --- agent steps ----------------------------------------------------------------------
+
+
+def _agent_runtime(
+    deps: InvestigationDeps, tenant_id: uuid.UUID, run_id: uuid.UUID, policy_out: dict[str, Any]
+) -> dict[str, Any]:
+    from opsbridge.agents.runtime import Recorder, RunBudget, route
+    from opsbridge.auth.permissions import TIERS
+
+    with deps.db.session(_ctx(tenant_id)) as s:
+        run = s.get(WorkflowRun, run_id)
+        tenant = s.get(Tenant, tenant_id)
+        assert run is not None and tenant is not None
+        mode, tier = run.model_mode, TIERS[tenant.tier]
+        routing = "hosted_permitted"
+        if policy_out.get("policy_version_id"):
+            pv = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
+            routing = (pv.document or {}).get("data_routing", "hosted_permitted") if pv else routing
+    decision = route(mode, tier, routing, deps.settings, deps.adapter_overrides)
+    budget = RunBudget(
+        max_model_calls=tier.max_model_calls_per_run,
+        max_tool_calls=4,
+        max_output_tokens=2000,
+        timeout_seconds=30.0,
+    )
+    with deps.db.session(_ctx(tenant_id)) as s:
+        run = s.get(WorkflowRun, run_id)
+        assert run is not None
+        run.budget = {
+            "max_model_calls": budget.max_model_calls,
+            "max_tool_calls": budget.max_tool_calls,
+            "max_output_tokens": budget.max_output_tokens,
+        }
+        run.usage = {
+            **(run.usage or {}),
+            "routing": {
+                "mode": mode,
+                "data_routing": routing,
+                "reason": decision.reason,
+                "blocked": decision.blocked,
+            },
+        }
+        if decision.adapter is not None:
+            run.response_mode = (
+                "mocked"
+                if decision.adapter.capabilities.provider in ("mock", "scripted")
+                else "live"
+            )
+    return {
+        "mode": mode,
+        "adapter": decision.adapter,
+        "blocked_reason": decision.reason if decision.blocked else None,
+        "budget": budget,
+        "recorder": Recorder(deps.db, deps.store, tenant_id, run_id),
+    }
+
+
+def _agent_context(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    case: dict[str, Any],
+    recon: dict[str, Any],
+    policy_out: dict[str, Any],
+) -> Any:
+    from opsbridge.agents.steps import AgentContext, Evidence
+    from opsbridge.domain.records import SourceRef
+    from opsbridge.persistence.models import SourceDocument
+
+    policy = None
+    with deps.db.session(_ctx(tenant_id)) as s:
+        if policy_out.get("policy_version_id"):
+            pv = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
+            policy = ReconciliationPolicy.model_validate(pv.document) if pv else None
+        ctx = AgentContext(case=case, recon=recon, policy_out=policy_out, policy=policy)
+        refs = [SourceRef(**e) for f in recon["findings"] for e in f.get("evidence", [])]
+        for rc in resolve_all(s, refs):
+            if rc.status != "valid":
+                continue
+            kind = (
+                s.execute(
+                    select(SourceDocument.kind).where(
+                        SourceDocument.id == uuid.UUID(rc.ref.document_id)
+                    )
+                ).scalar()
+                or "document"
+            )
+            ctx.evidence.append(
+                Evidence(
+                    f"E{len(ctx.evidence) + 1}",
+                    rc.ref.to_dict(),
+                    kind,
+                    rc.document_title,
+                    rc.value,
+                    rc.excerpt,
+                )
+            )
+    return ctx
+
+
+def _case_versions(deps: InvestigationDeps, tenant_id: uuid.UUID, case_id: str) -> list[uuid.UUID]:
+    from opsbridge.persistence.models import CaseDocument, DocumentVersion
+
+    with deps.db.session(_ctx(tenant_id)) as s:
+        return list(
+            s.execute(
+                select(DocumentVersion.id)
+                .join(CaseDocument, CaseDocument.document_id == DocumentVersion.document_id)
+                .where(CaseDocument.case_id == uuid.UUID(case_id))
+            ).scalars()
+        )
+
+
+def _explain(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    agent: dict[str, Any],
+    case: dict[str, Any],
+    recon: dict[str, Any],
+    policy_out: dict[str, Any],
+    collected: dict[str, Any],
+) -> dict[str, Any]:
+    from opsbridge.agents.steps import explain
+    from opsbridge.evidence.retrieval import search
+
+    def fallback() -> dict[str, Any]:
+        return template_explanation(recon=recon, policy=policy_out, case=case)
+
+    if agent["adapter"] is None:
+        return fallback()
+    ctx = _agent_context(deps, tenant_id, case, recon, policy_out)
+    allowed_versions = _case_versions(deps, tenant_id, case["case_id"])
+
+    def search_fn(query: str) -> list[dict[str, Any]]:
+        with deps.db.session(_ctx(tenant_id)) as s:
+            return [h.__dict__ for h in search(s, allowed_versions, query, limit=3)]
+
+    return explain(
+        agent["adapter"],
+        ctx,
+        recorder=agent["recorder"],
+        budget=agent["budget"],
+        settings=deps.settings,
+        search=search_fn,
+        fallback=fallback,
+    )
+
+
+def _propose(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    agent: dict[str, Any],
+    case: dict[str, Any],
+    recon: dict[str, Any],
+    policy_out: dict[str, Any],
+) -> dict[str, Any]:
+    from opsbridge.agents.steps import propose
+
+    rec = recon.get("recommendation")
+    if not rec:
+        return {}
+    if agent["adapter"] is None:
+        return {
+            "action_type": rec["action_type"],
+            "assignee_group": rec.get("assignee_group"),
+            "title": rec["title"],
+            "body": "\n".join(
+                f["summary"] for f in recon["findings"] if f["status"] != "informational"
+            )[:2000],
+            "origin": "rules",
+            "citations": [],
+            "validation": {"accepted": True, "problems": []},
+        }
+    ctx = _agent_context(deps, tenant_id, case, recon, policy_out)
+    return propose(
+        agent["adapter"],
+        ctx,
+        recorder=agent["recorder"],
+        budget=agent["budget"],
+        settings=deps.settings,
+    )
+
+
+def _validate_draft(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    draft: dict[str, Any],
+    recon: dict[str, Any],
+    policy_out: dict[str, Any],
+) -> dict[str, Any]:
+    """Deterministic gate on the draft that will become a proposal (independent of the model)."""
+    if not draft:
+        return {}
+    problems = []
+    with deps.db.session(_ctx(tenant_id)) as s:
+        pv = (
+            s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
+            if policy_out.get("policy_version_id")
+            else None
+        )
+        policy = ReconciliationPolicy.model_validate(pv.document) if pv else None
+    rec = recon.get("recommendation") or {}
+    if policy is None:
+        problems.append("no policy")
+    else:
+        if draft.get("action_type") not in policy.allowed_actions:
+            problems.append("action not allowed by policy")
+        groups = {r.assignee_group for r in policy.action_routes.values()}
+        if draft.get("assignee_group") not in groups:
+            problems.append("assignee group not defined by policy")
+    if draft.get("action_type") != rec.get("action_type"):
+        problems.append("action differs from rule-selected action")
+    if len(draft.get("title") or "") > 140 or len(draft.get("body") or "") > 2000:
+        problems.append("text exceeds bounds")
+    return {**draft, "gate": {"passed": not problems, "problems": problems}}
 
 
 # --- explain_findings (template baseline) ---------------------------------------------

@@ -25,6 +25,7 @@ from opsbridge.persistence.models import (
     FieldCorrection,
     InvestigationVersion,
     SourceDocument,
+    TenantSettings,
     User,
     WorkflowRun,
     WorkflowStep,
@@ -60,10 +61,23 @@ def _case(session: Session, p: Principal, case_id: uuid.UUID, lock: bool = False
 
 
 def start_investigation(
-    db: Database, p: Principal, case_id: uuid.UUID, model_mode: str, correlation_id: str | None
+    db: Database,
+    p: Principal,
+    case_id: uuid.UUID,
+    model_mode: str | None,
+    correlation_id: str | None,
 ) -> tuple[WorkflowRun, bool]:
     require(p, "investigation.run")
     with db.session(_ctx(p)) as s:
+        settings_row = s.get(TenantSettings, p.tenant_id)
+        mode = model_mode or (settings_row.model_mode if settings_row else "rules_only")
+        if mode != "rules_only" and mode not in p.tier.model_modes:
+            # Tier entitlement is a feature gate, not an authorization grant.
+            raise Conflict(
+                "not_entitled",
+                f"Model mode {mode!r} is not enabled for the {p.tier.tier} tier.",
+                {"allowed": sorted(p.tier.model_modes)},
+            )
         case = _case(s, p, case_id, lock=True)
         if case.status in ("resolved", "closed_without_resolution"):
             raise Conflict("case_closed", "A closed case cannot be investigated again.")
@@ -77,14 +91,21 @@ def start_investigation(
             .first()
         )
         if active is not None:
+            if active.model_mode != mode:
+                # Do not silently substitute a different run for the one the user asked for.
+                raise Conflict(
+                    "run_in_progress",
+                    "Another investigation run is in progress for this case.",
+                    {"run_id": str(active.id), "model_mode": active.model_mode},
+                )
             return active, False
         run = WorkflowRun(
             tenant_id=p.tenant_id,
             case_id=case.id,
             kind="investigation",
             status="queued",
-            workflow_version="investigation/1.0.0",
-            model_mode=model_mode,
+            workflow_version="investigation/1.1.0",
+            model_mode=mode,
             response_mode="live",
             requested_by=p.user_id,
             budget={},

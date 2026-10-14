@@ -124,6 +124,10 @@ class CorrectionCreated(BaseModel):
     new_value: str
 
 
+class StartIn(BaseModel):
+    model_mode: Literal["rules_only", "mock", "anthropic", "ollama"] | None = None
+
+
 class CorrectionIn(BaseModel):
     new_value: str = Field(min_length=1, max_length=500)
     reason: str = Field(min_length=5, max_length=1000)
@@ -172,10 +176,15 @@ def start(
     state: State,
     request: Request,
     response: Response,
+    body: StartIn | None = None,
 ) -> RunOut:
     try:
         run, created = svc.start_investigation(
-            state.db, principal, case_id, "rules_only", request.state.correlation_id
+            state.db,
+            principal,
+            case_id,
+            body.model_mode if body else None,
+            request.state.correlation_id,
         )
     except (svc.NotFound, svc.Conflict) as exc:
         raise _map_errors(exc) from exc

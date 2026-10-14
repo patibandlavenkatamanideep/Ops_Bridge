@@ -13,7 +13,14 @@ from sqlalchemy import select
 from opsbridge.config import REPO_ROOT, Settings
 from opsbridge.packs import load_policy_file
 from opsbridge.persistence.db import Database, DbContext
-from opsbridge.persistence.models import Membership, PolicyVersion, ServiceIdentity, Tenant, User
+from opsbridge.persistence.models import (
+    Membership,
+    PolicyVersion,
+    ServiceIdentity,
+    Tenant,
+    TenantSettings,
+    User,
+)
 
 DEFAULT_FIXTURE = REPO_ROOT / "fixtures" / "demo" / "tenants.yaml"
 
@@ -112,6 +119,15 @@ def seed_demo(
     for t in spec["tenants"]:
         tid = tenant_ids[t["slug"]]
         with db.session(DbContext(tenant_id=tid)) as s:
+            if s.get(TenantSettings, tid) is None:
+                s.add(
+                    TenantSettings(
+                        tenant_id=tid,
+                        model_mode=t.get("model_mode", "mock"),
+                        task_connector="sim_tasks",
+                        retention={},
+                    )
+                )
             for rel in t["policies"]:
                 loaded = load_policy_file(packs_dir / rel)
                 p = loaded.policy

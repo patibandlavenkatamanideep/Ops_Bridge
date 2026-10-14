@@ -510,6 +510,8 @@ export interface components {
         MembershipOut: {
             /** Approval Scope */
             approval_scope: string[];
+            /** Model Modes */
+            model_modes: string[];
             /** Pack Id */
             pack_id: string;
             /** Permissions */
@@ -585,6 +587,11 @@ export interface components {
             }[];
             /** Workflow Version */
             workflow_version: string;
+        };
+        /** StartIn */
+        StartIn: {
+            /** Model Mode */
+            model_mode?: ("rules_only" | "mock" | "anthropic" | "ollama") | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -926,7 +933,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["StartIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             202: {

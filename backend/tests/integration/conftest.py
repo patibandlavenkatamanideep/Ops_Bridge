@@ -113,3 +113,7 @@ def ctx(tenant: uuid.UUID | None, user: uuid.UUID | None = None) -> DbContext:
 @pytest.fixture
 def settings():  # type: ignore[no-untyped-def]
     return get_settings()
+
+
+# Shared stack fixtures (real simulator HTTP server, API app, worker); see stack.py.
+from .stack import simulator, stack  # noqa: E402, F401

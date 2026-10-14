@@ -21,7 +21,7 @@ test("investigation shows a cited quantity mismatch and opens the cited source l
   const finding = page.locator(".finding", { hasText: "Quantity mismatch" });
   await expect(finding).toBeVisible({ timeout: 30_000 });
   await expect(finding).toContainText("2 EA exceed the allocatable quantity");
-  await expect(page.locator(".explanation")).toContainText("does not resolve the discrepancy");
+  await expect(page.locator(".explanation:not(.draft-body)")).toContainText("does not resolve the discrepancy");
   await expect(page.locator(".facts dd", { hasText: "furniture-ap@v2" })).toBeVisible();
 
   await finding.getByRole("button", { name: /receipt_line.quantity/ }).click();

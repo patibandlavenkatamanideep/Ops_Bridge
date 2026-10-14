@@ -75,6 +75,9 @@ class Settings(BaseSettings):
     live_model_opt_in: bool = False
     live_spend_ceiling_usd: str = "0"
     anthropic_model: str | None = None
+    # Operator-configured prices (USD per million tokens) used to enforce the spend ceiling.
+    anthropic_price_input_per_mtok_usd: str | None = None
+    anthropic_price_output_per_mtok_usd: str | None = None
     ollama_base_url: str = "http://localhost:11434"
     ollama_model: str | None = None
 
