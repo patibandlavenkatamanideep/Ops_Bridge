@@ -1,0 +1,262 @@
+{
+  "realm": "opsbridge",
+  "displayName": "OpsBridge (local development only)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 28800,
+  "clients": [
+    {
+      "clientId": "opsbridge-web",
+      "name": "OpsBridge web application",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OPSBRIDGE_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": false,
+      "redirectUris": [
+        "http://localhost:5173/auth/callback",
+        "http://localhost:8000/auth/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:8000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/##http://localhost:8000/"
+      }
+    },
+    {
+      "clientId": "opsbridge-worker",
+      "name": "OpsBridge worker service identity",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "${OPSBRIDGE_WORKER_CLIENT_SECRET}",
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "aud-records-mcp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "opsbridge-records-mcp",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "aud-casework-mcp",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "opsbridge-casework-mcp",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "opsbridge-records-mcp",
+      "name": "Records MCP resource",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "opsbridge-casework-mcp",
+      "name": "Casework MCP resource",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    }
+  ],
+  "users": [
+    {
+      "id": "11111111-0000-4000-8000-000000000001",
+      "username": "furn-requester",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Fran",
+      "lastName": "Requester",
+      "email": "furn-requester@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "11111111-0000-4000-8000-000000000002",
+      "username": "furn-investigator",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ivy",
+      "lastName": "Investigator",
+      "email": "furn-investigator@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "11111111-0000-4000-8000-000000000003",
+      "username": "furn-approver",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Abe",
+      "lastName": "Approver",
+      "email": "furn-approver@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "11111111-0000-4000-8000-000000000004",
+      "username": "furn-approver2",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ana",
+      "lastName": "Notes-Approver",
+      "email": "furn-approver2@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "11111111-0000-4000-8000-000000000005",
+      "username": "furn-admin",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "email": "furn-admin@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "11111111-0000-4000-8000-000000000006",
+      "username": "furn-auditor",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Aud",
+      "lastName": "Auditor",
+      "email": "furn-auditor@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "22222222-0000-4000-8000-000000000001",
+      "username": "it-requester",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Rex",
+      "lastName": "Requester",
+      "email": "it-requester@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "22222222-0000-4000-8000-000000000002",
+      "username": "it-investigator",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Isa",
+      "lastName": "Investigator",
+      "email": "it-investigator@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "22222222-0000-4000-8000-000000000003",
+      "username": "it-approver",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Ari",
+      "lastName": "Approver",
+      "email": "it-approver@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "33333333-0000-4000-8000-000000000001",
+      "username": "multi-member",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Max",
+      "lastName": "Multi",
+      "email": "multi-member@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

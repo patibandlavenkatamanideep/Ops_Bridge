@@ -1,0 +1,62 @@
+# OpsBridge local stack. Run through `make dev` / `make demo` (which load ../../.env).
+# Named volumes persist data; `make down` never removes them.
+name: opsbridge
+
+services:
+  postgres:
+    build:
+      context: ./postgres
+    image: opsbridge/postgres:16-pgvector-local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?run make setup}
+      POSTGRES_DB: postgres
+      OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
+      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
+      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - opsbridge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opsbridge"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
+      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
+      OPSBRIDGE_DEMO_USER_PASSWORD: ${OPSBRIDGE_DEMO_USER_PASSWORD:?}
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ../identity/realm-opsbridge.json:/opt/keycloak/data/import/realm-opsbridge.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl; use bash's /dev/tcp against the management port.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": *\"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+
+volumes:
+  opsbridge_pgdata:

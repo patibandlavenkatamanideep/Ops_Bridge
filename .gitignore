@@ -39,3 +39,6 @@ evals/results/_scratch/
 .DS_Store
 .idea/
 .vscode/
+
+# iCloud-excluded regenerable environments (see docs/adr/0009)
+*.nosync/
