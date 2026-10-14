@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# Local configuration and secrets
+.env
+.env.local
+*.key
+!fixtures/**/*.key.example
+secrets/
+
+# Runtime data
+var/
+.data/
+backups/
+*.log
+
+# Evaluation working files (sealed results are committed under evals/results)
+.evalseal/
+evals/results/_scratch/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
