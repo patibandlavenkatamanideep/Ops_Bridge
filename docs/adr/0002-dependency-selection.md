@@ -31,6 +31,9 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
 | vitest / jsdom | **4.1.11 / 29.1.1** | vitest 5 and jsdom 30 exclude Node 25 in their `engines` |
 | @playwright/test | 1.64.1 | Browser tests |
 | openapi-typescript | 7.13.0 | Generate API types from the backend OpenAPI document |
+| @tanstack/react-query / react-router-dom | 5.104.2 / 7.18.4 | Server state and routing |
+| eslint / @eslint/js | 10.12.0 / 10.0.1 | ESLint 9 is marked unsupported by its maintainers |
+| eslint-plugin-jsx-a11y-x | 0.2.0 | Fork of jsx-a11y with ESLint 10 support; upstream 6.10.2 (last release 2024) peers only on ESLint ≤ 9. Young project: runtime checks in browser tests remain necessary |
 
 ## Infrastructure images
 - `pgvector/pgvector:pg16` (PostgreSQL 16 with pgvector).

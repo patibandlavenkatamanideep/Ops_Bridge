@@ -1,38 +1,87 @@
 # OpsBridge status
 
-Last updated: 2026-10-14 · Branch: `feat/opsbridge-foundation`
+Last updated: 2026-10-14 · Branch: `feat/opsbridge-foundation` (pushed to
+github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
+Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 ## Summary by validation level
 
 | Level | State |
 |---|---|
-| Local application complete | not yet |
+| Local application complete | no — Phases 0–1 done; Phase 2 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
-| External connector (GitHub sandbox) validated | not evaluated (no repo/token/authorization) |
+| External connector (GitHub sandbox) validated | not evaluated (no sandbox repo/token/authorization for writes) |
+| Hosted CI | not run (no workflow pushed yet) |
 | Staging deployed | no |
 | Operator pilot measured | no |
 
 ## Workspace inventory (Phase 0, 2026-10-14)
 
-- Initial contents: `CLAUDE.md`, `OPSBRIDGE_BUILD_PROMPT.md`. No git repository, code,
-  dependency files, or tests existed. Initialized git on branch `feat/opsbridge-foundation`.
-- Toolchain found: uv 0.10.2 (manages CPython 3.12.12), Node 25.9.0 / npm 11.12.1,
-  Docker CLI 29.8.1 + Compose 5.5.1 (Docker Desktop daemon **not running**),
-  Podman 5.7.1 machine **running** with a Docker-compatible socket, GNU Make 3.81,
-  git 2.50.1, gh 2.92.0. Homebrew PostgreSQL 16 on :5432 hosts unrelated databases and is
-  not used by OpsBridge.
-- Missing: Java (Keycloak runs in a container instead), Ollama, Tesseract OCR, pdftotext.
-- Network: PyPI, npm, GitHub API, quay.io and Docker Hub reachable. Pulled
-  `pgvector/pgvector:pg16` and `quay.io/keycloak/keycloak:26.8.1` through Podman.
+- Initial contents: `CLAUDE.md`, `OPSBRIDGE_BUILD_PROMPT.md`. No repository, code or tests.
+- Toolchain: uv 0.10.2 (CPython 3.12.12), Node 25.9.0 / npm 11.12.1, Docker CLI 29.8.1 +
+  Compose 5.5.1 (Docker Desktop daemon **not running**), Podman 5.7.1 machine running with a
+  Docker-compatible socket, GNU Make 3.81, git 2.50.1, gh 2.92.0. Homebrew PostgreSQL 16 on
+  :5432 hosts unrelated databases and is never used by OpsBridge.
+- Missing: Java (Keycloak runs in a container), Ollama, Tesseract OCR.
+- The owner created the public GitHub repo during Phase 1 and authorized pushing the
+  feature branch after each phase. Its initial commit (MIT LICENSE, README, .gitignore) was
+  merged, not rewritten.
 
 ## Completed
 
 ### Phase 0 — audit, contract, discovery assumptions
 - docs/discovery.md, docs/IMPLEMENTATION_PLAN.md, docs/requirements-traceability.md,
-  ADRs 0001–0008 under docs/adr/.
-- Upstream interfaces inspected locally (scratch venv): evalseal 2.2.0 API/CLI and docs
-  at tag v2.2.0; mcp 2.3.0 (`MCPServer`, `Client`, `streamable_http_client`,
-  `TokenVerifier`, `AccessToken`).
+  ADRs 0001–0009.
+- Upstream interfaces inspected locally: evalseal 2.2.0 (API, CLI, docs at tag v2.2.0),
+  mcp 2.3.0 (`MCPServer`, `Client`, `streamable_http_client`, `TokenVerifier`),
+  Authlib 1.9.1 Starlette client (PKCE, nonce, ID-token validation path).
+
+### Phase 1 — authenticated skeleton and durable data (exit gate passed locally)
+- Domain: Decimal money, units, versioned policies, three-way matcher, rules-only routing
+  (`backend/src/opsbridge/domain/`), furniture and IT policy packs (`packs/`).
+- Infra: `infra/compose/docker-compose.yml` (pgvector PG16 with baked role init on :5433,
+  Keycloak 26.8.1 on :8081 with realm import using env placeholders).
+- Persistence: 40 tables, composite tenant FKs, Alembic 0001 (schema) + 0002 (RLS on all
+  40 tables, FORCE RLS, least-privilege grants; app/worker/mcp roles are NOSUPERUSER
+  NOBYPASSRLS non-owners). Transaction-local tenant context re-applied on every transaction.
+- Identity: OIDC Authorization Code + PKCE via Authlib against Keycloak; server-side hashed
+  sessions (absolute 8 h, idle 30 min), CSRF synchronizer token + Origin check, RP-initiated
+  logout; worker client-credentials identity with MCP audiences.
+- API: `/api/v1/me`, case intake (idempotency key, duplicate-invoice guard), keyset-paginated
+  queue, case detail; consistent error bodies; correlation IDs; security headers; body-size
+  and per-session/IP rate limits; liveness/readiness.
+- UI: React 19/Vite 8 shell with sign-in, tenant switcher, case queue (loading/empty/
+  denied/error states), new case form, case detail; types generated from OpenAPI.
+- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants.
+- Commands: Makefile (`doctor setup infra-up migrate seed-demo dev demo lint typecheck test
+  test-integration test-e2e verify build down reset-demo openapi`); direct equivalents in
+  docs/developer-commands.md. `eval-offline` and `demo --seed-records` targets exist but
+  depend on Phase 2/7 commands not yet implemented.
+
+## Verification evidence (local, macOS arm64, 2026-10-14)
+
+`make verify` → **10 passed, 0 failed, 0 skipped**:
+
+| Gate | Result |
+|---|---|
+| backend ruff lint + format | passed |
+| backend mypy --strict (37 files) | passed |
+| backend unit tests | 51 passed |
+| frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
+| frontend unit tests (vitest) | 7 passed |
+| integration tests (real PostgreSQL roles + real Keycloak) | 32 passed |
+| browser tests (Playwright Chromium 156 → Vite → API → Keycloak) | 3 passed |
+| frontend production build | passed |
+
+Phase 1 exit gate evidence:
+- Logged-in user creates/reads own case: `tests/integration/test_api_cases.py::test_requester_creates_and_reads_own_case`, `frontend/e2e/phase1.spec.ts` (real login).
+- Other tenant denied via API: `test_other_tenant_cannot_access_case_by_any_route`; via
+  browser: `e2e/phase1.spec.ts::a user cannot open another organization's case`.
+- Other tenant denied via database role: `tests/integration/test_rls.py` (12 tests incl.
+  pooled-connection reuse across tenants and after an error).
+- Restart preserves the case: `test_case_survives_application_restart` (engine disposed,
+  new app instance).
+- No paid API used.
 
 ## Blockers (affect only dependent work)
 
@@ -40,17 +89,22 @@ Last updated: 2026-10-14 · Branch: `feat/opsbridge-foundation`
 |---|---|---|
 | No Anthropic credentials / live opt-in | Live hosted-model checks | Owner provides key, purpose and spend ceiling |
 | Ollama not installed | Live local-inference checks | Install Ollama and pull a pinned model |
-| No GitHub sandbox repo/token/authorization | Live connector run (OB-22 verified_sandbox) | Owner names repo, provides fine-grained token, authorizes writes |
+| No GitHub sandbox repo/token/authorization for issue writes | Live connector run (OB-22) | Owner names a sandbox repo, provides a fine-grained token, authorizes writes |
 | Tesseract not installed | OCR path for scanned PDFs | Install tesseract; otherwise scanned documents route to needs_review |
 | No cloud account/authorization | Staging deployment | Owner authorizes and provides account |
 | No operator participants | Pilot measurements | Pilot owner recruits participants |
 
-## Known defects
+## Known defects and limitations
 
-None recorded yet.
+- Rate limiting is per process and in memory; not a DDoS control.
+- Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
+- The "Evaluation" navigation entry has no page yet (Phase 7).
+- Development `.env` from the original Desktop location was uploaded to iCloud before
+  eviction (ADR 0009); values are local-only development secrets.
 
 ## Next executable task
 
-Phase 1: backend project (uv, FastAPI), pure domain rules (money/units/tolerance/matching)
-with tests, PostgreSQL container + roles + migrations with RLS, Keycloak realm, sessions,
-case intake/queue API and web shell.
+Phase 2: purchasing simulator (HTTP + persisted records), pack field mappings, ingestion
+of JSON/CSV/PDF/text with raw and normalized digests, evidence references and chunks,
+correction history, deterministic investigation run producing a versioned investigation
+with citations, case detail evidence UI, rules-only baseline on the seed corpus.

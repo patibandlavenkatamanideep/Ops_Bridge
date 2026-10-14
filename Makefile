@@ -1,0 +1,86 @@
+# OpsBridge developer commands. Direct equivalents are listed in docs/developer-commands.md.
+SHELL := /bin/bash
+.DEFAULT_GOAL := help
+
+ROOT := $(abspath .)
+COMPOSE_FILE := infra/compose/docker-compose.yml
+# Regenerable environments live in *.nosync dirs so a cloud-synced checkout never evicts them.
+export UV_PROJECT_ENVIRONMENT := .venv.nosync
+export PYTHONPYCACHEPREFIX := $(ROOT)/.pycache.nosync
+UV := uv --directory backend
+PY := $(UV) run --frozen
+CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
+COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
+
+.PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
+        test-e2e eval-offline verify build down reset-demo openapi
+
+help: ## List targets
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
+
+doctor: ## Check prerequisites without printing secrets
+	@python3 scripts/doctor.py
+
+setup: ## Install locked dependencies; create .env without overwriting secrets
+	python3 scripts/setup_env.py
+	$(UV) sync --frozen
+	cd frontend && npm ci --no-audit --no-fund
+	mkdir -p var/artifacts var/keys
+
+infra-up: ## Start PostgreSQL and Keycloak containers and wait until healthy
+	$(COMPOSE) up -d --build --wait postgres keycloak
+
+migrate: ## Apply database migrations (dev and test databases)
+	$(PY) alembic upgrade head
+	$(PY) alembic -x db=opsbridge_test upgrade head
+
+seed-demo: ## Idempotently load ONLY the designated synthetic demo tenants
+	$(PY) python -m opsbridge.cli seed-demo
+
+dev: infra-up migrate ## Start infrastructure, then API/worker/simulator/MCP/UI with health checks
+	$(PY) python $(ROOT)/scripts/devstack.py
+
+demo: infra-up migrate seed-demo ## Start the stack, migrate and seed non-destructively, then run it
+	$(PY) python $(ROOT)/scripts/devstack.py --seed-records
+
+lint: ## Ruff + ESLint
+	$(PY) ruff check src tests
+	$(PY) ruff format --check src tests
+	cd frontend && npm run lint
+
+typecheck: ## mypy --strict + tsc
+	$(PY) mypy src
+	cd frontend && npm run typecheck
+
+test: ## Unit tests (no services, no network)
+	$(PY) pytest -q -m "not integration and not keycloak"
+	cd frontend && npm test
+
+test-integration: ## Integration tests against real PostgreSQL, Keycloak, HTTP and MCP (fails if services are down)
+	OPSBRIDGE_REQUIRE_INTEGRATION=1 $(PY) pytest -q -m "integration or keycloak"
+
+test-e2e: ## Playwright browser tests against the running dev stack
+	cd frontend && npm run e2e
+
+eval-offline: ## Replay the declared benchmark offline (no paid calls, network egress blocked)
+	$(PY) python -m opsbridge.cli eval-offline
+
+openapi: ## Regenerate OpenAPI document and frontend types
+	$(PY) python -m opsbridge.cli export-openapi --out ../frontend/src/api/openapi.json
+	cd frontend && npm run gen:api
+
+verify: ## Run every available local gate and name missing prerequisites
+	@python3 scripts/verify.py
+
+build: ## Build backend wheel and frontend bundle from the locked dependencies
+	$(UV) build --wheel --out-dir ../dist
+	cd frontend && npm run build
+
+down: ## Stop containers WITHOUT deleting persistent volumes
+	$(COMPOSE) stop
+
+reset-demo: ## DESTRUCTIVE: delete the local demo database volume (requires CONFIRM=delete-local-demo-data)
+	@if [ "$(CONFIRM)" != "delete-local-demo-data" ]; then \
+	  echo "Refusing: run 'make reset-demo CONFIRM=delete-local-demo-data' to delete local demo data."; exit 2; fi
+	@grep -q '^OPSBRIDGE_ENV=development' .env || { echo "Refusing: OPSBRIDGE_ENV is not development"; exit 2; }
+	$(COMPOSE) down --volumes
