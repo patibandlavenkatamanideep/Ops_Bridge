@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import re
+import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
@@ -28,6 +29,7 @@ from typing import Any
 import jsonschema
 
 from opsbridge.domain.policy import ReconciliationPolicy
+from opsbridge.telemetry import metrics, tracing
 
 from .contracts import ModelAdapter, ModelRequest
 from .prompts import EXPLAIN_V1, PROPOSE_V1
@@ -390,10 +392,20 @@ def explain(
                 except Exception as exc:  # budget exhausted: answer with what we have
                     problems_all.append(str(exc))
                     break
+                started = time.monotonic()
                 try:
-                    hits = search(req["query"])
+                    with tracing.span(
+                        f"tool {SEARCH_TOOL}",
+                        attributes={"opsbridge.tool.transport": tool_transport},
+                        step="explain_findings",
+                    ):
+                        hits = search(req["query"])
                 except Exception as exc:  # denied or failed tool calls are data, not crashes
                     denied = type(exc).__name__ == "McpDenied"
+                    metrics.TOOL_CALLS.labels(
+                        SEARCH_TOOL, "denied" if denied else "error", tool_transport
+                    ).inc()
+                    metrics.TOOL_DURATION.labels(SEARCH_TOOL).observe(time.monotonic() - started)
                     recorder.tool(
                         step="explain_findings",
                         tool=SEARCH_TOOL,
@@ -408,6 +420,8 @@ def explain(
                         f"evidence search {'denied' if denied else 'failed'}: {exc}"[:200]
                     )
                     break
+                metrics.TOOL_CALLS.labels(SEARCH_TOOL, "ok", tool_transport).inc()
+                metrics.TOOL_DURATION.labels(SEARCH_TOOL).observe(time.monotonic() - started)
                 recorder.tool(
                     step="explain_findings",
                     tool=SEARCH_TOOL,
