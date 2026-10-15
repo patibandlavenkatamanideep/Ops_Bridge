@@ -7,6 +7,18 @@
 #   opsbridge_eval  offline benchmark runs (truncated per run)
 set -euo pipefail
 
+# NOLOGIN role that owns the aggregate-only metrics function (migration 0004). It has no
+# login, no BYPASSRLS and only column-level SELECT granted by the migration.
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<'SQL'
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'opsbridge_ops_reader') THEN
+    CREATE ROLE opsbridge_ops_reader NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+  END IF;
+END $$;
+GRANT opsbridge_ops_reader TO opsbridge_migrator;
+SQL
+
 for db in opsbridge opsbridge_test opsbridge_eval; do
   exists=$(psql -tA --username "$POSTGRES_USER" --dbname postgres \
     -c "SELECT 1 FROM pg_database WHERE datname = '${db}'")
