@@ -65,10 +65,13 @@ the model.
 ## Untrusted content
 
 Document excerpts reach the model only inside `<untrusted_document>` tags, with a system
-rule that instructions in data are ignored. This is a mitigation, not a guarantee; the
-guarantee comes from the validators above and from the fact that the model has no
-authority (see `tests/integration/test_agent_flow.py::test_injected_document_instructions_cannot_change_authority`,
-which uses a deliberately compromised scripted model).
+rule that instructions in data are ignored. This is a mitigation, not a guarantee. What
+limits the damage is that the model has no authority (it cannot choose the route, act,
+approve or change permissions) and that the validators above reject outputs that cite
+unknown evidence, use unsupported numbers, make prohibited claims or disagree with the
+rules (see `tests/integration/test_agent_flow.py::test_injected_document_instructions_cannot_change_authority`,
+which uses a deliberately compromised scripted model). A manipulated explanation that passes
+validation can still mislead a reader; the human approval step is the remaining control.
 
 ## Redaction
 
