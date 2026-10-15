@@ -156,6 +156,15 @@ def create_simulator(
             raise HTTPException(404, "not found")
         return task
 
+    @app.get("/orgs/{org}/capabilities")
+    async def capabilities(org: Org) -> dict[str, Any]:
+        """What the task tracker honours right now (connectors discover this; never assume)."""
+        caps = store.capabilities(org)
+        return {
+            "idempotency_keys": caps["idempotency"],
+            "lookup": "strong" if caps["search"] else "none",
+        }
+
     @app.get("/orgs/{org}/tasks")
     async def search_tasks(
         org: Org, marker: Annotated[str, Query(min_length=1, max_length=120)]
