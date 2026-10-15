@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import signal
@@ -11,8 +12,11 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from opentelemetry.trace import SpanKind
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
 from opsbridge.config import Settings, get_settings
@@ -22,6 +26,7 @@ from opsbridge.evidence.storage import LocalArtifactStore
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import Database, DbContext, get_database
 from opsbridge.persistence.models import Tenant, WorkflowRun
+from opsbridge.telemetry import metrics, tracing
 from opsbridge.telemetry.logging import configure_logging
 
 from . import jobs
@@ -79,38 +84,59 @@ class Worker:
     )
     handlers: dict[str, Handler] = field(default_factory=dict)
     stop_event: threading.Event = field(default_factory=threading.Event)
+    last_loop: float = field(default_factory=time.monotonic)
 
     def register(self, kind: str, handler: Handler) -> None:
         self.handlers[kind] = handler
 
     def run_once(self) -> bool:
         """Claim and process at most one job. Returns True if a job was processed."""
+        self.last_loop = time.monotonic()
         job = jobs.claim(
             self.db, self.worker_id, self.settings.worker_lease_seconds, list(self.handlers)
         )
         if job is None:
             return False
+        started = time.monotonic()
+        with tracing.span(
+            f"job {job.kind}",
+            kind=SpanKind.CONSUMER,
+            context=tracing.context_from(job.payload.get("_trace")),
+            attributes={"opsbridge.job.attempt": job.attempts},
+            tenant_id=job.tenant_id,
+            job_id=job.id,
+            run_id=job.payload.get("run_id"),
+            operation_id=job.payload.get("operation_id"),
+        ) as sp:
+            result = self._handle(job)
+            sp.set_attribute("opsbridge.job.result", result)
+        metrics.JOBS.labels(job.kind, result).inc()
+        metrics.JOB_DURATION.labels(job.kind).observe(time.monotonic() - started)
+        return True
+
+    def _handle(self, job: jobs.ClaimedJob) -> str:
         handler = self.handlers[job.kind]
         try:
             handler(job)
         except LeaseLost as exc:
             log.warning("job %s %s: %s; stopping without writing results", job.kind, job.id, exc)
-            return True
+            return "lease_lost"
         except StepFailed as exc:
             status = jobs.fail(self.db, job, str(exc), retryable=exc.retryable)
             log.warning("job %s %s failed (%s): %s", job.kind, job.id, status, exc)
             if status in ("failed", "dead"):
                 self._on_exhausted(job, str(exc))
-            return True
+            return "retry" if status == "queued" else status
         except Exception as exc:  # unexpected: retry with backoff, never crash the loop
             status = jobs.fail(self.db, job, f"{type(exc).__name__}: {exc}", retryable=True)
             log.exception("job %s %s crashed (%s)", job.kind, job.id, status)
             if status == "dead":
                 self._on_exhausted(job, f"{type(exc).__name__}: {exc}")
-            return True
+            return "crash_retry" if status == "queued" else f"crash_{status}"
         if not jobs.complete(self.db, job):
             log.warning("job %s lease lost before completion; result kept in durable state", job.id)
-        return True
+            return "lease_lost"
+        return "completed"
 
     def _on_exhausted(self, job: jobs.ClaimedJob, error: str) -> None:
         if job.kind == "dispatch_operation":
@@ -137,6 +163,7 @@ class Worker:
                 self.stop_event.wait(backoff)
                 continue
             backoff = 0.0
+            self.last_loop = time.monotonic()
             if not processed:
                 self.stop_event.wait(self.settings.worker_poll_seconds)
 
@@ -200,7 +227,59 @@ def make_worker(settings: Settings | None = None, db: Database | None = None) ->
         log.info("retention sweep for tenant %s: %s", job.tenant_id, report.to_dict())
 
     worker.register("retention_sweep", _retention)
+    metrics.POOLS.register("worker", db.engine)
+    metrics.watch_state(db.engine)
+    metrics.watch_storage(settings.artifact_dir)
     return worker
+
+
+class _HealthHandler(BaseHTTPRequestHandler):
+    worker: Worker
+
+    def log_message(self, format: str, *args: Any) -> None:
+        return None  # scrapes and probes are not logged
+
+    def _send(self, code: int, body: bytes, ctype: str = "application/json") -> None:
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_GET(self) -> None:
+        w = self.worker
+        stale_after = max(60.0, 2.0 * w.settings.worker_lease_seconds)
+        loop_age = time.monotonic() - w.last_loop
+        if self.path == "/healthz":
+            ok = loop_age < stale_after
+            self._send(
+                200 if ok else 503,
+                json.dumps({"live": ok, "loop_age_seconds": round(loop_age, 1)}).encode(),
+            )
+        elif self.path == "/readyz":
+            checks = {"loop": "ok" if loop_age < stale_after else "stale"}
+            try:
+                with w.db.engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+                checks["database"] = "ok"
+            except Exception as exc:
+                checks["database"] = f"error:{type(exc).__name__}"
+            ready = all(v == "ok" for v in checks.values())
+            self._send(
+                200 if ready else 503, json.dumps({"ready": ready, "checks": checks}).encode()
+            )
+        elif self.path == "/metrics":
+            self._send(200, metrics.render(), metrics.CONTENT_TYPE_LATEST)
+        else:
+            self._send(404, b"{}")
+
+
+def serve_health(worker: Worker, host: str, port: int) -> ThreadingHTTPServer:
+    """Liveness (loop heartbeat), readiness (database + loop) and metrics for the worker."""
+    handler = type("Handler", (_HealthHandler,), {"worker": worker})
+    server = ThreadingHTTPServer((host, port), handler)
+    threading.Thread(target=server.serve_forever, name="worker-health", daemon=True).start()
+    return server
 
 
 def _investigate(deps: InvestigationDeps, job: jobs.ClaimedJob) -> None:
@@ -209,7 +288,10 @@ def _investigate(deps: InvestigationDeps, job: jobs.ClaimedJob) -> None:
 
 def main() -> None:
     configure_logging()
+    tracing.configure_tracing("opsbridge-worker")
     worker = make_worker()
+    if worker.settings.worker_http_port:
+        serve_health(worker, worker.settings.worker_http_host, worker.settings.worker_http_port)
     signal.signal(signal.SIGTERM, lambda *_: worker.stop_event.set())
     try:
         worker.run_forever()
