@@ -135,6 +135,17 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
         <dd>
           v{inv.version} · {new Date(inv.created_at).toLocaleString()} · explanation: {inv.explanation_origin}
         </dd>
+        {inv.model_routing && (
+          <>
+            <dt>Model use</dt>
+            <dd>
+              {String(inv.model_routing.mode)}
+              {inv.model_routing.blocked ? " — blocked: " : " — "}
+              {String(inv.model_routing.reason)}
+              {inv.model_routing.data_routing ? ` (policy data routing: ${String(inv.model_routing.data_routing)})` : ""}
+            </dd>
+          </>
+        )}
       </dl>
       <h3 className="section">Explanation</h3>
       <pre className="explanation">{inv.explanation}</pre>
