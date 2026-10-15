@@ -344,6 +344,24 @@ def _eval_verify(_args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 1
 
 
+def _verify_restore(args: argparse.Namespace) -> int:
+    from opsbridge.config import get_settings
+    from opsbridge.operations.restore import verify_restored
+
+    if args.database in ("opsbridge", "opsbridge_test", "opsbridge_eval"):
+        print("Refusing: verify-restore runs against an isolated restored database only.")
+        return 2
+    artifact_dir = Path(args.artifact_dir)
+    if not artifact_dir.is_absolute():
+        # `uv --directory backend` changes the working directory; a relative path would
+        # silently point elsewhere and report every artifact as missing.
+        print("Refusing: --artifact-dir must be an absolute path.")
+        return 2
+    report = verify_restored(get_settings(), args.database, artifact_dir)
+    print(json.dumps(report, indent=1, default=str))
+    return 0 if report["ok"] else 1
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -471,6 +489,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
     p.set_defaults(func=_eval_verify)
+
+    p = sub.add_parser("verify-restore", help="application-level checks on a restored database")
+    p.add_argument("--database", required=True)
+    p.add_argument("--artifact-dir", required=True)
+    p.set_defaults(func=_verify_restore)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)
