@@ -13,11 +13,13 @@ import threading
 import time
 from collections.abc import Awaitable, Callable
 
+from opentelemetry.trace import SpanKind
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 from opsbridge.auth.sessions import COOKIE_NAME, hash_token
+from opsbridge.telemetry import metrics, tracing
 from opsbridge.telemetry.context import correlation_id_var
 
 _CID_RE = re.compile(r"^[A-Za-z0-9-]{8,64}$")
@@ -43,10 +45,24 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
         cid = incoming if _CID_RE.match(incoming) else secrets.token_hex(12)
         request.state.correlation_id = cid
         token = correlation_id_var.set(cid)
-        try:
-            response = await self._guarded(request, call_next, cid)
-        finally:
-            correlation_id_var.reset(token)
+        started = time.monotonic()
+        # A new trace per request: trace context from the internet is not trusted.
+        with tracing.span(
+            f"{request.method} request", kind=SpanKind.SERVER, correlation_id=cid
+        ) as sp:
+            try:
+                response = await self._guarded(request, call_next, cid)
+            finally:
+                correlation_id_var.reset(token)
+            route = _route_template(request)
+            sp.update_name(f"{request.method} {route}")
+            sp.set_attribute("http.request.method", request.method)
+            sp.set_attribute("http.route", route)
+            sp.set_attribute("http.response.status_code", response.status_code)
+        metrics.HTTP_REQUESTS.labels(
+            request.method, route, metrics.status_class(response.status_code)
+        ).inc()
+        metrics.HTTP_DURATION.labels(route).observe(time.monotonic() - started)
         response.headers["X-Correlation-Id"] = cid
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["Referrer-Policy"] = "no-referrer"
@@ -86,6 +102,17 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
                 resp.headers["Retry-After"] = str(retry_after)
                 return resp
         return await call_next(request)
+
+
+def _route_template(request: Request) -> str:
+    """Bounded label: the matched route template, never the raw path."""
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    if path:
+        return str(path)
+    if request.url.path.startswith(("/api/", "/auth/")):
+        return "unmatched"
+    return "static"
 
 
 def _error(status: int, code: str, message: str, cid: str, retryable: bool) -> JSONResponse:
