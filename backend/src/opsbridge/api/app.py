@@ -33,6 +33,7 @@ def create_app(
         redoc_url=None,
     )
     app.state.opsbridge = AppState(settings=settings, db=db or get_database("app"))
+    _watch(app.state.opsbridge)
     app.state.oauth = auth.build_oauth(settings)
     errors.install(app)
 
@@ -88,3 +89,26 @@ def _mount_spa(app: FastAPI, static_dir: Path) -> None:
     @app.get("/{path:path}", include_in_schema=False)
     def spa(path: str) -> FileResponse:
         return FileResponse(index)
+
+
+def _watch(state: AppState) -> None:
+    """Process gauges for this API: pool use, artifact storage, dependency readiness."""
+    from sqlalchemy import text
+
+    from opsbridge.telemetry import metrics
+
+    metrics.POOLS.register("app", state.db.engine)
+    metrics.watch_storage(state.settings.artifact_dir)
+
+    def database() -> bool:
+        with state.db.engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return True
+
+    def identity_provider() -> bool:
+        import httpx
+
+        base = (state.settings.oidc_discovery_url or state.settings.oidc_issuer).rstrip("/")
+        return httpx.get(f"{base}/.well-known/openid-configuration", timeout=2.0).status_code == 200
+
+    metrics.watch_dependencies({"database": database, "identity_provider": identity_provider})
