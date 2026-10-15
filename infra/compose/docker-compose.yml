@@ -58,6 +58,120 @@ services:
       retries: 60
     restart: unless-stopped
 
+  # --- Containerized application (profile "app"; `make demo-containers`) -----------------
+  # Replaces `make dev` (same ports); stop host processes first. The API serves the built UI
+  # on http://localhost:8000. Simulator and MCP services are reachable only on this network.
+  bootstrap:
+    image: opsbridge/app:local
+    build: {context: ../.., dockerfile: infra/containers/opsbridge.Dockerfile}
+    profiles: [app]
+    environment: &app-env
+      OPSBRIDGE_ENV: development
+      OPSBRIDGE_DB_HOST: postgres
+      OPSBRIDGE_DB_PORT: "5432"
+      OPSBRIDGE_DB_NAME: opsbridge
+      OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
+      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
+      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
+      # Browsers and token issuers use the public URL; containers use the backchannel.
+      OPSBRIDGE_OIDC_ISSUER: http://localhost:8081/realms/opsbridge
+      OPSBRIDGE_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/opsbridge
+      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
+      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
+      OPSBRIDGE_SESSION_SECRET: ${OPSBRIDGE_SESSION_SECRET:?}
+      OPSBRIDGE_PUBLIC_URL: http://localhost:8000
+      OPSBRIDGE_CORS_ORIGINS: '["http://localhost:8000"]'
+      OPSBRIDGE_SIMULATOR_URL: http://simulator:8090
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
+      OPSBRIDGE_SIMULATOR_FAULT_CONTROLS: "true"
+      OPSBRIDGE_RECORDS_MCP_URL: http://records-mcp:8101/mcp
+      OPSBRIDGE_CASEWORK_MCP_URL: http://casework-mcp:8102/mcp
+      OPSBRIDGE_TOOL_TRANSPORT: mcp
+    command: ["sh", "-c", "alembic upgrade head && python -m opsbridge.cli seed-demo && python -m opsbridge.cli init-keys"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    image: opsbridge/app:local
+    profiles: [app]
+    environment: *app-env
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:8000/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  worker:
+    image: opsbridge/app:local
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "worker"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      records-mcp: {condition: service_healthy}
+      casework-mcp: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:9101/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  records-mcp:
+    image: opsbridge/app:local
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "mcp-records", "--host", "0.0.0.0", "--port", "8101"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "tcp://127.0.0.1:8101"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  casework-mcp:
+    image: opsbridge/app:local
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "mcp-casework", "--host", "0.0.0.0", "--port", "8102"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      simulator: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "tcp://127.0.0.1:8102"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  simulator:
+    image: opsbridge/app:local
+    profiles: [app]
+    environment: *app-env
+    command: ["sh", "-c", "python -m opsbridge.cli simulator-seed /app/fixtures/scenarios/dev.yaml && python -m opsbridge.cli simulator --host 0.0.0.0 --port 8090"]
+    volumes: [opsbridge_simdata:/app/var]
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:8090/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
   # Optional: `make observability-up`. Scrapes the API and worker on the host (make dev)
   # and evaluates infra/observability/prometheus/alerts.yml. Bound to localhost only.
   prometheus:
@@ -77,3 +191,5 @@ services:
 volumes:
   opsbridge_pgdata:
   opsbridge_prometheus:
+  opsbridge_appdata:
+  opsbridge_simdata:
