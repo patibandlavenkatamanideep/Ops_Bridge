@@ -62,6 +62,9 @@ class Settings(BaseSettings):
     artifact_dir: Path = REPO_ROOT / "var" / "artifacts"
     packs_dir: Path = REPO_ROOT / "packs"
     evals_dir: Path = REPO_ROOT / "evals"
+    metrics_token: SecretStr | None = None  # bearer token for /metrics when set
+    worker_http_host: str = "127.0.0.1"
+    worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
     delegation_key_path: Path = REPO_ROOT / "var" / "keys" / "delegation_ed25519.pem"
 
     simulator_url: str = "http://localhost:8090"
