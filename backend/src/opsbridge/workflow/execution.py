@@ -69,7 +69,8 @@ class LeaseLost(Exception):
 @dataclass
 class ExecutionDeps:
     db: Database
-    connector_for: Callable[[uuid.UUID, str], TaskConnector]  # (tenant_id, connector name)
+    # (tenant_id, connector name, operation context) → connector bound to that operation
+    connector_for: Callable[[uuid.UUID, str, dict[str, Any]], TaskConnector]
     timeout_seconds: float
     lease_seconds: int
 
@@ -146,7 +147,7 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
     if snapshot["action_type"] != "create_follow_up_task":
         _execute_local(deps, job, snapshot)
         return
-    connector = deps.connector_for(tid, snapshot["connector"])
+    connector = deps.connector_for(tid, snapshot["connector"], snapshot)
     if succeeded:  # created earlier; only read-back was missing
         _read_back(
             deps, job, snapshot, connector, succeeded[-1].remote_ref or "", parent=succeeded[-1].id
@@ -171,6 +172,7 @@ def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
         "marker": marker_for(op),
         "retry_index": len(attempts),
         "last_attempt_id": attempts[-1].id if attempts else None,
+        "approved_by": op.approved_by,
     }
 
 

@@ -21,12 +21,14 @@ export function CaseQueue() {
   const { tenant = "" } = useParams();
   const { can } = useSession();
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
   const query = useInfiniteQuery<QueuePage, ApiError>({
-    queryKey: ["cases", tenant, status],
+    queryKey: ["cases", tenant, status, search],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams({ limit: "25" });
       if (status) params.set("status", status);
+      if (search.trim()) params.set("q", search.trim());
       if (pageParam) params.set("cursor", pageParam as string);
       return api<QueuePage>(tenantPath(tenant, `/cases?${params}`), { signal });
     },
@@ -46,6 +48,11 @@ export function CaseQueue() {
         )}
       </div>
       <div className="filters">
+        <label>
+          Search{" "}
+          <input type="search" value={search} maxLength={100} placeholder="Case, invoice or PO number"
+                 onChange={(e) => setSearch(e.target.value)} />
+        </label>{" "}
         <label>
           Status{" "}
           <select value={status} onChange={(e) => setStatus(e.target.value)}>

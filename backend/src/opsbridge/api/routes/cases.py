@@ -120,12 +120,13 @@ def list_cases(
     status: Annotated[str | None, Query(max_length=40)] = None,
     cursor: Annotated[str | None, Query(max_length=200)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    q: Annotated[str | None, Query(min_length=1, max_length=100)] = None,
 ) -> QueuePage:
     if status is not None and status not in svc.CASE_STATUSES:
         raise invalid("Unknown status filter.", {"allowed": list(svc.CASE_STATUSES)})
     try:
         items, next_cursor = svc.list_cases(
-            state.db, principal, status=status, cursor=cursor, limit=limit
+            state.db, principal, status=status, cursor=cursor, limit=limit, search=q
         )
     except (ValueError, TypeError) as exc:
         raise invalid("Invalid cursor.") from exc

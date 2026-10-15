@@ -128,6 +128,63 @@ def _eval_rules(args: argparse.Namespace) -> int:
     return 0
 
 
+def _mcp(args: argparse.Namespace, which: str) -> int:
+    import uuid
+
+    import uvicorn
+
+    from opsbridge.config import get_settings
+    from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector
+    from opsbridge.mcp_services import factory
+    from opsbridge.mcp_services.auth import JwksTokenVerifier
+    from opsbridge.mcp_services.casework import build_casework_server
+    from opsbridge.mcp_services.records import build_records_server
+    from opsbridge.persistence.db import Database, DbContext, make_engine
+    from opsbridge.persistence.models import Tenant
+
+    settings = get_settings()
+    db = Database(make_engine("mcp"))
+    if which == "records":
+        aud, url = factory.RECORDS_AUDIENCE, settings.records_mcp_url
+        token_verifier = JwksTokenVerifier(
+            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"})
+        )
+        server = build_records_server(
+            db, token_verifier, factory.verifier(settings, aud), url, settings.oidc_issuer
+        )
+    else:
+        aud, url = factory.CASEWORK_AUDIENCE, settings.casework_mcp_url
+        token_verifier = JwksTokenVerifier(
+            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"})
+        )
+
+        def connector_for(tenant_id: uuid.UUID, name: str) -> TaskConnector:
+            with db.session(DbContext(tenant_id=tenant_id)) as s:
+                tenant = s.get(Tenant, tenant_id)
+                assert tenant is not None
+                org = tenant.slug
+            if name == "github_issues":
+                from opsbridge.connectors.github import github_connector_from_settings
+
+                return github_connector_from_settings(settings)
+            return SimTaskConnector(
+                settings.simulator_url, settings.sim_master_secret.get_secret_value(), org
+            )
+
+        server = build_casework_server(
+            db,
+            token_verifier,
+            factory.verifier(settings, aud),
+            url,
+            settings.oidc_issuer,
+            connector_for,
+            timeout_seconds=settings.connector_timeout_seconds,
+        )
+    app = server.streamable_http_app(stateless_http=True, json_response=True)
+    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="opsbridge")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -157,6 +214,12 @@ def main(argv: list[str] | None = None) -> int:
     p = sub.add_parser("simulator-seed", help="load scenario corpora into the simulator store")
     p.add_argument("corpus", nargs="*")
     p.set_defaults(func=_simulator_seed)
+
+    for which, port in (("records", 8101), ("casework", 8102)):
+        p = sub.add_parser(f"mcp-{which}", help=f"run the {which} MCP service (streamable HTTP)")
+        p.add_argument("--host", default="127.0.0.1")
+        p.add_argument("--port", type=int, default=port)
+        p.set_defaults(func=lambda a, w=which: _mcp(a, w))
 
     p = sub.add_parser("eval-rules", help="run the rules-only baseline on a scenario corpus")
     p.add_argument("--corpus", default="../fixtures/scenarios/dev.yaml")

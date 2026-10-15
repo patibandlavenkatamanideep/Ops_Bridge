@@ -292,3 +292,38 @@ def test_cors_allows_only_configured_origin(client: TestClient) -> None:
         headers={"Origin": "https://evil.example", "Access-Control-Request-Method": "GET"},
     )
     assert "access-control-allow-origin" not in bad.headers
+
+
+def test_queue_search_matches_identifiers_and_escapes_wildcards(client: TestClient, world) -> None:  # type: ignore[no-untyped-def]
+    for i, inv in enumerate(("INV-100", "INV-200", "INV-300")):
+        call(
+            client,
+            world["inv"],
+            "POST",
+            "/api/v1/tenants/demo-furniture/cases",
+            json={"title": f"Blocked invoice {i}", "invoice_number": inv, "po_number": f"PO-7{i}"},
+        )
+    found = call(
+        client, world["inv"], "GET", "/api/v1/tenants/demo-furniture/cases?q=inv-200"
+    ).json()["items"]
+    assert [c["title"] for c in found] == ["Blocked invoice 1"]
+    assert (
+        len(
+            call(
+                client, world["inv"], "GET", "/api/v1/tenants/demo-furniture/cases?q=PO-72"
+            ).json()["items"]
+        )
+        == 1
+    )
+    assert (
+        call(client, world["inv"], "GET", "/api/v1/tenants/demo-furniture/cases?q=%25").json()[
+            "items"
+        ]
+        == []
+    )
+    assert (
+        call(client, world["inv"], "GET", "/api/v1/tenants/demo-furniture/cases?q=_").json()[
+            "items"
+        ]
+        == []
+    )

@@ -1,11 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { rerunInvestigation, signIn } from "./helpers";
-
-async function openCase(page: Page, invoice: string): Promise<void> {
-  await page.goto("/t/demo-furniture/cases");
-  await page.getByRole("link", { name: new RegExp(invoice) }).first().click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(invoice);
-}
+import { expect, test } from "@playwright/test";
+import { openCase, rerunInvestigation, signIn } from "./helpers";
 
 test("investigator proposes, approver approves, execution is confirmed and the case stays open", async ({ browser }) => {
   const inv = await browser.newPage();

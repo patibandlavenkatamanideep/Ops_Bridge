@@ -92,7 +92,7 @@ def fault(st: dict[str, Any], mode: str, count: int = 1, route: str = "tasks.cre
 
 def use_connector(st: dict[str, Any], factory: Any, **overrides: Any) -> None:
     st["exec"]["exec"] = replace(
-        st["exec"]["exec"], connector_for=lambda tid, name: factory(), **overrides
+        st["exec"]["exec"], connector_for=lambda tid, name, op: factory(), **overrides
     )
 
 

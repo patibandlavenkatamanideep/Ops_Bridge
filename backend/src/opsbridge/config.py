@@ -90,6 +90,15 @@ class Settings(BaseSettings):
     connector_timeout_seconds: float = 5.0
 
     @model_validator(mode="after")
+    def _absolute_paths(self) -> Settings:
+        # Relative paths in .env are relative to the repository root, not the process cwd.
+        for name in ("artifact_dir", "packs_dir", "delegation_key_path"):
+            value: Path = getattr(self, name)
+            if not value.is_absolute():
+                object.__setattr__(self, name, (REPO_ROOT / value).resolve())
+        return self
+
+    @model_validator(mode="after")
     def _production_guards(self) -> Settings:
         if self.env != "production":
             return self

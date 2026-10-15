@@ -8,9 +8,9 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–4 done; Phase 5 next |
+| Local application complete | no — Phases 0–5 done; Phase 6 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
-| External connector (GitHub sandbox) validated | not evaluated (no sandbox repo/token/authorization for writes) |
+| External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
 | Hosted CI | not run (no workflow pushed yet) |
 | Staging deployed | no |
 | Operator pilot measured | no |
@@ -134,20 +134,38 @@ table in docs/execution-and-recovery.md) and `frontend/e2e/phase4.spec.ts` (inve
 proposes, a different approver approves, worker dispatches, read-back confirms, case stays
 "Follow-up pending").
 
+### Phase 5 — MCP services and sandbox adapter (exit gate passed locally; live GitHub blocked)
+- Records MCP and Casework MCP on the official SDK (streamable HTTP), two-credential
+  authorization (Keycloak service token + Ed25519 delegation token), server-side membership
+  re-check, audited denials (`mcp_services/`).
+- Executor can run through Casework MCP (`McpCaseworkConnector`); agent evidence search can
+  run through Records MCP. The dev stack uses MCP transport; tests default to in-process and
+  have dedicated MCP tests.
+- GitHub Issues connector with declared capabilities (no idempotency, eventual lookup),
+  repository allow-list and explicit write authorization; tier-gated per tenant.
+- Details: docs/integrations.md.
+
+Phase 5 exit gate evidence: `tests/integration/test_mcp.py` (16, real transport and Keycloak
+tokens; permitted discovery/calls and denied calls), `tests/contracts/test_github_connector.py`
+(10), `tests/integration/test_github_execution.py` (3). Browser tests (10) pass with the dev
+stack in MCP mode; the dev audit trail shows `mcp.casework.create_follow_up_task` and
+`get_follow_up_task`. Live GitHub run: **blocked** (no repo/token/authorization);
+`tests/live/test_github_live.py` is skipped unless explicitly enabled.
+
 ## Verification evidence (local, macOS arm64, 2026-10-14)
 
-`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 4):
+`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 5):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (75 files) | passed |
-| backend unit tests | 141 passed |
+| backend mypy --strict (83 files) | passed |
+| backend unit + contract tests | 151 passed, 1 skipped (live GitHub test, never runs by default) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 7 passed |
 | migration drift (`alembic check`) | passed |
-| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP with faults) | 63 passed |
-| browser tests (Playwright Chromium 156, real login, real worker) | 10 passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport) | 83 passed |
+| browser tests (Playwright, dev stack in MCP mode) | 10 passed |
 | frontend production build | passed |
 
 Phase 2 exit gate evidence:
@@ -186,6 +204,8 @@ Phase 1 exit gate evidence:
 
 - Rate limiting is per process and in memory; not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
+  Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
+  queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
 - The "Evaluation" navigation entry has no page yet (Phase 7).
 - No genuine scanned paper document is in the fixtures; the scanned case is a synthetic
   image-only PDF. OCR is unverified (tesseract not installed) and routes to needs_review.
@@ -199,7 +219,7 @@ Phase 1 exit gate evidence:
 
 ## Next executable task
 
-Phase 5: Records MCP and Casework MCP services on the official SDK (streamable HTTP) with
-service-token + delegation-token authorization, permitted/denied discovery and call tests
-over real transport, and the GitHub Issues sandbox connector with HTTP contract tests
-(live run blocked pending repo, token and authorization).
+Phase 6: retention and deletion (raw documents, conversations, extracted text, caches,
+replay artifacts) with opaque audit references, upload endpoint with size/type/filename
+defences, conversation history with controlled correction/deletion, cache/artifact isolation
+tests, OCR path reported unavailable, threat-model notes.

@@ -16,6 +16,8 @@ import pytest
 os.environ.setdefault("OPSBRIDGE_ENV", "test")
 os.environ["OPSBRIDGE_LIVE_MODEL_OPT_IN"] = "false"
 os.environ["OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED"] = "false"
+# Tests call services in-process unless a test builds MCP clients explicitly.
+os.environ["OPSBRIDGE_TOOL_TRANSPORT"] = "inprocess"
 os.environ.pop("ANTHROPIC_API_KEY", None)
 
 
@@ -40,5 +42,5 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             if require:
                 raise pytest.UsageError("Keycloak on :8081 is required (run `make dev`)")
             item.add_marker(pytest.mark.skip(reason="Keycloak :8081 unreachable; run `make dev`"))
-        if "live" in item.keywords:
+        if "live" in item.keywords and not os.environ.get("OPSBRIDGE_RUN_LIVE"):
             item.add_marker(pytest.mark.skip(reason="live provider tests never run by default"))

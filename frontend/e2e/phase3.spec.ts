@@ -1,9 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { rerunInvestigation, signIn } from "./helpers";
+import { openCase, rerunInvestigation, signIn } from "./helpers";
 
 async function openInvoiceCase(page: Page): Promise<void> {
-  await page.goto("/t/demo-furniture/cases");
-  await page.getByRole("link", { name: /INV-9001/ }).first().click();
+  await openCase(page, "INV-9001");
   await expect(page.getByRole("button", { name: /Run investigation|Re-run investigation/ })).toBeEnabled();
 }
 

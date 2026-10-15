@@ -11,6 +11,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from typing import Any
 
 from opsbridge.config import Settings, get_settings
 from opsbridge.connectors.purchasing import PurchasingClient
@@ -44,7 +45,25 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
         pack_for=packs.get,
         purchasing_for=purchasing_for,
         settings=settings,
+        records_mcp=_records_client(settings),
+        signer=_signer(settings),
     )
+
+
+def _records_client(settings: Settings) -> Any:
+    if settings.tool_transport != "mcp":
+        return None
+    from opsbridge.mcp_services.factory import records_client
+
+    return records_client(settings)
+
+
+def _signer(settings: Settings) -> Any:
+    if settings.tool_transport != "mcp":
+        return None
+    from opsbridge.mcp_services.factory import signer
+
+    return signer(settings)
 
 
 @dataclass
@@ -121,13 +140,21 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         )
     secret = settings.sim_master_secret.get_secret_value()
 
-    def connector_for(tenant_id: uuid.UUID, name: str) -> TaskConnector:
+    def connector_for(tenant_id: uuid.UUID, name: str, operation: dict[str, Any]) -> TaskConnector:
         with db.session(DbContext(tenant_id=tenant_id)) as s:
             tenant = s.get(Tenant, tenant_id)
             assert tenant is not None
             org = tenant.slug
+        if name == "sim_tasks" and settings.tool_transport == "mcp":
+            from opsbridge.mcp_services.factory import casework_connector
+
+            return casework_connector(settings, tenant_id, operation)
         if name == "sim_tasks":
             return SimTaskConnector(settings.simulator_url, secret, org)
+        if name == "github_issues":
+            from opsbridge.connectors.github import github_connector_from_settings
+
+            return github_connector_from_settings(settings)
         raise ValueError(f"unknown task connector {name!r}")
 
     return ExecutionDeps(

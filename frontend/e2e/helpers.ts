@@ -34,3 +34,11 @@ export async function rerunInvestigation(page: Page, mode: string): Promise<void
   await expect(version).toBeVisible({ timeout: 30_000 });
   await expect(version).not.toHaveText(before, { timeout: 30_000 });
 }
+
+/** Open a case from the queue by searching for it (robust to queue pagination). */
+export async function openCase(page: Page, invoice: string, tenant = "demo-furniture"): Promise<void> {
+  await page.goto(`/t/${tenant}/cases`);
+  await page.getByLabel("Search").fill(invoice);
+  await page.getByRole("link", { name: new RegExp(invoice) }).first().click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(invoice);
+}

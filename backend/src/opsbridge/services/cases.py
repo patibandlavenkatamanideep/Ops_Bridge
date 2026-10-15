@@ -207,7 +207,13 @@ def decode_cursor(cursor: str) -> tuple[datetime, uuid.UUID]:
 
 
 def list_cases(
-    db: Database, principal: Principal, *, status: str | None, cursor: str | None, limit: int
+    db: Database,
+    principal: Principal,
+    *,
+    status: str | None,
+    search: str | None = None,
+    cursor: str | None,
+    limit: int,
 ) -> tuple[list[QueueItem], str | None]:
     ctx = DbContext(tenant_id=principal.tenant_id, user_id=principal.user_id)
     with db.session(ctx) as s:
@@ -218,6 +224,18 @@ def list_cases(
         )
         if status:
             q = q.where(Case.status == status)
+        if search:
+            pattern = (
+                "%" + search.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+            )
+            q = q.where(
+                or_(
+                    Case.case_number.ilike(pattern, escape="\\"),
+                    Case.invoice_number.ilike(pattern, escape="\\"),
+                    Case.po_number.ilike(pattern, escape="\\"),
+                    Case.title.ilike(pattern, escape="\\"),
+                )
+            )
         if cursor:
             created_at, cid = decode_cursor(cursor)
             q = q.where(

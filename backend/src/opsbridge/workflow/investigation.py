@@ -56,6 +56,8 @@ class InvestigationDeps:
     purchasing_for: Callable[[str], PurchasingClient]
     settings: Any = None
     adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
+    records_mcp: Any = None  # McpToolClient when tool_transport == "mcp"
+    signer: Any = None  # DelegationSigner for MCP calls
 
 
 class StepFailed(Exception):
@@ -668,6 +670,25 @@ def _explain(
     allowed_versions = _case_versions(deps, tenant_id, case["case_id"])
 
     def search_fn(query: str) -> list[dict[str, Any]]:
+        if deps.records_mcp is not None:
+            with deps.db.session(_ctx(tenant_id)) as s:
+                run = s.execute(
+                    select(WorkflowRun)
+                    .where(WorkflowRun.case_id == uuid.UUID(case["case_id"]))
+                    .order_by(WorkflowRun.created_at.desc())
+                    .limit(1)
+                ).scalar_one()
+                principal = run.requested_by
+            delegation = deps.signer.sign(
+                tenant_id=tenant_id,
+                principal_id=principal,
+                audience="opsbridge-records-mcp",
+                tools=["search_case_evidence"],
+                case_id=uuid.UUID(case["case_id"]),
+                ttl_seconds=60,
+            )
+            out = deps.records_mcp.call("search_case_evidence", {"query": query}, delegation)
+            return list(out.get("hits", []))
         with deps.db.session(_ctx(tenant_id)) as s:
             return [h.__dict__ for h in search(s, allowed_versions, query, limit=3)]
 
@@ -679,6 +700,7 @@ def _explain(
         settings=deps.settings,
         search=search_fn,
         fallback=fallback,
+        tool_transport="mcp" if deps.records_mcp is not None else "inprocess",
     )
 
 

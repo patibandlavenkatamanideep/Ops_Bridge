@@ -351,6 +351,7 @@ def explain(
     settings: Any,
     search: SearchFn,
     fallback: Callable[[], dict[str, Any]],
+    tool_transport: str = "inprocess",
 ) -> dict[str, Any]:
     """Model explanation with an optional, capped read-only evidence-search round."""
     problems_all: list[str] = []
@@ -386,7 +387,24 @@ def explain(
                 except Exception as exc:  # budget exhausted: answer with what we have
                     problems_all.append(str(exc))
                     break
-                hits = search(req["query"])
+                try:
+                    hits = search(req["query"])
+                except Exception as exc:  # denied or failed tool calls are data, not crashes
+                    denied = type(exc).__name__ == "McpDenied"
+                    recorder.tool(
+                        step="explain_findings",
+                        tool=SEARCH_TOOL,
+                        version=TOOL_VERSION,
+                        args={"query": req["query"]},
+                        response=None,
+                        outcome="denied" if denied else "error",
+                        transport=tool_transport,
+                        error=str(exc)[:300],
+                    )
+                    problems_all.append(
+                        f"evidence search {'denied' if denied else 'failed'}: {exc}"[:200]
+                    )
+                    break
                 recorder.tool(
                     step="explain_findings",
                     tool=SEARCH_TOOL,
@@ -394,6 +412,7 @@ def explain(
                     args={"query": req["query"]},
                     response=hits,
                     outcome="ok",
+                    transport=tool_transport,
                 )
                 for hit in hits[:3]:
                     excerpts.append(_excerpt(ctx, hit))

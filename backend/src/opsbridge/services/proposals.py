@@ -412,8 +412,19 @@ def _check_params_policy(action: str, params: dict[str, Any], policy: Reconcilia
 
 
 def _connector(s: Session, tenant_id: uuid.UUID) -> str:
+    """The tenant's task connector, if its service tier enables it (no silent fallback)."""
+    from opsbridge.auth.permissions import TIERS
+    from opsbridge.persistence.models import Tenant
+
     ts = s.get(TenantSettings, tenant_id)
-    return ts.task_connector if ts else "sim_tasks"
+    name = ts.task_connector if ts else "sim_tasks"
+    tenant = s.get(Tenant, tenant_id)
+    if tenant is None or name not in TIERS[tenant.tier].external_connectors:
+        raise Conflict(
+            "connector_not_entitled",
+            f"Task connector {name!r} is not enabled for this tenant's tier.",
+        )
+    return name
 
 
 # --- decide -----------------------------------------------------------------------------

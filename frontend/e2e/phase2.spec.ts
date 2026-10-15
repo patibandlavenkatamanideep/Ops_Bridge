@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { signIn } from "./helpers";
+import { openCase, signIn } from "./helpers";
 
 /** Create a case for an invoice, or open the existing one (keeps the test repeatable). */
-async function openCase(page: Page, invoice: string): Promise<void> {
+async function createOrOpenCase(page: Page, invoice: string): Promise<void> {
   await page.goto("/t/demo-furniture/cases/new");
   await page.getByLabel("Title").fill(`Invoice ${invoice} blocked`);
   await page.getByLabel("Invoice number").fill(invoice);
@@ -16,7 +16,7 @@ async function openCase(page: Page, invoice: string): Promise<void> {
 
 test("investigation shows a cited quantity mismatch and opens the cited source line", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("button", { name: /Run investigation|Re-run investigation/ }).click();
   const finding = page.locator(".finding", { hasText: "Quantity mismatch" });
   await expect(finding).toBeVisible({ timeout: 30_000 });
@@ -34,7 +34,7 @@ test("investigation shows a cited quantity mismatch and opens the cited source l
 
 test("tabs support arrow-key navigation", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   const inv = page.getByRole("tab", { name: "Investigation" });
   await inv.focus();
   await page.keyboard.press("ArrowRight");
@@ -44,8 +44,7 @@ test("tabs support arrow-key navigation", async ({ page }) => {
 
 test("approver can read evidence but cannot run investigations or correct fields", async ({ page }) => {
   await signIn(page, "furn-approver");
-  await page.goto("/t/demo-furniture/cases");
-  await page.getByRole("link", { name: /INV-9001/ }).first().click();
+  await openCase(page, "INV-9001");
   await expect(page.getByRole("tab", { name: "Evidence" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Run investigation|Re-run investigation/ })).toHaveCount(0);
   await page.getByRole("tab", { name: "Evidence" }).click();
