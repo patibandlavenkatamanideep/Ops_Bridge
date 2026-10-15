@@ -20,8 +20,9 @@ from opsbridge.persistence.models import User
 from opsbridge.seed import seed_demo
 from opsbridge.simulator.app import create_simulator
 from opsbridge.simulator.scenarios import load_corpus, seed_simulator
+from opsbridge.workflow.execution import dispatch
 from opsbridge.workflow.investigation import run_investigation
-from opsbridge.workflow.worker import Worker, build_investigation_deps
+from opsbridge.workflow.worker import Worker, build_execution_deps, build_investigation_deps
 
 from .servers import serve
 from .test_api_cases import call, login
@@ -67,10 +68,13 @@ def stack(
         "investigate",
         lambda job: run_investigation(deps, job.tenant_id, uuid.UUID(job.payload["run_id"])),
     )
+    holder: dict[str, Any] = {"exec": build_execution_deps(settings, worker_db)}
+    worker.register("dispatch_operation", lambda job: dispatch(holder["exec"], job))
     with TestClient(
         create_app(settings=settings, db=app_db), base_url="http://localhost:5173"
     ) as client:
         yield {
+            "exec": holder,
             "client": client,
             "worker": worker,
             "actors": actors,

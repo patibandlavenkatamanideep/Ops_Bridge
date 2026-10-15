@@ -7,11 +7,13 @@ import { StatusBadge, statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
 import { EvidencePanel } from "./case/EvidencePanel";
 import { InvestigationPanel } from "./case/InvestigationPanel";
+import { ProposalsPanel } from "./case/ProposalsPanel";
 
-type Tab = "investigation" | "evidence";
+type Tab = "investigation" | "evidence" | "proposals";
 const TABS: { id: Tab; label: string; permission?: string }[] = [
   { id: "investigation", label: "Investigation" },
   { id: "evidence", label: "Evidence", permission: "evidence.read" },
+  { id: "proposals", label: "Proposals & execution", permission: "proposal.read" },
 ];
 
 export function CaseDetail() {
@@ -94,8 +96,10 @@ export function CaseDetail() {
         {tab === "investigation" ? (
           <InvestigationPanel tenant={tenant} caseId={caseId}
                               onCite={(cite) => { setFocus(cite); if (can(tenant, "evidence.read")) setTab("evidence"); }} />
-        ) : (
+        ) : tab === "evidence" ? (
           <EvidencePanel tenant={tenant} caseId={caseId} focus={focus} />
+        ) : (
+          <ProposalsPanel tenant={tenant} caseId={caseId} caseStatus={c.status} />
         )}
       </div>
     </article>

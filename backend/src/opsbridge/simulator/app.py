@@ -109,35 +109,6 @@ def create_simulator(
     def healthz() -> dict[str, str]:
         return {"status": "ok"}
 
-    @app.get("/orgs/{org}/{collection}")
-    async def list_records(
-        org: Org, collection: str, po_number: Annotated[str | None, Query(max_length=100)] = None
-    ) -> Any:
-        if collection not in COLLECTIONS:
-            raise HTTPException(404, "unknown collection")
-        mode = await apply_fault(org, "records.list")
-        if mode == "fail_500":
-            store.log(org, "records.list", "fault_500")
-            return JSONResponse({"error": "internal"}, status_code=500)
-        return {"items": store.list_records(org, collection, po_number)}
-
-    @app.get("/orgs/{org}/{collection}/{key}")
-    async def get_record(org: Org, collection: str, key: str) -> Response:
-        if collection not in COLLECTIONS or not _valid_key(key):
-            raise HTTPException(404, "not found")
-        mode = await apply_fault(org, "records.get")
-        if mode == "fail_500":
-            store.log(org, "records.get", "fault_500")
-            return JSONResponse({"error": "internal"}, status_code=500)
-        rec = store.get_record(org, collection, key)
-        if rec is None:
-            raise HTTPException(404, "not found")
-        body, ctype, digest = rec
-        if mode == "malformed":
-            body = body[: max(1, len(body) // 3)]
-        store.log(org, "records.get", "ok")
-        return Response(content=body, media_type=ctype, headers={"ETag": f'"{digest}"'})
-
     @app.post("/orgs/{org}/tasks", status_code=201)
     async def create_task(
         org: Org,
@@ -195,6 +166,37 @@ def create_simulator(
         if mode == "fail_500":
             return JSONResponse({"error": "internal"}, status_code=500)
         return {"items": store.find_tasks(org, marker)}
+
+    # Generic record routes are registered AFTER the task routes so /orgs/{org}/tasks/... is
+    # never captured by /orgs/{org}/{collection}/{key}.
+    @app.get("/orgs/{org}/{collection}")
+    async def list_records(
+        org: Org, collection: str, po_number: Annotated[str | None, Query(max_length=100)] = None
+    ) -> Any:
+        if collection not in COLLECTIONS:
+            raise HTTPException(404, "unknown collection")
+        mode = await apply_fault(org, "records.list")
+        if mode == "fail_500":
+            store.log(org, "records.list", "fault_500")
+            return JSONResponse({"error": "internal"}, status_code=500)
+        return {"items": store.list_records(org, collection, po_number)}
+
+    @app.get("/orgs/{org}/{collection}/{key}")
+    async def get_record(org: Org, collection: str, key: str) -> Response:
+        if collection not in COLLECTIONS or not _valid_key(key):
+            raise HTTPException(404, "not found")
+        mode = await apply_fault(org, "records.get")
+        if mode == "fail_500":
+            store.log(org, "records.get", "fault_500")
+            return JSONResponse({"error": "internal"}, status_code=500)
+        rec = store.get_record(org, collection, key)
+        if rec is None:
+            raise HTTPException(404, "not found")
+        body, ctype, digest = rec
+        if mode == "malformed":
+            body = body[: max(1, len(body) // 3)]
+        store.log(org, "records.get", "ok")
+        return Response(content=body, media_type=ctype, headers={"ETag": f'"{digest}"'})
 
     if fault_controls:
 

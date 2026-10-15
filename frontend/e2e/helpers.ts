@@ -19,3 +19,18 @@ export async function signIn(page: Page, username: string, path = "/"): Promise<
   await page.locator("#kc-login").click();
   await expect(page.getByText("OpsBridge").first()).toBeVisible();
 }
+
+/**
+ * Re-run the investigation on the open case with a model mode and wait for a NEW version.
+ * Captures the current version only after the investigation panel has finished loading.
+ */
+export async function rerunInvestigation(page: Page, mode: string): Promise<void> {
+  const version = page.locator(".facts dt", { hasText: "Version" }).locator("xpath=following-sibling::dd[1]");
+  const empty = page.getByRole("heading", { name: "No investigation yet" });
+  await expect(version.or(empty)).toBeVisible();
+  const before = (await version.count()) ? await version.innerText() : "";
+  await page.getByLabel("Model").selectOption(mode);
+  await page.getByRole("button", { name: /Run investigation|Re-run investigation/ }).click();
+  await expect(version).toBeVisible({ timeout: 30_000 });
+  await expect(version).not.toHaveText(before, { timeout: 30_000 });
+}

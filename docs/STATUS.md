@@ -8,7 +8,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–3 done; Phase 4 next |
+| Local application complete | no — Phases 0–4 done; Phase 5 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
 | External connector (GitHub sandbox) validated | not evaluated (no sandbox repo/token/authorization for writes) |
 | Hosted CI | not run (no workflow pushed yet) |
@@ -110,19 +110,44 @@ Phase 3 exit gate evidence:
 - Hosted/local live checks: **blocked** (no key/opt-in; Ollama not installed). Adapter
   contracts verified against local fakes only.
 
+### Phase 4 — approvals, execution and recovery (exit gate passed locally)
+- Versioned proposals with canonical payload digests; approvals bound to version, digest,
+  policy, source manifest, expiry, scope and separation of duties (`services/proposals.py`).
+- Approval consumption + operation + outbox event + dispatch job in one transaction.
+- Executor with attempt ledger, read-back confirmation, reconciliation by declared connector
+  capability, fencing-token guards, dispatch-time revalidation, cancellation and human review
+  of unknown outcomes (`workflow/execution.py`, `connectors/tasks.py`).
+- UI: Proposals & execution tab (create from validated draft, approve/reject the reviewed
+  version, attempt timeline, cancellation, unknown-outcome review).
+- Details, state machines and residual risks: docs/execution-and-recovery.md.
+- Defects found and fixed while building this phase (evidence for the case study):
+  1. Simulator route ordering captured `/orgs/{org}/tasks/{id}` with the generic records route;
+     the executor's read-back check refused to confirm and marked `outcome_unknown` instead of
+     claiming success. Fixed by registering task routes first.
+  2. Setting `consumed_at` by UPDATE violated the insert-only grant on approvals; consumption is
+     now written at insert time.
+  3. Dispatch resolved a task connector before routing local actions; fixed.
+  4. UI did not refresh the case after asynchronous operation completion; fixed.
+
+Phase 4 exit gate evidence: `tests/integration/test_approvals_execution.py` (18 tests; see the
+table in docs/execution-and-recovery.md) and `frontend/e2e/phase4.spec.ts` (investigator
+proposes, a different approver approves, worker dispatches, read-back confirms, case stays
+"Follow-up pending").
+
 ## Verification evidence (local, macOS arm64, 2026-10-14)
 
-`make verify` → **10 passed, 0 failed, 0 skipped** (after Phase 3):
+`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 4):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (71 files) | passed |
+| backend mypy --strict (75 files) | passed |
 | backend unit tests | 141 passed |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 7 passed |
-| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP) | 45 passed |
-| browser tests (Playwright Chromium 156, real login, real worker) | 8 passed |
+| migration drift (`alembic check`) | passed |
+| integration tests (real PostgreSQL roles, real Keycloak, real simulator HTTP with faults) | 63 passed |
+| browser tests (Playwright Chromium 156, real login, real worker) | 10 passed |
 | frontend production build | passed |
 
 Phase 2 exit gate evidence:
@@ -174,8 +199,7 @@ Phase 1 exit gate evidence:
 
 ## Next executable task
 
-Phase 4: versioned proposals with canonical payload digests, approval binding (actor,
-version, digest, policy, source manifest, expiry, separation of duties), transactional
-operation + outbox, leased dispatch with attempt ledger, sim task connector with
-idempotency/reconciliation capabilities, timeout-after-commit and duplicate-delivery tests,
-review and execution-timeline UI.
+Phase 5: Records MCP and Casework MCP services on the official SDK (streamable HTTP) with
+service-token + delegation-token authorization, permitted/denied discovery and call tests
+over real transport, and the GitHub Issues sandbox connector with HTTP contract tests
+(live run blocked pending repo, token and authorization).

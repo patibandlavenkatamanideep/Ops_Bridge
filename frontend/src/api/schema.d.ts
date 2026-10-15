@@ -158,6 +158,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Operations */
+        get: operations["list_operations_api_v1_tenants__tenant__cases__case_id__operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/operations/{operation_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel */
+        post: operations["cancel_api_v1_tenants__tenant__cases__case_id__operations__operation_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/operations/{operation_id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Review */
+        post: operations["review_api_v1_tenants__tenant__cases__case_id__operations__operation_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Proposals */
+        get: operations["list_proposals_api_v1_tenants__tenant__cases__case_id__proposals_get"];
+        put?: never;
+        /** Create Proposal */
+        post: operations["create_proposal_api_v1_tenants__tenant__cases__case_id__proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit Proposal */
+        put: operations["edit_proposal_api_v1_tenants__tenant__cases__case_id__proposals__proposal_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/proposals/{proposal_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decide */
+        post: operations["decide_api_v1_tenants__tenant__cases__case_id__proposals__proposal_id__decision_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/cases/{case_id}/resolve": {
         parameters: {
             query?: never;
@@ -247,6 +350,39 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AttemptOut */
+        AttemptOut: {
+            /** Connector Version */
+            connector_version: string;
+            /** Error Category */
+            error_category: string | null;
+            /** Error Detail */
+            error_detail: string | null;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: string;
+            /** Input Digest */
+            input_digest: string;
+            /** Kind */
+            kind: string;
+            /** Output Digest */
+            output_digest: string | null;
+            /** Parent Attempt Id */
+            parent_attempt_id: string | null;
+            /** Remote Ref */
+            remote_ref: string | null;
+            /** Retry Index */
+            retry_index: number;
+            /** Started At */
+            started_at: string;
+            /** Status */
+            status: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Worker Id */
+            worker_id: string | null;
+        };
         /** CaseCreateIn */
         CaseCreateIn: {
             /**
@@ -353,6 +489,29 @@ export interface components {
             previous_value: string | null;
             /** Reason */
             reason: string;
+        };
+        /** DecisionIn */
+        DecisionIn: {
+            /**
+             * Decision
+             * @enum {string}
+             */
+            decision: "approve" | "reject";
+            /** Payload Digest */
+            payload_digest: string;
+            /** Reason */
+            reason?: string | null;
+            /** Version */
+            version: number;
+        };
+        /** DecisionOut */
+        DecisionOut: {
+            /** Approval Id */
+            approval_id: string;
+            /** Decision */
+            decision: string;
+            operation: components["schemas"]["OperationOut"] | null;
+            proposal: components["schemas"]["ProposalOut"];
         };
         /** DocumentList */
         DocumentList: {
@@ -527,6 +686,126 @@ export interface components {
             /** Tier */
             tier: string;
         };
+        /** OperationList */
+        OperationList: {
+            /** Items */
+            items: components["schemas"]["OperationOut"][];
+        };
+        /** OperationOut */
+        OperationOut: {
+            /** Action Type */
+            action_type: string;
+            /** Approval Id */
+            approval_id: string;
+            /** Approved By */
+            approved_by: string;
+            /** Attempts */
+            attempts: components["schemas"]["AttemptOut"][];
+            /** Cancellation */
+            cancellation: string;
+            /** Confirmation */
+            confirmation: {
+                [key: string]: unknown;
+            } | null;
+            /** Connector */
+            connector: string;
+            /** Created At */
+            created_at: string;
+            /** Executed By */
+            executed_by: string | null;
+            /** Failure Category */
+            failure_category: string | null;
+            /** Id */
+            id: string;
+            /** Operation Key */
+            operation_key: string;
+            /** Payload Digest */
+            payload_digest: string;
+            /** Proposal Id */
+            proposal_id: string;
+            /** Remote Ref */
+            remote_ref: string | null;
+            /** Requested By */
+            requested_by: string;
+            /** Review Required */
+            review_required: boolean;
+            /** Status */
+            status: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /** ProposalCreateIn */
+        ProposalCreateIn: {
+            /** Body */
+            body?: string | null;
+            /** Title */
+            title?: string | null;
+        };
+        /** ProposalEditIn */
+        ProposalEditIn: {
+            /** Body */
+            body?: string | null;
+            /** Expected Payload Digest */
+            expected_payload_digest: string;
+            /** Title */
+            title?: string | null;
+        };
+        /** ProposalList */
+        ProposalList: {
+            /** Items */
+            items: components["schemas"]["ProposalOut"][];
+        };
+        /** ProposalOut */
+        ProposalOut: {
+            /** Action Type */
+            action_type: string;
+            /** Affected Resources */
+            affected_resources: string[];
+            /** Author Id */
+            author_id: string;
+            /** Author Kind */
+            author_kind: string;
+            /** Canonicalization */
+            canonicalization: string;
+            /** Effect Summary */
+            effect_summary: string;
+            /** Evidence Refs */
+            evidence_refs: {
+                [key: string]: unknown;
+            }[];
+            /** Expires At */
+            expires_at: string;
+            /** Generated At */
+            generated_at: string;
+            /** Id */
+            id: string;
+            /** Investigation Version Id */
+            investigation_version_id: string;
+            /** Parameters */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /** Payload Digest */
+            payload_digest: string;
+            /** Policy Ref */
+            policy_ref: string;
+            /** Proposal Key */
+            proposal_key: string;
+            /** Required Permission */
+            required_permission: string;
+            /**
+             * Schema Version
+             * @default 1
+             * @constant
+             */
+            schema_version: 1;
+            /** Source Manifest Digest */
+            source_manifest_digest: string;
+            /** Status */
+            status: string;
+            /** Version */
+            version: number;
+        };
         /** QueueItemOut */
         QueueItemOut: {
             /** Age Seconds */
@@ -564,6 +843,18 @@ export interface components {
              * @default
              */
             note: string;
+        };
+        /** ReviewIn */
+        ReviewIn: {
+            /**
+             * Finding
+             * @enum {string}
+             */
+            finding: "exists" | "absent";
+            /** Note */
+            note: string;
+            /** Remote Ref */
+            remote_ref?: string | null;
         };
         /** RunOut */
         RunOut: {
@@ -946,6 +1237,250 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_operations_api_v1_tenants__tenant__cases__case_id__operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_api_v1_tenants__tenant__cases__case_id__operations__operation_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                operation_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    review_api_v1_tenants__tenant__cases__case_id__operations__operation_id__review_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                operation_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReviewIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_proposals_api_v1_tenants__tenant__cases__case_id__proposals_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_proposal_api_v1_tenants__tenant__cases__case_id__proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    edit_proposal_api_v1_tenants__tenant__cases__case_id__proposals__proposal_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                proposal_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEditIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    decide_api_v1_tenants__tenant__cases__case_id__proposals__proposal_id__decision_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                proposal_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DecisionOut"];
                 };
             };
             /** @description Validation Error */

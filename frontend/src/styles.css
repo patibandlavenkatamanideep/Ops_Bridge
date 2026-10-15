@@ -498,3 +498,20 @@ textarea {
 .source .src-line span:last-child {
   word-break: break-all;
 }
+.attempts {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+.decision {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.decision label {
+  display: grid;
+  gap: 0.25rem;
+}
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

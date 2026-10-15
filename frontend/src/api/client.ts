@@ -13,6 +13,11 @@ export type DocumentList = components["schemas"]["DocumentList"];
 export type DocumentItem = components["schemas"]["DocumentOut"];
 export type VersionDetail = components["schemas"]["VersionDetailOut"];
 export type FieldItem = components["schemas"]["FieldOut"];
+export type ProposalItem = components["schemas"]["ProposalOut"];
+export type ProposalList = components["schemas"]["ProposalList"];
+export type OperationItem = components["schemas"]["OperationOut"];
+export type OperationList = components["schemas"]["OperationList"];
+export type DecisionResult = components["schemas"]["DecisionOut"];
 
 /** A finding as stored in an investigation version (fields omitted for requesters). */
 export interface Finding {
