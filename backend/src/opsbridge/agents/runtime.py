@@ -27,6 +27,7 @@ from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Artifact, ModelCall, ToolInvocation
 from opsbridge.privacy.redaction import redact
+from opsbridge.telemetry import metrics, tracing
 
 from .adapters import AnthropicAdapter, MockModelAdapter, OllamaAdapter
 from .contracts import (
@@ -313,6 +314,49 @@ def call_model(
     )
     cost: Decimal | None = None
     start = time.monotonic()
+    with tracing.span(
+        f"model {step}",
+        attributes={
+            "gen_ai.system": caps.provider,
+            "opsbridge.prompt_template": request.template_id,
+            "opsbridge.hosted": caps.hosted,
+        },
+        step=step,
+    ) as sp:
+        value, problems, cid, outcome, response, cost = _call(
+            adapter, req, sent_user, redaction, step, recorder, budget, settings, validate, start
+        )
+        sp.set_attribute("opsbridge.model.outcome", outcome)
+        if response is not None and response.input_tokens is not None:
+            sp.set_attribute("gen_ai.usage.input_tokens", response.input_tokens)
+        if response is not None and response.output_tokens is not None:
+            sp.set_attribute("gen_ai.usage.output_tokens", response.output_tokens)
+    metrics.MODEL_CALLS.labels(caps.provider, step, outcome).inc()
+    metrics.MODEL_DURATION.labels(caps.provider).observe(time.monotonic() - start)
+    if response is not None:
+        if response.input_tokens:
+            metrics.MODEL_TOKENS.labels(caps.provider, "input").inc(response.input_tokens)
+        if response.output_tokens:
+            metrics.MODEL_TOKENS.labels(caps.provider, "output").inc(response.output_tokens)
+    if cost:
+        metrics.MODEL_COST.labels(caps.provider).inc(float(cost))
+    return value, problems, cid
+
+
+def _call(
+    adapter: ModelAdapter,
+    req: ModelRequest,
+    sent_user: str,
+    redaction: dict[str, Any],
+    step: str,
+    recorder: Recorder,
+    budget: RunBudget,
+    settings: Settings,
+    validate: Callable[[str], tuple[Any, list[str]]],
+    start: float,
+) -> tuple[Any | None, list[str], str, str, ModelResponse | None, Decimal | None]:
+    caps = adapter.capabilities
+    cost: Decimal | None = None
     try:
         budget.take_model_call()
         if caps.hosted:
@@ -337,18 +381,19 @@ def call_model(
             cost_estimate=None,
             latency_ms=int((time.monotonic() - start) * 1000),
         )
-        return None, [f"{exc.category}: {exc}"], cid
+        return None, [f"{exc.category}: {exc}"], cid, exc.category, None, cost
     if len(response.text) > req.max_output_tokens * 8:
         problems = ["output exceeds the size bound"]
         value = None
     else:
         value, problems = validate(response.text)
+    outcome = "ok" if not problems else "rejected_output"
     cid = recorder.model_call(
         step=step,
         request=req,
         sent_user=sent_user,
         response=response,
-        outcome="ok" if not problems else "rejected_output",
+        outcome=outcome,
         error="; ".join(problems) or None,
         redaction=redaction,
         provider=caps.provider,
@@ -357,7 +402,7 @@ def call_model(
         latency_ms=response.latency_ms,
         validation={"accepted": not problems, "problems": problems},
     )
-    return (value if not problems else None), problems, cid
+    return (value if not problems else None), problems, cid, outcome, response, cost
 
 
 def _estimate_cost(req: ModelRequest, settings: Settings) -> Decimal:
