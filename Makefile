@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers
+        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -68,6 +68,9 @@ eval-offline: ## Replay the declared benchmark offline (no paid calls, network e
 	$(PY) python -m opsbridge.cli eval-bench --split heldout --replay
 	$(PY) python -m opsbridge.cli eval-bench --split security --replay
 	$(PY) python -m opsbridge.cli eval-verify
+
+eval-canary: ## Offline regression check (rules path, dev/validation/security) against the pinned baseline
+	$(PY) python -m opsbridge.cli eval-canary
 
 openapi: ## Regenerate OpenAPI document and frontend types
 	$(PY) python -m opsbridge.cli export-openapi --out ../frontend/src/api/openapi.json
