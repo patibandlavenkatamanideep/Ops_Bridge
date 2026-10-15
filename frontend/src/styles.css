@@ -444,8 +444,21 @@ textarea {
 }
 .side-by-side {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* Extracted fields need more room than the source text beside them. */
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: 1rem;
+}
+/* Below wide desktop widths the document list moves above the side-by-side panels so the
+   fields table is not squeezed into three narrow columns. */
+@media (max-width: 1440px) {
+  .evidence {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .doc-list > ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 1.75rem;
+  }
 }
 .source {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
