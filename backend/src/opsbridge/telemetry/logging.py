@@ -51,6 +51,7 @@ class RedactingFilter(logging.Filter):
     """
 
     def filter(self, record: logging.LogRecord) -> bool:
+        _correlate(record)
         if record.name == "uvicorn.access" and isinstance(record.args, tuple):
             record.args = tuple(scrub(a) if isinstance(a, str) else a for a in record.args)
         else:
@@ -68,7 +69,20 @@ class RedactingFilter(logging.Filter):
         return True
 
 
-_FORMAT = "%(asctime)s %(levelname)s %(name)s %(message)s"
+def _correlate(record: logging.LogRecord) -> None:
+    """Attach trace and correlation ids so log lines join to traces (never payloads)."""
+    from opentelemetry import trace
+
+    from .context import correlation_id_var
+
+    ctx = trace.get_current_span().get_span_context()
+    record.trace_id = format(ctx.trace_id, "032x") if ctx.is_valid else "-"
+    record.correlation_id = correlation_id_var.get() or "-"
+
+
+_FORMAT = (
+    "%(asctime)s %(levelname)s %(name)s [trace=%(trace_id)s cid=%(correlation_id)s] %(message)s"
+)
 
 
 def configure_logging(level: int = logging.INFO) -> None:
@@ -88,6 +102,9 @@ def uvicorn_log_config(level: str = "info") -> dict[str, Any]:
     cfg["filters"] = {"redact": {"()": RedactingFilter}}
     for handler in cfg["handlers"].values():
         handler["filters"] = ["redact"]
+    cfg["formatters"]["default"]["fmt"] = (
+        "%(levelprefix)s [trace=%(trace_id)s cid=%(correlation_id)s] %(message)s"
+    )
     cfg["root"] = {"handlers": ["default"], "level": level.upper()}
     for name in ("uvicorn", "uvicorn.access"):
         cfg["loggers"][name]["level"] = level.upper()
