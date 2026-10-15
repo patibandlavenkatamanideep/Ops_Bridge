@@ -62,6 +62,15 @@ errors, invalid citations or rejected outputs on this split.
 | No duplicate external effects in the declared trial set | pass (0 observed) | test_approvals_execution.py, test_github_execution.py |
 | Real-model quality | **not evaluated** | no real-model dataset |
 
+**Found after the benchmark (2026-10-15, Phase 9):** a demo browser test produced a
+duplicate external effect in a configuration outside the declared trial set — the task
+tracker stopped honouring idempotency keys while its search was unavailable, but the
+simulator connector still declared idempotency support, so a resend after a timeout created
+a second task. The "no duplicate external effects" gate holds for the declared trial set it
+names, but the defect shows that set did not cover a connector whose behaviour diverges from
+its declaration. Fixed by capability discovery (weakest contract when unknown) with
+regression tests in-process and through Casework MCP (docs/execution-and-recovery.md).
+
 A pass at the exact threshold with a lower bound of 0.77 is weak evidence: 40 cases cannot
 separate 0.90 from, for example, 0.80. Zero unsafe misses in 40 cases is not zero risk.
 
