@@ -21,3 +21,17 @@ Status: accepted (2026-10-14). Verified against evalseal 2.2.0 (PyPI, tag v2.2.0
   integrity relative to that key only, not independent time or input truth.
 - External timestamp anchoring (`evalseal anchor`) is not used until its trust validation
   is exercised; it is reported as unavailable.
+
+## Implementation notes (Phase 7)
+- `evaluation/receipt.py` runs each benchmark mode through `run_eval` with OpsBridge as a
+  `LocalCallableTarget` (prompt = case reference, expected = next-action label,
+  `ExactMatchScorer`), passes the ledger head as `prev_hash`, seals with `seal_and_append`
+  and signs with `sign_head`. The private key lives in `var/evalseal/` (not committed); the
+  public key is `evals/keys/opsbridge-eval.pub`.
+- `tool_acl` and `tool_responses` are written in EvalSeal's agent schemas and are validated
+  by EvalSeal when sealed. Other bound files use `opsbridge_*` roles.
+- Artifact verification uses the documented CLI (`evalseal verify --artifacts --index i`).
+  The CLI exits non-zero only for `changed`; OpsBridge additionally fails on `missing` and
+  `unverifiable`.
+- EvalSeal's `flip_rate` (non-majority verdicts / runs) is the instability definition
+  reported; the adjacent-transition rate is not used.

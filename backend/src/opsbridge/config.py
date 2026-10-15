@@ -61,6 +61,7 @@ class Settings(BaseSettings):
 
     artifact_dir: Path = REPO_ROOT / "var" / "artifacts"
     packs_dir: Path = REPO_ROOT / "packs"
+    evals_dir: Path = REPO_ROOT / "evals"
     delegation_key_path: Path = REPO_ROOT / "var" / "keys" / "delegation_ed25519.pem"
 
     simulator_url: str = "http://localhost:8090"
@@ -92,7 +93,7 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def _absolute_paths(self) -> Settings:
         # Relative paths in .env are relative to the repository root, not the process cwd.
-        for name in ("artifact_dir", "packs_dir", "delegation_key_path"):
+        for name in ("artifact_dir", "packs_dir", "evals_dir", "delegation_key_path"):
             value: Path = getattr(self, name)
             if not value.is_absolute():
                 object.__setattr__(self, name, (REPO_ROOT / value).resolve())

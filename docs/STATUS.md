@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-14 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-15 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -8,8 +8,8 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–6 done; Phase 7 next |
-| Real model validated | not evaluated (no live opt-in, no credentials) |
+| Local application complete | no — Phases 0–7 done; Phase 8 next |
+| Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
 | Hosted CI | not run (no workflow pushed yet) |
 | Staging deployed | no |
@@ -191,21 +191,60 @@ Explicitly unverified with safe fallback: OCR (tesseract absent → `needs_revie
 retrieval (not built; lexical only), live local inference (Ollama absent → blocked, no hosted
 fallback).
 
-## Verification evidence (local, macOS arm64, 2026-10-14)
+### Phase 7 — evaluation, replay and EvalSeal (exit gate passed locally)
+- Frozen benchmark `opsbridge-bench-v1` (commit 31515f0, before any held-out run): plan
+  (docs/evaluation-plan.md), machine-readable acceptance policy, digest manifest of splits,
+  document rendering, policies, prompts, scoring, modes and repeats. Corpus: dev 37,
+  validation 20, held-out 40, security 7 (104; target ~120 not reached), hand-labelled,
+  families and templates disjoint across splits; held-out includes an unseen invoice layout.
+- Stack-level harness (`evaluation/bench.py`): each trial runs through simulator HTTP,
+  services, worker and PostgreSQL (`opsbridge_eval`); rules_only and mock modes on the same
+  cases; 3 fixed repeats.
+- Strict replay (`evaluation/cassette.py`): keyed by case/mode/repeat/call with request
+  digests; a missing or diverged call fails the run (never a fallback or live call);
+  Python-level egress limited to loopback (`evaluation/egress.py`).
+- EvalSeal 2.2.0 receipts (`evaluation/receipt.py`): OpsBridge as `LocalCallableTarget`,
+  bound artifacts incl. `tool_acl`/`tool_responses` in EvalSeal's agent schemas, chained
+  ledger signed with a local Ed25519 key; `eval-verify` fails on changed or missing files.
+- Metrics (`evaluation/metrics.py`): case-majority, Wilson intervals, per-type
+  precision/recall, safe vs unsafe misses, EvalSeal flip rate, paired McNemar, frozen gate.
+- UI: Evaluation page (runs, comparability, uncertainty, gate, per-case verdicts for the
+  user's own pack, receipt download); API `/api/v1/tenants/{t}/evaluations`.
+- Worker survives a database outage with backoff (found when the DB container was
+  recreated); idempotent `opsbridge_eval` database creation for existing volumes.
+- **Held-out result (mocked responses):** next action 36/40 = 0.90 (Wilson 95% 0.77–0.96)
+  in both modes; all 4 misses are the unseen-layout family and are safe escalations; 0
+  unsafe misses; no discordant cases between modes. Gate: "pass (interval includes values
+  below the target)". Real-model quality: not evaluated. Details: docs/evaluation-results.md.
+- Defects found by validation/security runs and fixed before held-out: findings stating
+  numbers missing from their values (rules 1.0.1), validator rejecting magnitudes and
+  rule-title counts; harness ledger-linking bug.
 
-`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 6):
+Phase 7 exit gate evidence: edited bound artifact fails verification and a missing one
+fails too (`tests/integration/test_evaluation.py::test_receipt_detects_edited_and_missing_artifacts_and_replay_miss_seals_nothing`);
+missing/diverged replay response fails closed with nothing sealed (same file,
+`test_strict_replay_reproduces_recorded_runs_and_fails_closed`); egress guard and manifest
+drift (`tests/evaluation/test_offline_guards.py`); results state mode, units, splits,
+settings, failures and uncertainty (docs/evaluation-results.md, results JSON);
+`make eval-offline` reproduced identical held-out verdicts; 14 ledger records verified.
+
+## Verification evidence (local, macOS arm64, 2026-10-15)
+
+`make verify` → **12 passed, 0 failed, 0 skipped** (after Phase 7):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (87 files) | passed |
-| backend unit + contract tests | 165 passed, 1 skipped (live GitHub test, never runs by default) |
+| backend mypy --strict (96 files) | passed |
+| backend unit + contract tests | 226 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 8 passed |
+| evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 14 records ok |
 | migration drift (`alembic check`) | passed |
-| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport) | 99 passed |
-| browser tests (Playwright, dev stack in MCP mode) | 14 passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness) | 102 passed |
+| browser tests (Playwright, dev stack in MCP mode) | 16 passed |
 | frontend production build | passed |
+| `make eval-offline` (run separately; appends replay records) | held-out and security replays identical to recordings; receipts verified |
 
 Phase 2 exit gate evidence:
 - 20 ordered / 18 received: `tests/integration/test_investigation_stack.py::test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch`
@@ -245,7 +284,6 @@ Phase 1 exit gate evidence:
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
   queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
-- The "Evaluation" navigation entry has no page yet (Phase 7).
 - No genuine scanned paper document is in the fixtures; the scanned case is a synthetic
   image-only PDF. OCR is unverified (tesseract not installed) and routes to needs_review.
 - Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
@@ -260,10 +298,15 @@ Phase 1 exit gate evidence:
 - Development `.env` from the original Desktop location was uploaded to iCloud before
   eviction (ADR 0009); values are local-only development secrets.
 
+- Benchmark: 104 cases (not ~120); labels authored by the same agent that wrote the rules;
+  mocked responses only; held-out pass sits exactly at the 0.90 target with a 0.77 lower
+  bound; supplier invoice layouts outside the pack mappings are escalated, not read.
+- The egress guard covers Python sockets; libpq connects only to the configured local DB.
+
 ## Next executable task
 
-Phase 7: frozen evaluation manifests and splits (validation + held-out toward 120 cases),
-case/attempt cassettes with strict offline replay (network disabled, missing response fails
-closed), rules-only vs mock-agent comparison on the same held-out cases, repeated runs,
-EvalSeal 2.2.0 receipt with tamper verification, `make eval-offline`, evaluation page,
-docs/evaluation-plan.md and docs/evaluation-results.md.
+Phase 8: OpenTelemetry traces and metrics (with the log scrubber applied to span
+attributes), health/readiness detail and alert rules, container images and a compose
+demo profile, backup/restore drill against PostgreSQL, CI workflow (least privilege,
+pinned actions, no secrets for forks; not pushed to run without the owner's consent for
+hosted CI), docs/operations.md, docs/deployment.md, docs/architecture.md.

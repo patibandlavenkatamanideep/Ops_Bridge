@@ -49,6 +49,8 @@ def main() -> int:
     results.append(run("frontend lint", ["npm", "run", "lint"], ROOT / "frontend"))
     results.append(run("frontend typecheck", ["npm", "run", "typecheck"], ROOT / "frontend"))
     results.append(run("frontend unit tests", ["npm", "test"], ROOT / "frontend"))
+    # Read-only: re-hash every sealed benchmark receipt (replays run via make eval-offline).
+    results.append(run("evaluation receipts (eval-verify)", [*PY, "python", "-m", "opsbridge.cli", "eval-verify"]))
 
     if up(5433):
         results.append(run("migration drift (alembic check)", [*PY, "alembic", "check"]))

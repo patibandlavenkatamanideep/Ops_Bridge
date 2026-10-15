@@ -70,13 +70,27 @@ def _git_head(root: Path) -> str | None:
 
 
 def code_version(root: Path) -> dict[str, Any]:
-    """Commit of the code that ran, and whether the working tree had uncommitted changes."""
+    """Commit of the code that ran, and whether code or inputs had uncommitted changes."""
     git = shutil.which("git")
     dirty = None
     if git is not None:
         try:
             out = subprocess.run(  # noqa: S603 - fixed argv: resolved git binary, read-only query
-                [git, "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                # Code and benchmark inputs only: appending to the evaluation ledger is not a
+                # code change.
+                [
+                    git,
+                    "-C",
+                    str(root),
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=no",
+                    "--",
+                    "backend",
+                    "frontend",
+                    "packs",
+                    "fixtures",
+                ],
                 capture_output=True,
                 text=True,
                 timeout=10,

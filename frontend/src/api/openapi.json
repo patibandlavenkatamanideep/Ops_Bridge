@@ -3723,6 +3723,179 @@
         ]
       }
     },
+    "/api/v1/tenants/{tenant}/evaluations": {
+      "get": {
+        "operationId": "list_runs_api_v1_tenants__tenant__evaluations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response List Runs Api V1 Tenants  Tenant  Evaluations Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs",
+        "tags": [
+          "evaluations"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/evaluations/{benchmark}/{run_id}": {
+      "get": {
+        "operationId": "run_detail_api_v1_tenants__tenant__evaluations__benchmark___run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "benchmark",
+            "required": true,
+            "schema": {
+              "title": "Benchmark",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Run Detail Api V1 Tenants  Tenant  Evaluations  Benchmark   Run Id  Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Detail",
+        "tags": [
+          "evaluations"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/evaluations/{benchmark}/{run_id}/receipt": {
+      "get": {
+        "operationId": "receipt_api_v1_tenants__tenant__evaluations__benchmark___run_id__receipt_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "benchmark",
+            "required": true,
+            "schema": {
+              "title": "Benchmark",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receipt",
+        "tags": [
+          "evaluations"
+        ]
+      }
+    },
     "/api/v1/tenants/{tenant}/retention/run": {
       "post": {
         "operationId": "run_retention_api_v1_tenants__tenant__retention_run_post",

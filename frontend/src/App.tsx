@@ -3,6 +3,7 @@ import { Layout } from "./components/Layout";
 import { EmptyState, ErrorState, Loading } from "./components/States";
 import { CaseDetail } from "./pages/CaseDetail";
 import { CaseQueue } from "./pages/CaseQueue";
+import { Evaluation } from "./pages/Evaluation";
 import { NewCase } from "./pages/NewCase";
 import { SignIn } from "./pages/SignIn";
 import { TenantSettings } from "./pages/TenantSettings";
@@ -59,6 +60,8 @@ export function App() {
           <Route path="cases/new" element={<NewCase />} />
           <Route path="cases/:caseId" element={<CaseDetail />} />
           <Route path="settings" element={<TenantSettings />} />
+          <Route path="evaluation" element={<Evaluation />} />
+          <Route path="evaluation/:benchmark/:runId" element={<Evaluation />} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

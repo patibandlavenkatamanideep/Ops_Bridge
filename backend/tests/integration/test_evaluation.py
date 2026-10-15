@@ -155,3 +155,37 @@ def test_receipt_detects_edited_and_missing_artifacts_and_replay_miss_seals_noth
         with pytest.raises(ReplayFailure):
             _run(env, corpus, replay, tmp_path, "mock", {})
     assert (tmp_path / "ledger.jsonl").read_text() == before
+
+
+def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> None:  # type: ignore[no-untyped-def]
+    from .stack import get
+
+    st = stack
+    runs = get(st, "furn-investigator", "/api/v1/tenants/demo-furniture/evaluations").json()[
+        "items"
+    ]
+    held = next(r for r in runs if r["split"] == "heldout" and r["kind"] == "record")
+    url = f"/api/v1/tenants/demo-furniture/evaluations/{held['benchmark_id']}/{held['run_id']}"
+    detail = get(st, "furn-investigator", url).json()
+    cases = detail["modes"]["rules_only"]["pack_cases"]
+    assert cases and all(c["case_id"].startswith("fur-") for c in cases)  # no IT-pack case detail
+    assert detail["modes"]["rules_only"]["n_cases"] == 40  # aggregates cover the whole benchmark
+    it = get(st, "it-investigator", url.replace("demo-furniture", "demo-it")).json()
+    assert all(c["case_id"].startswith("it-") for c in it["modes"]["rules_only"]["pack_cases"])
+    receipt_resp = get(st, "furn-investigator", url + "/receipt")
+    assert receipt_resp.headers["content-disposition"].startswith("attachment;")
+    assert {r["hash"] for r in receipt_resp.json()} == {
+        r["record_hash"] for r in detail["receipts"].values()
+    }
+    for bad in ("../../../etc/passwd", "heldout-record-x", "..%2F..%2Fmanifests"):
+        assert (
+            get(
+                st,
+                "furn-investigator",
+                f"/api/v1/tenants/demo-furniture/evaluations/{held['benchmark_id']}/{bad}",
+            ).status_code
+            == 404
+        )
+    assert (
+        get(st, "furn-requester", "/api/v1/tenants/demo-furniture/evaluations").status_code == 403
+    )
