@@ -43,7 +43,7 @@ from opsbridge.persistence.models import (
     WorkflowStep,
 )
 from opsbridge.services.cases import transition
-from opsbridge.telemetry import tracing
+from opsbridge.telemetry import metrics, tracing
 
 WORKFLOW_VERSION = "investigation/1.1.0"
 SERVICE_IDENTITY = "service:opsbridge-worker"
@@ -920,6 +920,12 @@ def _finalize(
             case.assignee_group = recon["recommendation"]["assignee_group"]
         run.status = "completed"
         run.finished_at = datetime.now(UTC)
+        took = max((run.finished_at - run.created_at).total_seconds(), 0.0)
+        mode, outcome = run.model_mode, recon["outcome"]
+        metrics.after_commit(
+            s, lambda: metrics.INVESTIGATION_DURATION.labels(mode, outcome).observe(took)
+        )
+        tracing.set_ids(case_id=case.id, run_id=run.id)
         audit.record(
             s,
             tenant_id=tenant_id,
