@@ -344,6 +344,38 @@ def _eval_verify(_args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 1
 
 
+def _probe(args: argparse.Namespace) -> int:
+    """Container health probe: `http://…` must answer 200; `tcp://host:port` must accept.
+    A subcommand (not `python -c`) because some engines re-split health-check arguments."""
+    import socket
+    import urllib.request
+    from urllib.parse import urlparse
+
+    target = urlparse(args.url)
+    try:
+        if target.scheme == "tcp":
+            socket.create_connection((target.hostname, target.port), timeout=3).close()
+            return 0
+        if target.hostname not in ("127.0.0.1", "localhost") or target.scheme != "http":
+            return 2  # probes are for the local process only
+        with urllib.request.urlopen(args.url, timeout=3) as r:  # noqa: S310 - loopback http only
+            return 0 if r.status == 200 else 1
+    except OSError:
+        return 1
+
+
+def _init_keys(_args: argparse.Namespace) -> int:
+    """Create the delegation signing key once, before services that share it start."""
+    from opsbridge.config import get_settings
+    from opsbridge.mcp_services.auth import load_or_create_key
+
+    path = get_settings().delegation_key_path
+    existed = path.exists()
+    load_or_create_key(path)
+    print(f"delegation key {'present' if existed else 'created'} at {path}")
+    return 0
+
+
 def _verify_restore(args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
     from opsbridge.operations.restore import verify_restored
@@ -379,11 +411,14 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
 
     configure_tracing(f"opsbridge-mcp-{which}")
     settings = get_settings()
+    # Tokens must carry the public issuer; keys may be fetched over the backchannel.
+    backchannel = (settings.oidc_discovery_url or settings.oidc_issuer).rstrip("/")
+    jwks_url = f"{backchannel}/protocol/openid-connect/certs"
     db = Database(make_engine("mcp"))
     if which == "records":
         aud, url = factory.RECORDS_AUDIENCE, settings.records_mcp_url
         token_verifier = JwksTokenVerifier(
-            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"})
+            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"}), jwks_url=jwks_url
         )
         server = build_records_server(
             db, token_verifier, factory.verifier(settings, aud), url, settings.oidc_issuer
@@ -391,7 +426,7 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
     else:
         aud, url = factory.CASEWORK_AUDIENCE, settings.casework_mcp_url
         token_verifier = JwksTokenVerifier(
-            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"})
+            settings.oidc_issuer, aud, frozenset({"opsbridge-worker"}), jwks_url=jwks_url
         )
 
         def connector_for(tenant_id: uuid.UUID, name: str) -> TaskConnector:
@@ -416,7 +451,22 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
             connector_for,
             timeout_seconds=settings.connector_timeout_seconds,
         )
-    app = server.streamable_http_app(stateless_http=True, json_response=True)
+    # DNS-rebinding protection stays on; the allowed Host values are this service's configured
+    # address (a container name under Compose) and its loopback forms.
+    from urllib.parse import urlparse
+
+    from mcp.server.transport_security import TransportSecuritySettings
+
+    parsed = urlparse(url)
+    security = TransportSecuritySettings(
+        enable_dns_rebinding_protection=True,
+        allowed_hosts=sorted(
+            {parsed.netloc, f"localhost:{parsed.port}", f"127.0.0.1:{parsed.port}"}
+        ),
+    )
+    app = server.streamable_http_app(
+        stateless_http=True, json_response=True, transport_security=security
+    )
     uvicorn.run(
         app,
         host=args.host,
@@ -489,6 +539,13 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
     p.set_defaults(func=_eval_verify)
+
+    p = sub.add_parser("probe", help="health probe for containers (http://127.0.0.1… or tcp://…)")
+    p.add_argument("url")
+    p.set_defaults(func=_probe)
+
+    p = sub.add_parser("init-keys", help="create the delegation signing key if absent")
+    p.set_defaults(func=_init_keys)
 
     p = sub.add_parser("verify-restore", help="application-level checks on a restored database")
     p.add_argument("--database", required=True)
