@@ -29,6 +29,7 @@ dependencies = [
     "evalseal==2.2.0",
     "pillow==12.3.0",
     "jsonschema==4.26.0",
+    "opentelemetry-exporter-otlp-proto-http==1.45.1",
 ]
 
 [dependency-groups]
