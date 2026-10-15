@@ -145,6 +145,32 @@ def _eval_rules(args: argparse.Namespace) -> int:
     return 0
 
 
+def _eval_canary(args: argparse.Namespace) -> int:
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation import canary
+
+    path = REPO_ROOT / "evals" / "baselines" / "canary-rules.json"
+    current = canary.run(REPO_ROOT)
+    if args.update_baseline:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(current, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"baseline written: {len(current['cases'])} cases → {path.relative_to(REPO_ROOT)}")
+        return 0
+    if not path.exists():
+        print(
+            f"No pinned baseline at {path}; create it with --update-baseline in a reviewed commit."
+        )
+        return 2
+    diffs = canary.compare(canary.load(path), current)
+    agree = sum(1 for c in current["cases"].values() if c["matches_label"])
+    print(
+        f"canary: {len(current['cases'])} cases, {agree} match their labels, {len(diffs)} change(s) vs baseline"
+    )
+    for d in diffs:
+        print(f"  CHANGED {d}")
+    return 1 if diffs else 0
+
+
 def _eval_freeze(args: argparse.Namespace) -> int:
     from opsbridge.config import REPO_ROOT
     from opsbridge.evaluation import manifest
@@ -517,6 +543,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--corpus", default="../fixtures/scenarios/dev.yaml")
     p.add_argument("--out", default="../evals/results/rules-baseline-dev.json")
     p.set_defaults(func=_eval_rules)
+
+    p = sub.add_parser("eval-canary", help="offline regression check against the pinned baseline")
+    p.add_argument("--update-baseline", action="store_true")
+    p.set_defaults(func=_eval_canary)
 
     p = sub.add_parser("eval-freeze", help="freeze benchmark inputs by digest (once per id)")
     p.add_argument("--benchmark", default="opsbridge-bench-v1")
