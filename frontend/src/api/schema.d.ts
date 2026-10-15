@@ -761,6 +761,10 @@ export interface components {
             }[];
             /** Id */
             id: string;
+            /** Model Routing */
+            model_routing?: {
+                [key: string]: unknown;
+            } | null;
             /** Outcome */
             outcome: string;
             /** Policy Ref */
