@@ -7,6 +7,8 @@ import json
 import sys
 from pathlib import Path
 
+from opsbridge.telemetry.logging import uvicorn_log_config
+
 
 def _export_openapi(args: argparse.Namespace) -> int:
     from opsbridge.api.app import create_app
@@ -40,7 +42,14 @@ def _api(args: argparse.Namespace) -> int:
 
     static = Path(args.static) if args.static else REPO_ROOT / "frontend" / "dist"
     app = create_app(static_dir=static if args.serve_frontend else None)
-    uvicorn.run(app, host=args.host, port=args.port, proxy_headers=False, log_level="info")
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        proxy_headers=False,
+        log_level="info",
+        log_config=uvicorn_log_config("info"),
+    )
     return 0
 
 
@@ -56,7 +65,13 @@ def _simulator(args: argparse.Namespace) -> int:
 
     from opsbridge.simulator.app import app_from_env
 
-    uvicorn.run(app_from_env(), host=args.host, port=args.port, log_level="warning")
+    uvicorn.run(
+        app_from_env(),
+        host=args.host,
+        port=args.port,
+        log_level="warning",
+        log_config=uvicorn_log_config("warning"),
+    )
     return 0
 
 
@@ -181,7 +196,13 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
             timeout_seconds=settings.connector_timeout_seconds,
         )
     app = server.streamable_http_app(stateless_http=True, json_response=True)
-    uvicorn.run(app, host=args.host, port=args.port, log_level="warning")
+    uvicorn.run(
+        app,
+        host=args.host,
+        port=args.port,
+        log_level="warning",
+        log_config=uvicorn_log_config("warning"),
+    )
     return 0
 
 

@@ -5,15 +5,17 @@ import { ApiError, api, tenantPath, type CaseOut, type Citation } from "../api/c
 import { ErrorState, Loading } from "../components/States";
 import { StatusBadge, statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
+import { ConversationPanel } from "./case/ConversationPanel";
 import { EvidencePanel } from "./case/EvidencePanel";
 import { InvestigationPanel } from "./case/InvestigationPanel";
 import { ProposalsPanel } from "./case/ProposalsPanel";
 
-type Tab = "investigation" | "evidence" | "proposals";
+type Tab = "investigation" | "evidence" | "proposals" | "conversation";
 const TABS: { id: Tab; label: string; permission?: string }[] = [
   { id: "investigation", label: "Investigation" },
   { id: "evidence", label: "Evidence", permission: "evidence.read" },
   { id: "proposals", label: "Proposals & execution", permission: "proposal.read" },
+  { id: "conversation", label: "Conversation" },
 ];
 
 export function CaseDetail() {
@@ -98,8 +100,10 @@ export function CaseDetail() {
                               onCite={(cite) => { setFocus(cite); if (can(tenant, "evidence.read")) setTab("evidence"); }} />
         ) : tab === "evidence" ? (
           <EvidencePanel tenant={tenant} caseId={caseId} focus={focus} />
-        ) : (
+        ) : tab === "proposals" ? (
           <ProposalsPanel tenant={tenant} caseId={caseId} caseStatus={c.status} />
+        ) : (
+          <ConversationPanel tenant={tenant} caseId={caseId} />
         )}
       </div>
     </article>

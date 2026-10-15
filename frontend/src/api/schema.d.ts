@@ -66,7 +66,8 @@ export interface paths {
         /** Documents */
         get: operations["documents_api_v1_tenants__tenant__cases__case_id__documents_get"];
         put?: never;
-        post?: never;
+        /** Upload */
+        post: operations["upload_api_v1_tenants__tenant__cases__case_id__documents_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -152,6 +153,41 @@ export interface paths {
         put?: never;
         /** Start */
         post: operations["start_api_v1_tenants__tenant__cases__case_id__investigations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Messages */
+        get: operations["messages_api_v1_tenants__tenant__cases__case_id__messages_get"];
+        put?: never;
+        /** Post Message */
+        post: operations["post_message_api_v1_tenants__tenant__cases__case_id__messages_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/messages/{message_id}/delete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Delete Message */
+        post: operations["delete_message_api_v1_tenants__tenant__cases__case_id__messages__message_id__delete_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -295,6 +331,41 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/retention/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Run Retention */
+        post: operations["run_retention_api_v1_tenants__tenant__retention_run_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_v1_tenants__tenant__settings_get"];
+        /** Put Settings */
+        put: operations["put_settings_api_v1_tenants__tenant__settings_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -382,6 +453,13 @@ export interface components {
             tool_name: string;
             /** Worker Id */
             worker_id: string | null;
+        };
+        /** Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post */
+        Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post: {
+            /** File */
+            file: string;
+            /** Kind */
+            kind: string;
         };
         /** CaseCreateIn */
         CaseCreateIn: {
@@ -513,6 +591,11 @@ export interface components {
             operation: components["schemas"]["OperationOut"] | null;
             proposal: components["schemas"]["ProposalOut"];
         };
+        /** DeleteIn */
+        DeleteIn: {
+            /** Reason */
+            reason: string;
+        };
         /** DocumentList */
         DocumentList: {
             /** Items */
@@ -557,6 +640,17 @@ export interface components {
             version_id: string;
             /** Version No */
             version_no: number;
+        };
+        /** Entitlements */
+        Entitlements: {
+            /** External Connectors */
+            external_connectors: string[];
+            /** Local Inference */
+            local_inference: boolean;
+            /** Max Model Calls Per Run */
+            max_model_calls_per_run: number;
+            /** Model Modes */
+            model_modes: string[];
         };
         /** FieldOut */
         FieldOut: {
@@ -665,6 +759,19 @@ export interface components {
             /** Username */
             username: string;
         };
+        /** MemberOut */
+        MemberOut: {
+            /** Approval Scope */
+            approval_scope: string[];
+            /** Display Name */
+            display_name: string | null;
+            /** Roles */
+            roles: string[];
+            /** Status */
+            status: string;
+            /** Username */
+            username: string;
+        };
         /** MembershipOut */
         MembershipOut: {
             /** Approval Scope */
@@ -685,6 +792,43 @@ export interface components {
             tenant_slug: string;
             /** Tier */
             tier: string;
+        };
+        /** MessageIn */
+        MessageIn: {
+            /** Body */
+            body: string;
+            /** Supersedes Id */
+            supersedes_id?: string | null;
+        };
+        /** MessageList */
+        MessageList: {
+            /** Items */
+            items: components["schemas"]["MessageOut"][];
+        };
+        /** MessageOut */
+        MessageOut: {
+            /** Author */
+            author: string | null;
+            /** Author Id */
+            author_id: string | null;
+            /** Author Kind */
+            author_kind: string;
+            /** Body */
+            body: string | null;
+            /** Body Sha256 */
+            body_sha256: string;
+            /** Created At */
+            created_at: string;
+            /** Deleted At */
+            deleted_at: string | null;
+            /** Deletion Reason */
+            deletion_reason: string | null;
+            /** Id */
+            id: string;
+            /** Seq */
+            seq: number;
+            /** Supersedes Id */
+            supersedes_id: string | null;
         };
         /** OperationList */
         OperationList: {
@@ -879,10 +1023,84 @@ export interface components {
             /** Workflow Version */
             workflow_version: string;
         };
+        /** SettingsIn */
+        SettingsIn: {
+            /** Model Mode */
+            model_mode?: string | null;
+            /** Retention */
+            retention?: {
+                [key: string]: number;
+            } | null;
+            /** Task Connector */
+            task_connector?: string | null;
+        };
+        /** SettingsOut */
+        SettingsOut: {
+            entitlements: components["schemas"]["Entitlements"];
+            /** Members */
+            members: components["schemas"]["MemberOut"][];
+            /**
+             * Retention Keys
+             * @default [
+             *       "raw_documents_days",
+             *       "conversation_days",
+             *       "model_artifacts_days",
+             *       "tool_artifacts_days"
+             *     ]
+             */
+            retention_keys: string[];
+            settings: components["schemas"]["SettingsValues"];
+            tenant: components["schemas"]["TenantInfo"];
+        };
+        /** SettingsValues */
+        SettingsValues: {
+            /** Model Mode */
+            model_mode: string;
+            /** Retention */
+            retention: {
+                [key: string]: number;
+            };
+            /** Task Connector */
+            task_connector: string;
+        };
         /** StartIn */
         StartIn: {
             /** Model Mode */
             model_mode?: ("rules_only" | "mock" | "anthropic" | "ollama") | null;
+        };
+        /** TenantInfo */
+        TenantInfo: {
+            /** Name */
+            name: string;
+            /** Pack Id */
+            pack_id: string;
+            /** Slug */
+            slug: string;
+            /** Synthetic Demo */
+            synthetic_demo: boolean;
+            /** Tier */
+            tier: string;
+        };
+        /** UploadOut */
+        UploadOut: {
+            /** Document Id */
+            document_id: string;
+            /** Parse Detail */
+            parse_detail: string | null;
+            /** Parse Status */
+            parse_status: string;
+            /** Problems */
+            problems: string[];
+            /** Raw Sha256 */
+            raw_sha256: string;
+            /** Records */
+            records: {
+                [key: string]: number;
+            };
+            /** Version Id */
+            version_id: string;
+            /** Version No */
+            version_no: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -1078,6 +1296,42 @@ export interface operations {
             };
         };
     };
+    upload_api_v1_tenants__tenant__cases__case_id__documents_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     version_api_v1_tenants__tenant__cases__case_id__documents_versions__version_id__get: {
         parameters: {
             query?: never;
@@ -1238,6 +1492,111 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    messages_api_v1_tenants__tenant__cases__case_id__messages_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_message_api_v1_tenants__tenant__cases__case_id__messages_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MessageIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_message_api_v1_tenants__tenant__cases__case_id__messages__message_id__delete_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                message_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MessageOut"];
                 };
             };
             /** @description Validation Error */
@@ -1551,6 +1910,105 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_retention_api_v1_tenants__tenant__retention_run_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: string;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_v1_tenants__tenant__settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_settings_api_v1_tenants__tenant__settings_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
                 };
             };
             /** @description Validation Error */

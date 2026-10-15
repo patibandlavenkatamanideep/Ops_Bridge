@@ -71,6 +71,11 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
                 return _error(
                     413, "payload_too_large", "The request body is too large.", cid, False
                 )
+        elif "chunked" in request.headers.get("transfer-encoding", "").lower():
+            # Without a declared length the limit could only be enforced after buffering.
+            return _error(
+                411, "length_required", "Request bodies must declare Content-Length.", cid, False
+            )
         if request.url.path.startswith(("/api/", "/auth/")):
             cookie = request.cookies.get(COOKIE_NAME)
             client = request.client.host if request.client else "unknown"

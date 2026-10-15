@@ -15,6 +15,7 @@ from sqlalchemy import Engine, select
 
 from opsbridge.api.app import create_app
 from opsbridge.config import REPO_ROOT, Settings, get_settings
+from opsbridge.evidence.storage import LocalArtifactStore
 from opsbridge.persistence.db import Database, make_engine
 from opsbridge.persistence.models import User
 from opsbridge.seed import seed_demo
@@ -22,6 +23,7 @@ from opsbridge.simulator.app import create_simulator
 from opsbridge.simulator.scenarios import load_corpus, seed_simulator
 from opsbridge.workflow.execution import dispatch
 from opsbridge.workflow.investigation import run_investigation
+from opsbridge.workflow.retention import sweep
 from opsbridge.workflow.worker import Worker, build_execution_deps, build_investigation_deps
 
 from .servers import serve
@@ -70,6 +72,10 @@ def stack(
     )
     holder: dict[str, Any] = {"exec": build_execution_deps(settings, worker_db)}
     worker.register("dispatch_operation", lambda job: dispatch(holder["exec"], job))
+    artifacts = LocalArtifactStore(settings.artifact_dir)
+    worker.register(
+        "retention_sweep", lambda job: sweep(worker_db, artifacts, job.tenant_id) and None
+    )
     with TestClient(
         create_app(settings=settings, db=app_db), base_url="http://localhost:5173"
     ) as client:

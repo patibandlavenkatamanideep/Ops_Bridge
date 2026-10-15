@@ -8,7 +8,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–5 done; Phase 6 next |
+| Local application complete | no — Phases 0–6 done; Phase 7 next |
 | Real model validated | not evaluated (no live opt-in, no credentials) |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
 | Hosted CI | not run (no workflow pushed yet) |
@@ -152,20 +152,59 @@ stack in MCP mode; the dev audit trail shows `mcp.casework.create_follow_up_task
 `get_follow_up_task`. Live GitHub run: **blocked** (no repo/token/authorization);
 `tests/live/test_github_live.py` is skipped unless explicitly enabled.
 
+### Phase 6 — privacy, retention and adversarial hardening (exit gate passed locally)
+- Uploads (`POST /cases/{id}/documents`, `services/casework_admin.py`): kind allow-list,
+  size cap enforced from `Content-Length` before buffering and chunked bodies refused (411),
+  content sniffed against the declared type, safe basename, re-upload of a name = new version,
+  same parsers/pack mappings as source records, audited.
+- Case conversation (`/cases/{id}/messages`): author-only corrections via `supersedes_id`;
+  deletion by author or tenant admin clears text, keeps who/when/why and digest.
+- Tenant settings (`/settings`): default model mode, task connector and retention, gated by
+  tier entitlements and by `tenant.manage_policy` / `tenant.manage_connectors`; read-only for
+  auditors; members listed.
+- Retention sweep (`workflow/retention.py`, job `retention_sweep`): deletes original bytes and
+  their chunks, model/tool artifacts and message text past the configured days; keeps
+  digests, findings and audit; API reports "deleted by retention policy". No schedule yet.
+- Log redaction (`telemetry/logging.py`) on API, worker, simulator and MCP processes,
+  including uvicorn access logs (OIDC `code`/`state`) and tracebacks.
+- UI: Tenant settings page, Conversation tab, upload form on the Evidence tab.
+- Docs: docs/privacy-and-retention.md, docs/security-and-threat-model.md (T1–T19).
+- Defects found while building this phase:
+  1. The dev access log printed full request URLs, so OIDC callback codes reached local
+     process output (never committed). Fixed by the redacting filter; covered by a test that
+     applies uvicorn's real logging config.
+  2. Chunked request bodies bypassed the `Content-Length` limit check; now refused with 411.
+  3. Connector changes were checked against `tenant.manage_policy` instead of
+     `tenant.manage_connectors`; fixed.
+  4. A retrieval isolation test first passed vacuously (query matched nothing); rewritten to
+     prove the foreign term matches under its own tenant and returns nothing under another.
+
+Phase 6 exit gate evidence: `tests/integration/test_hardening.py` (16): uploads (parse +
+versioning; HTML disguised as text/PDF, bad image, unknown kind; size, traversal filename,
+cross-tenant and role denial; chunked body 411; download no-store/attachment), conversation
+correction/deletion, settings roles vs tiers, retention deletion with honest API state,
+policy published before dispatch → `cancelled_before_dispatch` with no remote task, changed
+PO → new version 2 and new manifest digest, retrieval isolation before ranking, artifact key
+traversal/cross-tenant, pooled worker connection reuse across tenants;
+`tests/privacy/test_log_redaction.py` (14); `frontend/e2e/phase6.spec.ts` (4).
+Explicitly unverified with safe fallback: OCR (tesseract absent → `needs_review`), semantic
+retrieval (not built; lexical only), live local inference (Ollama absent → blocked, no hosted
+fallback).
+
 ## Verification evidence (local, macOS arm64, 2026-10-14)
 
-`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 5):
+`make verify` → **11 passed, 0 failed, 0 skipped** (after Phase 6):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (83 files) | passed |
-| backend unit + contract tests | 151 passed, 1 skipped (live GitHub test, never runs by default) |
+| backend mypy --strict (87 files) | passed |
+| backend unit + contract tests | 165 passed, 1 skipped (live GitHub test, never runs by default) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
-| frontend unit tests (vitest) | 7 passed |
+| frontend unit tests (vitest) | 8 passed |
 | migration drift (`alembic check`) | passed |
-| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport) | 83 passed |
-| browser tests (Playwright, dev stack in MCP mode) | 10 passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport) | 99 passed |
+| browser tests (Playwright, dev stack in MCP mode) | 14 passed |
 | frontend production build | passed |
 
 Phase 2 exit gate evidence:
@@ -212,6 +251,10 @@ Phase 1 exit gate evidence:
 - Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
   route to needs_review rather than parse.
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
+- Retention runs only on request (no schedule); backups are outside its reach. Extracted
+  field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
+- Uploads are not malware-scanned; there is no in-app member editor (memberships are seeded).
+- Browser tests add conversation notes and upload versions to the local demo case INV-9001.
 - A run of a different model mode is refused (409) while another run is active, instead of
   silently returning the active run (found by a browser test; fixed in Phase 3).
 - Development `.env` from the original Desktop location was uploaded to iCloud before
@@ -219,7 +262,8 @@ Phase 1 exit gate evidence:
 
 ## Next executable task
 
-Phase 6: retention and deletion (raw documents, conversations, extracted text, caches,
-replay artifacts) with opaque audit references, upload endpoint with size/type/filename
-defences, conversation history with controlled correction/deletion, cache/artifact isolation
-tests, OCR path reported unavailable, threat-model notes.
+Phase 7: frozen evaluation manifests and splits (validation + held-out toward 120 cases),
+case/attempt cassettes with strict offline replay (network disabled, missing response fails
+closed), rules-only vs mock-agent comparison on the same held-out cases, repeated runs,
+EvalSeal 2.2.0 receipt with tamper verification, `make eval-offline`, evaluation page,
+docs/evaluation-plan.md and docs/evaluation-results.md.

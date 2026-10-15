@@ -5,6 +5,7 @@ import { CaseDetail } from "./pages/CaseDetail";
 import { CaseQueue } from "./pages/CaseQueue";
 import { NewCase } from "./pages/NewCase";
 import { SignIn } from "./pages/SignIn";
+import { TenantSettings } from "./pages/TenantSettings";
 import { SessionProvider, useMe, useSession } from "./session";
 
 function TenantGuard() {
@@ -57,6 +58,7 @@ export function App() {
           <Route path="cases" element={<CaseQueue />} />
           <Route path="cases/new" element={<NewCase />} />
           <Route path="cases/:caseId" element={<CaseDetail />} />
+          <Route path="settings" element={<TenantSettings />} />
         </Route>
         <Route path="*" element={<Home />} />
       </Routes>

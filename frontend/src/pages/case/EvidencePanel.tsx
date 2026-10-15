@@ -7,6 +7,7 @@ import {
   type Citation,
   type DocumentList,
   type FieldItem,
+  type UploadResult,
   type VersionDetail,
 } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
@@ -30,46 +31,137 @@ export function EvidencePanel({ tenant, caseId, focus }: { tenant: string; caseI
     queryKey: ["documents", tenant, caseId],
     queryFn: ({ signal }) => api<DocumentList>(tenantPath(tenant, `/cases/${caseId}/documents`), { signal }),
   });
+  const { can } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
   const versionId = focus?.version_id ?? selected ?? docs.data?.items[0]?.versions[0]?.version_id ?? null;
+  const uploader = can(tenant, "evidence.upload") && (
+    <UploadForm tenant={tenant} caseId={caseId} onUploaded={(r) => setSelected(r.version_id)} />
+  );
 
   if (docs.isPending) return <Loading label="Loading evidence" />;
   if (docs.isError) return <ErrorState error={docs.error} onRetry={() => docs.refetch()} />;
   if (docs.data.items.length === 0) {
     return (
-      <EmptyState title="No evidence collected">
-        <p>Run an investigation to collect source documents for this case.</p>
-      </EmptyState>
+      <>
+        <EmptyState title="No evidence collected">
+          <p>Run an investigation to collect source documents for this case, or upload one.</p>
+        </EmptyState>
+        {uploader}
+      </>
     );
   }
   return (
-    <div className="evidence">
-      <nav aria-label="Source documents" className="doc-list">
-        <ul>
-          {docs.data.items.map((d) => (
-            <li key={d.document_id}>
-              <span className="doc-title">{d.title}</span>
-              <span className="muted small"> {statusLabel(d.kind)}</span>
-              <ul>
-                {d.versions.map((v) => (
-                  <li key={v.version_id}>
-                    <button
-                      type="button"
-                      className={`link-button ${v.version_id === versionId ? "current" : ""}`}
-                      aria-current={v.version_id === versionId ? "true" : undefined}
-                      onClick={() => setSelected(v.version_id)}
-                    >
-                      v{v.version_no} · {statusLabel(v.parse_status)}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </li>
+    <>
+      {uploader}
+      <div className="evidence">
+        <nav aria-label="Source documents" className="doc-list">
+          <ul>
+            {docs.data.items.map((d) => (
+              <li key={d.document_id}>
+                <span className="doc-title">{d.title}</span>
+                <span className="muted small"> {statusLabel(d.kind)}</span>
+                <ul>
+                  {d.versions.map((v) => (
+                    <li key={v.version_id}>
+                      <button
+                        type="button"
+                        className={`link-button ${v.version_id === versionId ? "current" : ""}`}
+                        aria-current={v.version_id === versionId ? "true" : undefined}
+                        onClick={() => setSelected(v.version_id)}
+                      >
+                        v{v.version_no} · {statusLabel(v.parse_status)}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        </nav>
+        {versionId && <VersionView tenant={tenant} caseId={caseId} versionId={versionId} focus={focus} />}
+      </div>
+    </>
+  );
+}
+
+const UPLOAD_KINDS = [
+  { id: "supplier_message", label: "Supplier message" },
+  { id: "invoice", label: "Invoice" },
+  { id: "goods_receipt", label: "Goods receipt" },
+  { id: "attachment", label: "Other attachment" },
+];
+
+/** Uploads are untrusted: the server checks size and content against the declared type and parses with the same
+ *  bounded parsers as source-system records. Nothing in a document can change permissions or trigger actions. */
+function UploadForm({ tenant, caseId, onUploaded }: { tenant: string; caseId: string;
+  onUploaded: (r: UploadResult) => void }) {
+  const qc = useQueryClient();
+  const [kind, setKind] = useState("supplier_message");
+  const [file, setFile] = useState<File | null>(null);
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const m = useMutation<UploadResult, ApiError>({
+    mutationFn: () => {
+      const form = new FormData();
+      form.append("kind", kind);
+      form.append("file", file!);
+      return api<UploadResult>(tenantPath(tenant, `/cases/${caseId}/documents`), { method: "POST", body: form });
+    },
+    onSuccess: (r) => {
+      void qc.invalidateQueries({ queryKey: ["documents", tenant, caseId] });
+      setFile(null);
+      if (inputRef.current) inputRef.current.value = "";
+      onUploaded(r);
+    },
+  });
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    if (file) m.mutate();
+  }
+  if (!open) {
+    return (
+      <div className="actions">
+        <button type="button" className="button secondary" onClick={() => setOpen(true)}>Upload a document</button>
+        {m.isSuccess && <UploadSummary result={m.data} />}
+      </div>
+    );
+  }
+  return (
+    <form className="form inline-form" onSubmit={submit} aria-label="Upload a document">
+      <label>
+        Document type
+        <select value={kind} onChange={(e) => setKind(e.target.value)}>
+          {UPLOAD_KINDS.map((k) => (
+            <option key={k.id} value={k.id}>{k.label}</option>
           ))}
-        </ul>
-      </nav>
-      {versionId && <VersionView tenant={tenant} caseId={caseId} versionId={versionId} focus={focus} />}
-    </div>
+        </select>
+      </label>
+      <label>
+        File (PDF, plain text, CSV or JSON)
+        <input ref={inputRef} type="file" required accept=".pdf,.txt,.eml,.csv,.json,application/pdf,text/plain,text/csv,application/json"
+               onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+      </label>
+      {m.isError && <ErrorState error={m.error} />}
+      {m.isSuccess && <UploadSummary result={m.data} />}
+      <div className="actions">
+        <button type="submit" className="button primary" disabled={!file || m.isPending}>Upload</button>
+        <button type="button" className="button secondary" onClick={() => setOpen(false)}>Close</button>
+      </div>
+      <p className="muted small">
+        A file with the same name becomes a new version of the earlier upload. Re-run the investigation to use it.
+      </p>
+    </form>
+  );
+}
+
+function UploadSummary({ result }: { result: UploadResult }) {
+  const records = Object.entries(result.records).map(([k, v]) => `${v} ${statusLabel(k)}`);
+  return (
+    <p role="status" className="small">
+      Stored as version {result.version_no} · {statusLabel(result.parse_status)}
+      {records.length > 0 && ` · extracted ${records.join(", ")}`}
+      {result.problems.length > 0 && ` · needs review: ${result.problems.join("; ")}`}
+    </p>
   );
 }
 

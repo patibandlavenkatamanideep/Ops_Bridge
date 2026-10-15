@@ -18,6 +18,10 @@ export type ProposalList = components["schemas"]["ProposalList"];
 export type OperationItem = components["schemas"]["OperationOut"];
 export type OperationList = components["schemas"]["OperationList"];
 export type DecisionResult = components["schemas"]["DecisionOut"];
+export type SettingsView = components["schemas"]["SettingsOut"];
+export type UploadResult = components["schemas"]["UploadOut"];
+export type Message = components["schemas"]["MessageOut"];
+export type MessageList = components["schemas"]["MessageList"];
 
 /** A finding as stored in an investigation version (fields omitted for requesters). */
 export interface Finding {
@@ -76,7 +80,9 @@ export async function api<T>(path: string, init: { method?: Method; body?: unkno
   headers?: Record<string, string>; signal?: AbortSignal } = {}): Promise<T> {
   const method = init.method ?? "GET";
   const headers: Record<string, string> = { Accept: "application/json", ...init.headers };
-  if (init.body !== undefined) headers["Content-Type"] = "application/json";
+  // FormData sets its own multipart boundary; everything else is JSON.
+  const isForm = init.body instanceof FormData;
+  if (init.body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (method !== "GET" && csrfToken) headers["X-CSRF-Token"] = csrfToken;
   let response: Response;
   try {
@@ -84,7 +90,7 @@ export async function api<T>(path: string, init: { method?: Method; body?: unkno
       method,
       headers,
       credentials: "same-origin",
-      body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      body: init.body === undefined ? undefined : isForm ? (init.body as FormData) : JSON.stringify(init.body),
       signal: init.signal,
     });
   } catch (err) {

@@ -20,10 +20,12 @@ from opsbridge.evidence.storage import LocalArtifactStore
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import Database, DbContext, get_database
 from opsbridge.persistence.models import Tenant, WorkflowRun
+from opsbridge.telemetry.logging import configure_logging
 
 from . import jobs
 from .execution import ExecutionDeps, LeaseLost, dispatch, mark_unknown_after_exhaustion
 from .investigation import InvestigationDeps, StepFailed, run_investigation
+from .retention import sweep as retention_sweep
 
 log = logging.getLogger("opsbridge.worker")
 
@@ -173,6 +175,13 @@ def make_worker(settings: Settings | None = None, db: Database | None = None) ->
     worker.register("investigate", lambda job: _investigate(deps, job))
     exec_deps = build_execution_deps(settings, db)
     worker.register("dispatch_operation", lambda job: dispatch(exec_deps, job))
+    store = LocalArtifactStore(settings.artifact_dir)
+
+    def _retention(job: jobs.ClaimedJob) -> None:
+        report = retention_sweep(db, store, job.tenant_id)
+        log.info("retention sweep for tenant %s: %s", job.tenant_id, report.to_dict())
+
+    worker.register("retention_sweep", _retention)
     return worker
 
 
@@ -181,7 +190,7 @@ def _investigate(deps: InvestigationDeps, job: jobs.ClaimedJob) -> None:
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
+    configure_logging()
     worker = make_worker()
     signal.signal(signal.SIGTERM, lambda *_: worker.stop_event.set())
     try:

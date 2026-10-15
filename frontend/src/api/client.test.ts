@@ -32,3 +32,16 @@ test("network failure becomes a retryable error", async () => {
   expect(err.code).toBe("network_error");
   expect(err.retryable).toBe(true);
 });
+
+test("multipart uploads keep the browser boundary and still carry CSRF", async () => {
+  setCsrfToken("tok");
+  const fetchMock = mockFetch(() => json(201, {}));
+  const form = new FormData();
+  form.append("kind", "attachment");
+  await api("/upload", { method: "POST", body: form });
+  const init = fetchMock.mock.calls[0]![1]!;
+  const headers = init.headers as Record<string, string>;
+  expect(headers["Content-Type"]).toBeUndefined();
+  expect(headers["X-CSRF-Token"]).toBe("tok");
+  expect(init.body).toBe(form);
+});
