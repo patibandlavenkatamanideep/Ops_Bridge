@@ -49,11 +49,13 @@ def main() -> int:
     results.append(run("frontend lint", ["npm", "run", "lint"], ROOT / "frontend"))
     results.append(run("frontend typecheck", ["npm", "run", "typecheck"], ROOT / "frontend"))
     results.append(run("frontend unit tests", ["npm", "test"], ROOT / "frontend"))
+    results.append(run("evaluation canary (pinned baseline)", [*PY, "python", "-m", "opsbridge.cli", "eval-canary"]))
     # Read-only: re-hash every sealed benchmark receipt (replays run via make eval-offline).
     results.append(run("evaluation receipts (eval-verify)", [*PY, "python", "-m", "opsbridge.cli", "eval-verify"]))
 
     if up(5433):
         results.append(run("migration drift (alembic check)", [*PY, "alembic", "check"]))
+        results.append(run("alert rules (promtool)", ["make", "-s", "alerts-test"], ROOT))
     if up(5433) and up(8081):
         results.append(run("integration tests", [*PY, "pytest", "-q", "-m", "integration or keycloak"],
                            extra_env={"OPSBRIDGE_REQUIRE_INTEGRATION": "1"}))
