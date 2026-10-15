@@ -23,12 +23,15 @@ the current lease holder's results.
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from opentelemetry import trace
+from opentelemetry.trace import Span, Status, StatusCode
 from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
@@ -54,6 +57,7 @@ from opsbridge.persistence.models import (
 )
 from opsbridge.privacy.redaction import redact
 from opsbridge.services.cases import transition
+from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 from .investigation import StepFailed
@@ -223,6 +227,17 @@ def _finish(
     cancellation: str | None = None,
     review: bool = False,
 ) -> None:
+    if status in TERMINAL:
+        elapsed = (_now() - op.created_at).total_seconds()
+        connector = op.connector
+
+        def _record() -> None:
+            metrics.OPERATIONS_FINISHED.labels(status, connector).inc()
+            metrics.EXECUTION_DURATION.labels(status).observe(max(elapsed, 0.0))
+
+        metrics.after_commit(s, _record)
+        tracing.set_ids(operation_id=op.id, remote_ref=remote_ref or op.remote_ref)
+        trace.get_current_span().set_attribute("opsbridge.operation.status", status)
     op.status = status
     op.failure_category = category if status != "confirmed" else None
     op.remote_ref = remote_ref or op.remote_ref
@@ -307,7 +322,24 @@ def _new_attempt(
         )
         s.add(a)
         s.flush()
-        return a.id
+        attempt_id = a.id
+    # Child of the job span; ends in _close_attempt with the outcome.
+    sp = tracing.tracer.start_span(f"connector {tool}")
+    tracing.set_ids(
+        sp,
+        tenant_id=snap["tenant_id"],
+        case_id=snap["case_id"],
+        operation_id=snap["operation_id"],
+        attempt_id=attempt_id,
+    )
+    sp.set_attribute("opsbridge.connector.phase", kind)
+    sp.set_attribute("opsbridge.connector.version", connector_version)
+    _OPEN[attempt_id] = (sp, time.monotonic(), kind)
+    return attempt_id
+
+
+# attempt id -> (span, start, phase) for attempts opened by this worker process
+_OPEN: dict[uuid.UUID, tuple[Span, float, str]] = {}
 
 
 def _close_attempt(
@@ -331,6 +363,18 @@ def _close_attempt(
         a.error_detail = (detail or "")[:1000] or None
         a.remote_ref = remote_ref
         a.finished_at = _now()
+    opened = _OPEN.pop(attempt_id, None)
+    if opened is not None:
+        sp, started, phase = opened
+        sp.set_attribute("opsbridge.attempt.status", status)
+        if category:
+            sp.set_attribute("opsbridge.attempt.category", category)
+        tracing.set_ids(sp, remote_ref=remote_ref)
+        if status != "succeeded":
+            sp.set_status(Status(StatusCode.ERROR, category or status))
+        sp.end()
+        metrics.CONNECTOR_ATTEMPTS.labels(phase, status).inc()
+        metrics.CONNECTOR_DURATION.labels(phase).observe(time.monotonic() - started)
 
 
 def _complete(
