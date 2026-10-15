@@ -192,7 +192,8 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
         </dd>
         <dt>Receipts</dt>
         <dd>
-          {d.verification.ok ? "verified" : "NOT verified"} — {d.verification.chain}; {d.verification.signatures}{" "}
+          {d.verification.ok ? "verified" : "NOT verified"} when this run finished — {d.verification.chain};{" "}
+          {d.verification.signatures} (re-check the whole ledger with <code>make eval-offline</code>){" "}
           <a href={tenantPath(tenant, `/evaluations/${benchmark}/${runId}/receipt`)}>Download EvalSeal records</a>
         </dd>
       </dl>
