@@ -49,6 +49,8 @@ class InvestigationOut(BaseModel):
     source_manifest_digest: str
     created_at: str
     history: list[dict[str, Any]]
+    # Mode requested, data routing from policy, and why a model was or was not used.
+    model_routing: dict[str, Any] | None = None
 
 
 class DocumentVersionOut(BaseModel):
@@ -238,6 +240,7 @@ def latest(
         source_manifest_digest=iv.source_manifest_digest,
         created_at=iv.created_at.isoformat(),
         history=view.versions,
+        model_routing=view.model_routing,
     )
 
 
