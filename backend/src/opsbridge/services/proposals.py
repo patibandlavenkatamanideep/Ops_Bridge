@@ -41,6 +41,7 @@ from opsbridge.persistence.models import (
     Proposal,
     TenantSettings,
 )
+from opsbridge.telemetry import metrics
 from opsbridge.workflow import jobs
 
 from .cases import _visible_filter, transition
@@ -515,6 +516,9 @@ def decide(
         )
         s.add(ad)
         s.flush()
+        # Human wait: submitted for approval (status_changed_at) to this decision.
+        waited = max((now - pr.status_changed_at).total_seconds(), 0.0)
+        metrics.after_commit(s, lambda: metrics.APPROVAL_WAIT.labels(decision).observe(waited))
         op: Operation | None = None
         if decision == "reject":
             pr.status = "rejected"
