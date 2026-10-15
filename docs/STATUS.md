@@ -8,7 +8,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–8 done; Phase 9 next |
+| Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
 | Hosted CI | not run — workflow committed (PRs to main, manual dispatch), validated with actionlint only |
@@ -269,25 +269,55 @@ ready in 3 s, worker backed off without restarting; backup → isolated restore 
 docs/operations.md "Drills". Staging plan with resources, secrets, cost considerations and
 rollback: docs/deployment.md. External deployment: not performed (no account/authorization).
 
+### Phase 9 — portability and handoff (exit gate passed locally; pilot not run)
+- Portability: `tests/integration/test_portability.py` runs the same core for both packs
+  (investigation, citations, pack-specific routing and approvers, execution, cross-tenant
+  denial, per-tenant roles for one user); `tests/portability/` proves no core package names
+  an organization.
+- Demo: docs/demo-script.md, with steps 4 (timeout reconciliation; unknown outcome recorded
+  by a person) and 6 (IT local-only policy) automated in `frontend/e2e/demo.spec.ts`.
+- UI: investigation shows model use and why a model was blocked; evidence table no longer
+  squeezed at 1280 px; README screenshots from the running app (synthetic data).
+- Docs: README, data-contracts, demo-script, operator-guide, pilot-plan,
+  integration-onboarding, case-study, final-report; traceability 24 verified_local,
+  3 implemented_unverified, 1 in_progress.
+- Handoff checks: `make verify` 14/14; fresh clone from GitHub (doctor, setup, lint,
+  typecheck, unit, canary, build, 18 receipts verify); offline replay at the final code
+  reproduced held-out verdicts; documented make targets and CLI commands exist; claims review.
+- Defects found in this phase:
+  1. **Duplicate external effect**: with the task tracker no longer honouring idempotency
+     keys and lookup unavailable, a resend after a timeout created a second task, because the
+     simulator connector hard-coded its capabilities. Fixed by capability discovery (weakest
+     contract when unknown); regression tests in-process and through MCP; recorded in
+     docs/evaluation-results.md and docs/case-study.md.
+  2. `make doctor` failed on a fresh checkout because `.env` did not exist yet (README order);
+     now reported as the next step.
+  3. The agents doc overstated what the validators guarantee; corrected.
+
+Phase 9 exit gate evidence: the owner-facing material exists and the demo's recovery and
+portability steps pass as browser tests; local completion is marked separately from live
+model, sandbox, staging and pilot validation (docs/final-report.md).
+
 ## Verification evidence (local, macOS arm64, 2026-10-15)
 
-`make verify` → **14 passed, 0 failed, 0 skipped** (after Phase 8):
+`make verify` → **14 passed, 0 failed, 0 skipped** (final, after Phase 9):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
 | backend mypy --strict (102 files) | passed |
-| backend unit + contract tests | 228 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
+| backend unit + contract tests | 243 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 8 passed |
 | evaluation canary (pinned baseline) | 64 cases, 0 changes |
-| evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 14 records ok |
+| evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 18 records ok |
 | migration drift (`alembic check`) | passed |
 | alert rules (promtool check + 9 unit cases) | passed |
-| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry) | 108 passed |
-| browser tests (Playwright, dev stack in MCP mode) | 16 passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry, portability) | 114 passed |
+| browser tests (Playwright, dev stack in MCP mode, incl. demo steps) | 19 passed |
 | frontend production build | passed |
-| `make eval-offline` (run separately; appends replay records) | held-out and security replays identical to recordings; receipts verified |
+| `make eval-offline` (run separately; appends replay records) | at commit 05081df: held-out and security replays identical to recordings; 18 receipts verified |
+| fresh clone from GitHub (separate directory) | doctor, setup, lint, typecheck, test (243 + 8), eval-canary, build pass; receipts verify |
 
 Phase 2 exit gate evidence:
 - 20 ordered / 18 received: `tests/integration/test_investigation_stack.py::test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch`
@@ -351,7 +381,9 @@ Phase 1 exit gate evidence:
 
 ## Next executable task
 
-Phase 9: re-run the core and isolation suites against the IT hardware pack (no tenant-specific
-branches), then README (with screenshots from the running app), docs/data-contracts.md,
-demo-script, operator guide, pilot plan, integration onboarding guide, engineering case
-study and final report; requirement evidence matrix completed.
+The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
+run hosted CI (open a PR to `main` or dispatch the workflow); with authorization, the live
+GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
+pilot owner. Local improvements that need no authorization: per-tenant usage quotas
+(OB-27), the delegation-key secret entrypoint and an S3 artifact store for staging, and the
+next supplier invoice layout for the furniture pack.
