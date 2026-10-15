@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Job
+from opsbridge.telemetry import tracing
 
 
 @dataclass(frozen=True)
@@ -46,10 +47,12 @@ def enqueue(
     max_attempts: int = 5,
     run_after: datetime | None = None,
 ) -> Job:
+    trace_ctx = tracing.carrier()
     job = Job(
         tenant_id=tenant_id,
         kind=kind,
-        payload=payload,
+        # W3C trace context lets the worker continue the requester's trace.
+        payload={**payload, "_trace": trace_ctx} if trace_ctx else payload,
         status="queued",
         priority=priority,
         attempts=0,
