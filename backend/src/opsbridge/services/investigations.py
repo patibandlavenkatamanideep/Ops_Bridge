@@ -158,6 +158,7 @@ class InvestigationView:
     citations: list[dict[str, Any]]
     evidence_visible: bool
     versions: list[dict[str, Any]]
+    model_routing: dict[str, Any] | None = None  # how the producing run routed model use
 
 
 def latest_investigation(
@@ -192,7 +193,9 @@ def latest_investigation(
                 .order_by(InvestigationVersion.version.desc())
             ).scalars()
         ]
-        return InvestigationView(iv, citations, visible, history)
+        run = s.get(WorkflowRun, iv.run_id) if iv.run_id else None
+        routing = dict((run.usage or {}).get("routing") or {}) if run is not None else None
+        return InvestigationView(iv, citations, visible, history, routing or None)
 
 
 def _linked_version(
