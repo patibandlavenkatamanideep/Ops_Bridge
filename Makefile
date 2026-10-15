@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up
+        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -88,6 +88,12 @@ alerts-test: ## Check and unit-test the Prometheus alert rules (promtool in a co
 
 observability-up: ## Start Prometheus (scrapes make dev processes; alerts at http://localhost:9090/alerts)
 	$(COMPOSE) --profile observability up -d prometheus
+
+backup: ## Back up the local database and artifact store to var/backups/<UTC timestamp>
+	python3 scripts/backup_restore.py backup
+
+restore-drill: ## Restore the latest backup into an isolated database, verify, and drop it
+	python3 scripts/backup_restore.py restore-drill
 
 down: ## Stop containers WITHOUT deleting persistent volumes
 	$(COMPOSE) stop
