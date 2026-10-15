@@ -89,6 +89,9 @@ class InvoiceSpec(_M):
     # Document defects for extraction tests: amount_mismatch → line amounts inconsistent;
     # scanned → image-only PDF with no text layer.
     defect: Literal["none", "amount_mismatch", "scanned"] = "none"
+    # Supplier invoice layout (furniture PDFs). v2 is a different supplier template that no
+    # pack mapping was written for; it tests template generalization on held-out data.
+    layout: Literal["v1", "v2"] = "v1"
 
 
 class AllocationSpec(_M):
@@ -250,6 +253,8 @@ def _render_furniture(s: Scenario) -> list[Record]:
 
 def _furniture_invoice_pdf(s: Scenario) -> bytes:
     inv = s.invoice
+    if inv.layout == "v2":
+        return _furniture_invoice_pdf_v2(s)
     lines = [
         f"{inv.supplier_name.upper()} - INVOICE",
         f"Invoice No: {inv.number}",
@@ -294,6 +299,35 @@ def _furniture_invoice_pdf(s: Scenario) -> bytes:
     ]
     if inv.defect == "scanned":
         return _scanned(lines)
+    return text_pdf([lines])
+
+
+def _furniture_invoice_pdf_v2(s: Scenario) -> bytes:
+    """A second supplier template: different labels, day-first dates, fixed-width lines."""
+    inv = s.invoice
+    lines = [
+        "TAX INVOICE",
+        inv.supplier_name,
+        f"Document number: {inv.number}    Date of issue: {inv.date.strftime('%d/%m/%Y')}",
+    ]
+    if inv.po_number:
+        lines.append(f"Customer order: {inv.po_number}")
+    if inv.supplier_id:
+        lines.append(f"Supplier code: {inv.supplier_id}")
+    lines += [
+        f"Amounts in {inv.currency}",
+        "",
+        "Pos  Article     Description               Qty    Unit  Price      Net",
+    ]
+    total = Decimal(0)
+    for ln in inv.lines:
+        net = ln.qty * ln.price - ln.discount
+        total += net
+        lines.append(
+            f"{ln.line:<4} {(ln.item or ''):<10} {ln.desc[:24]:<25} {_d(ln.qty):>5}  {ln.unit:<5} "
+            f"{_money(ln.price):>9}  {_money(net):>9}"
+        )
+    lines += ["", f"Total due {inv.currency} {_money(total)}", "Synthetic document for testing."]
     return text_pdf([lines])
 
 

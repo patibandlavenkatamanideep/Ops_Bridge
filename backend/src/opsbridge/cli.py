@@ -143,6 +143,26 @@ def _eval_rules(args: argparse.Namespace) -> int:
     return 0
 
 
+def _eval_freeze(args: argparse.Namespace) -> int:
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation import manifest
+
+    out = (
+        Path(args.out) if args.out else REPO_ROOT / "evals" / "manifests" / f"{args.benchmark}.json"
+    )
+    if out.exists():
+        print(f"{out} exists; a frozen benchmark is never re-frozen. Use a new benchmark id.")
+        return 2
+    body = manifest.freeze(
+        REPO_ROOT, args.benchmark, modes=args.modes.split(","), repeats=args.repeats
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
+    sizes = ", ".join(f"{k}={v['n_cases']}" for k, v in body["splits"].items())
+    print(f"froze {args.benchmark} ({sizes}) → {out}")
+    return 0
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -246,6 +266,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--corpus", default="../fixtures/scenarios/dev.yaml")
     p.add_argument("--out", default="../evals/results/rules-baseline-dev.json")
     p.set_defaults(func=_eval_rules)
+
+    p = sub.add_parser("eval-freeze", help="freeze benchmark inputs by digest (once per id)")
+    p.add_argument("--benchmark", default="opsbridge-bench-v1")
+    p.add_argument("--modes", default="rules_only,mock")
+    p.add_argument("--repeats", type=int, default=3)
+    p.add_argument("--out", default=None)
+    p.set_defaults(func=_eval_freeze)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)
