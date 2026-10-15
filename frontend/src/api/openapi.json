@@ -926,6 +926,18 @@
             "title": "Id",
             "type": "string"
           },
+          "model_routing": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Routing"
+          },
           "outcome": {
             "title": "Outcome",
             "type": "string"
