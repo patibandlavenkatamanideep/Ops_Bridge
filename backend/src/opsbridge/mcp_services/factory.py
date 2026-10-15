@@ -41,10 +41,13 @@ def records_client(settings: Settings) -> McpToolClient:
 
 
 def casework_connector(
-    settings: Settings, tenant_id: uuid.UUID, operation: dict[str, Any]
+    settings: Settings, tenant_id: uuid.UUID, operation: dict[str, Any], org: str
 ) -> McpCaseworkConnector:
-    # Capabilities are those of the connector the casework service uses (sim_tasks).
-    caps = SimTaskConnector(settings.simulator_url, "unused", "unused").capabilities
+    # Capabilities are those of the connector the casework service uses (sim_tasks for this
+    # organization), discovered from the tracker so the worker and the service agree.
+    caps = SimTaskConnector(
+        settings.simulator_url, settings.sim_master_secret.get_secret_value(), org
+    ).capabilities
     caps = ConnectorCapabilities(
         caps.idempotency_keys,
         caps.lookup,
