@@ -80,7 +80,9 @@ class LookupUnavailable(Exception):
 class TaskConnector(Protocol):
     name: str
     version: str
-    capabilities: ConnectorCapabilities
+
+    @property
+    def capabilities(self) -> ConnectorCapabilities: ...
 
     def create(
         self, req: TaskRequest, idempotency_key: str | None, timeout: float
@@ -101,25 +103,59 @@ class SimTaskConnector:
         master_secret: str,
         org: str,
         *,
-        idempotency_keys: bool = True,
-        lookup: Consistency = "strong",
+        idempotency_keys: bool | None = None,
+        lookup: Consistency | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.org = org
-        self.capabilities = ConnectorCapabilities(
-            idempotency_keys=idempotency_keys,
-            lookup=lookup,
-            conditional_writes=False,
-            definite_failure_statuses=frozenset({400, 401, 403, 404, 409, 422}),
-            retryable_definite_statuses=frozenset({503}),
-            notes="503 is definite only with X-Sim-Not-Committed: true; other 5xx and timeouts are ambiguous.",
-        )
+        self._declared = (idempotency_keys, lookup)
+        self._capabilities: ConnectorCapabilities | None = None
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             follow_redirects=False,
             transport=transport,
             headers={"Authorization": f"Bearer {org_key(master_secret, org)}"},
         )
+
+    @property
+    def capabilities(self) -> ConnectorCapabilities:
+        """Explicit settings win; otherwise discovered from the tracker, once per instance.
+
+        Discovery failure assumes the weakest contract (no idempotency keys, no lookup), so an
+        ambiguous result is sent to human review instead of being retried into a duplicate.
+        """
+        if self._capabilities is None:
+            idem, lookup = self._declared
+            if idem is None or lookup is None:
+                found_idem, found_lookup = self._discover()
+                idem = found_idem if idem is None else idem
+                lookup = found_lookup if lookup is None else lookup
+            self._capabilities = ConnectorCapabilities(
+                idempotency_keys=idem,
+                lookup=lookup,
+                conditional_writes=False,
+                definite_failure_statuses=frozenset({400, 401, 403, 404, 409, 422}),
+                retryable_definite_statuses=frozenset({503}),
+                notes="503 is definite only with X-Sim-Not-Committed: true; other 5xx and timeouts are "
+                "ambiguous. Capabilities discovered from the tracker unless configured.",
+            )
+        return self._capabilities
+
+    def _discover(self) -> tuple[bool, Consistency]:
+        try:
+            r = self._client.get(f"/orgs/{self.org}/capabilities", timeout=3.0)
+            if r.status_code == 200:
+                d = r.json()
+                lookup = d.get("lookup")
+                if isinstance(d.get("idempotency_keys"), bool) and lookup in (
+                    "strong",
+                    "eventual",
+                    "none",
+                ):
+                    return d["idempotency_keys"], lookup
+        except (httpx.HTTPError, ValueError):
+            pass
+        return False, "none"
 
     def _task(self, d: dict[str, Any]) -> RemoteTask:
         return RemoteTask(
