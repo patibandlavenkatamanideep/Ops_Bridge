@@ -163,6 +163,185 @@ def _eval_freeze(args: argparse.Namespace) -> int:
     return 0
 
 
+def _eval_bench(args: argparse.Namespace) -> int:
+    import os
+    from datetime import UTC, datetime
+    from typing import Any, cast
+
+    from opsbridge.agents.adapters import MockModelAdapter
+    from opsbridge.agents.contracts import ModelAdapter
+    from opsbridge.agents.prompts import REGISTRY as PROMPTS
+    from opsbridge.config import REPO_ROOT, get_settings
+    from opsbridge.evaluation import manifest as mf
+    from opsbridge.evaluation import metrics, receipt
+    from opsbridge.evaluation.bench import environment
+    from opsbridge.evaluation.cassette import RecordingAdapter, ReplayAdapter, ReplayFailure
+    from opsbridge.evaluation.egress import EgressBlocked, loopback_only
+    from opsbridge.simulator.scenarios import load_corpus
+
+    os.chdir(REPO_ROOT)  # receipts and results use repository-relative paths only
+    mpath = Path("evals/manifests") / f"{args.benchmark}.json"
+    frozen = mf.load(mpath)
+    problems = mf.verify(frozen, REPO_ROOT)
+    if problems:
+        print("Refusing to run: inputs differ from the frozen benchmark:")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 2
+    split = frozen["splits"][args.split]
+    corpus = load_corpus(Path(split["path"]))
+    modes = args.modes.split(",") if args.modes else list(frozen["modes"])
+    repeats = int(frozen["repeats"])  # fixed schedule from the frozen plan
+    runs_root = Path(f"evals/runs/{args.benchmark}")
+    recorded = sorted(runs_root.glob(f"{args.split}-record-*/model-cassette.json"))
+    adapter: RecordingAdapter | ReplayAdapter
+    if args.replay:
+        if not recorded:
+            print(f"No recorded run for split {args.split}; record it first.")
+            return 2
+        source = Path(args.from_run) / "model-cassette.json" if args.from_run else recorded[-1]
+        adapter = ReplayAdapter.load(source)
+        kind = "replay"
+    else:
+        if args.split == "heldout" and recorded:
+            print("The held-out split was already recorded; the final comparison runs once.")
+            print("Reproduce it offline with --replay (make eval-offline).")
+            return 2
+        adapter = RecordingAdapter(inner=MockModelAdapter())
+        kind = "record"
+    run_id = f"{args.split}-{kind}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+    run_dir = runs_root / run_id
+    # Record runs write their own cassette; replay runs bind the cassette they replayed.
+    cassette = run_dir / "model-cassette.json" if kind == "record" else source
+    run_dir.mkdir(parents=True, exist_ok=True)
+    prompts = run_dir / "prompts.json"
+    prompts.write_text(
+        json.dumps(
+            [
+                {
+                    "template_id": t.template_id,
+                    "digest": t.digest,
+                    "system": t.system,
+                    "instructions": t.instructions,
+                }
+                for t in PROMPTS.values()
+            ],
+            indent=1,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    ledger = Path("evals/ledger/opsbridge-bench.jsonl")
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    key = REPO_ROOT / "var" / "evalseal" / "opsbridge-eval.key"
+    public_key = receipt.ensure_key(key, Path("evals/keys/opsbridge-eval.pub"))
+    bound = {
+        "opsbridge_manifest": str(mpath),
+        "opsbridge_acceptance_policy": "evals/acceptance-policy.json",
+        "opsbridge_prompts": str(prompts),
+        **{f"opsbridge_policy_{Path(p).stem}": p for p in frozen["files"] if "/policies/" in p},
+    }
+    summary: dict[str, Any] = {
+        "schema": "opsbridge-eval-results/1",
+        "benchmark_id": args.benchmark,
+        "manifest_sha256": frozen["manifest_sha256"],
+        "split": args.split,
+        "run_id": run_id,
+        "kind": kind,
+        "response_origin": "mocked (deterministic mock model); no real model evaluated",
+        "network": "Python-level egress limited to loopback during the run",
+        "repeats": repeats,
+        "code_version": mf.code_version(REPO_ROOT),
+        "modes": {},
+        "receipts": {},
+    }
+    mode_results: dict[str, dict[str, Any]] = {}
+    receipts: dict[str, dict[str, Any]] = {}
+
+    def progress(_t: dict[str, Any]) -> None:
+        print(".", end="", flush=True)
+
+    try:
+        with (
+            loopback_only(),
+            environment(
+                get_settings(),
+                corpus,
+                REPO_ROOT / "var" / "eval" / run_id,
+                cast(ModelAdapter, adapter),
+            ) as env,
+        ):
+            for mode in modes:
+                print(f"{args.split} / {mode} / {repeats} repeats ", end="", flush=True)
+                trials, record = receipt.run_mode(
+                    env,
+                    corpus.scenarios,
+                    mode=mode,
+                    repeats=repeats,
+                    split=args.split,
+                    corpus_rel=split["path"],
+                    corpus_sha=split["sha256"],
+                    run_dir=run_dir,
+                    ledger=ledger,
+                    key_path=key,
+                    bound=bound,
+                    adapter=adapter,
+                    cassette_rel=str(cassette),
+                    benchmark_id=args.benchmark,
+                    on_trial=progress,
+                )
+                print()
+                mode_results[mode] = metrics.summarize_mode(trials)
+                receipts[mode] = {
+                    "record_hash": record.hash,
+                    "ledger": str(ledger),
+                    "run_dir": str(run_dir),
+                }
+    except (ReplayFailure, EgressBlocked) as exc:
+        print(f"\nFAILED CLOSED ({type(exc).__name__}): {exc}")
+        return 3
+    summary["modes"], summary["receipts"] = mode_results, receipts
+    if "rules_only" in mode_results and "mock" in mode_results:
+        summary["paired_rules_vs_mock"] = metrics.paired(
+            mode_results["rules_only"], mode_results["mock"]
+        )
+    policy = json.loads(Path("evals/acceptance-policy.json").read_text(encoding="utf-8"))
+    summary["acceptance"] = metrics.acceptance(summary, policy, args.split)
+    summary["verification"] = receipt.verify(ledger, public_key)
+    out = Path(f"evals/results/{args.benchmark}/{run_id}.json")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    for mode, r in mode_results.items():
+        na = r["next_action"]
+        print(
+            f"  {mode:<10} next action {na['correct']}/{na['n']} "
+            f"(Wilson95 {na['wilson95']}), case {r['case']['correct']}/{r['case']['n']}, "
+            f"safe misses {r['safe_misses']}, unsafe misses {r['unsafe_misses']}, "
+            f"errors {r['trial_errors']}"
+        )
+    ok = bool(summary["verification"]["ok"])
+    print(f"  receipts {'verified' if ok else 'FAILED VERIFICATION'}; results → {out}")
+    return 0 if ok else 4
+
+
+def _eval_verify(_args: argparse.Namespace) -> int:
+    import os
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation import receipt
+
+    os.chdir(REPO_ROOT)
+    ledger = Path("evals/ledger/opsbridge-bench.jsonl")
+    report = receipt.verify(ledger, Path("evals/keys/opsbridge-eval.pub").read_text().strip())
+    print(f"chain: {report['chain']['message']}")
+    print(f"signatures: {report['signatures']['message']}")
+    for r in report["artifacts"]:
+        print(f"record {r['index']}: {'ok' if r['ok'] else 'FAILED'}")
+        if not r["ok"]:
+            print(r["output"])
+    return 0 if report["ok"] else 1
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -273,6 +452,21 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--repeats", type=int, default=3)
     p.add_argument("--out", default=None)
     p.set_defaults(func=_eval_freeze)
+
+    p = sub.add_parser("eval-bench", help="run a frozen benchmark split through the stack")
+    p.add_argument("--benchmark", default="opsbridge-bench-v1")
+    p.add_argument("--split", required=True, choices=["dev", "validation", "heldout", "security"])
+    p.add_argument("--modes", default=None, help="comma-separated; default: the frozen modes")
+    mode = p.add_mutually_exclusive_group()
+    mode.add_argument("--record", action="store_true", help="record model calls (default)")
+    mode.add_argument("--replay", action="store_true", help="strict offline replay")
+    p.add_argument(
+        "--from-run", default=None, help="record run directory to replay (default: latest)"
+    )
+    p.set_defaults(func=_eval_bench)
+
+    p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
+    p.set_defaults(func=_eval_verify)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)

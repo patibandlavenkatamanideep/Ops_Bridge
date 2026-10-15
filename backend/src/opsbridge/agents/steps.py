@@ -244,7 +244,9 @@ def _allowed_numbers(ctx: AgentContext, labels: list[str]) -> set[str]:
     nums: set[str] = set()
     for f in ctx.recon["findings"]:
         for v in (f.get("values") or {}).values():
-            nums |= _numbers(str(v))
+            # A computed difference such as "-3.0000" may be restated as a magnitude
+            # ("3.00 below"); _NUMBER never matches digits after a hyphen, so strip the sign.
+            nums |= _numbers(str(v).strip().lstrip("-"))
         nums |= _numbers(f.get("po_line_number") or "")
         for ln in f.get("invoice_line_numbers") or []:
             nums |= _numbers(str(ln))
@@ -331,9 +333,10 @@ def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | Non
         problems.append("cites unknown evidence")
     for field_name in ("title", "body", "rationale"):
         problems += [f"{field_name}: {p}" for p in _common_text_problems(out[field_name])]
-    unsupported = _numbers(out["title"] + " " + out["body"]) - _allowed_numbers(
-        ctx, out["citations"] or [e.label for e in ctx.evidence]
-    )
+    allowed = _allowed_numbers(ctx, out["citations"] or [e.label for e in ctx.evidence])
+    # The rule-selected title comes from the policy's template (e.g. a condition count).
+    allowed |= _numbers(str(rec.get("title") or ""))
+    unsupported = _numbers(out["title"] + " " + out["body"]) - allowed
     if unsupported:
         problems.append(f"uses numbers not in the evidence: {sorted(unsupported)}")
     return (out if not problems else None), problems

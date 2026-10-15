@@ -161,6 +161,17 @@ def test_compromised_proposals_are_rejected(override: dict[str, Any], expected: 
     assert any(expected in p for p in problems), problems
 
 
+def test_proposal_may_reuse_the_rule_selected_title() -> None:
+    # Found on the security split: a manual-review title from the policy template states a
+    # condition count ("1 condition(s)") that is in no evidence; reusing it is not invention.
+    c = ctx()
+    c.recon["recommendation"]["title"] = "Review CASE-00001: 1 condition(s) need manual review"
+    value, problems = validate_proposal(c, proposal(title=c.recon["recommendation"]["title"]))
+    assert problems == [] and value is not None
+    value, problems = validate_proposal(c, proposal(title="Review CASE-00001: 3 condition(s)"))
+    assert value is None and any("numbers not in the evidence" in p for p in problems)
+
+
 def test_routing_rules() -> None:
     s = get_settings().model_copy(
         update={"live_model_opt_in": False, "anthropic_model": None, "ollama_model": None}

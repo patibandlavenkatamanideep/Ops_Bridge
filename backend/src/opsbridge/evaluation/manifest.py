@@ -69,6 +69,25 @@ def _git_head(root: Path) -> str | None:
         return None
 
 
+def code_version(root: Path) -> dict[str, Any]:
+    """Commit of the code that ran, and whether the working tree had uncommitted changes."""
+    git = shutil.which("git")
+    dirty = None
+    if git is not None:
+        try:
+            out = subprocess.run(  # noqa: S603 - fixed argv: resolved git binary, read-only query
+                [git, "-C", str(root), "status", "--porcelain", "--untracked-files=no"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=True,
+            )
+            dirty = bool(out.stdout.strip())
+        except (OSError, subprocess.SubprocessError):
+            dirty = None
+    return {"commit": _git_head(root), "uncommitted_changes": dirty}
+
+
 def inputs(root: Path) -> dict[str, Any]:
     """The frozen inputs, recomputed from disk."""
     corpora: dict[str, Any] = {}

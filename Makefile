@@ -65,7 +65,9 @@ test-e2e: ## Playwright browser tests against the running dev stack
 	cd frontend && npm run e2e
 
 eval-offline: ## Replay the declared benchmark offline (no paid calls, network egress blocked)
-	$(PY) python -m opsbridge.cli eval-offline
+	$(PY) python -m opsbridge.cli eval-bench --split heldout --replay
+	$(PY) python -m opsbridge.cli eval-bench --split security --replay
+	$(PY) python -m opsbridge.cli eval-verify
 
 openapi: ## Regenerate OpenAPI document and frontend types
 	$(PY) python -m opsbridge.cli export-openapi --out ../frontend/src/api/openapi.json

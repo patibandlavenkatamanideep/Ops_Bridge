@@ -29,7 +29,7 @@ from .records import (
 )
 from .units import canonical_unit, conversion_factor
 
-RULES_VERSION = "opsbridge-rules/1.0.0"
+RULES_VERSION = "opsbridge-rules/1.0.1"
 
 FindingType = Literal[
     "missing_receipt",
@@ -270,7 +270,7 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
                 f"{len(charges)} charge line(s) totalling {decimal_str(total)} {inv_ccy} are "
                 "excluded from price and quantity matching.",
                 invoice_line_numbers=tuple(c.line_number for c in charges),
-                values={"charges_total": decimal_str(total)},
+                values={"charge_lines": str(len(charges)), "charges_total": decimal_str(total)},
                 evidence=tuple(r for c in charges for r in c.refs.values()),
             )
         )
@@ -578,16 +578,22 @@ def _check_line(
             )
 
     if prior_allocated + invoiced > po_line.quantity:
+        cumulative = prior_allocated + invoiced
+        # Own values: every number in the summary is stated here (the receipt shortfall's
+        # `excess` belongs to that other finding and is not carried over).
+        over = {k: v for k, v in values.items() if k != "excess"}
+        over["cumulative_invoiced"] = decimal_str(cumulative)
+        over["excess_over_ordered"] = decimal_str(cumulative - po_line.quantity)
         findings.append(
             Finding(
                 "quantity_mismatch",
                 "discrepancy",
                 "invoiced_exceeds_ordered",
-                f"Cumulative invoiced quantity {decimal_str(prior_allocated + invoiced)} {po_unit} "
+                f"Cumulative invoiced quantity {decimal_str(cumulative)} {po_unit} "
                 f"exceeds the ordered {decimal_str(po_line.quantity)} {po_unit} on PO line {line_no}.",
                 po_line_number=line_no,
                 invoice_line_numbers=inv_line_nos,
-                values=dict(values),
+                values=over,
                 evidence=base_refs + prior_refs,
             )
         )

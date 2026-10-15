@@ -1,0 +1,2782 @@
+{
+ "benchmark_id": "opsbridge-bench-v1",
+ "entries": [
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:478149231d5b5e185a326e1328d34f1cbd0c43e21d36d207912343d92a77e514",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:efd13e536ec5991ad1337c0e8a341af1c5d4b6991293cbe41d32cf14ccd8c31a",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1101 (CASE-00001)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:478149231d5b5e185a326e1328d34f1cbd0c43e21d36d207912343d92a77e514",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:efd13e536ec5991ad1337c0e8a341af1c5d4b6991293cbe41d32cf14ccd8c31a",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1101 (CASE-00001)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:478149231d5b5e185a326e1328d34f1cbd0c43e21d36d207912343d92a77e514",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-101",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:efd13e536ec5991ad1337c0e8a341af1c5d4b6991293cbe41d32cf14ccd8c31a",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 2, but only 15 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1101 (CASE-00001)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:f31543d574e419c0ff31c7ed888938a645b84b15c8a4bd6dafdfe8476de9bbb1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:589393bd940fc6db03d388946a08e828869a4a053af0ca4540f9bd7ca7be68f8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:f31543d574e419c0ff31c7ed888938a645b84b15c8a4bd6dafdfe8476de9bbb1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:589393bd940fc6db03d388946a08e828869a4a053af0ca4540f9bd7ca7be68f8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:f31543d574e419c0ff31c7ed888938a645b84b15c8a4bd6dafdfe8476de9bbb1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-102",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:589393bd940fc6db03d388946a08e828869a4a053af0ca4540f9bd7ca7be68f8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:545a28a82139636c0baed723f0e7e80496c1585734e3d7aec813e51b357bd579",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:c3e86edba82463bd5cb008815034d3ad1038e3728a21df8e20217747e1a39991",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00003\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:545a28a82139636c0baed723f0e7e80496c1585734e3d7aec813e51b357bd579",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:c3e86edba82463bd5cb008815034d3ad1038e3728a21df8e20217747e1a39991",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00003\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:545a28a82139636c0baed723f0e7e80496c1585734e3d7aec813e51b357bd579",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-103",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:c3e86edba82463bd5cb008815034d3ad1038e3728a21df8e20217747e1a39991",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00003\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:1ff5e95ead7d231a5139b8874139fd9ffc60d1c90a6bc3f2c4260169bbe2612d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:7fceb707ab42236d589ce05c21c9a2c7130d467bcae09e97683a98f68588bc56",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1104 (CASE-00004)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:1ff5e95ead7d231a5139b8874139fd9ffc60d1c90a6bc3f2c4260169bbe2612d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:7fceb707ab42236d589ce05c21c9a2c7130d467bcae09e97683a98f68588bc56",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1104 (CASE-00004)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:1ff5e95ead7d231a5139b8874139fd9ffc60d1c90a6bc3f2c4260169bbe2612d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-104",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:7fceb707ab42236d589ce05c21c9a2c7130d467bcae09e97683a98f68588bc56",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 2424.0100 USD is 24.0100 above the PO price 2400.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1104 (CASE-00004)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:6d86e915671c694d47c585a698583e452e81c6fea31b7a2285e812ba85106d60",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:bea8966ff260c3a4977848cd8f4101eeb702c69b7ea4fc88403539f086b97dbf",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:6d86e915671c694d47c585a698583e452e81c6fea31b7a2285e812ba85106d60",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:bea8966ff260c3a4977848cd8f4101eeb702c69b7ea4fc88403539f086b97dbf",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:6d86e915671c694d47c585a698583e452e81c6fea31b7a2285e812ba85106d60",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-105",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:bea8966ff260c3a4977848cd8f4101eeb702c69b7ea4fc88403539f086b97dbf",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"supplier-relations\", \"body\": \"Invoice line 1 net unit price 147.0000 USD is 3.0000 below the PO price 150.0000 USD, outside the furniture-ap@v2 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Request corrected invoice or credit note for PO-1105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:c0ca39a294adfd18688c48c1c99229d9dc3d9af5543d5634611fa4cb7696591c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:8aae88c198dd02475708943fd00fe541cc33260b5dcb6bb546947c373176edb4",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00006\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:c0ca39a294adfd18688c48c1c99229d9dc3d9af5543d5634611fa4cb7696591c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:8aae88c198dd02475708943fd00fe541cc33260b5dcb6bb546947c373176edb4",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00006\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:c0ca39a294adfd18688c48c1c99229d9dc3d9af5543d5634611fa4cb7696591c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-106",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:8aae88c198dd02475708943fd00fe541cc33260b5dcb6bb546947c373176edb4",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00006\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:dc08edb3bb49587d09d66277d570c74cac09568e1a710fb187d926dc708115fa",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"text\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\"}, {\"citations\": [\"E1\", \"E2\", \"E4\", \"E5\"], \"text\": \"Cumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:4ce996bdd808b054ac71434d579334bef38e378169b89ac0e6c67d0441d40b66",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\\nCumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1107 (CASE-00007)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:dc08edb3bb49587d09d66277d570c74cac09568e1a710fb187d926dc708115fa",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"text\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\"}, {\"citations\": [\"E1\", \"E2\", \"E4\", \"E5\"], \"text\": \"Cumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:4ce996bdd808b054ac71434d579334bef38e378169b89ac0e6c67d0441d40b66",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\\nCumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1107 (CASE-00007)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:dc08edb3bb49587d09d66277d570c74cac09568e1a710fb187d926dc708115fa",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"text\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\"}, {\"citations\": [\"E1\", \"E2\", \"E4\", \"E5\"], \"text\": \"Cumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-107",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:4ce996bdd808b054ac71434d579334bef38e378169b89ac0e6c67d0441d40b66",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 16 EA on PO line 1, but 15 of the 30 received were already matched to earlier invoices; 1 EA exceed the allocatable quantity.\\nCumulative invoiced quantity 31 EA exceeds the ordered 30 EA on PO line 1.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\", \"E5\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1107 (CASE-00007)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:24cf96610419927f743c208e2a90fd3009dda378f0b633462deacc84341d534c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\"}, {\"citations\": [\"E3\", \"E4\"], \"text\": \"No receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:babd86ba4278b7bc501e1e1ae4c2d62b79496965e8f080a93d92621b22502c71",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\\nNo receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Provide receiving record for PO-1108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:24cf96610419927f743c208e2a90fd3009dda378f0b633462deacc84341d534c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\"}, {\"citations\": [\"E3\", \"E4\"], \"text\": \"No receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:babd86ba4278b7bc501e1e1ae4c2d62b79496965e8f080a93d92621b22502c71",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\\nNo receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Provide receiving record for PO-1108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:24cf96610419927f743c208e2a90fd3009dda378f0b633462deacc84341d534c",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\"}, {\"citations\": [\"E3\", \"E4\"], \"text\": \"No receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"2 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-108",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:babd86ba4278b7bc501e1e1ae4c2d62b79496965e8f080a93d92621b22502c71",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"No receiving record is available for PO PO-1108 line 1. This does not establish whether the goods were delivered.\\nNo receiving record is available for PO PO-1108 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Provide receiving record for PO-1108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:acfd40f47702714f99322016f33a43db0e352715bbfd606cee6ded1a3fda0929",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:177dca2785c0424bc13d3d40178eee4e92224f4fdece57a826c1fffc58bd9e69",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1109 (CASE-00009)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:acfd40f47702714f99322016f33a43db0e352715bbfd606cee6ded1a3fda0929",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:177dca2785c0424bc13d3d40178eee4e92224f4fdece57a826c1fffc58bd9e69",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1109 (CASE-00009)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:acfd40f47702714f99322016f33a43db0e352715bbfd606cee6ded1a3fda0929",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-109",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:177dca2785c0424bc13d3d40178eee4e92224f4fdece57a826c1fffc58bd9e69",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"receiving\", \"body\": \"Invoice bills 6 EA on PO line 1, but only 0 were received; 6 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Confirm delivered quantity for PO-1109 (CASE-00009)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:ca54f24f7905c073a4dbe2e1f6a508ade5b71c966a412ff8ce405a0cdbebdb44",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"Unit 'pallet' is not defined in the policy unit table.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:33f3092082866e5c208e8c65a2b7b75d6bb0f61a82d5b33f2b666e6b584d6352",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"ap-review\", \"body\": \"Unit 'pallet' is not defined in the policy unit table.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Review CASE-00010: 1 condition(s) need manual review\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:ca54f24f7905c073a4dbe2e1f6a508ade5b71c966a412ff8ce405a0cdbebdb44",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"Unit 'pallet' is not defined in the policy unit table.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:33f3092082866e5c208e8c65a2b7b75d6bb0f61a82d5b33f2b666e6b584d6352",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"ap-review\", \"body\": \"Unit 'pallet' is not defined in the policy unit table.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Review CASE-00010: 1 condition(s) need manual review\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:ca54f24f7905c073a4dbe2e1f6a508ade5b71c966a412ff8ce405a0cdbebdb44",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"Unit 'pallet' is not defined in the policy unit table.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-110",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:33f3092082866e5c208e8c65a2b7b75d6bb0f61a82d5b33f2b666e6b584d6352",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"ap-review\", \"body\": \"Unit 'pallet' is not defined in the policy unit table.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Review CASE-00010: 1 condition(s) need manual review\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:4b2d87e80cc580443762f4e7cc9330e4e6999af20d584fbc0656fb0ae923b8ba",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:b95a461f1c9355a454e8ba7e14f0201fce1978991ffa9b5accd1c6bb3ab71f93",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:293dc20a4d7f8f9139164a0bc92095f45f085dc36c005c2545b54e0326544f24",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [\"E1\"], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00011\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:4b2d87e80cc580443762f4e7cc9330e4e6999af20d584fbc0656fb0ae923b8ba",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:b95a461f1c9355a454e8ba7e14f0201fce1978991ffa9b5accd1c6bb3ab71f93",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:293dc20a4d7f8f9139164a0bc92095f45f085dc36c005c2545b54e0326544f24",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [\"E1\"], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00011\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:4b2d87e80cc580443762f4e7cc9330e4e6999af20d584fbc0656fb0ae923b8ba",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:b95a461f1c9355a454e8ba7e14f0201fce1978991ffa9b5accd1c6bb3ab71f93",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 18 delivered but the receiving record shows 15. Policy furniture-ap@v2 ranks the receiving record above supplier messages, so the receiving record controls.\"}], \"summary\": \"1 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:293dc20a4d7f8f9139164a0bc92095f45f085dc36c005c2545b54e0326544f24",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [\"E1\"], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00011\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:92f2e82879c6147bc3f6077d4181eb6290e63b34621d9a40beaed8313d0d6bc6",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:f18798533832a9faed887db217585046c51fac27ef30c0ac63fa1166fd687ffb",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00012\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:92f2e82879c6147bc3f6077d4181eb6290e63b34621d9a40beaed8313d0d6bc6",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:f18798533832a9faed887db217585046c51fac27ef30c0ac63fa1166fd687ffb",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00012\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:92f2e82879c6147bc3f6077d4181eb6290e63b34621d9a40beaed8313d0d6bc6",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under furniture-ap@v2.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "fur-validation-112",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:f18798533832a9faed887db217585046c51fac27ef30c0ac63fa1166fd687ffb",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"No discrepancy found for CASE-00012\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:f867fa4d454086644b8bd2cd54d1b2baa3dfb3fe1b604dd4bf96f9702ec34fa9",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:5760e052ef6425608b37d427aaec911c66ebe2d368f877b184f82d523d50dea2",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00001\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:f867fa4d454086644b8bd2cd54d1b2baa3dfb3fe1b604dd4bf96f9702ec34fa9",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:5760e052ef6425608b37d427aaec911c66ebe2d368f877b184f82d523d50dea2",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00001\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:f867fa4d454086644b8bd2cd54d1b2baa3dfb3fe1b604dd4bf96f9702ec34fa9",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-101",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:5760e052ef6425608b37d427aaec911c66ebe2d368f877b184f82d523d50dea2",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00001\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:3815991a54eef0b5a0bbcd3fdeb90a29b662fb779e6fe296fb7c830b831e68b8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:c9669c2b7e271c7fc11691c535ce084c5be79bd3b1a0911f00c38c739d97af26",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:3815991a54eef0b5a0bbcd3fdeb90a29b662fb779e6fe296fb7c830b831e68b8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:c9669c2b7e271c7fc11691c535ce084c5be79bd3b1a0911f00c38c739d97af26",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:3815991a54eef0b5a0bbcd3fdeb90a29b662fb779e6fe296fb7c830b831e68b8",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-102",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:c9669c2b7e271c7fc11691c535ce084c5be79bd3b1a0911f00c38c739d97af26",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00002\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:9d740760381e5037964f425dffce9dfca76d46b08aed02d5252950c954cfe718",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:e1bf913ae18dea580bad0b2eed22f5fe989b6004f1e4b674fbb1b3181ffe962d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"vendor-management\", \"body\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Draft price query to vendor for PO-2103 (CASE-00003)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:9d740760381e5037964f425dffce9dfca76d46b08aed02d5252950c954cfe718",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:e1bf913ae18dea580bad0b2eed22f5fe989b6004f1e4b674fbb1b3181ffe962d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"vendor-management\", \"body\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Draft price query to vendor for PO-2103 (CASE-00003)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:9d740760381e5037964f425dffce9dfca76d46b08aed02d5252950c954cfe718",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"text\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-103",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:e1bf913ae18dea580bad0b2eed22f5fe989b6004f1e4b674fbb1b3181ffe962d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_supplier_message_draft\", \"assignee_group\": \"vendor-management\", \"body\": \"Invoice line 1 net unit price 102.01 EUR is 2.01 above the PO price 100.00 EUR, outside the it-procurement@v1 tolerance.\", \"citations\": [\"E1\", \"E2\", \"E3\", \"E4\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Draft price query to vendor for PO-2103 (CASE-00003)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:ce6a3545d212f16f5655511404e4a5260de2e8dff1c98b8716a26cd7adf9b1e5",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:9434977fb7c19c5d5907a8b4e5684165791a6b245b7f2d3918a1e62635c73203",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00004\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:ce6a3545d212f16f5655511404e4a5260de2e8dff1c98b8716a26cd7adf9b1e5",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:9434977fb7c19c5d5907a8b4e5684165791a6b245b7f2d3918a1e62635c73203",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00004\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:ce6a3545d212f16f5655511404e4a5260de2e8dff1c98b8716a26cd7adf9b1e5",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [], \"summary\": \"0 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-104",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:9434977fb7c19c5d5907a8b4e5684165791a6b245b7f2d3918a1e62635c73203",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"record_review_note\", \"assignee_group\": null, \"body\": \"See case findings.\", \"citations\": [], \"decision\": \"no_action\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Matched: CASE-00004\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:a6c89d990554ec14838c81f28d2aec70e4a87b86faf69c8283afa16a9acc71e3",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:a7a1c3a03a5ea5ef94619cc81a60a728b3bfaac21ad47a289d385be1aa5ba029",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:a6c89d990554ec14838c81f28d2aec70e4a87b86faf69c8283afa16a9acc71e3",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:a7a1c3a03a5ea5ef94619cc81a60a728b3bfaac21ad47a289d385be1aa5ba029",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:a6c89d990554ec14838c81f28d2aec70e4a87b86faf69c8283afa16a9acc71e3",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-105",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:a7a1c3a03a5ea5ef94619cc81a60a728b3bfaac21ad47a289d385be1aa5ba029",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 20 EA on PO line 1, but only 15 were received; 5 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2105 (CASE-00005)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:61fb9c2be20a0dfc9add79a33433663c6141ef50bbe725f10601ba81b614ac61",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:2efedf23794fc0c64a0118c1c5e21db5a9a037d494a1e8aed7dcc1527cf03de0",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Register asset intake for PO-2106 (CASE-00006)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:61fb9c2be20a0dfc9add79a33433663c6141ef50bbe725f10601ba81b614ac61",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:2efedf23794fc0c64a0118c1c5e21db5a9a037d494a1e8aed7dcc1527cf03de0",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Register asset intake for PO-2106 (CASE-00006)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:61fb9c2be20a0dfc9add79a33433663c6141ef50bbe725f10601ba81b614ac61",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"clarify\", \"statements\": [{\"citations\": [\"E1\", \"E2\"], \"text\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-106",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:2efedf23794fc0c64a0118c1c5e21db5a9a037d494a1e8aed7dcc1527cf03de0",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"No receiving record is available for PO PO-2106 line 2. This does not establish whether the goods were delivered.\", \"citations\": [\"E1\", \"E2\"], \"decision\": \"clarify\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Register asset intake for PO-2106 (CASE-00006)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:b0d9855790c709e57ceb570cc873adacb09768840af8723b0ec92965634e5826",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:53bd9f7a54475dc70bbde31e8bd5d8a7d059a18a087d7fcdb03194d94248f3a1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:51d07dfb089f4f360b1905eb0190fdc245e1df69224413ec998b691b1aa3e879",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"it-procurement-leads\", \"body\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\", \"citations\": [\"E1\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Escalate CASE-00007 for review (1 open condition(s))\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:b0d9855790c709e57ceb570cc873adacb09768840af8723b0ec92965634e5826",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:53bd9f7a54475dc70bbde31e8bd5d8a7d059a18a087d7fcdb03194d94248f3a1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:51d07dfb089f4f360b1905eb0190fdc245e1df69224413ec998b691b1aa3e879",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"it-procurement-leads\", \"body\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\", \"citations\": [\"E1\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Escalate CASE-00007 for review (1 open condition(s))\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:b0d9855790c709e57ceb570cc873adacb09768840af8723b0ec92965634e5826",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [{\"query\": \"delivered\", \"tool\": \"search_case_evidence\"}], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:53bd9f7a54475dc70bbde31e8bd5d8a7d059a18a087d7fcdb03194d94248f3a1",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"escalate\", \"statements\": [{\"citations\": [\"E1\"], \"text\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 2,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-107",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:51d07dfb089f4f360b1905eb0190fdc245e1df69224413ec998b691b1aa3e879",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"assign_case\", \"assignee_group\": \"it-procurement-leads\", \"body\": \"Supplier correspondence claims 9 delivered but the receiving record shows 10, and policy it-procurement@v1 defines no precedence between these sources.\", \"citations\": [\"E1\"], \"decision\": \"escalate\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Escalate CASE-00007 for review (1 open condition(s))\"}"
+   },
+   "seq": 3,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:d5013856a3dc57fe818f0498a9ce7612073d0c0f62388c8c60d27c0d8c4d796d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 0,
+   "request_sha256": "sha256:e99200456269af6ee64fa0e0441f4086f470419afd0588447d875e459957dbbc",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:d5013856a3dc57fe818f0498a9ce7612073d0c0f62388c8c60d27c0d8c4d796d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 1,
+   "request_sha256": "sha256:e99200456269af6ee64fa0e0441f4086f470419afd0588447d875e459957dbbc",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:d5013856a3dc57fe818f0498a9ce7612073d0c0f62388c8c60d27c0d8c4d796d",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 1200
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"evidence_requests\": [], \"outcome\": \"answer\", \"statements\": [{\"citations\": [\"E1\", \"E2\", \"E3\"], \"text\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\"}], \"summary\": \"1 cited statement(s) under it-procurement@v1.\", \"uncertainties\": []}"
+   },
+   "seq": 1,
+   "template_id": "explain_findings/v1"
+  },
+  {
+   "case_id": "it-validation-108",
+   "mode": "mock",
+   "repeat": 2,
+   "request_sha256": "sha256:e99200456269af6ee64fa0e0441f4086f470419afd0588447d875e459957dbbc",
+   "response": {
+    "effective_params": {
+     "max_output_tokens": 800
+    },
+    "input_tokens": null,
+    "latency_ms": 0,
+    "origin": "mocked",
+    "output_tokens": null,
+    "provider": "mock",
+    "requested_model": "opsbridge-mock-1",
+    "resolved_model": "opsbridge-mock-1",
+    "stop_reason": "end_turn",
+    "text": "{\"action_type\": \"create_follow_up_task\", \"assignee_group\": \"it-asset-intake\", \"body\": \"Invoice bills 50 EA on PO line 1, but only 49 were received; 1 EA exceed the allocatable quantity.\", \"citations\": [\"E1\", \"E2\", \"E3\"], \"decision\": \"propose\", \"rationale\": \"Follows the deterministic route for the reported findings.\", \"title\": \"Reconcile delivered device count for PO-2108 (CASE-00008)\"}"
+   },
+   "seq": 2,
+   "template_id": "propose_follow_up/v1"
+  }
+ ],
+ "response_origins": [
+  "mocked"
+ ],
+ "schema": "opsbridge-model-cassette/1",
+ "split": "validation"
+}

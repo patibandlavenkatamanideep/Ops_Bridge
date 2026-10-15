@@ -580,7 +580,9 @@ def _agent_runtime(
             },
         }
         if decision.adapter is not None:
-            run.response_mode = (
+            # A replay adapter declares what it replays (mocked or recorded responses).
+            declared = getattr(decision.adapter, "response_mode", None)
+            run.response_mode = declared or (
                 "mocked"
                 if decision.adapter.capabilities.provider in ("mock", "scripted")
                 else "live"

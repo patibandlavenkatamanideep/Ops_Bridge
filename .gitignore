@@ -269,3 +269,6 @@ evals/results/_scratch/
 
 # The Python template ignores any lib/ directory; frontend source uses one.
 !frontend/src/lib/
+
+# EvalSeal ledger lock (runtime only)
+evals/ledger/*.lock
