@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline verify build down reset-demo openapi
+        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -79,6 +79,15 @@ verify: ## Run every available local gate and name missing prerequisites
 build: ## Build backend wheel and frontend bundle from the locked dependencies
 	$(UV) build --wheel --out-dir ../dist
 	cd frontend && npm run build
+
+PROMETHEUS_IMAGE := docker.io/prom/prometheus:v3.13.4
+
+alerts-test: ## Check and unit-test the Prometheus alert rules (promtool in a container)
+	$(CONTAINER_ENV) && docker run --rm -v "$(ROOT)/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool $(PROMETHEUS_IMAGE) check rules alerts.yml
+	$(CONTAINER_ENV) && docker run --rm -v "$(ROOT)/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool $(PROMETHEUS_IMAGE) test rules alerts.test.yml
+
+observability-up: ## Start Prometheus (scrapes make dev processes; alerts at http://localhost:9090/alerts)
+	$(COMPOSE) --profile observability up -d prometheus
 
 down: ## Stop containers WITHOUT deleting persistent volumes
 	$(COMPOSE) stop
