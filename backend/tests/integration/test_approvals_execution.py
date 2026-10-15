@@ -598,3 +598,48 @@ def test_local_review_note_runs_through_the_same_ledger(stack) -> None:  # type:
     assert op["confirmation"]["method"] == "local_transaction"
     case = get(st, "furn-investigator", f"{T}/cases/{case_id}").json()
     assert case["assignee_group"] == "ap-review"
+
+
+def test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate(stack) -> None:  # type: ignore[no-untyped-def]
+    """Found by the demo test (Phase 9): the connector hard-coded idempotency support, so when
+    the tracker stopped honouring keys and lookup was unavailable, a retry after a timeout
+    created a second task. Capabilities are now discovered from the tracker."""
+    st = stack
+    st["store"].set_capabilities(ORG, False, False)
+    try:
+        case_id, prop = prepared(st, "INV-9001")
+        assert approve(st, case_id, prop).status_code == 200
+        fault(st, "timeout_after_commit")
+        drain(st)
+    finally:
+        st["store"].set_capabilities(ORG, True, True)
+        httpx.delete(f"{st['base']}/_control/faults")
+    [op] = operations(st, case_id)
+    assert (op["status"], op["failure_category"]) == ("outcome_unknown", "unreconcilable")
+    assert op["review_required"] is True
+    assert len(remote_tasks(st, op)) == 1  # committed once; never re-sent
+
+
+def test_capabilities_are_discovered_and_unknown_means_weakest(stack) -> None:  # type: ignore[no-untyped-def]
+    from opsbridge.connectors.tasks import SimTaskConnector
+
+    from .stack import MASTER
+
+    st = stack
+    caps = SimTaskConnector(st["base"], MASTER, ORG).capabilities
+    assert (caps.idempotency_keys, caps.lookup) == (True, "strong")
+    st["store"].set_capabilities(ORG, False, False)
+    try:
+        caps = SimTaskConnector(st["base"], MASTER, ORG).capabilities
+        assert (caps.idempotency_keys, caps.lookup) == (False, "none")
+    finally:
+        st["store"].set_capabilities(ORG, True, True)
+    unknown = SimTaskConnector(st["base"], "wrong-secret", ORG).capabilities  # discovery refused
+    assert (unknown.idempotency_keys, unknown.lookup) == (False, "none")
+    explicit = SimTaskConnector(
+        st["base"], "wrong-secret", ORG, idempotency_keys=True, lookup="eventual"
+    )
+    assert (explicit.capabilities.idempotency_keys, explicit.capabilities.lookup) == (
+        True,
+        "eventual",
+    )
