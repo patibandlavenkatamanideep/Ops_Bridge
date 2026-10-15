@@ -43,6 +43,7 @@ from opsbridge.persistence.models import (
     WorkflowStep,
 )
 from opsbridge.services.cases import transition
+from opsbridge.telemetry import tracing
 
 WORKFLOW_VERSION = "investigation/1.1.0"
 SERVICE_IDENTITY = "service:opsbridge-worker"
@@ -97,7 +98,10 @@ def _run_step(
         step.started_at = datetime.now(UTC)
         step.error = None
     try:
-        output = fn()
+        with tracing.span(
+            f"step {name}", tenant_id=run.tenant_id, case_id=run.case_id, run_id=run.id, step=name
+        ):
+            output = fn()
     except Exception as exc:
         with deps.db.session(ctx) as s:
             step = s.execute(
