@@ -77,8 +77,8 @@ def main() -> int:
     print("Configuration")
     env_path = ROOT / ".env"
     if not env_path.exists():
-        print("  --  .env missing (run make setup)")
-        problems.append(".env missing")
+        # Expected on a fresh checkout: `make setup` creates it with generated local secrets.
+        print("  next .env not created yet — `make setup` creates it (secrets generated, never printed)")
     else:
         keys = {line.split("=", 1)[0]: line.split("=", 1)[1].strip()
                 for line in env_path.read_text().splitlines() if "=" in line and not line.startswith("#")}
