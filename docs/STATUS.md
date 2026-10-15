@@ -8,11 +8,11 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
 | Level | State |
 |---|---|
-| Local application complete | no — Phases 0–7 done; Phase 8 next |
+| Local application complete | no — Phases 0–8 done; Phase 9 next |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | not run (no workflow pushed yet) |
-| Staging deployed | no |
+| Hosted CI | not run — workflow committed (PRs to main, manual dispatch), validated with actionlint only |
+| Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
 ## Workspace inventory (Phase 0, 2026-10-14)
@@ -228,20 +228,63 @@ drift (`tests/evaluation/test_offline_guards.py`); results state mode, units, sp
 settings, failures and uncertainty (docs/evaluation-results.md, results JSON);
 `make eval-offline` reproduced identical held-out verdicts; 14 ledger records verified.
 
+### Phase 8 — operations and staging preparation (exit gate passed locally; staging not deployed)
+- Telemetry: OpenTelemetry spans from the API request (perimeter server span; client trace
+  context not trusted; FastAPI native telemetry disabled) through the job (trace context in
+  the payload), durable steps, model and tool calls and connector attempts, with case, run,
+  operation, attempt, remote-reference and correlation ids; OTLP/HTTP or JSON-lines export
+  when configured. Prometheus metrics with bounded labels on API `/metrics` (optional token)
+  and worker `:9101/metrics`; queue gauges; tenant-scoped backlogs only via the aggregate
+  `ops.metrics_snapshot()` (migration 0004, NOLOGIN owner role, column-level grants). Logs
+  carry trace and correlation ids.
+- Health: worker `/healthz` (loop heartbeat) and `/readyz` (loop + database); API `/readyz`.
+- Alerts: 16 Prometheus rules with runbook links; `make alerts-test` (promtool, 9 cases);
+  live drills with injected failures (IdP down, worker down) fired and resolved.
+- Containers: one image (non-root, allow-list build context) for every role; compose
+  profile `app` with bootstrap, health probes and volumes; clean launch from empty volumes
+  and recovery drills (worker exit, database restart) passed; 12 browser tests passed
+  against the containers.
+- Backup/restore: `make backup`, `make restore-drill` (isolated database; counts, RLS,
+  artifact digests, citations; tampering detected).
+- Canary: `make eval-canary` against a pinned 64-case baseline (offline, egress-guarded).
+- CI: `.github/workflows/ci.yml` (least privilege, pinned actions, no secrets) — not run.
+- Docs: architecture.md, operations.md, deployment.md; threat model T20–T25.
+- Defects found in this phase:
+  1. The worker crashed when PostgreSQL restarted (fixed: backoff; re-verified in containers).
+  2. An alert rule could never fire (free/total ratio with mismatched labels; caught by promtool).
+  3. FastAPI 0.143 creates its own server spans that trust incoming `traceparent` and record
+     raw URLs; disabled in favour of the perimeter span (found by a failing trace test).
+  4. Podman re-splits exec-form health checks with spaces (`python -c "…"` became `import`);
+     replaced by an `opsbridge probe` command.
+  5. The MCP SDK's default DNS-rebinding allow-list rejected container hostnames; now an
+     explicit allow-list derived from each service's URL.
+  6. `verify-restore` with a relative path reported every artifact missing (uv changes the
+     working directory); relative paths are now refused.
+- Observed, not a defect of OpsBridge: the development laptop's data volume is ~90% full
+  (23 GiB free); the disk alert went pending.
+
+Phase 8 exit gate evidence: clean local launch (38 s from empty volumes, all health checks,
+browser tests) and recovery drills (worker exit → restarted in 7 s; database restart → API
+ready in 3 s, worker backed off without restarting; backup → isolated restore verified) —
+docs/operations.md "Drills". Staging plan with resources, secrets, cost considerations and
+rollback: docs/deployment.md. External deployment: not performed (no account/authorization).
+
 ## Verification evidence (local, macOS arm64, 2026-10-15)
 
-`make verify` → **12 passed, 0 failed, 0 skipped** (after Phase 7):
+`make verify` → **14 passed, 0 failed, 0 skipped** (after Phase 8):
 
 | Gate | Result |
 |---|---|
 | backend ruff lint + format | passed |
-| backend mypy --strict (96 files) | passed |
-| backend unit + contract tests | 226 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
+| backend mypy --strict (102 files) | passed |
+| backend unit + contract tests | 228 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 8 passed |
+| evaluation canary (pinned baseline) | 64 cases, 0 changes |
 | evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 14 records ok |
 | migration drift (`alembic check`) | passed |
-| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness) | 102 passed |
+| alert rules (promtool check + 9 unit cases) | passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry) | 108 passed |
 | browser tests (Playwright, dev stack in MCP mode) | 16 passed |
 | frontend production build | passed |
 | `make eval-offline` (run separately; appends replay records) | held-out and security replays identical to recordings; receipts verified |
@@ -302,11 +345,13 @@ Phase 1 exit gate evidence:
   mocked responses only; held-out pass sits exactly at the 0.90 target with a 0.77 lower
   bound; supplier invoice layouts outside the pack mappings are escalated, not read.
 - The egress guard covers Python sockets; libpq connects only to the configured local DB.
+- Artifact storage is the local filesystem (EFS in the staging plan); no S3 store. The
+  delegation key is a file path; staging needs a secret-to-tmpfs entrypoint.
+- Container root filesystems are not read-only; alert routing (pager/email) is not set up.
 
 ## Next executable task
 
-Phase 8: OpenTelemetry traces and metrics (with the log scrubber applied to span
-attributes), health/readiness detail and alert rules, container images and a compose
-demo profile, backup/restore drill against PostgreSQL, CI workflow (least privilege,
-pinned actions, no secrets for forks; not pushed to run without the owner's consent for
-hosted CI), docs/operations.md, docs/deployment.md, docs/architecture.md.
+Phase 9: re-run the core and isolation suites against the IT hardware pack (no tenant-specific
+branches), then README (with screenshots from the running app), docs/data-contracts.md,
+demo-script, operator guide, pilot plan, integration onboarding guide, engineering case
+study and final report; requirement evidence matrix completed.
