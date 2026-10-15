@@ -39,7 +39,9 @@ def _api(args: argparse.Namespace) -> int:
 
     from opsbridge.api.app import create_app
     from opsbridge.config import REPO_ROOT
+    from opsbridge.telemetry.tracing import configure_tracing
 
+    configure_tracing("opsbridge-api")
     static = Path(args.static) if args.static else REPO_ROOT / "frontend" / "dist"
     app = create_app(static_dir=static if args.serve_frontend else None)
     uvicorn.run(
@@ -355,7 +357,9 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
     from opsbridge.mcp_services.records import build_records_server
     from opsbridge.persistence.db import Database, DbContext, make_engine
     from opsbridge.persistence.models import Tenant
+    from opsbridge.telemetry.tracing import configure_tracing
 
+    configure_tracing(f"opsbridge-mcp-{which}")
     settings = get_settings()
     db = Database(make_engine("mcp"))
     if which == "records":
