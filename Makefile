@@ -29,10 +29,12 @@ setup: ## Install locked dependencies; create .env without overwriting secrets
 
 infra-up: ## Start PostgreSQL and Keycloak containers and wait until healthy
 	$(COMPOSE) up -d --build --wait postgres keycloak
+	$(COMPOSE) exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh >/dev/null
 
-migrate: ## Apply database migrations (dev and test databases)
+migrate: ## Apply database migrations (dev, test and eval databases)
 	$(PY) alembic upgrade head
 	$(PY) alembic -x db=opsbridge_test upgrade head
+	$(PY) alembic -x db=opsbridge_eval upgrade head
 
 seed-demo: ## Idempotently load ONLY the designated synthetic demo tenants
 	$(PY) python -m opsbridge.cli seed-demo

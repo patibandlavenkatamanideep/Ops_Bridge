@@ -13,6 +13,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from sqlalchemy.exc import DBAPIError
+
 from opsbridge.config import Settings, get_settings
 from opsbridge.connectors.purchasing import PurchasingClient
 from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector
@@ -118,8 +120,24 @@ class Worker:
 
     def run_forever(self) -> None:
         log.info("worker %s started; handlers=%s", self.worker_id, sorted(self.handlers))
+        backoff = 0.0
         while not self.stop_event.is_set():
-            if not self.run_once():
+            try:
+                processed = self.run_once()
+            except DBAPIError as exc:
+                # Database unavailable (restart, failover, network): keep the process and back
+                # off. An in-flight job's lease expires and its fencing token stops this worker
+                # from writing late results, so another claim resumes it from durable steps.
+                backoff = min(max(backoff * 2, 0.5), 30.0)
+                log.warning(
+                    "database unavailable (%s); retrying in %.1fs",
+                    type(exc.orig or exc).__name__,
+                    backoff,
+                )
+                self.stop_event.wait(backoff)
+                continue
+            backoff = 0.0
+            if not processed:
                 self.stop_event.wait(self.settings.worker_poll_seconds)
 
 
