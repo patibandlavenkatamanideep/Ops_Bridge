@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill
+        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -88,6 +88,14 @@ alerts-test: ## Check and unit-test the Prometheus alert rules (promtool in a co
 
 observability-up: ## Start Prometheus (scrapes make dev processes; alerts at http://localhost:9090/alerts)
 	$(COMPOSE) --profile observability up -d prometheus
+
+image: ## Build the application image (API+UI, worker, MCP, simulator) from the locks
+	$(CONTAINER_ENV) && docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .
+
+demo-containers: image ## Run the whole stack in containers (stop `make dev` first); UI on http://localhost:8000
+	$(COMPOSE) --profile app up -d --wait postgres keycloak
+	$(COMPOSE) exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh >/dev/null
+	$(COMPOSE) --profile app up -d --wait
 
 backup: ## Back up the local database and artifact store to var/backups/<UTC timestamp>
 	python3 scripts/backup_restore.py backup
