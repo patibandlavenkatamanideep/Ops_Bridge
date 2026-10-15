@@ -24,6 +24,12 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `test` | `pytest -q -m "not integration and not keycloak"` and `npm test` | macOS |
 | `test-integration` | `OPSBRIDGE_REQUIRE_INTEGRATION=1 pytest -q -m "integration or keycloak"` | macOS |
 | `test-e2e` | `cd frontend && npx playwright test` (needs the dev stack running) | macOS, Chromium 156 |
+| `eval-canary` | `uv --directory backend run --frozen python -m opsbridge.cli eval-canary` (offline rules path vs `evals/baselines/canary-rules.json`) | macOS |
+| `alerts-test` | `docker run --rm -v "$PWD/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool prom/prometheus:v3.13.4 test rules alerts.test.yml` (and `check rules alerts.yml`) | macOS + Podman |
+| `observability-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml --profile observability up -d prometheus` | macOS + Podman |
+| `backup` / `restore-drill` | `python3 scripts/backup_restore.py backup` / `… restore-drill [DIR] [--keep]` | macOS + Podman |
+| `image` | `docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .` | macOS + Podman |
+| `demo-containers` | `image`, then `docker compose … --profile app up -d --wait` (stop `make dev` first) | macOS + Podman |
 | `eval-offline` | `uv --directory backend run --frozen python -m opsbridge.cli eval-bench --split heldout --replay`, same for `--split security`, then `… eval-verify` | macOS |
 | `verify` | `python3 scripts/verify.py` | macOS |
 | `build` | `uv --directory backend build --wheel --out-dir ../dist && (cd frontend && npm run build)` | macOS |
@@ -40,6 +46,11 @@ docs/evaluation-plan.md):
 | `eval-bench --split S --replay [--from-run DIR]` | Strict offline replay of a recorded run; fails closed (exit 3) on a missing or diverged response or blocked egress. |
 | `eval-verify` | Ledger chain, signatures (committed public key) and every bound artifact; missing files fail. |
 | `eval-rules --corpus FILE` | Fast DB-free rules-only check (development only). |
+| `eval-canary [--update-baseline]` | Regression check against the pinned canary baseline; updating it is a reviewed change. |
+
+Operations commands: `probe URL` (container health probe), `init-keys` (create the delegation
+key once), `verify-restore --database D --artifact-dir /abs/path` (restore checks; refuses the
+live databases and relative paths).
 
 Linux with Docker is expected to work but has not been exercised locally; hosted CI
 results are reported separately in docs/STATUS.md. Windows/WSL has not been exercised.
