@@ -60,7 +60,17 @@ Connector declarations (`connectors/tasks.py`):
 
 | Connector | Idempotency keys | Lookup | Conditional writes | Definite | Ambiguous |
 |---|---|---|---|---|---|
-| sim_tasks (default) | yes | strong (marker search) | no | 400/401/403/404/409/422; 503 + `X-Sim-Not-Committed` | timeouts, dropped connections, other 5xx |
+| sim_tasks | discovered (`GET /orgs/{org}/capabilities`) | discovered: strong (marker search) or none | no | 400/401/403/404/409/422; 503 + `X-Sim-Not-Committed` | timeouts, dropped connections, other 5xx |
+| github_issues | no | eventual | no | 400/401/403/404/410/422 | timeouts, 5xx |
+
+Capabilities are a contract the executor relies on. The simulator connector discovers them
+from the tracker for each dispatch unless they are configured explicitly; if discovery fails
+it assumes the weakest contract (no idempotency, no lookup), so an ambiguous result goes to
+human review. (Before Phase 9 the simulator connector hard-coded "idempotency: yes"; a demo
+test showed that a tracker which silently stopped honouring keys, with lookup unavailable,
+received a resend after a timeout and created a second task. Fixed and covered by
+`test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate` and the same
+scenario through Casework MCP.)
 
 Reconciliation: strong lookup with one match → confirmed; none → safe to create; several →
 `outcome_unknown` (duplicates exist). Without lookup, idempotency keys make a resend safe.
@@ -88,6 +98,9 @@ absence.
 | Crash before / after remote commit | `test_worker_crash_before_or_after_remote_commit_recovers_without_duplicate[before/after]` |
 | Cancellation before dispatch / too late | `test_cancellation_before_dispatch_and_too_late` |
 | Local actions use the same ledger | `test_local_review_note_runs_through_the_same_ledger` |
+| Remote stops honouring idempotency keys, no lookup → review, one task | `test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate`, `test_unreliable_remote_behind_the_mcp_hop_goes_to_review_not_a_duplicate` |
+| Capability discovery; failed discovery means weakest | `test_capabilities_are_discovered_and_unknown_means_weakest` |
+| UI: reconcile after timeout; unknown outcome recorded by a person | `frontend/e2e/demo.spec.ts` |
 
 ## Residual risks (stated, not solved)
 
@@ -98,3 +111,6 @@ absence.
   for the simulator connector.
 - Read-back confirms the task exists with our marker; it does not confirm anyone acted on it.
 - Local cancellation cannot undo a dispatched external action.
+- Capabilities can change between discovery and the call; a provider that advertises
+  idempotency but does not honour it can still cause a duplicate on resend. Production
+  connectors need validation against the real provider (GitHub declares no idempotency).
