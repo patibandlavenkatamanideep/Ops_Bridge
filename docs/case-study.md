@@ -82,6 +82,6 @@ route template. Test: `test_incoming_trace_context_is_not_trusted`.
 ## What did not change
 
 The decision rules stayed deterministic, approvals stayed bound to the reviewed version,
-and no test was weakened to pass. Two tests that passed vacuously (an unbounded-retries
-check and a retrieval-isolation query that matched nothing) were rewritten so they could
-fail.
+and no test was weakened to pass. A vacuous unbounded-retries test was removed, and a
+retrieval-isolation test whose query matched nothing (so it passed trivially) was rewritten
+so that it can fail.
