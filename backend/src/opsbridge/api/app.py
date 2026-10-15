@@ -31,6 +31,9 @@ def create_app(
         openapi_url="/api/v1/openapi.json",
         docs_url="/api/docs",
         redoc_url=None,
+        # FastAPI's native telemetry would trust incoming trace context and record raw URLs;
+        # the perimeter middleware creates the server span instead (route templates, safe ids).
+        telemetry={"tracing": False, "metrics": False, "logs": False},
     )
     app.state.opsbridge = AppState(settings=settings, db=db or get_database("app"))
     _watch(app.state.opsbridge)
