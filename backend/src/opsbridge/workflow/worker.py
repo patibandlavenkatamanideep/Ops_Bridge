@@ -195,7 +195,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         if name == "sim_tasks" and settings.tool_transport == "mcp":
             from opsbridge.mcp_services.factory import casework_connector
 
-            return casework_connector(settings, tenant_id, operation)
+            return casework_connector(settings, tenant_id, operation, org)
         if name == "sim_tasks":
             return SimTaskConnector(settings.simulator_url, secret, org)
         if name == "github_issues":
