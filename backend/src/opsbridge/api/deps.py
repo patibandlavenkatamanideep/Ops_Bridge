@@ -14,6 +14,7 @@ from opsbridge.auth.sessions import COOKIE_NAME, CSRF_HEADER, SessionInfo, load_
 from opsbridge.config import Settings
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Membership, Tenant
+from opsbridge.telemetry import tracing
 
 from .errors import ApiError, not_found, unauthenticated
 
@@ -99,6 +100,7 @@ def current_principal(
     principal = resolve_principal(state.db, info, tenant)
     if principal is None:
         raise not_found("tenant")
+    tracing.set_ids(tenant_id=principal.tenant_id, user_id=principal.user_id)
     return principal
 
 
