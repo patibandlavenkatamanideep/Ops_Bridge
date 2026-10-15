@@ -1,9 +1,9 @@
 # Security and threat model
 
-Status: covers the local build through Phase 6. Deployment-specific threats (TLS
-termination, WAF, secret manager, network policy) are added with the staging plan in Phase 8.
-"Evidence" names the automated test that exercises the control; a control without a test is
-marked as such.
+Status: covers the local build through Phase 8 (local containers and CI definition
+included). Cloud-specific controls (WAF, managed keys, network policy) are planned in
+docs/deployment.md and are not implemented. "Evidence" names the automated test or drill
+that exercises the control; a control without one is marked as such.
 
 ## Assets
 
@@ -51,6 +51,12 @@ simulator / GitHub (HMAC or token, allow-listed repository); hosted model provid
 | T16 | Retained content kept longer than policy | Retention sweep deletes bytes/text and records the deletion | `test_retention_deletes_protected_content_and_says_so` | No automatic schedule; backups not covered |
 | T17 | Changed source data after investigation | Source manifest digest; new document versions only when bytes change; re-investigation shows the new version | `test_changed_source_document_creates_a_new_version_and_new_evidence_state` | Changes between investigation and approval are caught at dispatch via the manifest |
 | T18 | Abuse / brute force | Per-session/IP fixed-window rate limit, body-size limit | `test_rate_limit_and_body_limit` | In-memory, per process; not a DDoS control |
+| T20 | Telemetry leaks content or identifiers | Spans carry ids, route templates and statuses only (string attributes scrubbed); metric labels bounded (no tenant/case/user ids); logs scrubbed; FastAPI native telemetry disabled | `test_observability.py` (no document text in spans, no UUIDs in labels) | A new span attribute added carelessly is only pattern-scrubbed |
+| T21 | Forged trace context from the internet | Each request starts a new trace; `traceparent` from clients is ignored | `test_incoming_trace_context_is_not_trusted` | Internal propagation (API → job) is trusted |
+| T22 | Cross-tenant aggregates weaken RLS | `ops.metrics_snapshot()` is SECURITY DEFINER, owned by NOLOGIN `opsbridge_ops_reader` with column-level SELECT on status/timestamp columns; returns counts and ages only; app/worker may execute it, nothing else | `test_aggregate_state_reports_backlog_while_rls_still_hides_rows` | Counts across tenants are visible to operators of the metrics endpoint |
+| T23 | `/metrics` scraped by outsiders | Aggregate data only; optional bearer token; bound to localhost locally and to the private network in the staging plan | `test_metrics_endpoint_can_require_a_token` | Token is static; rotate with the deployment |
+| T24 | Secrets in images or CI | Allow-list build context (no `.env`, keys, `var/`); CI uses no secrets, `contents: read`, actions pinned to SHAs, runs on PRs to main or manual dispatch | image inspected (no `.env`); actionlint | Hosted CI not yet run |
+| T25 | Container compromise blast radius | Non-root uid 10001; only `/app/var` writable by the service user; internal services unpublished; MCP DNS-rebinding protection with explicit allowed hosts | clean-launch drill (docs/operations.md) | Root filesystem not read-only; no seccomp/AppArmor profile beyond engine defaults |
 | T19 | Forbidden autonomous actions | No payment, invoice posting, bank-detail or PO-modification actions exist; the action registry contains follow-up tasks and local case actions only | code review (`connectors/`, `services/proposals.py`) | — |
 
 ## Out of scope for v1
