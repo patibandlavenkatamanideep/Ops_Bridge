@@ -27,7 +27,8 @@ def verifier(settings: Settings, audience: str) -> DelegationVerifier:
 
 def worker_tokens(settings: Settings) -> ClientCredentialsTokens:
     return ClientCredentialsTokens(
-        f"{settings.oidc_issuer}/protocol/openid-connect/token",
+        # Backchannel URL when the public issuer is not reachable from here (containers).
+        f"{(settings.oidc_discovery_url or settings.oidc_issuer).rstrip('/')}/protocol/openid-connect/token",
         settings.worker_client_id,
         settings.worker_client_secret.get_secret_value(),
     )
