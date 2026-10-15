@@ -352,6 +352,25 @@ def test_timeout_after_commit_behind_the_mcp_hop_is_reconciled(stack, mcp) -> No
     assert len(remote_tasks(st, op)) == 1
 
 
+def test_unreliable_remote_behind_the_mcp_hop_goes_to_review_not_a_duplicate(stack, mcp) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    original = st["exec"]["exec"]
+    st["store"].set_capabilities("demo-furniture", False, False)
+    _via_mcp(st, mcp, {})
+    try:
+        case_id, prop = prepared(st, "INV-9001")
+        approve(st, case_id, prop)
+        fault(st, "timeout_after_commit")
+        drain(st)
+    finally:
+        st["exec"]["exec"] = original
+        st["store"].set_capabilities("demo-furniture", True, True)
+        httpx.delete(f"{st['base']}/_control/faults")
+    [op] = operations(st, case_id)
+    assert (op["status"], op["failure_category"]) == ("outcome_unknown", "unreconcilable")
+    assert len(remote_tasks(st, op)) == 1
+
+
 def test_casework_refuses_wrong_principal_and_non_executing_operations(stack, mcp) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(st, "INV-9001")
