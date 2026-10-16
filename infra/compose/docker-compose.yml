@@ -61,9 +61,15 @@ services:
   # --- Containerized application (profile "app"; `make demo-containers`) -----------------
   # Replaces `make dev` (same ports); stop host processes first. The API serves the built UI
   # on http://localhost:8000. Simulator and MCP services are reachable only on this network.
+  # Every app container: read-only root filesystem, /tmp tmpfs, no capabilities, no
+  # privilege escalation; only the /app/var volume is writable.
   bootstrap:
     image: opsbridge/app:local
     build: {context: ../.., dockerfile: infra/containers/opsbridge.Dockerfile}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: &app-env
       OPSBRIDGE_ENV: development
@@ -97,6 +103,10 @@ services:
 
   api:
     image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: *app-env
     ports: ["127.0.0.1:8000:8000"]
@@ -112,6 +122,10 @@ services:
 
   worker:
     image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: *app-env
     command: ["python", "-m", "opsbridge.cli", "worker"]
@@ -130,6 +144,10 @@ services:
 
   records-mcp:
     image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: *app-env
     command: ["python", "-m", "opsbridge.cli", "mcp-records", "--host", "0.0.0.0", "--port", "8101"]
@@ -145,6 +163,10 @@ services:
 
   casework-mcp:
     image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: *app-env
     command: ["python", "-m", "opsbridge.cli", "mcp-casework", "--host", "0.0.0.0", "--port", "8102"]
@@ -161,6 +183,10 @@ services:
 
   simulator:
     image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     profiles: [app]
     environment: *app-env
     command: ["sh", "-c", "python -m opsbridge.cli simulator-seed /app/fixtures/scenarios/dev.yaml && python -m opsbridge.cli simulator --host 0.0.0.0 --port 8090"]
