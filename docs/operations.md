@@ -97,7 +97,7 @@ search logs for `cid=<id>` and the trace with that `opsbridge.correlation_id`.
 
 ## Capacity
 
-`OpsBridgeDbPoolSaturated`, `OpsBridgeArtifactDiskLow`, `OpsBridgeProcessMemoryHigh`. Pool
+`OpsBridgeDbPoolSaturated`, `OpsBridgeArtifactDiskLow` (local store only), `OpsBridgeProcessMemoryHigh`. Pool
 size is `OPSBRIDGE_DB_POOL_SIZE` (+2 overflow) per process. Artifact storage grows with
 documents and model/tool payloads; retention (Tenant settings) deletes them by age.
 
@@ -124,6 +124,10 @@ New cluster-level roles (0004 needs `opsbridge_ops_reader`) come from
   superuser, restore the artifact tar into the artifact directory, start, run
   `verify-restore` against the restored database first. Content deleted by retention after
   the backup reappears from an older backup; re-run the retention sweep after a restore.
+- With the S3 store, `make backup` covers the database only; the bucket is protected by
+  versioning or replication (docs/deployment.md). Restore the bucket to the database's point
+  in time, then `verify-restore --database D --artifact-bucket B`. Covered by
+  `tests/integration/test_s3_store.py` against SeaweedFS, not by a drill on AWS.
 
 ## Rollback
 
