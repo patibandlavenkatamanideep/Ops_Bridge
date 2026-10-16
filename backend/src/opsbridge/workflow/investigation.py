@@ -565,6 +565,7 @@ def _agent_runtime(
         max_tool_calls=4,
         max_output_tokens=2000,
         timeout_seconds=30.0,
+        tenant_model_calls_per_day=tier.max_model_calls_per_day,
     )
     with deps.db.session(_ctx(tenant_id)) as s:
         run = s.get(WorkflowRun, run_id)
