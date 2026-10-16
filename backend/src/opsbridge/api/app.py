@@ -101,7 +101,8 @@ def _watch(state: AppState) -> None:
     from opsbridge.telemetry import metrics
 
     metrics.POOLS.register("app", state.db.engine)
-    metrics.watch_storage(state.settings.artifact_dir)
+    if not state.settings.artifact_s3_bucket:  # filesystem gauges apply to the local store only
+        metrics.watch_storage(state.settings.artifact_dir)
 
     def database() -> bool:
         with state.db.engine.connect() as conn:
