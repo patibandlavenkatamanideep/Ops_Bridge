@@ -362,7 +362,7 @@ Phase 1 exit gate evidence:
 - Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
   route to needs_review rather than parse.
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
-- Retention runs only on request (no schedule); backups are outside its reach. Extracted
+- Retention runs daily per configured tenant and on request; backups are outside its reach. Extracted
   field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
 - Uploads are not malware-scanned; there is no in-app member editor (memberships are seeded).
 - Browser tests add conversation notes and upload versions to the local demo case INV-9001.
