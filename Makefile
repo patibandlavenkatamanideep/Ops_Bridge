@@ -84,13 +84,17 @@ build: ## Build backend wheel and frontend bundle from the locked dependencies
 	cd frontend && npm run build
 
 PROMETHEUS_IMAGE := docker.io/prom/prometheus:v3.13.4
+ALERTMANAGER_IMAGE := docker.io/prom/alertmanager:v0.34.1
 
-alerts-test: ## Check and unit-test the Prometheus alert rules (promtool in a container)
+alerts-test: ## Check and unit-test alert rules (promtool) and alert routing (amtool), in containers
 	$(CONTAINER_ENV) && docker run --rm -v "$(ROOT)/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool $(PROMETHEUS_IMAGE) check rules alerts.yml
 	$(CONTAINER_ENV) && docker run --rm -v "$(ROOT)/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool $(PROMETHEUS_IMAGE) test rules alerts.test.yml
+	$(CONTAINER_ENV) && docker run --rm -v "$(ROOT)/infra/observability/alertmanager":/etc/am:ro --workdir /etc/am --entrypoint sh $(ALERTMANAGER_IMAGE) -c \
+	  'amtool check-config alertmanager.local.yml && grep -v "^\#" routes.test | while read -r want labels; do \
+	   amtool config routes test --config.file=alertmanager.local.yml --verify.receivers="$$want" $$labels || exit 1; done'
 
-observability-up: ## Start Prometheus (scrapes make dev processes; alerts at http://localhost:9090/alerts)
-	$(COMPOSE) --profile observability up -d prometheus
+observability-up: ## Start Prometheus, Alertmanager and the local alert sink (scrapes make dev processes)
+	$(COMPOSE) --profile observability up -d prometheus alertmanager alert-sink
 
 image: ## Build the application image (API+UI, worker, MCP, simulator) from the locks
 	$(CONTAINER_ENV) && docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .
