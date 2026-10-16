@@ -190,6 +190,15 @@ def start(
         )
     except (svc.NotFound, svc.Conflict) as exc:
         raise _map_errors(exc) from exc
+    except svc.QuotaExceeded as exc:
+        raise ApiError(
+            429,
+            "quota_exceeded",
+            str(exc),
+            retryable=True,
+            details={"retry_after_seconds": exc.retry_after_seconds},
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
     if not created:
         response.status_code = 200
     return _run_out(run)
