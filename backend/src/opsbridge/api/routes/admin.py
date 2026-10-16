@@ -9,7 +9,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from opsbridge.auth.permissions import require
-from opsbridge.evidence.storage import LocalArtifactStore
+from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import DbContext
 from opsbridge.services import casework_admin as svc
@@ -184,7 +184,7 @@ async def upload(
         result = await run_in_threadpool(
             svc.upload_document,
             state.db,
-            LocalArtifactStore(state.settings.artifact_dir),
+            artifact_store(state.settings),
             pack,
             principal,
             case_id,
