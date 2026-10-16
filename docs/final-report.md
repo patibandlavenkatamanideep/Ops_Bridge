@@ -33,11 +33,11 @@ backups, containers and an evaluation view are in place. See README.md for scree
 
 | Check | Result |
 |---|---|
-| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 250 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules ok; integration 123 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe accessibility scans); build ok |
+| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 253 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules and amtool routes ok; integration 123 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe accessibility scans); build ok |
 | Clean clone from GitHub | `make doctor`, `setup`, `lint`, `typecheck`, `test` (243 + 8), `eval-canary`, `build` pass; all 18 receipts verify |
 | Clean container launch | Empty volumes → all services healthy in 38 s; 12 browser tests passed against the containers; repeated with read-only root filesystems and dropped capabilities: 37 s, same 12 tests passed |
 | Recovery drills | Worker exit → restarted, healthy in 7 s; PostgreSQL restart → API ready in 3 s, worker backed off without restarting; backup → isolated restore verified (counts, RLS, artifact digests, citations; tampering caught) |
-| Alert drills | Identity provider down → alert fired after 145 s, resolved 30 s after recovery; worker down → 65 s, resolved 25 s after restart |
+| Alert drills | Identity provider down → alert fired after 145 s, resolved 30 s after recovery; worker down → 65 s, resolved 25 s after restart; routing (2026-10-16): identity-provider page delivered to the page receiver after 155 s, resolution after 296 s; synthetic ticket alert delivered after 30 s |
 | Held-out benchmark (40 cases, mocked responses) | Next action 36/40 = 0.90 (Wilson 95% 0.77–0.96) in rules-only and agent-assisted modes; 4 safe misses (unseen invoice layout), 0 unsafe; gate "pass (interval includes values below the target)"; strict offline replay at the final commit reproduced identical verdicts |
 | Demo script | Steps 4 and 6 automated in `frontend/e2e/demo.spec.ts` and passing |
 
@@ -81,6 +81,8 @@ their values. Details and reproduction: docs/case-study.md.
   installed; retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
   (encryption and IAM unverified); quota values are starting points.
 - Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
+- Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
+  queue or email receiver is connected.
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
 
@@ -102,4 +104,5 @@ their values. Details and reproduction: docs/case-study.md.
 3. Add the next supplier layout to the furniture pack from real (approved) samples, then
    re-run validation — the held-out misses point there.
 4. Close the remaining staging gaps in docs/deployment.md (S3 encryption, IAM and lifecycle
-   checked on the real bucket; alert routing) before any pilot.
+   checked on the real bucket; page and ticket receivers connected to real on-call and queue
+   services) before any pilot.
