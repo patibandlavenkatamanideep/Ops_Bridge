@@ -62,7 +62,9 @@ services:
   # Apache-2.0). Anonymous, localhost only; development and tests, not a production store.
   seaweedfs:
     image: docker.io/chrislusf/seaweedfs:4.47
-    command: ["server", "-s3", "-dir=/data"]
+    # every bucket gets its own collection of volumes; the default 8 volume slots fill after
+    # one or two buckets, so size slots from free disk with small volumes instead
+    command: ["server", "-s3", "-dir=/data", "-volume.max=0", "-master.volumeSizeLimitMB=64"]
     ports:
       - "127.0.0.1:8333:8333"
     volumes:
