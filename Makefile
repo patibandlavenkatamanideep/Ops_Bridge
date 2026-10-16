@@ -27,8 +27,8 @@ setup: ## Install locked dependencies; create .env without overwriting secrets
 	cd frontend && npm ci --no-audit --no-fund
 	mkdir -p var/artifacts var/keys
 
-infra-up: ## Start PostgreSQL and Keycloak containers and wait until healthy
-	$(COMPOSE) up -d --build --wait postgres keycloak
+infra-up: ## Start PostgreSQL, Keycloak and the local S3-compatible store; wait until healthy
+	$(COMPOSE) up -d --build --wait postgres keycloak seaweedfs
 	$(COMPOSE) exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh >/dev/null
 
 migrate: ## Apply database migrations (dev, test and eval databases)
