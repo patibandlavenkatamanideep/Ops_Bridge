@@ -306,15 +306,15 @@ model, sandbox, staging and pilot validation (docs/final-report.md).
 |---|---|
 | backend ruff lint + format | passed |
 | backend mypy --strict (102 files) | passed |
-| backend unit + contract tests | 243 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
+| backend unit + contract tests | 246 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
 | frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
 | frontend unit tests (vitest) | 8 passed |
 | evaluation canary (pinned baseline) | 64 cases, 0 changes |
 | evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 18 records ok |
 | migration drift (`alembic check`) | passed |
 | alert rules (promtool check + 9 unit cases) | passed |
-| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry, portability) | 114 passed |
-| browser tests (Playwright, dev stack in MCP mode, incl. demo steps) | 19 passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry, portability, quotas, retention schedule) | 120 passed |
+| browser tests (Playwright, dev stack in MCP mode, incl. demo steps and axe accessibility scans) | 23 passed |
 | frontend production build | passed |
 | `make eval-offline` (run separately; appends replay records) | at commit 05081df: held-out and security replays identical to recordings; 18 receipts verified |
 | fresh clone from GitHub (separate directory) | doctor, setup, lint, typecheck, test (243 + 8), eval-canary, build pass; receipts verify |
@@ -375,15 +375,34 @@ Phase 1 exit gate evidence:
   mocked responses only; held-out pass sits exactly at the 0.90 target with a 0.77 lower
   bound; supplier invoice layouts outside the pack mappings are escalated, not read.
 - The egress guard covers Python sockets; libpq connects only to the configured local DB.
-- Artifact storage is the local filesystem (EFS in the staging plan); no S3 store. The
-  delegation key is a file path; staging needs a secret-to-tmpfs entrypoint.
-- Container root filesystems are not read-only; alert routing (pager/email) is not set up.
+- Artifact storage is the local filesystem (EFS in the staging plan); no S3 store.
+- Alert routing (pager/email) is not set up; quota values are starting points.
+- Application processes must have synchronized clocks (NTP); comparisons against
+  database-written timestamps use the database clock (found when the Podman VM clock drifted
+  3 h 44 min after the laptop slept; fixed for quotas and retention).
 
 ## Next executable task
 
 The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
 run hosted CI (open a PR to `main` or dispatch the workflow); with authorization, the live
 GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
-pilot owner. Local improvements that need no authorization: per-tenant usage quotas
-(OB-27), the delegation-key secret entrypoint and an S3 artifact store for staging, and the
-next supplier invoice layout for the furniture pack.
+pilot owner. Local improvements that need no authorization: an S3-compatible artifact store
+for staging, and the next supplier invoice layout for the furniture pack (from approved real
+samples, not the held-out layout).
+
+### After-handoff hardening (2026-10-16)
+- Per-organization quotas: investigations per hour (429 `quota_exceeded`, `Retry-After`) and
+  model calls per day (recorded; rules fallback) — `test_quotas.py`.
+- Database clock for quota windows and retention cut-offs — regression test with a skewed
+  application clock.
+- Delegation key from a secret (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`); production never
+  generates one — `tests/mcp/test_delegation_key.py`.
+- Containers: read-only root filesystems, capabilities dropped, no-new-privileges; hardened
+  clean launch passed 12 browser tests.
+- Scheduled retention (daily per configured tenant via `ops.tenants_with_retention()`,
+  migration 0005) — `test_retention_schedule.py`.
+- Accessibility: axe-core WCAG 2.1 A/AA scans of every main screen, no serious or critical
+  violations — `e2e/a11y.spec.ts`.
+- Execution attempts keep their request and response as digest-matched artifacts.
+- Traceability: 25 verified_local, 3 implemented_unverified (OB-01, OB-22, OB-25).
+- `make verify` 14/14: unit 246 (+2 skipped), integration 120, browser 23.
