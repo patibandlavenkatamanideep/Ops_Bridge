@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     artifact_dir: Path = REPO_ROOT / "var" / "artifacts"
     packs_dir: Path = REPO_ROOT / "packs"
     evals_dir: Path = REPO_ROOT / "evals"
+    # S3-compatible artifact storage (staging). Unset bucket = local filesystem store.
+    artifact_s3_bucket: str | None = None
+    artifact_s3_prefix: str = ""
+    artifact_s3_endpoint_url: str | None = None  # e.g. a local S3-compatible server
+    artifact_s3_region: str | None = None
+    artifact_s3_sse: str | None = None  # "AES256" or "aws:kms"
+    artifact_s3_kms_key_id: str | None = None
     metrics_token: SecretStr | None = None  # bearer token for /metrics when set
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
