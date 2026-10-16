@@ -49,12 +49,8 @@ test("administrator settings", async ({ page }) => {
 });
 
 test("the scanner reports a planted violation (self-check)", async ({ page }) => {
-  await page.goto("/");
-  await page.evaluate(() => {
-    const img = document.createElement("img");
-    img.src = "data:image/gif;base64,R0lGODlhAQABAAAAACw=";
-    document.body.appendChild(img); // no alt text
-  });
+  // A minimal page with an image that has no alt text.
+  await page.setContent('<html lang="en"><body><main><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></main></body></html>');
   const result = await new AxeBuilder({ page }).withTags(["wcag2a"]).analyze();
   expect(result.violations.map((v) => v.id)).toContain("image-alt");
 });
