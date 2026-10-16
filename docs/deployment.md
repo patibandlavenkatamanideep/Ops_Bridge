@@ -66,9 +66,9 @@ the sizes above are conventional starting points, not measurements.
 **Secrets** (AWS Secrets Manager, injected as task secrets; never in images or task
 definitions): PostgreSQL passwords for migrator, app, worker and mcp roles (plus the master
 user, kept out of the application); OIDC client secret; worker client secret; session secret
-(≥ 32 chars); delegation Ed25519 private key (today a file path — needs an entrypoint that
-writes the injected secret to a tmpfs file with 0600, a gap to close before staging); metrics
-token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
+(≥ 32 chars); delegation Ed25519 private key (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`, PEM; used directly and
+never written to disk — production refuses to start the signer or verifier without it or an
+existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
 
 **Production settings checks** (`OPSBRIDGE_ENV=production` refuses to start otherwise): HTTPS
@@ -91,7 +91,6 @@ circuit breaker with automatic rollback to the previous task definition. Migrati
 backward compatible for one release. Data rollback = restore RDS snapshot + EFS backup into a
 new environment, verify with `opsbridge verify-restore`, then switch (docs/operations.md).
 
-**Before any staging deployment:** owner authorization and account; decide IdP; close the
-delegation-key file gap; consider an S3 artifact store (not implemented) instead of EFS;
+**Before any staging deployment:** owner authorization and account; decide IdP; consider an S3 artifact store (not implemented) instead of EFS;
 add the WAF/rate-limit edge (application rate limits are per process); run the restore drill
 there with synthetic data.
