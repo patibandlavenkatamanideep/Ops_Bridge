@@ -86,6 +86,9 @@ class TierEntitlements:
     max_model_calls_per_run: int
     external_connectors: frozenset[str]
     local_inference: bool
+    # Per-tenant usage quotas (bound compute for the whole organization, not one run).
+    max_investigations_per_hour: int = 60
+    max_model_calls_per_day: int = 200
 
 
 TIERS: dict[str, TierEntitlements] = {
@@ -102,6 +105,8 @@ TIERS: dict[str, TierEntitlements] = {
         max_model_calls_per_run=8,
         external_connectors=frozenset({"sim_tasks", "github_issues"}),
         local_inference=True,
+        max_investigations_per_hour=240,
+        max_model_calls_per_day=2000,
     ),
 }
 
