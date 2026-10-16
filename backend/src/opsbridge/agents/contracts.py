@@ -41,6 +41,12 @@ class BudgetExceeded(ModelError):
     category = "budget_exceeded"
 
 
+class QuotaExceeded(ModelError):
+    """The organization's daily model-call quota is used up; the run falls back to rules."""
+
+    category = "quota_exceeded"
+
+
 class RoutingBlocked(ModelError):
     """Data-routing policy or entitlements forbid this inference path."""
 
