@@ -141,6 +141,7 @@ external action cannot be rolled back locally; record a compensating follow-up i
 | Alert rules | synthetic series | `promtool test rules`: 9 test cases pass; caught a disk-ratio rule that could never fire (label mismatch) |
 | Unplanned | none | `OpsBridgeArtifactDiskLow` went pending on the development laptop (23 GiB free of 228 GiB, 10%); a real condition of the host disk, not of OpsBridge (7 MB) |
 | Clean launch | empty volumes, separate compose project, images prebuilt | all services healthy in 38 s; 12 browser tests (phases 1, 2, 4, 6) passed against the containers on :8000 |
+| Clean launch, hardened (2026-10-16) | same, with read-only root filesystems, no capabilities, no-new-privileges | healthy in 37 s; writing outside `/app/var` refused; the same 12 browser tests passed |
 | Worker process exit | SIGTERM inside the container | restart policy restarted it; healthy after 7 s; (`docker kill` counts as an operator stop and is not restarted) |
 | Database restart | `docker restart` PostgreSQL under the running stack | API `/readyz` 200 again after 3 s; worker logged one backoff and continued without restarting |
 | Backup + restore | `make backup`, `make restore-drill` | 1,408 rows, 408 KB dump (0.6 s); restore 1.2 s; counts and revision equal; RLS forced on all tables; 124 artifact rows (8 unique files) re-hashed; citations valid; application roles saw 0 rows without tenant context; tampering one artifact failed the check |
