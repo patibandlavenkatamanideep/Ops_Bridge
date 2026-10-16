@@ -6,7 +6,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
-from sqlalchemy import false, select
+from sqlalchemy import false, select, text
 from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
@@ -60,6 +60,39 @@ def _case(session: Session, p: Principal, case_id: uuid.UUID, lock: bool = False
     return case
 
 
+class QuotaExceeded(Exception):
+    def __init__(self, message: str, retry_after_seconds: int) -> None:
+        super().__init__(message)
+        self.retry_after_seconds = retry_after_seconds
+
+
+def _check_run_quota(s: Session, p: Principal) -> None:
+    """Organization-wide run quota per rolling hour (tier entitlement; not an authority).
+
+    The window is computed with the database clock, the same clock that wrote `created_at`;
+    mixing it with the application host's clock breaks the window when they drift.
+    """
+    limit = p.tier.max_investigations_per_hour
+    row = s.execute(
+        text(
+            "SELECT count(*), extract(epoch FROM ("
+            "  (SELECT created_at FROM workflow_runs WHERE kind = 'investigation' "
+            "     AND created_at > now() - interval '1 hour' "
+            "   ORDER BY created_at DESC OFFSET :k LIMIT 1) + interval '1 hour' - now())) "
+            "FROM workflow_runs WHERE kind = 'investigation' AND created_at > now() - interval '1 hour'"
+        ),
+        {"k": max(limit - 1, 0)},
+    ).one()
+    count, seconds_left = int(row[0]), row[1]
+    if count >= limit:
+        retry = max(1, int(seconds_left or 0) + 1)
+        raise QuotaExceeded(
+            f"Your organization has started {count} investigations in the last hour "
+            f"(limit {limit} for the {p.tier.tier} tier).",
+            retry,
+        )
+
+
 def start_investigation(
     db: Database,
     p: Principal,
@@ -81,6 +114,7 @@ def start_investigation(
         case = _case(s, p, case_id, lock=True)
         if case.status in ("resolved", "closed_without_resolution"):
             raise Conflict("case_closed", "A closed case cannot be investigated again.")
+        _check_run_quota(s, p)
         active = (
             s.execute(
                 select(WorkflowRun).where(
