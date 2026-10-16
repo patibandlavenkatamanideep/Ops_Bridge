@@ -32,6 +32,7 @@ from opsbridge.telemetry.logging import configure_logging
 from . import jobs
 from .execution import ExecutionDeps, LeaseLost, dispatch, mark_unknown_after_exhaustion
 from .investigation import InvestigationDeps, StepFailed, run_investigation
+from .retention import schedule_due as schedule_retention
 from .retention import sweep as retention_sweep
 
 log = logging.getLogger("opsbridge.worker")
@@ -85,6 +86,7 @@ class Worker:
     handlers: dict[str, Handler] = field(default_factory=dict)
     stop_event: threading.Event = field(default_factory=threading.Event)
     last_loop: float = field(default_factory=time.monotonic)
+    last_schedule: float = -1e12  # schedule immediately after start
 
     def register(self, kind: str, handler: Handler) -> None:
         self.handlers[kind] = handler
@@ -144,11 +146,24 @@ class Worker:
         else:
             _mark_run_failed(self.db, job, error)
 
+    def _maybe_schedule(self) -> None:
+        """Enqueue due retention sweeps at most every `retention_schedule_seconds`."""
+        every = self.settings.retention_schedule_seconds
+        if not every or "retention_sweep" not in self.handlers:
+            return
+        if time.monotonic() - self.last_schedule < every:
+            return
+        self.last_schedule = time.monotonic()
+        n = schedule_retention(self.db)
+        if n:
+            log.info("scheduled %d retention sweep(s)", n)
+
     def run_forever(self) -> None:
         log.info("worker %s started; handlers=%s", self.worker_id, sorted(self.handlers))
         backoff = 0.0
         while not self.stop_event.is_set():
             try:
+                self._maybe_schedule()
                 processed = self.run_once()
             except DBAPIError as exc:
                 # Database unavailable (restart, failover, network): keep the process and back
