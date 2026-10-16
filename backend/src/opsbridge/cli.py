@@ -408,18 +408,31 @@ def _init_keys(_args: argparse.Namespace) -> int:
 
 def _verify_restore(args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
+    from opsbridge.evidence.storage import ArtifactStore, LocalArtifactStore, S3ArtifactStore
     from opsbridge.operations.restore import verify_restored
 
     if args.database in ("opsbridge", "opsbridge_test", "opsbridge_eval"):
         print("Refusing: verify-restore runs against an isolated restored database only.")
         return 2
-    artifact_dir = Path(args.artifact_dir)
-    if not artifact_dir.is_absolute():
-        # `uv --directory backend` changes the working directory; a relative path would
-        # silently point elsewhere and report every artifact as missing.
-        print("Refusing: --artifact-dir must be an absolute path.")
-        return 2
-    report = verify_restored(get_settings(), args.database, artifact_dir)
+    settings = get_settings()
+    store: ArtifactStore
+    if args.artifact_bucket:
+        # the restored bucket; endpoint, region and prefix come from the S3 settings
+        store = S3ArtifactStore(
+            args.artifact_bucket,
+            prefix=settings.artifact_s3_prefix,
+            endpoint_url=settings.artifact_s3_endpoint_url,
+            region=settings.artifact_s3_region,
+        )
+    else:
+        artifact_dir = Path(args.artifact_dir)
+        if not artifact_dir.is_absolute():
+            # `uv --directory backend` changes the working directory; a relative path would
+            # silently point elsewhere and report every artifact as missing.
+            print("Refusing: --artifact-dir must be an absolute path.")
+            return 2
+        store = LocalArtifactStore(artifact_dir)
+    report = verify_restored(settings, args.database, store)
     print(json.dumps(report, indent=1, default=str))
     return 0 if report["ok"] else 1
 
@@ -583,7 +596,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("verify-restore", help="application-level checks on a restored database")
     p.add_argument("--database", required=True)
-    p.add_argument("--artifact-dir", required=True)
+    where = p.add_mutually_exclusive_group(required=True)
+    where.add_argument("--artifact-dir", help="restored local artifact directory (absolute)")
+    where.add_argument("--artifact-bucket", help="restored S3 bucket (endpoint from settings)")
     p.set_defaults(func=_verify_restore)
 
     args = parser.parse_args(argv)
