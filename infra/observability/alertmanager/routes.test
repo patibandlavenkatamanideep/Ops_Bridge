@@ -1,0 +1,8 @@
+# Expected receiver, then alert labels. `make alerts-test` runs
+# `amtool config routes test --verify.receivers=<receiver> <labels>` for each line.
+page   alertname=OpsBridgeTargetDown severity=page job=opsbridge-worker
+page   alertname=OpsBridgeDependencyDown severity=page job=opsbridge-api dependency=identity_provider
+ticket alertname=OpsBridgeOutcomeUnknown severity=ticket job=opsbridge-worker
+ticket alertname=OpsBridgeApiLatency severity=ticket job=opsbridge-api
+ticket alertname=RuleWithoutSeverity job=opsbridge-api
+ticket alertname=UnknownSeverity severity=info
