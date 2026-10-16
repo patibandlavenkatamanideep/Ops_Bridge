@@ -65,6 +65,9 @@ class Settings(BaseSettings):
     metrics_token: SecretStr | None = None  # bearer token for /metrics when set
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
+    retention_schedule_seconds: int = (
+        3600  # how often the worker checks for due sweeps (0 disables)
+    )
     delegation_key_path: Path = REPO_ROOT / "var" / "keys" / "delegation_ed25519.pem"
     # PEM from a secret store (staging/production); takes precedence and is never written.
     delegation_private_key: SecretStr | None = None
