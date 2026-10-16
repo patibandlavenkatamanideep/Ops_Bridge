@@ -67,7 +67,7 @@ Podman machine, GNU Make. No paid API keys are needed.
 ```bash
 make doctor          # checks prerequisites without printing secrets
 make setup           # locked dependencies; creates .env with generated local secrets
-make infra-up        # PostgreSQL 16 (:5433) and Keycloak (:8081)
+make infra-up        # PostgreSQL 16 (:5433), Keycloak (:8081), S3-compatible test store (:8333)
 make migrate
 make seed-demo       # only the two synthetic demo tenants
 make dev             # API :8000, worker, MCP services, simulator, UI http://localhost:5173
