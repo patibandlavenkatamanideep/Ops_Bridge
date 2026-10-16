@@ -1,0 +1,24 @@
+# Alert routing. Rules (../prometheus/alerts.yml) set severity: page (someone acts now) or
+# ticket (work it during the day). Locally both receivers are the alert sink
+# (scripts/alert_sink.py); staging replaces only the receivers (docs/deployment.md) and
+# keeps this routing tree. Routes are tested by `make alerts-test` (routes.test).
+route:
+  receiver: ticket            # anything unmatched, including a rule without severity, still notifies
+  group_by: [alertname, job]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 24h
+  routes:
+    - matchers: ['severity="page"']
+      receiver: page
+      group_wait: 10s
+      repeat_interval: 2h
+receivers:
+  - name: page
+    webhook_configs:
+      - url: http://alert-sink:9099/page
+        send_resolved: true
+  - name: ticket
+    webhook_configs:
+      - url: http://alert-sink:9099/ticket
+        send_resolved: true
