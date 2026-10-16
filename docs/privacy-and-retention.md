@@ -38,7 +38,10 @@ deleted material is no longer possible.
 - `POST /api/v1/tenants/{tenant}/retention/run` (or "Run retention sweep") enqueues a
   `retention_sweep` job; the worker deletes artifact bytes, chunks and message text past
   the cutoff and writes `retention.sweep` with counts.
-- There is **no automatic schedule** in this build; sweeps run when requested.
+- The worker also schedules a sweep once per database day for every tenant that configured
+  retention (`OPSBRIDGE_RETENTION_SCHEDULE_SECONDS`, default hourly checks; 0 disables). It
+  learns which tenants are due only through the aggregate `ops.tenants_with_retention()`
+  (migration 0005) and deduplicates by tenant and day. Cut-offs use the database clock.
 - Backups taken before a sweep still contain the deleted content until those backups expire
   (backup handling: Phase 8, docs/operations.md when written).
 
