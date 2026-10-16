@@ -22,7 +22,7 @@ from sqlalchemy.exc import DBAPIError
 from opsbridge.config import Settings, get_settings
 from opsbridge.connectors.purchasing import PurchasingClient
 from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector
-from opsbridge.evidence.storage import LocalArtifactStore
+from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import Database, DbContext, get_database
 from opsbridge.persistence.models import Tenant, WorkflowRun
@@ -51,7 +51,7 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
 
     return InvestigationDeps(
         db=db,
-        store=LocalArtifactStore(settings.artifact_dir),
+        store=artifact_store(settings),
         pack_for=packs.get,
         purchasing_for=purchasing_for,
         settings=settings,
@@ -224,7 +224,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         connector_for=connector_for,
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
-        store=LocalArtifactStore(settings.artifact_dir),
+        store=artifact_store(settings),
     )
 
 
@@ -236,7 +236,7 @@ def make_worker(settings: Settings | None = None, db: Database | None = None) ->
     worker.register("investigate", lambda job: _investigate(deps, job))
     exec_deps = build_execution_deps(settings, db)
     worker.register("dispatch_operation", lambda job: dispatch(exec_deps, job))
-    store = LocalArtifactStore(settings.artifact_dir)
+    store = artifact_store(settings)
 
     def _retention(job: jobs.ClaimedJob) -> None:
         report = retention_sweep(db, store, job.tenant_id)
@@ -245,7 +245,8 @@ def make_worker(settings: Settings | None = None, db: Database | None = None) ->
     worker.register("retention_sweep", _retention)
     metrics.POOLS.register("worker", db.engine)
     metrics.watch_state(db.engine)
-    metrics.watch_storage(settings.artifact_dir)
+    if not settings.artifact_s3_bucket:  # filesystem gauges apply to the local store only
+        metrics.watch_storage(settings.artifact_dir)
     return worker
 
 
