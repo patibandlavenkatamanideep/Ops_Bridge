@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, delete, select
+from sqlalchemy import CursorResult, delete, func, select
 
 from opsbridge.audit import events as audit
 from opsbridge.evidence.storage import ArtifactStore
@@ -50,9 +50,11 @@ class SweepReport:
 def sweep(
     db: Database, store: ArtifactStore, tenant_id: uuid.UUID, now: datetime | None = None
 ) -> SweepReport:
-    now = now or datetime.now(UTC)
     report = SweepReport()
     with db.session(DbContext(tenant_id=tenant_id)) as s:
+        # Cut-offs are compared with timestamps the database wrote, so use its clock: a
+        # drifting application clock would otherwise delete content early or late.
+        now = now or s.execute(select(func.now())).scalar_one()
         ts = s.get(TenantSettings, tenant_id)
         policy: dict[str, Any] = dict(ts.retention) if ts and ts.retention else {}
         for key, kinds in KINDS.items():
