@@ -643,3 +643,38 @@ def test_capabilities_are_discovered_and_unknown_means_weakest(stack) -> None:  
         True,
         "eventual",
     )
+
+
+def test_attempt_requests_and_responses_are_kept_and_match_their_digests(
+    stack,
+    worker_db: Database,  # type: ignore[no-untyped-def]
+    migrator_engine: Engine,
+) -> None:
+    import json
+
+    from opsbridge.evidence.storage import LocalArtifactStore
+    from opsbridge.persistence.models import Artifact
+
+    from .test_hardening import tenant_id
+
+    st = stack
+    case_id, prop = prepared(st, "INV-9001")
+    assert approve(st, case_id, prop).status_code == 200
+    drain(st)
+    [op] = operations(st, case_id)
+    tid = tenant_id(migrator_engine, ORG)
+    store = LocalArtifactStore(st["settings"].artifact_dir)
+    with worker_db.session(DbContext(tenant_id=tid)) as s:
+        attempts = list(
+            s.execute(select(Attempt).where(Attempt.operation_id == uuid.UUID(op["id"]))).scalars()
+        )
+        assert {a.kind for a in attempts} == {"dispatch", "readback"}
+        for a in attempts:
+            req = s.get(Artifact, a.input_artifact_id)
+            assert req is not None and req.kind == "tool_request" and req.sha256 == a.input_digest
+            assert json.loads(store.get(tid, req.storage_key))  # the exact request is retrievable
+            resp = s.get(Artifact, a.output_artifact_id)
+            assert (
+                resp is not None and resp.kind == "tool_response" and resp.sha256 == a.output_digest
+            )
+            assert json.loads(store.get(tid, resp.storage_key))["remote_ref"] == op["remote_ref"]
