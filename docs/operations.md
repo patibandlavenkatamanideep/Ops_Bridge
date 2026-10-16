@@ -2,7 +2,7 @@
 
 Runbooks for the local stack and the planned staging deployment. Alert rules:
 `infra/observability/prometheus/alerts.yml` (each links to a section below). Every number
-in "Drills" was observed on 2026-10-15 on a MacBook (Podman 5.7.1) with synthetic data; it
+in "Drills" was observed on 2026-10-15/16 on a MacBook (Podman 5.7.1) with synthetic data; it
 is an observation, not a recovery-time objective.
 
 ## Signals
@@ -19,9 +19,24 @@ is an observation, not a recovery-time objective.
 | Traces | `OTEL_EXPORTER_OTLP_ENDPOINT` (OTLP/HTTP) or `OPSBRIDGE_TRACE_FILE` (JSON lines). One trace per request, continued into the worker job; spans carry `opsbridge.case_id`, `run_id`, `operation_id`, `attempt_id`, `remote_ref`, `correlation_id` |
 | Audit | `audit_events` (who, on whose behalf, what, outcome) per tenant |
 
-Start Prometheus locally with `make observability-up` (scrapes `make dev` processes;
-alerts at http://localhost:9090/alerts). Metric labels never contain tenant, case or user
+`make observability-up` starts Prometheus (scrapes `make dev` processes; alerts at
+http://localhost:9090/alerts), Alertmanager (http://localhost:9093) and the local alert sink
+(http://localhost:9099/notifications). Metric labels never contain tenant, case or user
 ids; use the correlation id from an error response or log line to find the trace.
+
+## Alert routing
+
+Every rule carries `severity: page` (someone acts now) or `severity: ticket` (work it during
+the day). Alertmanager (`infra/observability/alertmanager/alertmanager.local.yml`) sends
+pages to receiver `page` (group wait 10 s, repeat every 2 h) and everything else, including a
+rule without a severity, to `ticket` (30 s, 24 h); both also send resolution. Notifications
+are grouped by alert name and job. A resolution goes out at the group's next interval, so it
+arrives up to 5 minutes after the alert clears. No inhibition rules or silences are
+configured. Locally both receivers are `scripts/alert_sink.py`; staging replaces only the
+receivers (docs/deployment.md). Checks: `make alerts-test` validates the configuration and the
+expected routes in `routes.test`; `tests/contracts/test_alerting_config.py` checks that every
+rule's severity reaches its own receiver and that its runbook section exists. To silence
+during maintenance: `amtool silence add` against Alertmanager, with an end time and a comment.
 
 ## API or worker down
 
@@ -142,6 +157,8 @@ external action cannot be rolled back locally; record a compensating follow-up i
 |---|---|---|
 | Alert: identity provider down | `docker compose stop keycloak` | `OpsBridgeDependencyDown{dependency="identity_provider"}` firing after 145 s; API `/readyz` 503; resolved 30 s after restart; `/readyz` 200 |
 | Alert: worker down | SIGTERM to the worker (dev stack then stopped the API too) | `OpsBridgeTargetDown` for worker after 65 s (and API); resolved 25 s after restart |
+| Alert routing, page (2026-10-16) | `docker compose stop keycloak` with Alertmanager and the sink running | `OpsBridgeDependencyDown{dependency="identity_provider"}` firing in Prometheus after 145 s, delivered to `page` after 155 s; after restart cleared in Prometheus within 15 s, resolution delivered after 296 s (group interval) |
+| Alert routing, ticket (2026-10-16) | synthetic `severity=ticket` alert added to Alertmanager with `amtool` (ending after 90 s) | delivered to `ticket` after 30 s; resolution delivered 301 s after injection |
 | Alert rules | synthetic series | `promtool test rules`: 9 test cases pass; caught a disk-ratio rule that could never fire (label mismatch) |
 | Unplanned | none | `OpsBridgeArtifactDiskLow` went pending on the development laptop (23 GiB free of 228 GiB, 10%); a real condition of the host disk, not of OpsBridge (7 MB) |
 | Clean launch | empty volumes, separate compose project, images prebuilt | all services healthy in 38 s; 12 browser tests (phases 1, 2, 4, 6) passed against the containers on :8000 |
