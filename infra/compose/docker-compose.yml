@@ -58,6 +58,22 @@ services:
       retries: 60
     restart: unless-stopped
 
+  # S3-compatible object store for the S3 artifact-store integration tests (SeaweedFS,
+  # Apache-2.0). Anonymous, localhost only; development and tests, not a production store.
+  seaweedfs:
+    image: docker.io/chrislusf/seaweedfs:4.47
+    command: ["server", "-s3", "-dir=/data"]
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - opsbridge_s3data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
   # --- Containerized application (profile "app"; `make demo-containers`) -----------------
   # Replaces `make dev` (same ports); stop host processes first. The API serves the built UI
   # on http://localhost:8000. Simulator and MCP services are reachable only on this network.
@@ -219,3 +235,4 @@ volumes:
   opsbridge_prometheus:
   opsbridge_appdata:
   opsbridge_simdata:
+  opsbridge_s3data:
