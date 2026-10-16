@@ -66,6 +66,8 @@ class Settings(BaseSettings):
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
     delegation_key_path: Path = REPO_ROOT / "var" / "keys" / "delegation_ed25519.pem"
+    # PEM from a secret store (staging/production); takes precedence and is never written.
+    delegation_private_key: SecretStr | None = None
 
     simulator_url: str = "http://localhost:8090"
     simulator_fault_controls: bool = False
