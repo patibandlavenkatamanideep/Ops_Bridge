@@ -82,8 +82,9 @@ blindly.
 PostgreSQL holds tenants, memberships, sessions, cases, documents and versions (digests),
 chunks, extracted fields, records, investigations, proposals, approvals, operations, attempts,
 outbox, jobs, audit, model and tool call records. Original bytes and model/tool payloads are in
-a content-addressed artifact store (`<tenant>/<aa>/<sha256>`; local filesystem today, object
-storage in staging). Retention: docs/privacy-and-retention.md.
+a content-addressed artifact store (`<tenant>/<aa>/<sha256>`; local filesystem by default, an
+S3-compatible bucket when `OPSBRIDGE_ARTIFACT_S3_BUCKET` is set; reads are re-hashed against
+the key). Retention: docs/privacy-and-retention.md.
 
 ## Telemetry
 
