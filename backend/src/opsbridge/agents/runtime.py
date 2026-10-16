@@ -36,6 +36,7 @@ from .contracts import (
     ModelError,
     ModelRequest,
     ModelResponse,
+    QuotaExceeded,
     RoutingBlocked,
 )
 
@@ -129,6 +130,7 @@ class RunBudget:
     timeout_seconds: float
     model_calls: int = 0
     tool_calls: int = 0
+    tenant_model_calls_per_day: int | None = None  # organization-wide quota (UTC day)
 
     def take_model_call(self) -> None:
         if self.model_calls >= self.max_model_calls:
@@ -232,6 +234,20 @@ class Recorder:
             s.flush()
             self.model_call_ids.append(str(row.id))
             return str(row.id)
+
+    def model_calls_today(self) -> int:
+        """Model calls recorded for this organization since 00:00 UTC (all runs, any outcome
+        except quota refusals, which never reached a model)."""
+        # The database clock wrote created_at, so the day boundary uses it too.
+        start = func.date_trunc("day", func.now(), "UTC")
+        with self.db.session(DbContext(tenant_id=self.tenant_id)) as s:
+            return int(
+                s.execute(
+                    select(func.count())
+                    .select_from(ModelCall)
+                    .where(ModelCall.created_at >= start, ModelCall.outcome != "quota_exceeded")
+                ).scalar_one()
+            )
 
     def tool(
         self,
@@ -359,6 +375,13 @@ def _call(
     cost: Decimal | None = None
     try:
         budget.take_model_call()
+        if budget.tenant_model_calls_per_day is not None:
+            used = recorder.model_calls_today()
+            if used >= budget.tenant_model_calls_per_day:
+                raise QuotaExceeded(
+                    f"the organization's daily model-call quota ({budget.tenant_model_calls_per_day}) "
+                    "is used up; rules-only output is used"
+                )
         if caps.hosted:
             cost = _estimate_cost(req, settings)
             ceiling = Decimal(settings.live_spend_ceiling_usd or "0")
