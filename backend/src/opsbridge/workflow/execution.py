@@ -36,7 +36,7 @@ from sqlalchemy import select, text
 from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
-from opsbridge.canonical import digest
+from opsbridge.canonical import canonical_json, digest
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
     DefiniteFailure,
@@ -45,9 +45,11 @@ from opsbridge.connectors.tasks import (
     TaskConnector,
     TaskRequest,
 )
+from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     ApprovalDecision,
+    Artifact,
     Attempt,
     Case,
     ConversationMessage,
@@ -77,6 +79,9 @@ class ExecutionDeps:
     connector_for: Callable[[uuid.UUID, str, dict[str, Any]], TaskConnector]
     timeout_seconds: float
     lease_seconds: int
+    # Where attempt requests/responses are kept (content-addressed, tenant-scoped); without
+    # one only digests are recorded.
+    store: ArtifactStore | None = None
 
 
 def _ctx(tenant_id: uuid.UUID) -> DbContext:
@@ -282,6 +287,29 @@ def _finish(
     )
 
 
+def _keep(
+    deps: ExecutionDeps, s: Session, tid: uuid.UUID, kind: str, payload: Any
+) -> uuid.UUID | None:
+    """Store a canonical-JSON copy of an attempt's request or response; its digest equals the
+    digest recorded on the attempt. Retention (`tool_artifacts_days`) applies to it."""
+    if deps.store is None:
+        return None
+    data = canonical_json(payload).encode("utf-8")
+    key, sha = deps.store.put(tid, data)
+    art = Artifact(
+        tenant_id=tid,
+        kind=kind,
+        sha256=sha,
+        size_bytes=len(data),
+        content_type="application/json",
+        storage_key=key,
+        classification="internal",
+    )
+    s.add(art)
+    s.flush()
+    return art.id
+
+
 def _new_attempt(
     deps: ExecutionDeps,
     job: jobs.ClaimedJob,
@@ -316,6 +344,7 @@ def _new_attempt(
             operation_key=snap["operation_key"],
             status="started",
             input_digest=digest(args),
+            input_artifact_id=_keep(deps, s, snap["tenant_id"], "tool_request", args),
             response_mode="live",
             worker_id=job.lease_owner,
             fencing_token=job.fencing_token,
@@ -359,6 +388,8 @@ def _close_attempt(
         assert a is not None
         a.status = status
         a.output_digest = digest(output) if output is not None else None
+        if output is not None:
+            a.output_artifact_id = _keep(deps, s, tid, "tool_response", output)
         a.error_category = category
         a.error_detail = (detail or "")[:1000] or None
         a.remote_ref = remote_ref
