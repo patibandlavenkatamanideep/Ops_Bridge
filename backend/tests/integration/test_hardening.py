@@ -485,3 +485,42 @@ def test_worker_connection_reuse_does_not_carry_tenant_context(
     assert len({pid for pid, _ in seen}) == 1
     assert [t for _, t in seen] == [{furn}, {it}, set(), {furn}]
     engine.dispose()
+
+
+def test_retention_uses_the_database_clock_not_a_drifting_app_clock(
+    stack, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """Found when the Podman VM clock drifted hours behind the host: cut-offs mixed the
+    application clock with database-written timestamps. Skew the application clock two days
+    ahead; one-day retention must still delete nothing that is actually new."""
+    import datetime as real
+
+    from opsbridge.workflow import retention
+
+    st = stack
+    case_id = investigated(st, "INV-9001")
+    vid = get(st, "furn-investigator", f"{T}/cases/{case_id}/documents").json()["items"][0][
+        "versions"
+    ][0]["version_id"]
+    adm = st["actors"]["furn-admin"]
+    assert (
+        call(
+            st["client"], adm, "PUT", f"{T}/settings", json={"retention": {"raw_documents_days": 1}}
+        ).status_code
+        == 200
+    )
+
+    class SkewedDatetime(real.datetime):
+        @classmethod
+        def now(cls, tz=None):  # type: ignore[no-untyped-def,override]
+            return real.datetime.now(tz) + real.timedelta(days=2)
+
+    monkeypatch.setattr(retention, "datetime", SkewedDatetime, raising=False)
+    assert call(st["client"], adm, "POST", f"{T}/retention/run").status_code == 202
+    drain(st)
+    assert (
+        get(
+            st, "furn-investigator", f"{T}/cases/{case_id}/documents/versions/{vid}/original"
+        ).status_code
+        == 200
+    )
