@@ -30,6 +30,7 @@ dependencies = [
     "pillow==12.3.0",
     "jsonschema==4.26.0",
     "opentelemetry-exporter-otlp-proto-http==1.45.1",
+    "boto3==1.43.107",
 ]
 
 [dependency-groups]
@@ -73,7 +74,7 @@ plugins = ["pydantic.mypy"]
 warn_unused_ignores = true
 
 [[tool.mypy.overrides]]
-module = ["authlib.*", "evalseal.*", "pypdf.*"]
+module = ["authlib.*", "evalseal.*", "pypdf.*", "boto3.*", "botocore.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
