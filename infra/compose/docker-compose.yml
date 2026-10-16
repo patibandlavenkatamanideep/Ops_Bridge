@@ -232,9 +232,41 @@ services:
       - "127.0.0.1:9090:9090"
     restart: unless-stopped
 
+  # Routes Prometheus alerts by severity (infra/observability/alertmanager). Single instance:
+  # clustering is off. Bound to localhost only.
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.34.1
+    profiles: [observability]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - ../observability/alertmanager/alertmanager.local.yml:/etc/alertmanager/alertmanager.yml:ro
+      - opsbridge_alertmanager:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    restart: unless-stopped
+
+  # Local receiver standing in for a pager and a ticket queue (scripts/alert_sink.py).
+  alert-sink:
+    image: docker.io/library/python:3.12.15-slim-bookworm
+    profiles: [observability]
+    command: ["python", "-I", "/sink/alert_sink.py", "--host", "0.0.0.0", "--port", "9099"]
+    volumes:
+      - ../../scripts/alert_sink.py:/sink/alert_sink.py:ro
+    ports:
+      - "127.0.0.1:9099:9099"
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
 volumes:
   opsbridge_pgdata:
   opsbridge_prometheus:
+  opsbridge_alertmanager:
   opsbridge_appdata:
   opsbridge_simdata:
   opsbridge_s3data:
