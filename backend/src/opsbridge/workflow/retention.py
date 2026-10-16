@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, delete, func, select
+from sqlalchemy import CursorResult, delete, func, select, text
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from opsbridge.audit import events as audit
 from opsbridge.evidence.storage import ArtifactStore
@@ -23,6 +24,7 @@ from opsbridge.persistence.models import (
     ConversationMessage,
     DocumentVersion,
     EvidenceChunk,
+    Job,
     TenantSettings,
 )
 
@@ -113,3 +115,35 @@ def sweep(
 
 def _rowcount(result: Any) -> int:
     return int(cast(CursorResult[Any], result).rowcount or 0)
+
+
+def schedule_due(db: Database) -> int:
+    """Enqueue one retention sweep per tenant with retention configured, per database day.
+
+    Tenant ids come from `ops.tenants_with_retention()` (aggregate-only, migration 0005); the
+    dedupe key `retention:<tenant>:<date>` makes concurrent schedulers enqueue at most one
+    sweep per tenant per day. Returns how many jobs this call enqueued.
+    """
+    enqueued = 0
+    with db.session(DbContext()) as s:
+        day = s.execute(select(func.current_date())).scalar_one()
+        tenants = list(s.execute(text("SELECT * FROM ops.tenants_with_retention()")).scalars())
+        for tenant_id in tenants:
+            result = s.execute(
+                pg_insert(Job)
+                .values(
+                    tenant_id=tenant_id,
+                    kind="retention_sweep",
+                    payload={"requested_by": "schedule"},
+                    status="queued",
+                    priority=200,
+                    attempts=0,
+                    max_attempts=3,
+                    fencing_token=0,
+                    dedupe_key=f"retention:{tenant_id}:{day.isoformat()}",
+                )
+                .on_conflict_do_nothing(index_elements=["dedupe_key"])
+                .returning(Job.id)
+            )
+            enqueued += 1 if result.first() is not None else 0  # nothing returned on conflict
+    return enqueued
