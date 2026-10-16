@@ -33,7 +33,7 @@ backups, containers and an evaluation view are in place. See README.md for scree
 
 | Check | Result |
 |---|---|
-| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 246 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules ok; integration 120 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP); browser 23 passed (incl. axe accessibility scans); build ok |
+| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 250 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules ok; integration 123 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe accessibility scans); build ok |
 | Clean clone from GitHub | `make doctor`, `setup`, `lint`, `typecheck`, `test` (243 + 8), `eval-canary`, `build` pass; all 18 receipts verify |
 | Clean container launch | Empty volumes → all services healthy in 38 s; 12 browser tests passed against the containers; repeated with read-only root filesystems and dropped capabilities: 37 s, same 12 tests passed |
 | Recovery drills | Worker exit → restarted, healthy in 7 s; PostgreSQL restart → API ready in 3 s, worker backed off without restarting; backup → isolated restore verified (counts, RLS, artifact digests, citations; tampering caught) |
@@ -78,7 +78,8 @@ their values. Details and reproduction: docs/case-study.md.
 - 104 synthetic benchmark cases, labelled by the same author that wrote the rules; held-out
   pass exactly at the target with a wide interval.
 - Supplier invoice layouts outside the pack mappings are escalated, not read; OCR not
-  installed; retrieval is lexical; no S3 artifact store; quota values are starting points.
+  installed; retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
+  (encryption and IAM unverified); quota values are starting points.
 - Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
@@ -100,5 +101,5 @@ their values. Details and reproduction: docs/case-study.md.
    on the frozen held-out split (new benchmark id if settings change).
 3. Add the next supplier layout to the furniture pack from real (approved) samples, then
    re-run validation — the held-out misses point there.
-4. Close the remaining staging gaps in docs/deployment.md (S3-compatible artifact store,
-   alert routing) before any pilot.
+4. Close the remaining staging gaps in docs/deployment.md (S3 encryption, IAM and lifecycle
+   checked on the real bucket; alert routing) before any pilot.
