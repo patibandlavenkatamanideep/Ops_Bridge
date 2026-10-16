@@ -377,7 +377,8 @@ Phase 1 exit gate evidence:
 - The egress guard covers Python sockets; libpq connects only to the configured local DB.
 - The S3 artifact store is tested against SeaweedFS only: server-side encryption, IAM and
   lifecycle behaviour on AWS S3 are unverified (docs/deployment.md).
-- Alert routing (pager/email) is not set up; quota values are starting points.
+- Alerts are routed (Alertmanager: page and ticket receivers) but locally reach only a sink;
+  no real pager, queue or email is connected. Quota values are starting points.
 - Application processes must have synchronized clocks (NTP); comparisons against
   database-written timestamps use the database clock (found when the Podman VM clock drifted
   3 h 44 min after the laptop slept; fixed for quotas and retention).
@@ -427,3 +428,17 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   - `make image` rebuilt from the lock (28 s); an S3 round trip from that image with a
     read-only root, all capabilities dropped and uid 10001 succeeded against SeaweedFS. The
     full container stack was not relaunched with a bucket configured.
+- Alert routing: Alertmanager v0.34.1 in the observability profile routes `severity=page` to
+  a `page` receiver and everything else (including a rule without severity) to `ticket`, both
+  with resolution notices; a local sink (`scripts/alert_sink.py`) stands in for the pager and
+  the queue. `alert_drill.py --sink` waits for delivery, not just firing.
+  - Evidence: `make alerts-test` (amtool config check and 6 expected routes; a deliberately
+    wrong expectation fails the gate); `tests/contracts/test_alerting_config.py` (3: every rule's
+    severity reaches its own receiver, resolution on, runbook sections exist). Live drill:
+    Keycloak stopped → firing in Prometheus 145 s, delivered to `page` 155 s; restarted →
+    resolution delivered 296 s; synthetic ticket alert delivered to `ticket` 30 s, resolution
+    301 s.
+  - Observed: resolutions arrive at the next group interval (5 min), documented in the runbook.
+    The ticket route was drilled with an alert injected into Alertmanager, not one raised by
+    Prometheus (no ticket condition could be produced safely in the dev data).
+  - `make verify` 14/14 (2026-10-16): unit 253 (+2 skipped), integration 123, browser 23.
