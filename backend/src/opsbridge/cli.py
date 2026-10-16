@@ -395,7 +395,11 @@ def _init_keys(_args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
     from opsbridge.mcp_services.auth import load_or_create_key
 
-    path = get_settings().delegation_key_path
+    settings = get_settings()
+    if settings.delegation_private_key and settings.delegation_private_key.get_secret_value():
+        print("delegation key provided from the secret store; nothing to create")
+        return 0
+    path = settings.delegation_key_path
     existed = path.exists()
     load_or_create_key(path)
     print(f"delegation key {'present' if existed else 'created'} at {path}")
