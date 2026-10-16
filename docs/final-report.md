@@ -33,9 +33,9 @@ backups, containers and an evaluation view are in place. See README.md for scree
 
 | Check | Result |
 |---|---|
-| `make verify` | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (102 files); unit + contract 243 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules ok; integration 114 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP); browser 19 passed; build ok |
+| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 246 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules ok; integration 120 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP); browser 23 passed (incl. axe accessibility scans); build ok |
 | Clean clone from GitHub | `make doctor`, `setup`, `lint`, `typecheck`, `test` (243 + 8), `eval-canary`, `build` pass; all 18 receipts verify |
-| Clean container launch | Empty volumes → all services healthy in 38 s; 12 browser tests passed against the containers |
+| Clean container launch | Empty volumes → all services healthy in 38 s; 12 browser tests passed against the containers; repeated with read-only root filesystems and dropped capabilities: 37 s, same 12 tests passed |
 | Recovery drills | Worker exit → restarted, healthy in 7 s; PostgreSQL restart → API ready in 3 s, worker backed off without restarting; backup → isolated restore verified (counts, RLS, artifact digests, citations; tampering caught) |
 | Alert drills | Identity provider down → alert fired after 145 s, resolved 30 s after recovery; worker down → 65 s, resolved 25 s after restart |
 | Held-out benchmark (40 cases, mocked responses) | Next action 36/40 = 0.90 (Wilson 95% 0.77–0.96) in rules-only and agent-assisted modes; 4 safe misses (unseen invoice layout), 0 unsafe; gate "pass (interval includes values below the target)"; strict offline replay at the final commit reproduced identical verdicts |
@@ -57,11 +57,10 @@ docs/demo-script.md; day-to-day use: docs/operator-guide.md; runbooks: docs/oper
 
 ## Requirement completion
 
-From docs/requirements-traceability.md (28 requirements): **verified_local 24**;
+From docs/requirements-traceability.md (28 requirements): **verified_local 25**;
 **implemented_unverified 3** — OB-01 discovery assumptions (no interviews), OB-22 GitHub
-sandbox connector (no live run), OB-25 handoff outcomes (no pilot); **in_progress 1** — OB-27
-bounded compute (per-tenant quotas not implemented). Each row lists its evidence and its
-unresolved limits. Nothing is verified_ci, verified_sandbox, deployed_staging or
+sandbox connector (no live run), OB-25 handoff outcomes (no pilot). Each row lists its
+evidence and its unresolved limits. Nothing is verified_ci, verified_sandbox, deployed_staging or
 pilot_validated.
 
 ## Defects found and fixed
@@ -79,8 +78,8 @@ their values. Details and reproduction: docs/case-study.md.
 - 104 synthetic benchmark cases, labelled by the same author that wrote the rules; held-out
   pass exactly at the target with a wide interval.
 - Supplier invoice layouts outside the pack mappings are escalated, not read; OCR not
-  installed; retrieval is lexical; no S3 artifact store; no per-tenant usage quotas.
-- Rate limits are per process; no WAF; container root filesystems are writable.
+  installed; retrieval is lexical; no S3 artifact store; quota values are starting points.
+- Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
 
@@ -101,4 +100,5 @@ their values. Details and reproduction: docs/case-study.md.
    on the frozen held-out split (new benchmark id if settings change).
 3. Add the next supplier layout to the furniture pack from real (approved) samples, then
    re-run validation — the held-out misses point there.
-4. Implement per-tenant quotas and the staging gaps in docs/deployment.md before any pilot.
+4. Close the remaining staging gaps in docs/deployment.md (S3-compatible artifact store,
+   alert routing) before any pilot.
