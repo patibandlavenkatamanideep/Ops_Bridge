@@ -224,6 +224,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         connector_for=connector_for,
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
+        store=LocalArtifactStore(settings.artifact_dir),
     )
 
 
