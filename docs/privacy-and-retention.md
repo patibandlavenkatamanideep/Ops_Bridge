@@ -92,6 +92,8 @@ parsers and pack mappings as source records. Instructions inside documents are d
 ## Not provided
 
 - No PII discovery across stored data, no data-subject export tooling, no legal hold.
-- No encryption configuration beyond what the host provides; the local artifact store is
-  plain files under `var/artifacts` (staging must use managed encrypted storage — Phase 8).
+- No encryption by OpsBridge itself. The local artifact store is plain files under
+  `var/artifacts`; the S3 store can request SSE-KMS per upload and relies on the bucket's
+  default encryption, not tested against AWS (docs/deployment.md). In a versioned bucket,
+  retention deletes need a noncurrent-version lifecycle rule to remove the bytes.
 - OCR is not installed; scanned documents route to `needs_review` with that reason.
