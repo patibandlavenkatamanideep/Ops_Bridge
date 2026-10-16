@@ -15,7 +15,7 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 |---|---|---|
 | `doctor` | `python3 scripts/doctor.py` | macOS 26.2 arm64 |
 | `setup` | `python3 scripts/setup_env.py && uv --directory backend sync --frozen && (cd frontend && npm ci)` | macOS 26.2 arm64 |
-| `infra-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml up -d --build --wait postgres keycloak`, then `docker compose … exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh` (idempotent; creates missing databases) | macOS + Podman 5.7.1 |
+| `infra-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml up -d --build --wait postgres keycloak seaweedfs`, then `docker compose … exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh` (idempotent; creates missing databases) | macOS + Podman 5.7.1 |
 | `migrate` | `uv --directory backend run --frozen alembic upgrade head` (and `-x db=opsbridge_test`, `-x db=opsbridge_eval`) | macOS |
 | `seed-demo` | `uv --directory backend run --frozen python -m opsbridge.cli seed-demo` | macOS |
 | `dev` | `infra-up`, `migrate`, then `uv --directory backend run --frozen python scripts/devstack.py` | macOS |
@@ -49,8 +49,9 @@ docs/evaluation-plan.md):
 | `eval-canary [--update-baseline]` | Regression check against the pinned canary baseline; updating it is a reviewed change. |
 
 Operations commands: `probe URL` (container health probe), `init-keys` (create the delegation
-key once), `verify-restore --database D --artifact-dir /abs/path` (restore checks; refuses the
-live databases and relative paths).
+key once), `verify-restore --database D --artifact-dir /abs/path` or `--artifact-bucket B` (restore
+checks; refuses the live databases and relative paths; the bucket uses the configured S3
+endpoint, region and prefix).
 
 Linux with Docker is expected to work but has not been exercised locally; hosted CI
 results are reported separately in docs/STATUS.md. Windows/WSL has not been exercised.
