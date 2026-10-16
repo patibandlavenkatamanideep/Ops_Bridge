@@ -6,19 +6,22 @@ from __future__ import annotations
 
 import os
 import uuid
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 
 import boto3
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from opsbridge.api.app import create_app
 from opsbridge.evidence.storage import ArtifactIntegrityError, ArtifactKeyError, S3ArtifactStore
+from opsbridge.operations.restore import verify_restored
 from opsbridge.persistence.db import Database
 from opsbridge.workflow.retention import sweep
 
+from .conftest import ctx
 from .test_api_cases import call
 from .test_approvals_execution import drain
 from .test_hardening import investigated, tenant_id, upload
@@ -28,12 +31,16 @@ ENDPOINT = os.environ.get("OPSBRIDGE_TEST_S3_ENDPOINT", "http://127.0.0.1:8333")
 
 
 @pytest.fixture
-def bucket(monkeypatch: pytest.MonkeyPatch) -> str:
+def bucket(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "local-test")  # the local server is anonymous
     monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "local-test")
     name = f"opsbridge-test-{uuid.uuid4().hex[:12]}"
-    _client().create_bucket(Bucket=name)
-    return name
+    s3 = _client()
+    s3.create_bucket(Bucket=name)
+    yield name
+    for obj in s3.list_objects_v2(Bucket=name).get("Contents", []):
+        s3.delete_object(Bucket=name, Key=obj["Key"])
+    s3.delete_bucket(Bucket=name)  # frees the server's volumes for the next test
 
 
 def _client() -> Any:
@@ -106,3 +113,29 @@ def test_uploads_downloads_and_retention_use_the_bucket(
     assert report.artifacts_deleted >= 1
     assert not _client().list_objects_v2(Bucket=bucket).get("Contents")  # deleted from the bucket
     drain(st)
+
+
+def test_restore_check_reads_artifacts_from_a_bucket(
+    stack: dict[str, Any], bucket: str, worker_db: Database, migrator_engine: Engine
+) -> None:
+    """A database whose artifacts live in a bucket verifies; a lost object is reported."""
+    st = stack
+    investigated(st, "INV-9001")
+    root = Path(st["settings"].artifact_dir)
+    with worker_db.session(ctx(tenant_id(migrator_engine, "demo-furniture"))) as session:
+        keys = list(
+            session.execute(
+                text("SELECT storage_key FROM artifacts WHERE storage_key IS NOT NULL")
+            ).scalars()
+        )
+    assert keys
+    for key in keys:  # what a staging deployment would hold in its bucket
+        _client().put_object(Bucket=bucket, Key=key, Body=(root / key).read_bytes())
+    store = S3ArtifactStore(bucket, endpoint_url=ENDPOINT, region="us-east-1")
+    report = verify_restored(st["settings"], "opsbridge_test", store)
+    assert report["ok"], report
+    assert report["tenants"]["demo-furniture"]["artifacts_checked"] == len(keys)
+    _client().delete_object(Bucket=bucket, Key=keys[0])
+    report = verify_restored(st["settings"], "opsbridge_test", store)
+    problems = [p for t in report["tenants"].values() for p in t["artifact_problems"]]
+    assert not report["ok"] and len(problems) == 1 and problems[0].startswith("missing ")
