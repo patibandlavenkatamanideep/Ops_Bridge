@@ -19,6 +19,7 @@ Status: accepted (2026-10-14). Versions verified against PyPI, npm and quay.io o
 | opentelemetry-api/sdk | 1.45.1 | Tracing | Apache-2.0 |
 | prometheus-client | 0.26.0 | Metrics endpoint | Apache-2.0/BSD-2 |
 | opentelemetry-exporter-otlp-proto-http | 1.45.1 (matches api/sdk) | Optional OTLP trace export (Phase 8); pulls opentelemetry-proto 1.45.1, protobuf 7.36.2, requests 2.34.2, urllib3 2.8.0 | Apache-2.0 / BSD-3 / Apache-2.0 / MIT |
+| boto3 | 1.43.107 (pulls botocore 1.43.114, s3transfer 0.19.2, jmespath 1.1.0, python-dateutil 2.9.0.post0, six 1.17.0) | Official AWS SDK for the S3-compatible artifact store; imported only when a bucket is configured | Apache-2.0 / Apache-2.0 / Apache-2.0 / MIT / Apache-2.0 or BSD-3 / MIT |
 | pytest / ruff / mypy | 9.1.1 / 0.17.0 / 2.4.0 | Quality gates | MIT |
 
 Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
@@ -47,6 +48,9 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
   `ghcr.io/astral-sh/uv:0.10.2` (the uv version used locally; 0.10.48 appeared in a tag listing
   but does not exist on ghcr.io).
 - `rhysd/actionlint:1.7.12` (workflow lint only).
+- `chrislusf/seaweedfs:4.47` (S3-compatible server for the S3 artifact-store integration
+  tests; image licence label Apache-2.0, built 2026-09-14). Development and tests only, not a
+  production store; it does not accept SSE request headers without its own KMS setup.
 
 ## CI actions (pinned by commit, verified 2026-10-15)
 `actions/checkout` v7.0.1 `3d3c42e5…`, `astral-sh/setup-uv` v10.3.0 `1c37ad07…`,
