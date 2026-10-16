@@ -6,7 +6,7 @@ been applied anywhere. Production readiness is not claimed.
 
 | Target | How | Verified |
 |---|---|---|
-| Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (12 gates) on macOS + Podman 5.7.1 |
+| Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (14 gates) on macOS + Podman 5.7.1 |
 | Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
 | Local observability | `make observability-up` (Prometheus :9090) | yes — alert drills with injected failures |
 | Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | **not run** — validated with actionlint only |
@@ -43,7 +43,7 @@ Internet ─▶ ALB (HTTPS, ACM certificate, optional AWS WAF) ─▶ ECS Fargat
                                                              │
 private subnets: ECS services worker (1–2), records-mcp, casework-mcp (Service Connect, no public route)
                  RDS PostgreSQL 16 (pgvector available; encrypted with KMS; automated backups)
-                 EFS (encrypted) mounted at /app/var for artifacts — the current LocalArtifactStore
+                 S3 bucket for artifacts (SSE-KMS, versioning, Block Public Access) — S3ArtifactStore
 identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer
 telemetry: ADOT collector sidecar → CloudWatch / X-Ray (OTLP); Amazon Managed Prometheus
            scraping api /metrics and worker :9101 inside the VPC; CloudWatch Logs
@@ -58,7 +58,7 @@ egress:   NAT gateway only if a hosted model or the GitHub sandbox is enabled; o
 | worker | 0.5 vCPU / 1 GB × 1–2 tasks | concurrency via more tasks (SKIP LOCKED); stop timeout ≥ 30 s (lease) |
 | records-mcp, casework-mcp | 0.25 vCPU / 0.5 GB each | internal only |
 | RDS | db.t4g.small class, 20 GB gp3, Multi-AZ optional | role passwords per service |
-| EFS | bursting throughput | artifact volume shared by api/worker/mcp |
+| S3 | Standard storage class, one bucket | artifacts for api and worker through the task role |
 
 Local resident-memory readings were not usable for sizing (macOS memory compression), so
 the sizes above are conventional starting points, not measurements.
@@ -78,8 +78,32 @@ controls off, session secret length. Cookies are `Secure` behind HTTPS.
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
 retention; ALB hours and LCUs; NAT gateway hours and data processing (avoid if no egress is
-needed); EFS storage; CloudWatch log ingestion and retention; Secrets Manager per secret;
+needed); S3 storage and requests, KMS requests for SSE-KMS; CloudWatch log ingestion and retention; Secrets Manager per secret;
 hosted model usage (bounded by the configured spend ceiling).
+
+**Artifact storage (S3; implemented, tested locally against SeaweedFS, not against AWS).**
+Set `OPSBRIDGE_ARTIFACT_S3_BUCKET` on api and worker, with `OPSBRIDGE_ARTIFACT_S3_PREFIX` and
+`OPSBRIDGE_ARTIFACT_S3_REGION` (`OPSBRIDGE_ARTIFACT_S3_ENDPOINT_URL` only for non-AWS
+S3-compatible stores). Keys are the same tenant-prefixed, content-addressed keys as the local
+store; every read is re-hashed against its key; credentials come from the task role (the
+standard AWS chain), never from settings.
+
+- Encryption: bucket default encryption with a customer-managed KMS key; optionally
+  `OPSBRIDGE_ARTIFACT_S3_SSE=aws:kms` and `OPSBRIDGE_ARTIFACT_S3_KMS_KEY_ID` so every upload
+  also requests it. OpsBridge does not encrypt bytes itself. The SSE parameters are only
+  unit-tested as passed through; SeaweedFS rejects them without its own KMS setup.
+- Task role: `s3:GetObject`, `s3:PutObject`, `s3:DeleteObject` on `<bucket>/<prefix>*`;
+  `s3:ListBucket` on the bucket limited to the prefix (without it S3 answers 403 instead of
+  404 for a missing object, and uploads fail); `kms:GenerateDataKey` and `kms:Decrypt` on the
+  key. Block Public Access on; a bucket policy denying requests without TLS.
+- Versioning and retention: with versioning on (useful for restore), a retention delete only
+  adds a delete marker. Add a lifecycle rule that expires noncurrent versions after the backup
+  window and state that window in the retention policy, or deleted documents stay recoverable.
+- Isolation: one bucket and one task role for all tenants, as with the local directory; tenant
+  separation comes from the store's key checks and the RLS-protected artifact manifest, not
+  per-tenant IAM.
+- The free-space gauge and `OpsBridgeArtifactDiskLow` apply to the local store only; watch the
+  bucket with S3 storage metrics.
 
 **Database roles.** Run the SQL in `infra/compose/postgres/10-opsbridge-roles.sh` and
 `20-opsbridge-databases.sh` once with the master user (roles are NOSUPERUSER NOBYPASSRLS;
@@ -88,9 +112,12 @@ hosted model usage (bounded by the configured spend ceiling).
 **Rollout and rollback.** Build the image in CI from the locks, tag it with the commit SHA,
 run the bootstrap task (migrations) first, then update the services. ECS deployment
 circuit breaker with automatic rollback to the previous task definition. Migrations stay
-backward compatible for one release. Data rollback = restore RDS snapshot + EFS backup into a
-new environment, verify with `opsbridge verify-restore`, then switch (docs/operations.md).
+backward compatible for one release. Data rollback = restore the RDS snapshot and the bucket's objects (versions or a replicated
+copy) to the same point into a new environment, verify with
+`opsbridge verify-restore --database D --artifact-bucket B`, then switch (docs/operations.md).
 
-**Before any staging deployment:** owner authorization and account; decide IdP; consider an S3 artifact store (not implemented) instead of EFS;
+**Before any staging deployment:** owner authorization and account; decide IdP; check the S3
+store's encryption, IAM and lifecycle settings against the real bucket (tested locally against
+SeaweedFS only);
 add the WAF/rate-limit edge (application rate limits are per process); run the restore drill
 there with synthetic data.
