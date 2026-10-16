@@ -1,7 +1,8 @@
 """Application-level checks on a restored database and artifact store (restore drill).
 
 Run against an isolated restored database only. Checks, per tenant, that every artifact
-still held (not deleted by retention) has its bytes and the same digest, and that every
+still held (not deleted by retention) has its bytes in the restored store (directory or
+bucket) with the same digest, and that every
 citation of the latest investigation of each case still resolves; and that the restored
 database still hides rows from application roles without a tenant context (RLS restored).
 """
@@ -9,19 +10,44 @@ database still hides rows from application roles without a tenant context (RLS r
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
+import uuid
+from collections.abc import Iterable
 from typing import Any
 
 from sqlalchemy import func, select, text
+from sqlalchemy.dialects.postgresql import distinct_on
 
 from opsbridge.config import Settings
 from opsbridge.domain.records import SourceRef
 from opsbridge.evidence.citations import resolve_all
+from opsbridge.evidence.storage import ArtifactIntegrityError, ArtifactKeyError, ArtifactStore
 from opsbridge.persistence.db import Database, DbContext, make_engine
 from opsbridge.persistence.models import Artifact, Case, InvestigationVersion
 
 
-def verify_restored(settings: Settings, database: str, artifact_dir: Path) -> dict[str, Any]:
+def artifact_problems(
+    store: ArtifactStore, tenant_id: uuid.UUID, artifacts: Iterable[Any]
+) -> list[str]:
+    """Each artifact's bytes must be readable from the store and hash to its recorded digest."""
+    bad: list[str] = []
+    for a in artifacts:
+        try:
+            data = store.get(tenant_id, str(a.storage_key))
+        except FileNotFoundError:
+            bad.append(f"missing {a.id}")
+            continue
+        except ArtifactIntegrityError:
+            bad.append(f"digest mismatch {a.id}")
+            continue
+        except ArtifactKeyError:
+            bad.append(f"key outside tenant {a.id}")
+            continue
+        if "sha256:" + hashlib.sha256(data).hexdigest() != a.sha256:
+            bad.append(f"digest mismatch {a.id}")
+    return bad
+
+
+def verify_restored(settings: Settings, database: str, store: ArtifactStore) -> dict[str, Any]:
     migrator = make_engine("migrator", settings, database=database)
     app = make_engine("app", settings, database=database)
     worker = Database(make_engine("worker", settings, database=database))
@@ -42,19 +68,13 @@ def verify_restored(settings: Settings, database: str, artifact_dir: Path) -> di
                 arts = list(
                     s.execute(select(Artifact).where(Artifact.storage_key.is_not(None))).scalars()
                 )
-                bad: list[str] = []
-                for a in arts:
-                    path = artifact_dir / str(a.storage_key)
-                    if not path.is_file():
-                        bad.append(f"missing {a.id}")
-                    elif "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest() != a.sha256:
-                        bad.append(f"digest mismatch {a.id}")
+                bad = artifact_problems(store, tid, arts)
                 deleted = s.execute(
                     select(func.count()).select_from(Artifact).where(Artifact.storage_key.is_(None))
                 ).scalar_one()
                 latest = (
                     select(InvestigationVersion)
-                    .distinct(InvestigationVersion.case_id)
+                    .ext(distinct_on(InvestigationVersion.case_id))
                     .order_by(InvestigationVersion.case_id, InvestigationVersion.version.desc())
                 )
                 total = valid = 0
