@@ -8,7 +8,7 @@ from typing import Any, Literal
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel, Field
 
-from opsbridge.evidence.storage import LocalArtifactStore
+from opsbridge.evidence.storage import artifact_store
 from opsbridge.services import investigations as svc
 
 from ..deps import CurrentPrincipal, State
@@ -278,7 +278,7 @@ def original(
     try:
         data, ctype, name = svc.raw_document(
             state.db,
-            LocalArtifactStore(state.settings.artifact_dir),
+            artifact_store(state.settings),
             principal,
             case_id,
             version_id,
