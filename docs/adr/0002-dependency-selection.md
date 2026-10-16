@@ -31,6 +31,7 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
 | typescript | **5.9.3**, not 7.0.2 | typescript-eslint 8.71 supports `<6.1`; openapi-typescript 7.13 peers on `^5` |
 | vitest / jsdom | **4.1.11 / 29.1.1** | vitest 5 and jsdom 30 exclude Node 25 in their `engines` |
 | @playwright/test | 1.64.1 | Browser tests |
+| @axe-core/playwright | 4.13.0 (axe-core 4.13.0, MPL-2.0; dev only) | Automated WCAG 2.1 A/AA checks in browser tests; 4.14.0 was a day old, so the previous release is pinned |
 | openapi-typescript | 7.13.0 | Generate API types from the backend OpenAPI document |
 | @tanstack/react-query / react-router-dom | 5.104.2 / 7.18.4 | Server state and routing |
 | eslint / @eslint/js | 10.12.0 / 10.0.1 | ESLint 9 is marked unsupported by its maintainers |
