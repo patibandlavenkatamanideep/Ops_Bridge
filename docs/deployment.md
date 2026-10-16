@@ -8,7 +8,7 @@ been applied anywhere. Production readiness is not claimed.
 |---|---|---|
 | Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (14 gates) on macOS + Podman 5.7.1 |
 | Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
-| Local observability | `make observability-up` (Prometheus :9090) | yes — alert drills with injected failures |
+| Local observability | `make observability-up` (Prometheus :9090, Alertmanager :9093, alert sink :9099) | yes — alert drills with injected failures, delivered through Alertmanager to the local sink |
 | Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | **not run** — validated with actionlint only |
 | Staging (AWS, below) | not provisioned | **no** |
 
@@ -47,6 +47,9 @@ private subnets: ECS services worker (1–2), records-mcp, casework-mcp (Service
 identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer
 telemetry: ADOT collector sidecar → CloudWatch / X-Ray (OTLP); Amazon Managed Prometheus
            scraping api /metrics and worker :9101 inside the VPC; CloudWatch Logs
+alerts:    the same rules and routing tree in Amazon Managed Prometheus's alert manager, whose
+           receivers are SNS topics (the only type it supports): one for page, subscribed by
+           the on-call pager, one for ticket, subscribed by the team's queue or email
 egress:   NAT gateway only if a hosted model or the GitHub sandbox is enabled; otherwise none
 ```
 
@@ -118,6 +121,7 @@ copy) to the same point into a new environment, verify with
 
 **Before any staging deployment:** owner authorization and account; decide IdP; check the S3
 store's encryption, IAM and lifecycle settings against the real bucket (tested locally against
-SeaweedFS only);
+SeaweedFS only); connect the page and ticket receivers to real on-call and queue services and
+repeat the routing drill there (locally they reach only the alert sink);
 add the WAF/rate-limit edge (application rate limits are per process); run the restore drill
 there with synthetic data.
