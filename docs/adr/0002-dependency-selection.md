@@ -48,6 +48,9 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
   `ghcr.io/astral-sh/uv:0.10.2` (the uv version used locally; 0.10.48 appeared in a tag listing
   but does not exist on ghcr.io).
 - `rhysd/actionlint:1.7.12` (workflow lint only).
+- `prom/alertmanager:v0.34.1` (observability profile and `amtool` for routing tests;
+  Apache-2.0; a patch release of 2026-09-17). The local alert sink runs on the same
+  `python:3.12.15-slim-bookworm` image as the application, standard library only.
 - `chrislusf/seaweedfs:4.47` (S3-compatible server for the S3 artifact-store integration
   tests; image licence label Apache-2.0, built 2026-09-14). Development and tests only, not a
   production store; it does not accept SSE request headers without its own KMS setup.
