@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-15 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-16 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -375,7 +375,8 @@ Phase 1 exit gate evidence:
   mocked responses only; held-out pass sits exactly at the 0.90 target with a 0.77 lower
   bound; supplier invoice layouts outside the pack mappings are escalated, not read.
 - The egress guard covers Python sockets; libpq connects only to the configured local DB.
-- Artifact storage is the local filesystem (EFS in the staging plan); no S3 store.
+- The S3 artifact store is tested against SeaweedFS only: server-side encryption, IAM and
+  lifecycle behaviour on AWS S3 are unverified (docs/deployment.md).
 - Alert routing (pager/email) is not set up; quota values are starting points.
 - Application processes must have synchronized clocks (NTP); comparisons against
   database-written timestamps use the database clock (found when the Podman VM clock drifted
@@ -386,9 +387,8 @@ Phase 1 exit gate evidence:
 The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
 run hosted CI (open a PR to `main` or dispatch the workflow); with authorization, the live
 GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
-pilot owner. Local improvements that need no authorization: an S3-compatible artifact store
-for staging, and the next supplier invoice layout for the furniture pack (from approved real
-samples, not the held-out layout).
+pilot owner. Local improvement that needs no authorization: the next supplier invoice
+layout for the furniture pack (from approved real samples, not the held-out layout).
 
 ### After-handoff hardening (2026-10-16)
 - Per-organization quotas: investigations per hour (429 `quota_exceeded`, `Retry-After`) and
@@ -406,3 +406,21 @@ samples, not the held-out layout).
 - Execution attempts keep their request and response as digest-matched artifacts.
 - Traceability: 25 verified_local, 3 implemented_unverified (OB-01, OB-22, OB-25).
 - `make verify` 14/14: unit 246 (+2 skipped), integration 120, browser 23.
+- S3-compatible artifact store (`S3ArtifactStore`, boto3 1.43.107), chosen when
+  `OPSBRIDGE_ARTIFACT_S3_BUCKET` is set: same tenant-prefixed content-addressed keys, every
+  read re-hashed, optional SSE-KMS request parameters, one cached client per endpoint. Uploads,
+  downloads, worker and retention go through `artifact_store(settings)`.
+  `verify-restore --artifact-bucket` checks a restored database against a bucket. Local
+  SeaweedFS 4.47 in `make infra-up` (:8333) for tests.
+  - Evidence: `tests/evidence/test_s3_store.py` (4: SSE/KMS and prefix passed through,
+    content-addressed puts, tenant keys, tamper detection, restore check through either
+    store); `tests/integration/test_s3_store.py` (3, SeaweedFS: round trip, cross-tenant key
+    refused, overwritten object refused, upload and download through the API stored only in
+    the bucket, retention deletes from the bucket, restore check reports a lost object);
+    `make restore-drill` still ok (190 artifacts, 18/18 citations).
+  - Found while testing: SeaweedFS's default 8 volume slots ran out after one or two buckets
+    (InternalError on PutObject); compose now sizes slots from free disk and tests delete their
+    buckets. SeaweedFS rejects SSE headers without its own KMS setup, so SSE is unit-tested
+    only. With AWS, `s3:ListBucket` is required (otherwise a missing object is 403, not 404)
+    and versioned buckets need a noncurrent-version lifecycle rule for retention.
+  - `make verify` 14/14 (2026-10-16): unit 250 (+2 skipped), integration 123, browser 23.
