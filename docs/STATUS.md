@@ -424,3 +424,6 @@ layout for the furniture pack (from approved real samples, not the held-out layo
     only. With AWS, `s3:ListBucket` is required (otherwise a missing object is 403, not 404)
     and versioned buckets need a noncurrent-version lifecycle rule for retention.
   - `make verify` 14/14 (2026-10-16): unit 250 (+2 skipped), integration 123, browser 23.
+  - `make image` rebuilt from the lock (28 s); an S3 round trip from that image with a
+    read-only root, all capabilities dropped and uid 10001 succeeded against SeaweedFS. The
+    full container stack was not relaunched with a bucket configured.
