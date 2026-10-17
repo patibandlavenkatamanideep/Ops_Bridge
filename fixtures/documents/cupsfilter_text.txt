@@ -1,0 +1,10 @@
+NORTHGATE SEATING CO - INVOICE
+Invoice No: INV-CUPS-1
+Invoice Date: 2026-09-30
+Supplier: Northgate Seating Co
+Supplier ID: SUP-NGS
+PO Reference: PO-CUPS-1
+Currency: USD
+Line | PO Line | SKU | Description | Qty | UoM | Unit Price | Discount | Type | Amount
+1 | 1 | ST-150 | Stacking chair | 20 | EA | 150.00 | 0.00 | GOODS | 3000.00
+Total: 3000.00

@@ -1,0 +1,272 @@
+# OpsBridge local stack. Run through `make dev` / `make demo` (which load ../../.env).
+# Named volumes persist data; `make down` never removes them.
+name: opsbridge
+
+services:
+  postgres:
+    build:
+      context: ./postgres
+    image: opsbridge/postgres:16-pgvector-local
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:?run make setup}
+      POSTGRES_DB: postgres
+      OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
+      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
+      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
+      KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - opsbridge_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d opsbridge"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.1
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?}
+      KC_HOSTNAME: http://localhost:8081
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?}
+      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
+      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
+      OPSBRIDGE_DEMO_USER_PASSWORD: ${OPSBRIDGE_DEMO_USER_PASSWORD:?}
+    ports:
+      - "127.0.0.1:8081:8080"
+    volumes:
+      - ../identity/realm-opsbridge.json:/opt/keycloak/data/import/realm-opsbridge.json:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      # The image has no curl; use bash's /dev/tcp against the management port.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": *\"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+    restart: unless-stopped
+
+  # S3-compatible object store for the S3 artifact-store integration tests (SeaweedFS,
+  # Apache-2.0). Anonymous, localhost only; development and tests, not a production store.
+  seaweedfs:
+    image: docker.io/chrislusf/seaweedfs:4.47
+    # every bucket gets its own collection of volumes; the default 8 volume slots fill after
+    # one or two buckets, so size slots from free disk with small volumes instead
+    command: ["server", "-s3", "-dir=/data", "-volume.max=0", "-master.volumeSizeLimitMB=64"]
+    ports:
+      - "127.0.0.1:8333:8333"
+    volumes:
+      - opsbridge_s3data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8333/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 40
+    restart: unless-stopped
+
+  # --- Containerized application (profile "app"; `make demo-containers`) -----------------
+  # Replaces `make dev` (same ports); stop host processes first. The API serves the built UI
+  # on http://localhost:8000. Simulator and MCP services are reachable only on this network.
+  # Every app container: read-only root filesystem, /tmp tmpfs, no capabilities, no
+  # privilege escalation; only the /app/var volume is writable.
+  bootstrap:
+    image: opsbridge/app:local
+    build: {context: ../.., dockerfile: infra/containers/opsbridge.Dockerfile}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: &app-env
+      OPSBRIDGE_ENV: development
+      OPSBRIDGE_DB_HOST: postgres
+      OPSBRIDGE_DB_PORT: "5432"
+      OPSBRIDGE_DB_NAME: opsbridge
+      OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
+      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
+      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
+      # Browsers and token issuers use the public URL; containers use the backchannel.
+      OPSBRIDGE_OIDC_ISSUER: http://localhost:8081/realms/opsbridge
+      OPSBRIDGE_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/opsbridge
+      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
+      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
+      OPSBRIDGE_SESSION_SECRET: ${OPSBRIDGE_SESSION_SECRET:?}
+      OPSBRIDGE_PUBLIC_URL: http://localhost:8000
+      OPSBRIDGE_CORS_ORIGINS: '["http://localhost:8000"]'
+      OPSBRIDGE_SIMULATOR_URL: http://simulator:8090
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
+      OPSBRIDGE_SIMULATOR_FAULT_CONTROLS: "true"
+      OPSBRIDGE_RECORDS_MCP_URL: http://records-mcp:8101/mcp
+      OPSBRIDGE_CASEWORK_MCP_URL: http://casework-mcp:8102/mcp
+      OPSBRIDGE_TOOL_TRANSPORT: mcp
+    command: ["sh", "-c", "alembic upgrade head && python -m opsbridge.cli seed-demo && python -m opsbridge.cli init-keys"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: *app-env
+    ports: ["127.0.0.1:8000:8000"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:8000/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  worker:
+    image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "worker"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      records-mcp: {condition: service_healthy}
+      casework-mcp: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:9101/readyz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  records-mcp:
+    image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "mcp-records", "--host", "0.0.0.0", "--port", "8101"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "tcp://127.0.0.1:8101"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  casework-mcp:
+    image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: *app-env
+    command: ["python", "-m", "opsbridge.cli", "mcp-casework", "--host", "0.0.0.0", "--port", "8102"]
+    volumes: [opsbridge_appdata:/app/var]
+    depends_on:
+      bootstrap: {condition: service_completed_successfully}
+      simulator: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "tcp://127.0.0.1:8102"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  simulator:
+    image: opsbridge/app:local
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    profiles: [app]
+    environment: *app-env
+    command: ["sh", "-c", "python -m opsbridge.cli simulator-seed /app/fixtures/scenarios/dev.yaml && python -m opsbridge.cli simulator --host 0.0.0.0 --port 8090"]
+    volumes: [opsbridge_simdata:/app/var]
+    healthcheck:
+      test: ["CMD", "python", "-m", "opsbridge.cli", "probe", "http://127.0.0.1:8090/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+  # Optional: `make observability-up`. Scrapes the API and worker on the host (make dev)
+  # and evaluates infra/observability/prometheus/alerts.yml. Bound to localhost only.
+  prometheus:
+    image: docker.io/prom/prometheus:v3.13.4
+    profiles: [observability]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=7d
+    volumes:
+      - ../observability/prometheus/prometheus.local.yml:/etc/prometheus/prometheus.yml:ro
+      - ../observability/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - opsbridge_prometheus:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    restart: unless-stopped
+
+  # Routes Prometheus alerts by severity (infra/observability/alertmanager). Single instance:
+  # clustering is off. Bound to localhost only.
+  alertmanager:
+    image: docker.io/prom/alertmanager:v0.34.1
+    profiles: [observability]
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+      - --cluster.listen-address=
+    volumes:
+      - ../observability/alertmanager/alertmanager.local.yml:/etc/alertmanager/alertmanager.yml:ro
+      - opsbridge_alertmanager:/alertmanager
+    ports:
+      - "127.0.0.1:9093:9093"
+    restart: unless-stopped
+
+  # Local receiver standing in for a pager and a ticket queue (scripts/alert_sink.py).
+  alert-sink:
+    image: docker.io/library/python:3.12.15-slim-bookworm
+    profiles: [observability]
+    command: ["python", "-I", "/sink/alert_sink.py", "--host", "0.0.0.0", "--port", "9099"]
+    volumes:
+      - ../../scripts/alert_sink.py:/sink/alert_sink.py:ro
+    ports:
+      - "127.0.0.1:9099:9099"
+    user: "65534:65534"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: unless-stopped
+
+volumes:
+  opsbridge_pgdata:
+  opsbridge_prometheus:
+  opsbridge_alertmanager:
+  opsbridge_appdata:
+  opsbridge_simdata:
+  opsbridge_s3data:

@@ -1,0 +1,24 @@
+{
+ "allowed": [
+  {
+   "definition_sha256": "sha256:67dd2200b60b984333c15842d55a0d49ae5cbdf688074be71f2295ceac3b20af",
+   "name": "search_case_evidence"
+  }
+ ],
+ "denied": [
+  "create_follow_up_task",
+  "get_follow_up_task",
+  "reconcile_operation"
+ ],
+ "note": "live = executed during the run against the local, frozen synthetic evidence store",
+ "response_mode": "live",
+ "schema": "evalseal.agent-tools/1",
+ "tools": [
+  {
+   "access": "read",
+   "description": "Read-only lexical search over the case's authorized evidence chunks.",
+   "name": "search_case_evidence",
+   "version": "1"
+  }
+ ]
+}

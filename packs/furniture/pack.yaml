@@ -1,0 +1,90 @@
+# Office furniture purchasing pack. Source system: snake_case JSON purchase orders,
+# CSV receiving exports (one per PO), text-layer PDF invoices from suppliers, JSON
+# invoice-allocation history, and plain-text supplier emails.
+schema_version: 1
+pack_id: furniture
+version: 1
+display_name: Office furniture purchasing
+policy_id: furniture-ap
+sources:
+  purchase_order:
+    format: json
+    collection: purchase_orders
+    record:
+      po_number: {path: po_number, transform: upper}
+      supplier_id: {path: supplier.id, transform: upper}
+      supplier_name: {path: supplier.name}
+      currency: {path: currency, transform: upper}
+      status: {path: status, map: {OPEN: open, CLOSED: closed, CANCELLED: cancelled}}
+    lines:
+      path: lines
+      record:
+        line_number: {path: line_no}
+        item_code: {path: sku, optional: true}
+        description: {path: description, optional: true}
+        quantity: {path: qty_ordered, transform: decimal}
+        unit: {path: uom}
+        unit_price: {path: unit_price, transform: decimal}
+        discount_amount: {path: discount, transform: decimal, default: "0"}
+  invoice:
+    format: pdf_text
+    collection: invoices
+    amount_check: true
+    header_patterns:
+      invoice_number: '^Invoice No:\s*(?P<v>[A-Z0-9-]+)\s*$'
+      invoice_date: '^Invoice Date:\s*(?P<v>\d{4}-\d{2}-\d{2})\s*$'
+      supplier_id: '^Supplier ID:\s*(?P<v>[A-Z0-9-]+)\s*$'
+      supplier_name: '^Supplier:\s*(?P<v>.+?)\s*$'
+      po_number: '^PO Reference:\s*(?P<v>[A-Z0-9-]+)\s*$'
+      currency: '^Currency:\s*(?P<v>[A-Z]{3})\s*$'
+      total: '^Total:\s*(?P<v>[0-9.,]+)\s*$'
+    record:
+      invoice_number: {group: invoice_number, transform: upper}
+      invoice_date: {group: invoice_date, transform: date}
+      supplier_id: {group: supplier_id, transform: upper, optional: true}
+      supplier_name: {group: supplier_name}
+      po_number: {group: po_number, transform: upper, optional: true}
+      currency: {group: currency, transform: upper}
+    lines:
+      pattern: '^(?P<line_number>\d+) \| (?P<po_line_number>[0-9]*) \| (?P<item_code>[A-Z0-9-]*) \| (?P<description>[^|]+?) \| (?P<quantity>[0-9.,]+) \| (?P<unit>[^|]+?) \| (?P<unit_price>[0-9.,]+) \| (?P<discount_amount>[0-9.,]+) \| (?P<kind>GOODS|CHARGE) \| (?P<amount>[0-9.,]+)$'
+      record:
+        line_number: {group: line_number}
+        po_line_number: {group: po_line_number, optional: true}
+        item_code: {group: item_code, optional: true}
+        description: {group: description}
+        quantity: {group: quantity, transform: decimal}
+        unit: {group: unit}
+        unit_price: {group: unit_price, transform: decimal}
+        discount_amount: {group: discount_amount, transform: decimal}
+        kind: {group: kind, map: {GOODS: goods, CHARGE: charge}}
+  goods_receipt:
+    format: csv
+    collection: receipts
+    group_by: receipt_id
+    record:
+      receipt_number: {column: receipt_id, transform: upper}
+      po_number: {column: po_ref, transform: upper}
+      received_date: {column: received_on, transform: date}
+    lines:
+      record:
+        po_line_number: {column: po_line}
+        quantity: {column: qty, transform: decimal}
+        unit: {column: uom}
+        kind: {column: movement, map: {RECEIPT: receipt, RETURN: return}}
+        status: {column: status, map: {ACCEPTED: accepted, REJECTED: rejected, REVERSED: reversed}}
+  allocation_history:
+    format: json
+    collection: allocations
+    root: allocations
+    record:
+      invoice_number: {path: invoice, transform: upper}
+      po_number: {path: po, transform: upper}
+      po_line_number: {path: po_line}
+      quantity: {path: qty, transform: decimal}
+      status: {path: state, map: {MATCHED: active, CANCELLED: cancelled}}
+  supplier_message:
+    format: text
+    collection: messages
+    assertion_patterns:
+      - '(?i)\b(?:delivered|shipped)\s+(?:all\s+)?(?P<quantity>\d+(?:\.\d+)?)\s+(?P<unit>[a-z]+)\b.*?\b(?P<po_number>PO-\d+)'
+      - '(?i)\b(?P<po_number>PO-\d+)\b.*?\b(?:delivered|shipped)\s+(?:all\s+)?(?P<quantity>\d+(?:\.\d+)?)\s+(?P<unit>[a-z]+)\b'

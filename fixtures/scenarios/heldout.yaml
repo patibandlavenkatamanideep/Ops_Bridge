@@ -1,0 +1,2251 @@
+# GENERATED from author_eval.py (hand-written table). Synthetic data only. Split: heldout.
+# Expected labels are written by hand from the policy files, not produced by OpsBridge.
+# Families and templates are disjoint from every other split.
+schema_version: 1
+corpus_id: opsbridge-heldout-v1
+scenarios:
+- id: fur-heldout-201
+  pack: furniture
+  family: FUR-H-REJECTED
+  template: fen-pdf-v1
+  split: heldout
+  description: '12 delivered: 10 accepted, 2 rejected; 12 billed.'
+  supplier: &id001
+    id: SUP-FEN
+    name: Fenwick Seating Ltd
+  po:
+    number: PO-1201
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '12'
+      unit: EA
+      price: '410.00'
+  receipts:
+  - id: GR-5201A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: receipt
+      status: rejected
+  invoice:
+    number: INV-9201
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1201
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '12'
+      unit: EA
+      price: '410.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: rejected units are not valid receipts
+- id: fur-heldout-202
+  pack: furniture
+  family: FUR-H-REJECTED
+  template: fen-pdf-v1
+  split: heldout
+  description: 12 accepted plus 3 extra rejected at the dock; 12 billed.
+  supplier: *id001
+  po:
+    number: PO-1202
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '12'
+      unit: EA
+      price: '410.00'
+  receipts:
+  - id: GR-5202A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '12'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 1
+      qty: '3'
+      unit: EA
+      kind: receipt
+      status: rejected
+  invoice:
+    number: INV-9202
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1202
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '12'
+      unit: EA
+      price: '410.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: fur-heldout-203
+  pack: furniture
+  family: FUR-H-POLICY-DATED
+  template: fen-pdf-v1
+  split: heldout
+  description: 'Invoice dated 2025-11-14: +0.80 on 40.00 under policy v1.'
+  supplier: *id001
+  po:
+    number: PO-1203
+    currency: USD
+    status: open
+    date: '2025-10-01'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '40.00'
+  receipts:
+  - id: GR-5203A
+    date: '2025-10-20'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9203
+    date: '2025-11-14'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1203
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '40.80'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: v1 absolute tolerance 1.00 applies by invoice date
+- id: fur-heldout-204
+  pack: furniture
+  family: FUR-H-POLICY-DATED
+  template: fen-pdf-v1
+  split: heldout
+  description: 'Invoice dated 2025-12-20: +1.20 on 40.00 under policy v1.'
+  supplier: *id001
+  po:
+    number: PO-1204
+    currency: USD
+    status: open
+    date: '2025-10-01'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '40.00'
+  receipts:
+  - id: GR-5204A
+    date: '2025-10-20'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9204
+    date: '2025-12-20'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1204
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '41.20'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: beyond v1 absolute 1.00
+- id: fur-heldout-205
+  pack: furniture
+  family: FUR-H-POLICY-DATED
+  template: fen-pdf-v1
+  split: heldout
+  description: 'Invoice dated 2026-02-02: +0.80 on 40.00 under policy v2.'
+  supplier: *id001
+  po:
+    number: PO-1205
+    currency: USD
+    status: open
+    date: '2026-01-10'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '40.00'
+  receipts:
+  - id: GR-5205A
+    date: '2026-01-25'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9205
+    date: '2026-02-02'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1205
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '40.80'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: 'v2: beyond 0.50 and beyond 1% (0.40)'
+- id: fur-heldout-206
+  pack: furniture
+  family: FUR-H-OVERBILL-PO
+  template: pin-pdf-v1
+  split: heldout
+  description: 20 ordered, 22 delivered and accepted, 22 billed.
+  supplier: &id002
+    id: SUP-PIN
+    name: Pinecrest Furnishings Co
+  po:
+    number: PO-1206
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '20'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GR-5206A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '22'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9206
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1206
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '22'
+      unit: EA
+      price: '220.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: billing beyond the ordered quantity
+- id: fur-heldout-207
+  pack: furniture
+  family: FUR-H-PARTIAL-BILL
+  template: pin-pdf-v1
+  split: heldout
+  description: 40 ordered, 25 received, 25 billed.
+  supplier: *id002
+  po:
+    number: PO-1207
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '40'
+      unit: EA
+      price: '140.00'
+  receipts:
+  - id: GR-5207A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '25'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9207
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1207
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '25'
+      unit: EA
+      price: '140.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: partial delivery billed as received
+- id: fur-heldout-208
+  pack: furniture
+  family: FUR-H-PARTIAL-BILL
+  template: pin-pdf-v1
+  split: heldout
+  description: 25 received, 20 already matched, 10 billed now.
+  supplier: *id002
+  po:
+    number: PO-1208
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '40'
+      unit: EA
+      price: '140.00'
+  receipts:
+  - id: GR-5208A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '25'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9208
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1208
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '10'
+      unit: EA
+      price: '140.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8208
+    line: 1
+    qty: '20'
+    state: active
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: only 5 available
+- id: fur-heldout-209
+  pack: furniture
+  family: FUR-H-MULTI-RECEIPT
+  template: fen-pdf-v1
+  split: heldout
+  description: Receipts 10+10+4 with a return of 2; 24 billed.
+  supplier: *id001
+  po:
+    number: PO-1209
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '24'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GR-5209A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5209B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5209C
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: return
+      status: accepted
+  - id: GR-5209D
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9209
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1209
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '24'
+      unit: EA
+      price: '220.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: net 22
+- id: fur-heldout-210
+  pack: furniture
+  family: FUR-H-MULTI-RECEIPT
+  template: fen-pdf-v1
+  split: heldout
+  description: Receipts 10+10+4; a return of 2 was reversed; 24 billed.
+  supplier: *id001
+  po:
+    number: PO-1210
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '24'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GR-5210A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5210B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5210C
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: return
+      status: reversed
+  - id: GR-5210D
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9210
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1210
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '24'
+      unit: EA
+      price: '220.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: net 24
+- id: fur-heldout-211
+  pack: furniture
+  family: FUR-H-ALIAS-UNITS
+  template: pin-pdf-v1
+  split: heldout
+  description: Invoice unit 'pcs'; PO and receipt in EA.
+  supplier: *id002
+  po:
+    number: PO-1211
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '16'
+      unit: EA
+      price: '90.00'
+  receipts:
+  - id: GR-5211A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '16'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9211
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1211
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '16'
+      unit: pcs
+      price: '90.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: alias of EA
+- id: fur-heldout-212
+  pack: furniture
+  family: FUR-H-ALIAS-UNITS
+  template: pin-pdf-v1
+  split: heldout
+  description: Invoice unit 'sets' against a PO in EA (no conversion).
+  supplier: *id002
+  po:
+    number: PO-1212
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '16'
+      unit: EA
+      price: '90.00'
+  receipts:
+  - id: GR-5212A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '16'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9212
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1212
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '16'
+      unit: sets
+      price: '90.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: SET and EA have no defined conversion
+- id: fur-heldout-213
+  pack: furniture
+  family: FUR-H-BOX-PRICE
+  template: fen-pdf-v1
+  split: heldout
+  description: '5 boxes of 10 at 125.00 = 12.50/EA vs 12.00: +0.50.'
+  supplier: *id001
+  po:
+    number: PO-1213
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '50'
+      unit: EA
+      price: '12.00'
+  receipts:
+  - id: GR-5213A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '50'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9213
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1213
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '5'
+      unit: box of 10
+      price: '125.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: absolute boundary inclusive after conversion
+- id: fur-heldout-214
+  pack: furniture
+  family: FUR-H-BOX-PRICE
+  template: fen-pdf-v1
+  split: heldout
+  description: '5 boxes of 10 at 126.00 = 12.60/EA vs 12.00: +0.60.'
+  supplier: *id001
+  po:
+    number: PO-1214
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '50'
+      unit: EA
+      price: '12.00'
+  receipts:
+  - id: GR-5214A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '50'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9214
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1214
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '5'
+      unit: box of 10
+      price: '126.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: beyond 0.50 and 1% (0.12)
+- id: fur-heldout-215
+  pack: furniture
+  family: FUR-H-PO-DISCOUNT
+  template: pin-pdf-v1
+  split: heldout
+  description: PO 520.00 less 200.00 line discount on 10 (net 500); billed 505.00.
+  supplier: *id002
+  po:
+    number: PO-1215
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '10'
+      unit: EA
+      price: '520.00'
+      discount: '200.00'
+  receipts:
+  - id: GR-5215A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9215
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1215
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '10'
+      unit: EA
+      price: '505.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: +5.00 is exactly 1% of net 500.00
+- id: fur-heldout-216
+  pack: furniture
+  family: FUR-H-MISSING-PLUS-PRICE
+  template: fen-pdf-v1
+  split: heldout
+  description: Line 1 has no receipt; line 2 received but +5.00.
+  supplier: *id001
+  po:
+    number: PO-1216
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LK-300
+      desc: Staff locker bank
+      qty: '6'
+      unit: EA
+      price: '300.00'
+    - line: 2
+      item: SH-150
+      desc: Steel shelving unit
+      qty: '10'
+      unit: EA
+      price: '150.00'
+  receipts:
+  - id: GR-5216A
+    date: '2026-09-20'
+    lines:
+    - line: 2
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9216
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1216
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LK-300
+      desc: Staff locker bank
+      qty: '6'
+      unit: EA
+      price: '300.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: SH-150
+      desc: Steel shelving unit
+      qty: '10'
+      unit: EA
+      price: '155.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    - price_mismatch
+    next_action: request_information:create_follow_up_task
+    note: missing receipt route has priority
+- id: fur-heldout-217
+  pack: furniture
+  family: FUR-H-CANCELLED-PO
+  template: pin-pdf-v1
+  split: heldout
+  description: Invoice against a cancelled PO; quantities and prices agree.
+  supplier: *id002
+  po:
+    number: PO-1217
+    currency: USD
+    status: cancelled
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+  receipts:
+  - id: GR-5217A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9217
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1217
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: a cancelled PO cannot authorize payment
+- id: fur-heldout-218
+  pack: furniture
+  family: FUR-H-LAYOUT-V2
+  template: har-pdf-v2
+  split: heldout
+  description: 'New invoice layout: 16 ordered, 14 received, 16 billed.'
+  supplier: &id003
+    id: SUP-HAR
+    name: Harbor Office Systems
+  po:
+    number: PO-1218
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GR-5218A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '14'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9218
+    date: '2026-09-30'
+    supplier_id: SUP-HAR
+    supplier_name: Harbor Office Systems
+    po_number: PO-1218
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+      kind: goods
+    layout: v2
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: business truth; unseen layout
+- id: fur-heldout-219
+  pack: furniture
+  family: FUR-H-LAYOUT-V2
+  template: har-pdf-v2
+  split: heldout
+  description: 'New invoice layout: 8 tables matched.'
+  supplier: *id003
+  po:
+    number: PO-1219
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '600.00'
+  receipts:
+  - id: GR-5219A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9219
+    date: '2026-09-30'
+    supplier_id: SUP-HAR
+    supplier_name: Harbor Office Systems
+    po_number: PO-1219
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '600.00'
+      kind: goods
+    layout: v2
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: business truth; unseen layout
+- id: fur-heldout-220
+  pack: furniture
+  family: FUR-H-LAYOUT-V2
+  template: har-pdf-v2
+  split: heldout
+  description: 'New invoice layout: tables billed 610.00 vs 600.00.'
+  supplier: *id003
+  po:
+    number: PO-1220
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '600.00'
+  receipts:
+  - id: GR-5220A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9220
+    date: '2026-09-30'
+    supplier_id: SUP-HAR
+    supplier_name: Harbor Office Systems
+    po_number: PO-1220
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '610.00'
+      kind: goods
+    layout: v2
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: business truth; unseen layout
+- id: fur-heldout-221
+  pack: furniture
+  family: FUR-H-LAYOUT-V2
+  template: har-pdf-v2
+  split: heldout
+  description: 'New invoice layout: no receiving record.'
+  supplier: *id003
+  po:
+    number: PO-1221
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '600.00'
+  receipts: []
+  invoice:
+    number: INV-9221
+    date: '2026-09-30'
+    supplier_id: SUP-HAR
+    supplier_name: Harbor Office Systems
+    po_number: PO-1221
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: TB-600
+      desc: Meeting table
+      qty: '8'
+      unit: EA
+      price: '600.00'
+      kind: goods
+    layout: v2
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: business truth; unseen layout
+- id: fur-heldout-222
+  pack: furniture
+  family: FUR-H-CLAIM-BELOW
+  template: pin-pdf-v1
+  split: heldout
+  description: Receipt 12 = billed 12; supplier email says 10 delivered.
+  supplier: *id002
+  po:
+    number: PO-1222
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '12'
+      unit: EA
+      price: '60.00'
+  receipts:
+  - id: GR-5222A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '12'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9222
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1222
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '12'
+      unit: EA
+      price: '60.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-F2220
+    text: 'Good morning,
+
+      We delivered 10 lamps for PO-1222 yesterday, the rest follow.
+
+      Pinecrest'
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: receiving record controls by policy precedence
+- id: fur-heldout-223
+  pack: furniture
+  family: FUR-H-UNKNOWN-PO-LINE
+  template: fen-pdf-v1
+  split: heldout
+  description: Invoice line references PO line 3 on a two-line PO.
+  supplier: *id001
+  po:
+    number: PO-1223
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+    - line: 2
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '8'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GR-5223A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9223
+    date: '2026-09-30'
+    supplier_id: SUP-FEN
+    supplier_name: Fenwick Seating Ltd
+    po_number: PO-1223
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+      kind: goods
+    - line: 2
+      po_line: 3
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '8'
+      unit: EA
+      price: '220.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: invoice line identity uncertain
+- id: fur-heldout-224
+  pack: furniture
+  family: FUR-H-ALLOC-CANCELLED-MIX
+  template: pin-pdf-v1
+  split: heldout
+  description: 20 received; 12 matched then cancelled, 8 still matched; 12 billed.
+  supplier: *id002
+  po:
+    number: PO-1224
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '20'
+      unit: EA
+      price: '90.00'
+  receipts:
+  - id: GR-5224A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9224
+    date: '2026-09-30'
+    supplier_id: SUP-PIN
+    supplier_name: Pinecrest Furnishings Co
+    po_number: PO-1224
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '12'
+      unit: EA
+      price: '90.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8224
+    line: 1
+    qty: '12'
+    state: cancelled
+  - invoice: INV-8225
+    line: 1
+    qty: '8'
+    state: active
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: 12 available
+- id: it-heldout-201
+  pack: it_hardware
+  family: IT-H-GBP
+  template: helix-json-v1
+  split: heldout
+  description: PO and invoice in GBP, which the policy does not support.
+  supplier: &id004
+    id: VEN-HELIX
+    name: Helix Networks Ltd
+  po:
+    number: PO-2201
+    currency: GBP
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+  receipts:
+  - id: GRN-6201A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7201
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2201
+    currency: GBP
+    lines:
+    - line: 1
+      po_line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: unsupported currency
+- id: it-heldout-202
+  pack: it_hardware
+  family: IT-H-DEVICES-ALIAS
+  template: nova-json-v1
+  split: heldout
+  description: Invoice unit 'devices'; 12 received, 12 billed.
+  supplier: &id005
+    id: VEN-NOVA
+    name: Nova Devices SARL
+  po:
+    number: PO-2202
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '12'
+      unit: EA
+      price: '950.00'
+  receipts:
+  - id: GRN-6202A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '12'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7202
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2202
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '12'
+      unit: devices
+      price: '950.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: alias of EA
+- id: it-heldout-203
+  pack: it_hardware
+  family: IT-H-PK5-PRICE
+  template: helix-json-v1
+  split: heldout
+  description: 8 packs of 5 at 126.00 = 25.20/EA vs 25.00.
+  supplier: *id004
+  po:
+    number: PO-2203
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: HS-025
+      desc: Headset
+      qty: '40'
+      unit: EA
+      price: '25.00'
+  receipts:
+  - id: GRN-6203A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '40'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7203
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2203
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: HS-025
+      desc: Headset
+      qty: '8'
+      unit: 5-pack
+      price: '126.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: +0.20 within 5.00 and 2% (0.50)
+- id: it-heldout-204
+  pack: it_hardware
+  family: IT-H-PK5-PRICE
+  template: helix-json-v1
+  split: heldout
+  description: 8 packs of 5 at 128.00 = 25.60/EA vs 25.00.
+  supplier: *id004
+  po:
+    number: PO-2204
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: HS-025
+      desc: Headset
+      qty: '40'
+      unit: EA
+      price: '25.00'
+  receipts:
+  - id: GRN-6204A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '40'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7204
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2204
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: HS-025
+      desc: Headset
+      qty: '8'
+      unit: 5-pack
+      price: '128.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: +0.60 beyond 2% (0.50); both rules required
+- id: it-heldout-205
+  pack: it_hardware
+  family: IT-H-MULTI-LINE
+  template: nova-json-v1
+  split: heldout
+  description: Notebooks billed under PO price; docks exact.
+  supplier: *id005
+  po:
+    number: PO-2205
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '10'
+      unit: EA
+      price: '950.00'
+    - line: 2
+      item: DS-120
+      desc: USB-C dock
+      qty: '10'
+      unit: EA
+      price: '120.00'
+  receipts:
+  - id: GRN-6205A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7205
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2205
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '10'
+      unit: EA
+      price: '940.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: DS-120
+      desc: USB-C dock
+      qty: '10'
+      unit: EA
+      price: '120.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: over-billing only
+- id: it-heldout-206
+  pack: it_hardware
+  family: IT-H-MULTI-LINE
+  template: nova-json-v1
+  split: heldout
+  description: 'Docks: 10 billed, 7 received.'
+  supplier: *id005
+  po:
+    number: PO-2206
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '10'
+      unit: EA
+      price: '950.00'
+    - line: 2
+      item: DS-120
+      desc: USB-C dock
+      qty: '10'
+      unit: EA
+      price: '120.00'
+  receipts:
+  - id: GRN-6206A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '7'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7206
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2206
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '10'
+      unit: EA
+      price: '950.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: DS-120
+      desc: USB-C dock
+      qty: '10'
+      unit: EA
+      price: '120.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: ''
+- id: it-heldout-207
+  pack: it_hardware
+  family: IT-H-MULTI-LINE
+  template: helix-json-v1
+  split: heldout
+  description: Switch +10.00 on 400.00; access points 2 short.
+  supplier: *id004
+  po:
+    number: PO-2207
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+    - line: 2
+      item: AP-100
+      desc: Wireless access point
+      qty: '12'
+      unit: EA
+      price: '100.00'
+  receipts:
+  - id: GRN-6207A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7207
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2207
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '410.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: AP-100
+      desc: Wireless access point
+      qty: '12'
+      unit: EA
+      price: '100.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: quantity route has priority
+- id: it-heldout-208
+  pack: it_hardware
+  family: IT-H-BIG-PRICE
+  template: helix-json-v1
+  split: heldout
+  description: Server 2000.00 billed 2004.50.
+  supplier: *id004
+  po:
+    number: PO-2208
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '2'
+      unit: EA
+      price: '2000.00'
+  receipts:
+  - id: GRN-6208A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7208
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2208
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '2'
+      unit: EA
+      price: '2004.50'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: +4.50 within 5.00 and 2%
+- id: it-heldout-209
+  pack: it_hardware
+  family: IT-H-BIG-PRICE
+  template: helix-json-v1
+  split: heldout
+  description: Server 2000.00 billed 2005.01.
+  supplier: *id004
+  po:
+    number: PO-2209
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '2'
+      unit: EA
+      price: '2000.00'
+  receipts:
+  - id: GRN-6209A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7209
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2209
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '2'
+      unit: EA
+      price: '2005.01'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: +5.01 beyond absolute 5.00; both required
+- id: it-heldout-210
+  pack: it_hardware
+  family: IT-H-RETURN-REVERSED
+  template: nova-json-v1
+  split: heldout
+  description: 15 received; an RMA of 3 was reversed; 15 billed.
+  supplier: *id005
+  po:
+    number: PO-2210
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '15'
+      unit: EA
+      price: '300.00'
+  receipts:
+  - id: GRN-6210A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '15'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GRN-6210B
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '3'
+      unit: EA
+      kind: return
+      status: reversed
+  invoice:
+    number: INV-7210
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2210
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '15'
+      unit: EA
+      price: '300.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-heldout-211
+  pack: it_hardware
+  family: IT-H-REJECTED
+  template: nova-json-v1
+  split: heldout
+  description: 20 ordered; 15 accepted, 5 rejected; 20 billed.
+  supplier: *id005
+  po:
+    number: PO-2211
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '20'
+      unit: EA
+      price: '300.00'
+  receipts:
+  - id: GRN-6211A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '15'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 1
+      qty: '5'
+      unit: EA
+      kind: receipt
+      status: rejected
+  invoice:
+    number: INV-7211
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2211
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '20'
+      unit: EA
+      price: '300.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: rejected units are not valid receipts
+- id: it-heldout-212
+  pack: it_hardware
+  family: IT-H-SUPPLIER-AMBIG
+  template: nova-json-v1
+  split: heldout
+  description: No vendor code; name 'Nova Device SARL' differs slightly.
+  supplier: *id005
+  po:
+    number: PO-2212
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '12'
+      unit: EA
+      price: '950.00'
+  receipts:
+  - id: GRN-6212A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '12'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7212
+    date: '2026-09-25'
+    supplier_id: null
+    supplier_name: Nova Device SARL
+    po_number: PO-2212
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: NB-950
+      desc: Notebook 15in
+      qty: '12'
+      unit: EA
+      price: '950.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: no silent cross-supplier join
+- id: it-heldout-213
+  pack: it_hardware
+  family: IT-H-PARTIAL-BILL
+  template: helix-json-v1
+  split: heldout
+  description: 30 ordered and received; 18 billed.
+  supplier: *id004
+  po:
+    number: PO-2213
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: HS-025
+      desc: Headset
+      qty: '30'
+      unit: EA
+      price: '25.00'
+  receipts:
+  - id: GRN-6213A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7213
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2213
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: HS-025
+      desc: Headset
+      qty: '18'
+      unit: EA
+      price: '25.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-heldout-214
+  pack: it_hardware
+  family: IT-H-OVERBILL-PO
+  template: nova-json-v1
+  split: heldout
+  description: 10 ordered, 12 delivered and accepted, 12 billed.
+  supplier: *id005
+  po:
+    number: PO-2214
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: DS-120
+      desc: USB-C dock
+      qty: '10'
+      unit: EA
+      price: '120.00'
+  receipts:
+  - id: GRN-6214A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '12'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7214
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2214
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: DS-120
+      desc: USB-C dock
+      qty: '12'
+      unit: EA
+      price: '120.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: billing beyond the ordered quantity
+- id: it-heldout-215
+  pack: it_hardware
+  family: IT-H-CANCELLED-PO
+  template: helix-json-v1
+  split: heldout
+  description: Invoice against a voided PO; quantities and prices agree.
+  supplier: *id004
+  po:
+    number: PO-2215
+    currency: EUR
+    status: cancelled
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+  receipts:
+  - id: GRN-6215A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7215
+    date: '2026-09-25'
+    supplier_id: VEN-HELIX
+    supplier_name: Helix Networks Ltd
+    po_number: PO-2215
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: a cancelled PO cannot authorize payment
+- id: it-heldout-216
+  pack: it_hardware
+  family: IT-H-CURRENCY-MISMATCH
+  template: nova-json-v1
+  split: heldout
+  description: PO in EUR, invoice in USD.
+  supplier: *id005
+  po:
+    number: PO-2216
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '10'
+      unit: EA
+      price: '300.00'
+  receipts:
+  - id: GRN-6216A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7216
+    date: '2026-09-25'
+    supplier_id: VEN-NOVA
+    supplier_name: Nova Devices SARL
+    po_number: PO-2216
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: MN-300
+      desc: Monitor 32in
+      qty: '10'
+      unit: EA
+      price: '300.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: no currency conversion

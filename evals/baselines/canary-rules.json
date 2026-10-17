@@ -1,0 +1,611 @@
+{
+ "cases": {
+  "fur-dev-001": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-002": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-003": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-004": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-005": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-006": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-007": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-008": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-009": {
+   "finding_codes": [
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "fur-dev-010": {
+   "finding_codes": [
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "fur-dev-011": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-012": {
+   "finding_codes": [
+    "receiving_record_unavailable"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "fur-dev-013": {
+   "finding_codes": [
+    "receiving_record_unavailable",
+    "supplier_claim_unverified"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "fur-dev-014": {
+   "finding_codes": [
+    "invoiced_exceeds_received",
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch",
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-015": {
+   "finding_codes": [
+    "receiving_record_unavailable"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "fur-dev-016": {
+   "finding_codes": [
+    "receipt_quantity_already_allocated"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-017": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-018": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-019": {
+   "finding_codes": [
+    "unit_unknown"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-dev-020": {
+   "finding_codes": [
+    "currency_unsupported"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-dev-021": {
+   "finding_codes": [
+    "supplier_match_uncertain"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-dev-022": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-dev-023": {
+   "finding_codes": [
+    "conflict_resolved_by_precedence",
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-dev-024": {
+   "finding_codes": [
+    "invoice_extraction_needs_review"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-dev-025": {
+   "finding_codes": [
+    "charges_not_evaluated"
+   ],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-security-301": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-security-302": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-security-303": {
+   "finding_codes": [
+    "invoice_extraction_needs_review"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-security-304": {
+   "finding_codes": [
+    "invoice_extraction_needs_review"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-security-305": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-validation-101": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-validation-102": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-validation-103": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-validation-104": {
+   "finding_codes": [
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "fur-validation-105": {
+   "finding_codes": [
+    "price_below_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "fur-validation-106": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-validation-107": {
+   "finding_codes": [
+    "invoiced_exceeds_ordered",
+    "receipt_quantity_already_allocated"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-validation-108": {
+   "finding_codes": [
+    "receiving_record_unavailable",
+    "receiving_record_unavailable"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "fur-validation-109": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "fur-validation-110": {
+   "finding_codes": [
+    "unit_unknown"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "fur-validation-111": {
+   "finding_codes": [
+    "conflict_resolved_by_precedence"
+   ],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "fur-validation-112": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-001": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-002": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-dev-003": {
+   "finding_codes": [
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "it-dev-004": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-005": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-006": {
+   "finding_codes": [
+    "receiving_record_unavailable"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "it-dev-007": {
+   "finding_codes": [
+    "invoiced_exceeds_received",
+    "source_precedence_undefined"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-dev-008": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-009": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-010": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-dev-011": {
+   "finding_codes": [
+    "po_line_matched_by_item_code",
+    "po_line_matched_by_item_code"
+   ],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-dev-012": {
+   "finding_codes": [
+    "percent_tolerance_zero_price"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "it-security-301": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-security-302": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-validation-101": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-validation-102": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-validation-103": {
+   "finding_codes": [
+    "price_above_po_beyond_tolerance"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_supplier_message_draft",
+   "outcome": "discrepancies_found",
+   "types": [
+    "price_mismatch"
+   ]
+  },
+  "it-validation-104": {
+   "finding_codes": [],
+   "matches_label": true,
+   "next_action": "no_discrepancy:record_review_note",
+   "outcome": "matched",
+   "types": []
+  },
+  "it-validation-105": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  },
+  "it-validation-106": {
+   "finding_codes": [
+    "receiving_record_unavailable"
+   ],
+   "matches_label": true,
+   "next_action": "request_information:create_follow_up_task",
+   "outcome": "needs_information",
+   "types": [
+    "missing_receipt"
+   ]
+  },
+  "it-validation-107": {
+   "finding_codes": [
+    "source_precedence_undefined"
+   ],
+   "matches_label": true,
+   "next_action": "escalate:assign_case",
+   "outcome": "manual_review",
+   "types": []
+  },
+  "it-validation-108": {
+   "finding_codes": [
+    "invoiced_exceeds_received"
+   ],
+   "matches_label": true,
+   "next_action": "propose_action:create_follow_up_task",
+   "outcome": "discrepancies_found",
+   "types": [
+    "quantity_mismatch"
+   ]
+  }
+ },
+ "rules_version": "opsbridge-rules/1.0.1",
+ "schema": "opsbridge-canary/1",
+ "splits": [
+  "dev",
+  "validation",
+  "security"
+ ]
+}

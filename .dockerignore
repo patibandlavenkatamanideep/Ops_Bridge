@@ -1,0 +1,23 @@
+# Build context for infra/containers/opsbridge.Dockerfile. Secrets and local state never enter images.
+**
+!backend/pyproject.toml
+!backend/uv.lock
+!backend/alembic.ini
+!backend/src/**
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/tsconfig*.json
+!frontend/vite.config.ts
+!frontend/public/**
+!frontend/src/**
+!packs/**
+!fixtures/demo/**
+!fixtures/scenarios/*.yaml
+!evals/acceptance-policy.json
+!evals/manifests/**
+!evals/results/**
+!evals/ledger/*.jsonl
+!evals/keys/**
+**/__pycache__
+**/*.pyc

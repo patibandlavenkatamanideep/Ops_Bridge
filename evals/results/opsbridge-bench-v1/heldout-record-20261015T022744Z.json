@@ -1,0 +1,3203 @@
+{
+ "acceptance": [
+  {
+   "denominator": 40,
+   "detail": "pass (interval includes values below the target)",
+   "gate": "heldout_next_action",
+   "mode": "rules_only",
+   "rate": 0.9,
+   "status": "pass",
+   "threshold": 0.9,
+   "wilson95": [
+    0.7695,
+    0.9604
+   ]
+  },
+  {
+   "denominator": 40,
+   "detail": "pass (interval includes values below the target)",
+   "gate": "heldout_next_action",
+   "mode": "mock",
+   "rate": 0.9,
+   "status": "pass",
+   "threshold": 0.9,
+   "wilson95": [
+    0.7695,
+    0.9604
+   ]
+  }
+ ],
+ "benchmark_id": "opsbridge-bench-v1",
+ "code_version": {
+  "commit": "a98f669c97f12db6702684cd0d52a9f51914d9c1",
+  "uncommitted_changes": false
+ },
+ "kind": "record",
+ "manifest_sha256": "sha256:359657416c7e41071c079c4ec8b8a5d2910bd72a240ad1d4417a9cb134361b23",
+ "modes": {
+  "mock": {
+   "agent": {
+    "citations": 204,
+    "citations_valid": 204,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "model:mock": 120
+    },
+    "input_tokens": 0,
+    "model_calls": 243,
+    "model_calls_rejected": 0,
+    "output_tokens": 0,
+    "proposals_rejected": 0,
+    "proposals_validated": 120,
+    "tool_calls": 3
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 13,
+     "n": 15,
+     "rate": 0.8667,
+     "wilson95": [
+      0.6212,
+      0.9626
+     ]
+    },
+    "manual_review": {
+     "correct": 7,
+     "n": 7,
+     "rate": 1.0,
+     "wilson95": [
+      0.6457,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 15,
+     "n": 16,
+     "rate": 0.9375,
+     "wilson95": [
+      0.7167,
+      0.9889
+     ]
+    },
+    "needs_information": {
+     "correct": 1,
+     "n": 2,
+     "rate": 0.5,
+     "wilson95": [
+      0.0945,
+      0.9055
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.5,
+     "tp": 1
+    },
+    "price_mismatch": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.875,
+     "tp": 7
+    },
+    "quantity_mismatch": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.8889,
+     "tp": 8
+    }
+   },
+   "case": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "cases": {
+    "fur-heldout-201": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "rejected units are not valid receipts",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-REJECTED",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-202": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-REJECTED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-203": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "v1 absolute tolerance 1.00 applies by invoice date",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-204": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "beyond v1 absolute 1.00",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-205": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "v2: beyond 0.50 and beyond 1% (0.40)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-206": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "billing beyond the ordered quantity",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-OVERBILL-PO",
+     "finding_codes": [
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-207": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "partial delivery billed as received",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-PARTIAL-BILL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-208": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "only 5 available",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-PARTIAL-BILL",
+     "finding_codes": [
+      "receipt_quantity_already_allocated"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-209": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 22",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-MULTI-RECEIPT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-210": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "net 24",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-MULTI-RECEIPT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-211": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-ALIAS-UNITS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-212": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "SET and EA have no defined conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-ALIAS-UNITS",
+     "finding_codes": [
+      "unit_conversion_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-213": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "absolute boundary inclusive after conversion",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-BOX-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-214": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "beyond 0.50 and 1% (0.12)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-BOX-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-215": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+5.00 is exactly 1% of net 500.00",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-PO-DISCOUNT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-216": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "missing receipt route has priority",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt",
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-MISSING-PLUS-PRICE",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt",
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-217": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "a cancelled PO cannot authorize payment",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-CANCELLED-PO",
+     "finding_codes": [
+      "po_cancelled"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-218": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "business truth; unseen layout",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-219": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "business truth; unseen layout",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-220": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "business truth; unseen layout",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-221": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "business truth; unseen layout",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-222": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "receiving record controls by policy precedence",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-CLAIM-BELOW",
+     "finding_codes": [
+      "conflict_resolved_by_precedence"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-223": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "invoice line identity uncertain",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-UNKNOWN-PO-LINE",
+     "finding_codes": [
+      "po_line_not_found"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-224": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "12 available",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-ALLOC-CANCELLED-MIX",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-201": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unsupported currency",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-GBP",
+     "finding_codes": [
+      "currency_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-202": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-DEVICES-ALIAS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-203": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+0.20 within 5.00 and 2% (0.50)",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-PK5-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-204": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+0.60 beyond 2% (0.50); both rules required",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-H-PK5-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-heldout-205": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "over-billing only",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-206": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-207": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "quantity route has priority",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance",
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-208": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+4.50 within 5.00 and 2%",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-BIG-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-209": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+5.01 beyond absolute 5.00; both required",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-H-BIG-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-heldout-210": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-RETURN-REVERSED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-211": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "rejected units are not valid receipts",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-REJECTED",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-212": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no silent cross-supplier join",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-SUPPLIER-AMBIG",
+     "finding_codes": [
+      "supplier_match_uncertain"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-213": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-PARTIAL-BILL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-214": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "billing beyond the ordered quantity",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-OVERBILL-PO",
+     "finding_codes": [
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-215": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "a cancelled PO cannot authorize payment",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-CANCELLED-PO",
+     "finding_codes": [
+      "po_cancelled"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-216": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no currency conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-CURRENCY-MISMATCH",
+     "finding_codes": [
+      "currency_conversion_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    }
+   },
+   "instability": {
+    "cases_with_any_flip": 0,
+    "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
+    "mean_flip_rate": 0.0
+   },
+   "latency_ms": {
+    "median": 110.5,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 131
+   },
+   "misses": {
+    "fur-heldout-218": {
+     "error": null,
+     "expected": "propose_action:create_follow_up_task",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-219": {
+     "error": null,
+     "expected": "no_discrepancy:record_review_note",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-220": {
+     "error": null,
+     "expected": "propose_action:create_supplier_message_draft",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-221": {
+     "error": null,
+     "expected": "request_information:create_follow_up_task",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    }
+   },
+   "n_cases": 40,
+   "n_trials": 120,
+   "next_action": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "outcome": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "safe_misses": 4,
+   "trial_errors": 0,
+   "types": {
+    "correct": 37,
+    "n": 40,
+    "rate": 0.925,
+    "wilson95": [
+     0.8014,
+     0.9742
+    ]
+   },
+   "unsafe_misses": 0
+  },
+  "rules_only": {
+   "agent": {
+    "citations": 204,
+    "citations_valid": 204,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "template": 120
+    },
+    "input_tokens": 0,
+    "model_calls": 0,
+    "model_calls_rejected": 0,
+    "output_tokens": 0,
+    "proposals_rejected": 0,
+    "proposals_validated": 120,
+    "tool_calls": 0
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 13,
+     "n": 15,
+     "rate": 0.8667,
+     "wilson95": [
+      0.6212,
+      0.9626
+     ]
+    },
+    "manual_review": {
+     "correct": 7,
+     "n": 7,
+     "rate": 1.0,
+     "wilson95": [
+      0.6457,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 15,
+     "n": 16,
+     "rate": 0.9375,
+     "wilson95": [
+      0.7167,
+      0.9889
+     ]
+    },
+    "needs_information": {
+     "correct": 1,
+     "n": 2,
+     "rate": 0.5,
+     "wilson95": [
+      0.0945,
+      0.9055
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.5,
+     "tp": 1
+    },
+    "price_mismatch": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.875,
+     "tp": 7
+    },
+    "quantity_mismatch": {
+     "fn": 1,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 0.8889,
+     "tp": 8
+    }
+   },
+   "case": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "cases": {
+    "fur-heldout-201": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "rejected units are not valid receipts",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-REJECTED",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-202": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-REJECTED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-203": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "v1 absolute tolerance 1.00 applies by invoice date",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-204": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "beyond v1 absolute 1.00",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-205": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "v2: beyond 0.50 and beyond 1% (0.40)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-POLICY-DATED",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-206": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "billing beyond the ordered quantity",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-OVERBILL-PO",
+     "finding_codes": [
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-207": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "partial delivery billed as received",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-PARTIAL-BILL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-208": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "only 5 available",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-PARTIAL-BILL",
+     "finding_codes": [
+      "receipt_quantity_already_allocated"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-209": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 22",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-MULTI-RECEIPT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-210": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "net 24",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-MULTI-RECEIPT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-211": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-ALIAS-UNITS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-212": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "SET and EA have no defined conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-ALIAS-UNITS",
+     "finding_codes": [
+      "unit_conversion_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-213": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "absolute boundary inclusive after conversion",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-BOX-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-214": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "beyond 0.50 and 1% (0.12)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-BOX-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-heldout-215": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+5.00 is exactly 1% of net 500.00",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-PO-DISCOUNT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-216": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "missing receipt route has priority",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt",
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-MISSING-PLUS-PRICE",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt",
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "fur-heldout-217": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "a cancelled PO cannot authorize payment",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-CANCELLED-PO",
+     "finding_codes": [
+      "po_cancelled"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-218": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "business truth; unseen layout",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-219": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "business truth; unseen layout",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-220": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "business truth; unseen layout",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-221": {
+     "correct": {
+      "case": false,
+      "next_action": false,
+      "outcome": false,
+      "types": false
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "business truth; unseen layout",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": true,
+     "template": "har-pdf-v2",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-222": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "receiving record controls by policy precedence",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-CLAIM-BELOW",
+     "finding_codes": [
+      "conflict_resolved_by_precedence"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-heldout-223": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "invoice line identity uncertain",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-H-UNKNOWN-PO-LINE",
+     "finding_codes": [
+      "po_line_not_found"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "fen-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-heldout-224": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "12 available",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-H-ALLOC-CANCELLED-MIX",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "pin-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-201": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unsupported currency",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-GBP",
+     "finding_codes": [
+      "currency_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-202": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-DEVICES-ALIAS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-203": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+0.20 within 5.00 and 2% (0.50)",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-PK5-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-204": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+0.60 beyond 2% (0.50); both rules required",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-H-PK5-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-heldout-205": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "over-billing only",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-206": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-207": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "quantity route has priority",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-MULTI-LINE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance",
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-208": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "+4.50 within 5.00 and 2%",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-BIG-PRICE",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-209": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+5.01 beyond absolute 5.00; both required",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-H-BIG-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-heldout-210": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-RETURN-REVERSED",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-211": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "rejected units are not valid receipts",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-REJECTED",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-212": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no silent cross-supplier join",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-SUPPLIER-AMBIG",
+     "finding_codes": [
+      "supplier_match_uncertain"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-213": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-H-PARTIAL-BILL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-heldout-214": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "billing beyond the ordered quantity",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-H-OVERBILL-PO",
+     "finding_codes": [
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-heldout-215": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "a cancelled PO cannot authorize payment",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-CANCELLED-PO",
+     "finding_codes": [
+      "po_cancelled"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "helix-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-heldout-216": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no currency conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-H-CURRENCY-MISMATCH",
+     "finding_codes": [
+      "currency_conversion_unsupported"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "nova-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    }
+   },
+   "instability": {
+    "cases_with_any_flip": 0,
+    "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
+    "mean_flip_rate": 0.0
+   },
+   "latency_ms": {
+    "median": 103.0,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 131
+   },
+   "misses": {
+    "fur-heldout-218": {
+     "error": null,
+     "expected": "propose_action:create_follow_up_task",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-219": {
+     "error": null,
+     "expected": "no_discrepancy:record_review_note",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-220": {
+     "error": null,
+     "expected": "propose_action:create_supplier_message_draft",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    },
+    "fur-heldout-221": {
+     "error": null,
+     "expected": "request_information:create_follow_up_task",
+     "family": "FUR-H-LAYOUT-V2",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "got": "escalate:assign_case",
+     "safe_miss": true,
+     "template": "har-pdf-v2"
+    }
+   },
+   "n_cases": 40,
+   "n_trials": 120,
+   "next_action": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "outcome": {
+    "correct": 36,
+    "n": 40,
+    "rate": 0.9,
+    "wilson95": [
+     0.7695,
+     0.9604
+    ]
+   },
+   "safe_misses": 4,
+   "trial_errors": 0,
+   "types": {
+    "correct": 37,
+    "n": 40,
+    "rate": 0.925,
+    "wilson95": [
+     0.8014,
+     0.9742
+    ]
+   },
+   "unsafe_misses": 0
+  }
+ },
+ "network": "Python-level egress limited to loopback during the run",
+ "paired_rules_vs_mock": {
+  "both_correct": 36,
+  "exact_mcnemar_p": null,
+  "improved": [],
+  "n_cases": 40,
+  "neither_correct": 4,
+  "note": "no discordant cases: the comparison cannot distinguish the modes on this split",
+  "regressed": []
+ },
+ "receipts": {
+  "mock": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:09e12d5f5003faa7b6f6298e1c0a770f6723acee517013e7102061c37fe7a99c",
+   "run_dir": "evals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z"
+  },
+  "rules_only": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:1d85b15f77eaca7dd0730b69a6efbdd38e008e849dd55a6a8112b89714424692",
+   "run_dir": "evals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z"
+  }
+ },
+ "repeats": 3,
+ "response_origin": "mocked (deterministic mock model); no real model evaluated",
+ "run_id": "heldout-record-20261015T022744Z",
+ "schema": "opsbridge-eval-results/1",
+ "split": "heldout",
+ "verification": {
+  "artifacts": [
+   {
+    "index": 0,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 1,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/cassettes/opsbridge-bench-v1/validation.json matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nmock.json matches the sealed digest\n"
+   },
+   {
+    "index": 2,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 3,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/model-cassette.\njson matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nmock.json matches the sealed digest\n"
+   },
+   {
+    "index": 4,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 5,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 6,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 7,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 8,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 9,
+    "ok": true,
+    "output": "Chain intact: 10 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   }
+  ],
+  "chain": {
+   "message": "Chain intact: 10 record(s).",
+   "ok": true
+  },
+  "ok": true,
+  "signatures": {
+   "message": "10 signature(s) valid; records 0-9 of 10 are signed.",
+   "ok": true
+  }
+ }
+}
