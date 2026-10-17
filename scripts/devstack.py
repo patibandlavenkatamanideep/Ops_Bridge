@@ -2,7 +2,8 @@
 """Run the OpsBridge application processes locally with health checks.
 
 Infrastructure (PostgreSQL, Keycloak) runs in containers via `make infra-up`.
-This script starts the API, worker, simulator, MCP services and UI dev server,
+This script loads the synthetic dev records into the simulator (an idempotent upsert, as the
+simulator container does), starts the API, worker, simulator, MCP services and UI dev server,
 prefixes their logs, waits for each health endpoint, and stops everything on Ctrl-C
 or when any process exits.
 """
@@ -82,7 +83,11 @@ def wait_healthy(proc: Proc, timeout: float = 60.0) -> bool:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--seed-records", action="store_true", help="load synthetic simulator records first")
+    parser.add_argument(
+        "--seed-records",
+        action="store_true",
+        help="load every scenario corpus (dev, validation, held-out, security), not only dev",
+    )
     parser.add_argument("--only", default="", help="comma-separated subset of processes")
     args = parser.parse_args()
 
@@ -111,8 +116,14 @@ def main() -> int:
 
     signal.signal(signal.SIGTERM, lambda *_: (stop(), sys.exit(0)))
     try:
-        if args.seed_records and "simulator" in have:
-            subprocess.run([PY, "-m", "opsbridge.cli", "simulator-seed"], cwd=ROOT / "backend", check=False)
+        if "simulator" in have and any(p.name == "simulator" for p in selected):
+            # Without records every investigation ends in needs-information. Record versions
+            # are content digests, so re-seeding unchanged records changes nothing.
+            corpora = [] if args.seed_records else [str(ROOT / "fixtures" / "scenarios" / "dev.yaml")]
+            seeded = subprocess.run([PY, "-m", "opsbridge.cli", "simulator-seed", *corpora], cwd=ROOT / "backend")
+            if seeded.returncode != 0:
+                print("[devstack] loading simulator records failed; not starting.")
+                return 1
         for p in selected:
             p.popen = subprocess.Popen(p.cmd, cwd=p.cwd, env=env, stdout=subprocess.PIPE,
                                        stderr=subprocess.STDOUT, text=True)
