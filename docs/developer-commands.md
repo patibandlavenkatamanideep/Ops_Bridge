@@ -18,7 +18,7 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `infra-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml up -d --build --wait postgres keycloak seaweedfs`, then `docker compose … exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh` (idempotent; creates missing databases) | macOS + Podman 5.7.1 |
 | `migrate` | `uv --directory backend run --frozen alembic upgrade head` (and `-x db=opsbridge_test`, `-x db=opsbridge_eval`) | macOS |
 | `seed-demo` | `uv --directory backend run --frozen python -m opsbridge.cli seed-demo` | macOS |
-| `dev` | `infra-up`, `migrate`, then `uv --directory backend run --frozen python scripts/devstack.py` | macOS |
+| `dev` | `infra-up`, `migrate`, then `uv --directory backend run --frozen python scripts/devstack.py` (upserts `fixtures/scenarios/dev.yaml` into the simulator before starting it; `--seed-records`, used by `make demo`, loads every corpus) | macOS; Linux in hosted CI |
 | `lint` | `ruff check src tests && ruff format --check src tests` (in backend via uv run) and `npm run lint` (frontend) | macOS |
 | `typecheck` | `mypy src` (backend) and `npm run typecheck` (frontend) | macOS |
 | `test` | `pytest -q -m "not integration and not keycloak"` and `npm test` | macOS |
