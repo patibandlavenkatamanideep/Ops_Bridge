@@ -53,8 +53,9 @@ key once), `verify-restore --database D --artifact-dir /abs/path` or `--artifact
 checks; refuses the live databases and relative paths; the bucket uses the configured S3
 endpoint, region and prefix).
 
-Linux with Docker is expected to work but has not been exercised locally; hosted CI
-results are reported separately in docs/STATUS.md. Windows/WSL has not been exercised.
+Linux with Docker (ubuntu-24.04) is exercised by hosted CI, which runs `setup`, `lint`,
+`typecheck`, `test`, `eval-canary`, `build`, `infra-up`, `migrate`, `seed-demo`,
+`alerts-test`, `test-integration` and `test-e2e` (results in docs/STATUS.md). Windows/WSL has not been exercised.
 
 ## Workspace location
 
