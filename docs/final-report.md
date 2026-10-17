@@ -1,7 +1,7 @@
 # Final report — OpsBridge (local build)
 
-Date: 2026-10-15 · Branch `feat/opsbridge-foundation` on
-github.com/patibandlavenkatamanideep/Ops_Bridge (never merged to `main`) · All data synthetic.
+Date: 2026-10-17 · Branch `feat/opsbridge-foundation` on
+github.com/patibandlavenkatamanideep/Ops_Bridge (PR #1 to `main` open for hosted CI, not merged) · All data synthetic.
 
 ## Where it stands
 
@@ -10,7 +10,8 @@ github.com/patibandlavenkatamanideep/Ops_Bridge (never merged to `main`) · All 
 | **Local application complete** | Yes. Phases 0–9 built and verified on one macOS machine (Podman); `make verify` 14/14 gates; clean-clone and clean-container launches reproduced. |
 | **Real model validated** | No. No API key, opt-in or local model was available. The agent path is verified with a deterministic mock; real-model quality is *not evaluated*. |
 | **External connector validated** | No. The GitHub Issues connector is contract-tested against a fake of the documented API; a live run needs a sandbox repository, a fine-grained token and your authorization. |
-| **Staging deployed** | No. An AWS (ECS Fargate, RDS, EFS) plan with sizes, secrets, cost drivers and rollback is in docs/deployment.md; nothing was provisioned. Hosted CI has not run. |
+| **Hosted CI** | Passing. GitHub Actions on ubuntu-24.04 (PR #1, run 39000811947 at 1f29197): checks, integration 123, browser 23. The first two runs failed and exposed three real defects, fixed (docs/case-study.md, section 6). |
+| **Staging deployed** | No. An AWS (ECS Fargate, RDS, S3) plan with sizes, secrets, cost drivers and rollback is in docs/deployment.md; nothing was provisioned. |
 | **Operator pilot measured** | No. A pilot plan exists (docs/pilot-plan.md); no participants, no timings, no savings claims. |
 
 OpsBridge is not production-ready and makes no compliance, fraud-detection or cost-saving
@@ -34,6 +35,7 @@ backups, containers and an evaluation view are in place. See README.md for scree
 | Check | Result |
 |---|---|
 | `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 253 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules and amtool routes ok; integration 123 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe accessibility scans); build ok |
+| Hosted CI (2026-10-17) | Run 39000811947 at 1f29197, ubuntu-24.04: ruff, mypy, unit 253 passed and 2 skipped, vitest 8, canary 64/64, 18 receipts, build; promtool and amtool; integration 123 passed; browser 23 passed |
 | Clean clone from GitHub | `make doctor`, `setup`, `lint`, `typecheck`, `test` (243 + 8), `eval-canary`, `build` pass; all 18 receipts verify |
 | Clean container launch | Empty volumes → all services healthy in 38 s; 12 browser tests passed against the containers; repeated with read-only root filesystems and dropped capabilities: 37 s, same 12 tests passed |
 | Recovery drills | Worker exit → restarted, healthy in 7 s; PostgreSQL restart → API ready in 3 s, worker backed off without restarting; backup → isolated restore verified (counts, RLS, artifact digests, citations; tampering caught) |
@@ -57,11 +59,13 @@ docs/demo-script.md; day-to-day use: docs/operator-guide.md; runbooks: docs/oper
 
 ## Requirement completion
 
-From docs/requirements-traceability.md (28 requirements): **verified_local 25**;
-**implemented_unverified 3** — OB-01 discovery assumptions (no interviews), OB-22 GitHub
-sandbox connector (no live run), OB-25 handoff outcomes (no pilot). Each row lists its
-evidence and its unresolved limits. Nothing is verified_ci, verified_sandbox, deployed_staging or
-pilot_validated.
+From docs/requirements-traceability.md (28 requirements): **verified_ci 19** (all listed
+tests also passed in hosted CI); **verified_local 6** — OB-17 evaluation, OB-18 provenance,
+OB-20 monitoring, OB-23 offline reproducibility, OB-24 deployment and recovery, OB-28 claims
+(their evidence includes local-only drills, recorded runs or reviews); **implemented_unverified
+3** — OB-01 discovery assumptions (no interviews), OB-22 GitHub sandbox connector (no live
+run), OB-25 handoff outcomes (no pilot). Each row lists its evidence and its unresolved
+limits. Nothing is verified_sandbox, deployed_staging or pilot_validated.
 
 ## Defects found and fixed
 
@@ -71,7 +75,10 @@ browser test, fixed by discovering connector capabilities (weakest contract when
 covered in-process and through MCP. Others: the worker crashed on a database restart; an
 alert rule could never fire; the web framework trusted client trace context; OIDC codes in
 access logs; chunked bodies bypassed the size limit; findings stated numbers missing from
-their values. Details and reproduction: docs/case-study.md.
+their values. The first hosted CI runs added three more: a stale lint cache hid an import
+error; on a fresh machine `make dev` started an empty simulator (the README quickstart could
+not have worked); browser tests depended on leftover data and could leak an injected fault.
+Details and reproduction: docs/case-study.md.
 
 ## Known limitations
 
@@ -92,13 +99,13 @@ their values. Details and reproduction: docs/case-study.md.
 |---|---|
 | Anthropic API key + explicit live opt-in + spend ceiling, or install Ollama with a pinned model | Real-model evaluation (OB-07 live, real-model quality gate) |
 | A GitHub sandbox repository, a fine-grained token (Issues read/write on that repo) and written authorization for writes | Live connector validation (OB-22) |
-| Opening a pull request to `main` or dispatching the workflow | Hosted CI evidence (verified_ci) |
+| Reviewing PR #1 and deciding whether to merge it | `main` containing the build (CI already passes on the PR) |
 | A cloud account and authorization | Staging deployment |
 | A pilot owner, participants and approved data | Operator pilot (OB-25 outcomes) |
 
 ## Recommended next steps
 
-1. Run hosted CI (open a PR or dispatch) and fix anything environment-specific.
+1. Review PR #1; hosted CI passes on it. Merging is your decision.
 2. With authorization, run the live GitHub sandbox test and a recorded real-model benchmark
    on the frozen held-out split (new benchmark id if settings change).
 3. Add the next supplier layout to the furniture pack from real (approved) samples, then
