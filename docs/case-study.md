@@ -1,7 +1,8 @@
 # Engineering case study: defects that changed the implementation
 
 Real defects found while building OpsBridge, how they were found, what changed, and how to
-reproduce the evidence. All on synthetic data, on the development machine, 2026-10-14/15.
+reproduce the evidence. All on synthetic data: sections 1–5 on the development machine
+(2026-10-14/15), section 6 in the first hosted CI runs (2026-10-17).
 Commit ids are on the `feat/opsbridge-foundation` branch.
 
 ## 1. A "safe" retry that created a duplicate task (Phase 9)
@@ -78,6 +79,27 @@ route template. Test: `test_incoming_trace_context_is_not_trusted`.
 | Podman re-split health-check arguments (`python -c "…"` became `import`) (Phase 8) | clean-launch drill: simulator never healthy | `opsbridge probe` command with no spaces in arguments |
 | MCP SDK rejected container hostnames (DNS-rebinding default) (Phase 8) | container profile design review | explicit allowed hosts from each service URL; protection kept on |
 | Evidence table squeezed into unreadable columns at 1280 px (Phase 9) | inspecting the real UI for README screenshots | document list moves above the panels below 1440 px |
+
+## 6. What the first hosted CI runs found (2026-10-17)
+
+Until then every gate had run on one Mac with a long-lived development database and
+simulator file. The first two runs on GitHub's ubuntu-24.04 runners failed (PR #1, runs
+38999032200 and 38999754931); every failure was a real defect, not a CI quirk.
+
+| Defect | Found by | Fix |
+|---|---|---|
+| A stale ruff cache passed an import-order error locally: `src = ["src", "tests"]` plus the `tests/mcp` package made ruff treat the MCP SDK as first-party | CI lint; reproduced with `ruff check --no-cache` | `mcp` declared third-party; `make lint` and `verify.py` run ruff without its cache (54c1ac0, 6302cf7, 77dd22b) |
+| On a fresh machine `make dev` started an empty simulator, so every investigation ended in needs-information; the README quickstart had the same gap, hidden locally by a simulator file seeded on the first day | CI browser tests: 8 of 23 failed; the simulator answered 404 for every demo record | the dev stack upserts the dev corpus before starting the simulator, as the simulator container already did (dae7088) |
+| Browser tests depended on leftover data: the a11y and demo specs opened an `INV-9001` case that only a later spec creates, and a timed-out demo test left an injected simulator fault that broke the next tests | CI browser tests: 4 of 23 still failed; reproduced on a fresh local database, where the old a11y test failed identically | tests create their own case; faults are cleared before each demo test and after the file (e666d5c–1f29197) |
+| Transport failures in attempt records read only "ExceptionGroup: unhandled errors in a TaskGroup (2 sub-exceptions)" | reading those records while diagnosing the row above | attempt records name the leaf errors (df52112) |
+
+**Evidence after the fixes:** run 39000811947 at 1f29197 passed all three jobs (unit 253,
+integration 123, browser 23); locally the browser suite passed 23/23 twice on a fresh
+database and once on the long-lived one.
+
+**Lesson:** the clean-clone check had run only the offline gates, and the clean container
+launch seeds its own simulator, so nothing had started the host development stack from an
+empty state. A fresh environment is a test input; so is test order.
 
 ## What did not change
 
