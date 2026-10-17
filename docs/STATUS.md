@@ -454,6 +454,8 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Run 39000811947 (1f29197): **passed**. checks: ruff, mypy (103 files), unit 253 passed and 2
   skipped, vitest 8, canary 64/64, 18 receipts, build; integration: promtool 16 rules,
   amtool config and routes, 123 passed in 117 s; browser: 23 passed in 1.5 min.
+- Run 39001110996 (f2268a1, adds the MCP error description and its tests): **passed**. unit
+  255 passed and 2 skipped, integration 123, browser 23.
 - Defects the hosted runs found (details: docs/case-study.md, section 6):
   1. A stale ruff cache passed an import-order error locally (`tests/mcp` made the MCP SDK
      first-party). Fixed: `mcp` declared third-party; lint runs without the cache.
