@@ -46,8 +46,8 @@ demo: infra-up migrate seed-demo ## Start the stack, migrate and seed non-destru
 	$(PY) python $(ROOT)/scripts/devstack.py --seed-records
 
 lint: ## Ruff + ESLint
-	$(PY) ruff check src tests
-	$(PY) ruff format --check src tests
+	$(PY) ruff check --no-cache src tests
+	$(PY) ruff format --no-cache --check src tests
 	cd frontend && npm run lint
 
 typecheck: ## mypy --strict + tsc
