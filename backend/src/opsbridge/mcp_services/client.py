@@ -36,6 +36,22 @@ class McpTransportError(Exception):
     """The call may or may not have reached the tool (timeout, connection loss)."""
 
 
+def describe_error(exc: BaseException) -> str:
+    """The SDK's task group wraps the real transport errors in exception groups; name the
+    leaf errors so an attempt record says what failed (e.g. a read timeout)."""
+    if not isinstance(exc, BaseExceptionGroup):
+        return f"{type(exc).__name__}: {exc}"
+    leaves: list[str] = []
+    pending: list[BaseException] = list(exc.exceptions)
+    while pending:
+        e = pending.pop(0)
+        if isinstance(e, BaseExceptionGroup):
+            pending[:0] = list(e.exceptions)
+        else:
+            leaves.append(f"{type(e).__name__}: {e}" if str(e) else type(e).__name__)
+    return f"{type(exc).__name__} of {len(leaves)}: " + "; ".join(leaves)
+
+
 @dataclass
 class ClientCredentialsTokens:
     """OAuth client-credentials token provider with caching (worker service identity)."""
@@ -99,7 +115,7 @@ class McpToolClient:
         except (
             Exception
         ) as exc:  # transport errors surface as exception groups from the SDK task group
-            raise McpTransportError(f"{type(exc).__name__}: {exc}"[:300]) from exc
+            raise McpTransportError(describe_error(exc)[:300]) from exc
 
     def list_tools(self, delegation: str | None = None) -> list[str]:
         async def go() -> list[str]:
