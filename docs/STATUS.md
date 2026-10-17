@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-16 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-17 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -11,7 +11,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | not run — workflow committed (PRs to main, manual dispatch), validated with actionlint only |
+| Hosted CI | passing — PR #1 to `main` (opened with the owner's authorization, not merged), run 39000811947 at 1f29197: all three jobs green on ubuntu-24.04 |
 | Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
@@ -386,7 +386,7 @@ Phase 1 exit gate evidence:
 ## Next executable task
 
 The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
-run hosted CI (open a PR to `main` or dispatch the workflow); with authorization, the live
+review and, if you choose, merge PR #1 (hosted CI passes; merging is yours); with authorization, the live
 GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
 pilot owner. Local improvement that needs no authorization: the next supplier invoice
 layout for the furniture pack (from approved real samples, not the held-out layout).
@@ -442,3 +442,31 @@ layout for the furniture pack (from approved real samples, not the held-out layo
     The ticket route was drilled with an alert injected into Alertmanager, not one raised by
     Prometheus (no ticket condition could be produced safely in the dev data).
   - `make verify` 14/14 (2026-10-16): unit 253 (+2 skipped), integration 123, browser 23.
+
+### Hosted CI (2026-10-17)
+- PR #1 (`feat/opsbridge-foundation` → `main`) opened with the owner's authorization so the
+  workflow runs; not merged. Workflow: `.github/workflows/ci.yml`, three jobs on
+  ubuntu-24.04 with Docker, no secrets, no paid or external calls.
+- Run 38999032200 (60af83d): **failed**. checks: `make lint` (import order in
+  `mcp_services/client.py`); integration: passed (123); browser: 8 of 23 failed.
+- Run 38999754931 (30864ee): **failed**. checks and integration passed; browser: 4 of 23
+  failed.
+- Run 39000811947 (1f29197): **passed**. checks: ruff, mypy (103 files), unit 253 passed and 2
+  skipped, vitest 8, canary 64/64, 18 receipts, build; integration: promtool 16 rules,
+  amtool config and routes, 123 passed in 117 s; browser: 23 passed in 1.5 min.
+- Defects the hosted runs found (details: docs/case-study.md, section 6):
+  1. A stale ruff cache passed an import-order error locally (`tests/mcp` made the MCP SDK
+     first-party). Fixed: `mcp` declared third-party; lint runs without the cache.
+  2. On a fresh machine `make dev` started an empty simulator, so every investigation ended in
+     needs-information; the README quickstart had the same gap. Fixed: the dev stack loads the
+     dev corpus before starting the simulator.
+  3. Browser tests depended on leftover data and could leak an injected simulator fault after
+     a timeout. Fixed: tests create their own case; faults are cleared before each demo test
+     and after the file. Reproduced on a fresh local database first (old test failed
+     identically); after the fix 23/23 there twice and on the long-lived dev database.
+  4. While diagnosing 3: MCP transport failures recorded only "ExceptionGroup … (2
+     sub-exceptions)". Fixed: attempt records name the leaf errors
+     (`tests/mcp/test_client_errors.py`).
+- Traceability: 19 verified_ci (every listed test also passed in run 39000811947),
+  6 verified_local (local-only drills, recorded benchmark, offline replay or review),
+  3 implemented_unverified (OB-01, OB-22, OB-25).
