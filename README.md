@@ -70,7 +70,8 @@ make setup           # locked dependencies; creates .env with generated local se
 make infra-up        # PostgreSQL 16 (:5433), Keycloak (:8081), S3-compatible test store (:8333)
 make migrate
 make seed-demo       # only the two synthetic demo tenants
-make dev             # API :8000, worker, MCP services, simulator, UI http://localhost:5173
+make dev             # loads the synthetic dev records into the simulator, then API :8000,
+                     # worker, MCP services, simulator, UI http://localhost:5173
 ```
 
 Sign in with a demo user (`furn-investigator`, `furn-approver`, `furn-admin`,
