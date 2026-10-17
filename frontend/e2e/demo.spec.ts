@@ -2,7 +2,7 @@ import { expect, test, type Browser, type Locator, type Page } from "@playwright
 import { createHmac } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { openCase, rerunInvestigation, signIn } from "./helpers";
+import { createOrOpenCase, openCase, rerunInvestigation, signIn } from "./helpers";
 
 // The recovery and portability steps of docs/demo-script.md, against the live dev stack.
 const SIM = "http://127.0.0.1:8090";
@@ -19,6 +19,17 @@ async function control(page: Page, path: string, body?: object, method = "POST")
   return r.json();
 }
 
+// A test that times out cannot run its `finally`, and a fault left behind would break the
+// next test that creates a task; clear faults before each test here and after this file.
+test.beforeEach(async ({ request }) => {
+  expect((await request.delete(`${SIM}/_control/faults`)).ok()).toBeTruthy();
+});
+test.afterAll(async ({ playwright }) => {
+  const ctx = await playwright.request.newContext();
+  await ctx.delete(`${SIM}/_control/faults`);
+  await ctx.dispose();
+});
+
 async function taskCount(page: Page): Promise<number> {
   return ((await control(page, `stats/${ORG}`, undefined, "GET")) as { tasks: number }).tasks;
 }
@@ -27,7 +38,7 @@ async function taskCount(page: Page): Promise<number> {
 async function proposeAndApprove(browser: Browser): Promise<{ approver: Page; op: Locator }> {
   const inv = await browser.newPage();
   await signIn(inv, "furn-investigator");
-  await openCase(inv, "INV-9001");
+  await createOrOpenCase(inv, "INV-9001");
   await rerunInvestigation(inv, "rules_only");
   await inv.getByRole("tab", { name: "Proposals & execution" }).click();
   const create = inv.getByRole("button", { name: "Create proposal from the validated draft" });
