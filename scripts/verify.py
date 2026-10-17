@@ -42,8 +42,8 @@ def run(name: str, cmd: list[str], cwd: Path = ROOT, extra_env: dict[str, str] |
 
 def main() -> int:
     results: list[tuple[str, str]] = []
-    results.append(run("backend lint", [*PY, "ruff", "check", "src", "tests"]))
-    results.append(run("backend format", [*PY, "ruff", "format", "--check", "src", "tests"]))
+    results.append(run("backend lint", [*PY, "ruff", "check", "--no-cache", "src", "tests"]))
+    results.append(run("backend format", [*PY, "ruff", "format", "--no-cache", "--check", "src", "tests"]))
     results.append(run("backend typecheck", [*PY, "mypy", "src"]))
     results.append(run("backend unit tests", [*PY, "pytest", "-q", "-m", "not integration and not keycloak"]))
     results.append(run("frontend lint", ["npm", "run", "lint"], ROOT / "frontend"))
