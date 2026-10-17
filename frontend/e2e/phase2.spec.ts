@@ -1,18 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import { openCase, signIn } from "./helpers";
-
-/** Create a case for an invoice, or open the existing one (keeps the test repeatable). */
-async function createOrOpenCase(page: Page, invoice: string): Promise<void> {
-  await page.goto("/t/demo-furniture/cases/new");
-  await page.getByLabel("Title").fill(`Invoice ${invoice} blocked`);
-  await page.getByLabel("Invoice number").fill(invoice);
-  await page.getByRole("button", { name: "Create case" }).click();
-  const existing = page.getByRole("link", { name: "Open the existing case" });
-  const heading = page.getByRole("heading", { level: 1 });
-  await expect(existing.or(heading.filter({ hasText: invoice }))).toBeVisible();
-  if (await existing.isVisible()) await existing.click();
-  await expect(page.getByRole("heading", { level: 1 })).toContainText(invoice);
-}
+import { expect, test } from "@playwright/test";
+import { createOrOpenCase, openCase, signIn } from "./helpers";
 
 test("investigation shows a cited quantity mismatch and opens the cited source line", async ({ page }) => {
   await signIn(page, "furn-investigator");
