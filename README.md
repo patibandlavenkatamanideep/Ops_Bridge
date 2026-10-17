@@ -42,14 +42,14 @@ only after a different person approves the exact version they reviewed.
 - **Evaluation**: frozen benchmark with hand-labelled held-out cases, strict offline replay,
   EvalSeal receipts with tamper detection.
 
-## Status (2026-10-15)
+## Status (2026-10-17)
 
 | Level | State |
 |---|---|
 | Local application | Phases 0–9 complete and verified locally (`make verify`: 14 gates; clean clone and clean container launch reproduced) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
-| Hosted CI | **Not run** — workflow committed (pull requests to main, manual dispatch) |
+| Hosted CI | **Passing** — GitHub Actions on ubuntu-24.04 (PR #1, run 39000811947): lint, types, unit 253, canary, receipts, build; integration 123; browser 23. The first two runs failed and exposed three defects, now fixed (docs/case-study.md) |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Operator pilot measured | **No** — pilot plan only |
 
@@ -89,8 +89,7 @@ Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
   wrote the rules.
 - Supplier PDF layouts outside the pack mappings are escalated, not read; OCR is not
   installed (scanned invoices go to manual review). Retrieval is lexical, not semantic.
-- No real model, connector, cloud deployment, hosted CI run or operator trial has been
-  performed. Rate limits are per process; there is no WAF.
+- No real model, live connector, cloud deployment or operator trial has been performed. Rate limits are per process; there is no WAF.
 - Not production-ready. No compliance, fraud-detection or cost-saving claims.
 
 ## Documentation
