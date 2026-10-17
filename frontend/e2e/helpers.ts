@@ -35,7 +35,23 @@ export async function rerunInvestigation(page: Page, mode: string): Promise<void
   await expect(version).not.toHaveText(before, { timeout: 30_000 });
 }
 
-/** Open a case from the queue by searching for it (robust to queue pagination). */
+/**
+ * Create a case for an invoice, or open the existing one. Use this where a test may run on a
+ * fresh database (as in CI) instead of relying on a case another spec created earlier.
+ */
+export async function createOrOpenCase(page: Page, invoice: string, tenant = "demo-furniture"): Promise<void> {
+  await page.goto(`/t/${tenant}/cases/new`);
+  await page.getByLabel("Title").fill(`Invoice ${invoice} blocked`);
+  await page.getByLabel("Invoice number").fill(invoice);
+  await page.getByRole("button", { name: "Create case" }).click();
+  const existing = page.getByRole("link", { name: "Open the existing case" });
+  const heading = page.getByRole("heading", { level: 1 });
+  await expect(existing.or(heading.filter({ hasText: invoice }))).toBeVisible();
+  if (await existing.isVisible()) await existing.click();
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(invoice);
+}
+
+/** Open an existing case from the queue by searching for it (robust to queue pagination). */
 export async function openCase(page: Page, invoice: string, tenant = "demo-furniture"): Promise<void> {
   await page.goto(`/t/${tenant}/cases`);
   await page.getByLabel("Search").fill(invoice);
