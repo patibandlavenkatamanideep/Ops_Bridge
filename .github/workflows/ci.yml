@@ -99,6 +99,8 @@ jobs:
       - run: make seed-demo
       - name: Start the dev stack
         run: |
+          # the environment `make setup` created (the Makefile exports the same variable)
+          export UV_PROJECT_ENVIRONMENT=.venv.nosync
           nohup uv --directory backend run --frozen python ../scripts/devstack.py > devstack.log 2>&1 &
           for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8000/readyz >/dev/null && curl -fsS http://127.0.0.1:5173/ >/dev/null && exit 0
