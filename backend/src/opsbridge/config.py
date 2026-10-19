@@ -69,6 +69,12 @@ class Settings(BaseSettings):
     artifact_s3_region: str | None = None
     artifact_s3_sse: str | None = None  # "AES256" or "aws:kms"
     artifact_s3_kms_key_id: str | None = None
+    # Optional local OCR for PDFs without a text layer (needs tesseract). OCR text and the
+    # field values read from it are shown for review and never used by the matching rules.
+    ocr_enabled: bool = False
+    ocr_max_pages: int = 3
+    ocr_page_timeout_seconds: float = 15.0
+    ocr_language: str = "eng"
     metrics_token: SecretStr | None = None  # bearer token for /metrics when set
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
