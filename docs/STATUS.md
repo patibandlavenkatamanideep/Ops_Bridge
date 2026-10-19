@@ -526,3 +526,19 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - `make verify` 14/14 locally (unit 270 + 3 skipped, integration 125, browser 23 + OCR spec
   skipped without tesseract). Hosted CI run 39206261166 at 519a973: passed (unit 271 + 2
   skipped, integration 125, browser 24).
+
+### Redaction corrupted identifiers (2026-10-19)
+- Found by hosted CI run 39207047346 on a docs-only commit: the observability integration test
+  failed because a case UUID ending in a 12-digit group was replaced by `[REDACTED:phone]` in
+  a trace attribute. Re-running locally then hit the same class with a simulator task
+  reference `T-1705292356`. The phone pattern matched digit runs right after a hyphen, and
+  digit-only UUID groups; the old redactor altered 2,306 of 200,000 random UUIDs (1.15%; 2,277
+  as phone, 30 as card numbers). It applies to logs, span attributes, hosted-model prompts and
+  external task titles/bodies, so ids and long hyphenated business numbers could be lost there.
+- Fix (`opsbridge-redact/2`): UUIDs are set aside before matching; no phone match right after a
+  hyphen; span correlation ids skip the identifier patterns (credentials still removed). Bare
+  long business numbers can still be redacted as phone numbers (documented).
+- Evidence: `tests/privacy/test_log_redaction.py` (20,000 random UUIDs unchanged; ids kept,
+  neighbouring phones/emails/cards still redacted) and `tests/privacy/test_trace_ids.py`; all
+  four new tests fail on the old code. `make verify` 14/14 (unit 274 + 3 skipped, integration
+  125, browser 23); observability test passed 6/6 repeats.
