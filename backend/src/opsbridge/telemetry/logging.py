@@ -34,13 +34,19 @@ _SECRET_KV = re.compile(
 )
 
 
-def scrub(text: str) -> str:
+def scrub_credentials(text: str) -> str:
+    """Credentials only: bearer/basic values, JWTs, provider keys, secret query parameters
+    and secret-like key=value pairs."""
     out = _SENSITIVE_QUERY.sub(r"\1[REDACTED]", text)
     out = _BEARER.sub(r"\1 [REDACTED:credential]", out)
     out = _JWT.sub("[REDACTED:jwt]", out)
     out = _PROVIDER_KEYS.sub("[REDACTED:api_key]", out)
-    out = _SECRET_KV.sub(r"\1\2[REDACTED]", out)
-    return redact(out).text
+    return _SECRET_KV.sub(r"\1\2[REDACTED]", out)
+
+
+def scrub(text: str) -> str:
+    """Credentials, then common personal identifiers (pattern-based, see privacy/redaction)."""
+    return redact(scrub_credentials(text)).text
 
 
 class RedactingFilter(logging.Filter):
