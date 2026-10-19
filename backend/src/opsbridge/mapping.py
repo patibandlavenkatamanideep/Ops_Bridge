@@ -11,6 +11,7 @@ in the pack are recorded as such).
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -240,6 +241,25 @@ class _Reader:
                 )
             )
         return values if ok else None
+
+
+def map_ocr_candidates(
+    pack: PackSpec, record_type: RecordType, parsed: ParsedDocument, doc: DocRef
+) -> MappingResult:
+    """Field values read from OCR text, for a person to review. They are stored as
+    `ocr` / `needs_review` and no record is built from them, so the matching rules never use
+    them: an OCR guess must not become an authoritative business fact."""
+    if parsed.ocr_engine is None:
+        raise ValueError("not OCR text")
+    full = map_document(pack, record_type, dataclasses.replace(parsed, status="parsed"), doc)
+    note = f"read by OCR ({parsed.ocr_engine}); not used by the matching rules"
+    return MappingResult(
+        fields=[
+            dataclasses.replace(f, method="ocr", status="needs_review", note=note)
+            for f in full.fields
+        ],
+        problems=list(full.problems),
+    )
 
 
 def map_document(
