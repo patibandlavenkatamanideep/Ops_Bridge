@@ -77,6 +77,30 @@ def per_case(trials: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
     return out
 
 
+def instability(cases: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """How often repeats of one case disagree, and what the repeat count cannot show."""
+    n = len(cases)
+    flipping = sum(1 for c in cases.values() if c["flip_rate"] > 0)
+    repeats = sorted({len(c["verdicts"]) for c in cases.values()})
+    fewest = repeats[0] if repeats else 0
+    if fewest < 2:
+        limit = "fewer than 2 repeats for some case: instability cannot be measured"
+    else:
+        limit = (
+            f"{fewest} repeats per case: a per-case flip rate below 1/{fewest} cannot be "
+            f"observed, and no flips in {fewest} repeats do not show that a case is stable; "
+            f"the interval for flipping cases is over {n} cases"
+        )
+    return {
+        "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
+        "cases_with_any_flip": flipping,
+        "cases_with_any_flip_rate": _rate(flipping, n),
+        "mean_flip_rate": round(sum(c["flip_rate"] for c in cases.values()) / n, 4) if n else None,
+        "repeats_per_case": repeats,
+        "sampling_limit": limit,
+    }
+
+
 def summarize_mode(trials: list[dict[str, Any]]) -> dict[str, Any]:
     cases = per_case(trials)
     n = len(cases)
@@ -134,13 +158,7 @@ def summarize_mode(trials: list[dict[str, Any]]) -> dict[str, Any]:
             )
             for o in ("matched", "discrepancies_found", "needs_information", "manual_review")
         },
-        "instability": {
-            "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
-            "cases_with_any_flip": sum(1 for c in cases.values() if c["flip_rate"] > 0),
-            "mean_flip_rate": round(sum(c["flip_rate"] for c in cases.values()) / n, 4)
-            if n
-            else None,
-        },
+        "instability": instability(cases),
         "agent": {
             "explanation_origins": dict(origins),
             "model_calls": sum(t["model_calls"] for t in trials),
