@@ -46,7 +46,7 @@ only after a different person approves the exact version they reviewed.
 
 | Level | State |
 |---|---|
-| Local application | Phases 0–9 complete and verified locally (`make verify`: 14 gates; clean clone and clean container launch reproduced) |
+| Local application | Phases 0–9 complete and verified locally (`make verify`: 15 gates; clean clone and clean container launch reproduced) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
 | Hosted CI | **Passing** — GitHub Actions on ubuntu-24.04 (PR #1, run 39000811947): lint, types, unit 253, canary, receipts, build; integration 123; browser 23. The first two runs failed and exposed three defects, now fixed (docs/case-study.md) |
@@ -79,7 +79,7 @@ Sign in with a demo user (`furn-investigator`, `furn-approver`, `furn-admin`,
 everything in containers: `make demo-containers` (UI on http://localhost:8000).
 
 Checks: `make verify` (lint, types, unit, canary, receipts, migrations, alert rules,
-integration, browser, build), `make eval-offline` (strict offline benchmark replay),
+integration, browser, build), `make eval-offline` (strict offline benchmark replay, seals receipts), `make eval-replay-check` (the same comparison, seals nothing),
 `make restore-drill`. Command reference: [docs/developer-commands.md](docs/developer-commands.md).
 Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
 
