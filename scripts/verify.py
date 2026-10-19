@@ -56,6 +56,9 @@ def main() -> int:
     if up(5433):
         results.append(run("migration drift (alembic check)", [*PY, "alembic", "check"]))
         results.append(run("alert rules and routing (promtool, amtool)", ["make", "-s", "alerts-test"], ROOT))
+        # Offline replay of the recorded benchmark runs; seals nothing (make eval-offline does).
+        results.append(run("benchmark replay reproduces recordings",
+                           [*PY, "python", "-m", "opsbridge.cli", "eval-replay-check"]))
     if up(5433) and up(8081):
         results.append(run("integration tests", [*PY, "pytest", "-q", "-m", "integration or keycloak"],
                            extra_env={"OPSBRIDGE_REQUIRE_INTEGRATION": "1"}))
