@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 REDACTION_VERSION = "opsbridge-redact/2"  # /2: UUIDs and hyphen-joined ids are never altered
@@ -81,11 +82,22 @@ def _redact_segment(text: str, counts: Counter[str]) -> str:
     return out
 
 
-def redact(text: str) -> RedactionResult:
+def _protected(keep: Iterable[str]) -> re.Pattern[str]:
+    """UUIDs plus the exact values in `keep` (longest first), as whole tokens."""
+    values = sorted({v for v in keep if v and len(v) >= 3}, key=len, reverse=True)
+    if not values:
+        return _UUID
+    exact = "|".join(re.escape(v) for v in values)
+    return re.compile(f"{_UUID.pattern}|(?<![A-Za-z0-9])(?:{exact})(?![A-Za-z0-9])")
+
+
+def redact(text: str, keep: Iterable[str] = ()) -> RedactionResult:
+    """Replace common personal identifiers. UUIDs and the exact values in `keep` (a case's own
+    business identifiers, such as a bare 10-digit PO number) are never altered."""
     counts: Counter[str] = Counter()
     parts: list[str] = []
     last = 0
-    for m in _UUID.finditer(text):
+    for m in _protected(keep).finditer(text):
         parts.append(_redact_segment(text[last : m.start()], counts))
         parts.append(m.group(0))
         last = m.end()
