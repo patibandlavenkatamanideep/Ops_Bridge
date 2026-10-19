@@ -92,15 +92,9 @@ def _explanation(**kw: Any) -> str:
     return json.dumps(base)
 
 
-def test_injected_document_instructions_cannot_change_authority(stack, worker_db: Database) -> None:  # type: ignore[no-untyped-def]
-    st = stack
-    # The supplier sends an email that tries to instruct the AI.
-    httpx.put(
-        f"{st['base']}/_control/records/demo-furniture/messages/MSG-INJ-1?po_number=PO-1001",
-        content=INJECTION,
-        headers={"content-type": "text/plain"},
-    ).raise_for_status()
-    compromised = ScriptedModelAdapter(
+def _compromised() -> ScriptedModelAdapter:
+    """A model that follows instructions embedded in a supplier document."""
+    return ScriptedModelAdapter(
         [
             # Round 0: valid, but asks to search for the injected text.
             _explanation(
@@ -129,6 +123,17 @@ def test_injected_document_instructions_cannot_change_authority(stack, worker_db
             ),
         ]
     )
+
+
+def test_injected_document_instructions_cannot_change_authority(stack, worker_db: Database) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    # The supplier sends an email that tries to instruct the AI.
+    httpx.put(
+        f"{st['base']}/_control/records/demo-furniture/messages/MSG-INJ-1?po_number=PO-1001",
+        content=INJECTION,
+        headers={"content-type": "text/plain"},
+    ).raise_for_status()
+    compromised = _compromised()
     st["deps"].adapter_overrides = {"mock": compromised}
     try:
         case_id = open_case(st, "furn-investigator", "demo-furniture", "INV-9001")
@@ -160,6 +165,50 @@ def test_injected_document_instructions_cannot_change_authority(stack, worker_db
     assert [c.outcome for c in calls] == ["ok", "rejected_output", "rejected_output"]
     tools = _rows(worker_db, tenant_id, ToolInvocation, run["run_id"])
     assert [t.tool_name for t in tools] == ["search_case_evidence"]  # only the read-only tool ran
+    with worker_db.session(DbContext(tenant_id=tenant_id)) as s:
+        case = s.get(Case, uuid.UUID(case_id))
+        assert case is not None and case.status == "awaiting_review"
+        assert s.execute(select(func.count()).select_from(Operation)).scalar_one() == 0
+
+
+def test_uploaded_document_instructions_are_data_not_authority(stack, worker_db: Database) -> None:  # type: ignore[no-untyped-def]
+    """The same attack through an investigator's upload instead of the source system."""
+    from .test_hardening import upload
+
+    st = stack
+    case_id = open_case(st, "furn-investigator", "demo-furniture", "INV-9001")
+    r = upload(
+        st["client"],
+        st["actors"]["furn-investigator"],
+        case_id,
+        "supplier_message",
+        "supplier-email.txt",
+        b"Upload reference UPLOAD-ONLY-7731\n" + INJECTION,  # tells the upload apart
+        "text/plain",
+    )
+    assert r.status_code == 201, r.text
+    compromised = _compromised()
+    st["deps"].adapter_overrides = {"mock": compromised}
+    try:
+        run = investigate(st, "furn-investigator", "demo-furniture", case_id)
+    finally:
+        st["deps"].adapter_overrides = None
+
+    round1 = compromised.requests[1].user
+    assert "UPLOAD-ONLY-7731" in round1  # the uploaded copy was retrieved as evidence
+    assert "SYSTEM NOTE TO THE AI ASSISTANT" in round1
+    before = round1.split("SYSTEM NOTE TO THE AI ASSISTANT")[0]
+    assert before.rfind("<untrusted_document") > before.rfind("</untrusted_document>")
+    inv = get(st, "furn-investigator", f"{T}/cases/{case_id}/investigation").json()
+    assert inv["outcome"] == "discrepancies_found"
+    assert {f["finding_type"] for f in inv["findings"]} >= {"quantity_mismatch"}
+    assert inv["explanation_origin"].startswith("template")
+    draft = inv["recommendation"]["proposal_draft"]
+    assert draft["origin"] == "rules" and draft["assignee_group"] == "receiving"
+    assert draft["validation"]["accepted"] is False and "payment" not in draft["title"].lower()
+    tenant_id = _tenant_of(worker_db, run["run_id"])
+    tools = _rows(worker_db, tenant_id, ToolInvocation, run["run_id"])
+    assert [t.tool_name for t in tools] == ["search_case_evidence"]
     with worker_db.session(DbContext(tenant_id=tenant_id)) as s:
         case = s.get(Case, uuid.UUID(case_id))
         assert case is not None and case.status == "awaiting_review"
