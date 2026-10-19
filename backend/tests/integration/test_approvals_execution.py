@@ -183,6 +183,50 @@ def test_approved_follow_up_is_created_once_confirmed_and_case_stays_open(stack)
     assert r.status_code == 409 and r.json()["error"]["code"] == "resolution_evidence_missing"
 
 
+NUMERIC_PO = "4500012345"  # a bare 10-digit purchase order number (SAP-style)
+
+
+def seed_numeric_po_case(st: dict[str, Any]) -> str:
+    """INV-9001's facts under invoice INV-9451 and PO 4500012345 (own receipt ids, so the
+    module's other INV-9001 records stay untouched); returns the invoice number."""
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.simulator.scenarios import load_corpus, render
+
+    base = next(
+        sc
+        for sc in load_corpus(REPO_ROOT / "fixtures" / "scenarios" / "dev.yaml").scenarios
+        if sc.invoice.number == "INV-9001"
+    )
+    numeric = base.model_copy(
+        update={
+            "po": base.po.model_copy(update={"number": NUMERIC_PO}),  # type: ignore[union-attr]
+            "receipts": [
+                r.model_copy(update={"id": f"GR-9451{i}"}) for i, r in enumerate(base.receipts)
+            ],
+            "invoice": base.invoice.model_copy(
+                update={"number": "INV-9451", "po_number": NUMERIC_PO}
+            ),
+        }
+    )
+    for collection, key, body, ctype, po_index in render(numeric):
+        st["store"].put_record(ORG, collection, key, body, ctype, po_index)
+    return "INV-9451"
+
+
+def test_a_bare_numeric_po_number_stays_readable_in_the_created_task(stack) -> None:  # type: ignore[no-untyped-def]
+    """Redaction before the external write keeps the case's own identifiers: a 10-digit PO
+    number looks like a phone number but must reach the follow-up task's title."""
+    st = stack
+    case_id, prop = prepared(st, seed_numeric_po_case(st))
+    assert NUMERIC_PO in prop["parameters"]["title"]
+    assert approve(st, case_id, prop).status_code == 200
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed"
+    [task] = remote_tasks(st, op)
+    assert NUMERIC_PO in task["title"] and "[REDACTED" not in task["title"]
+
+
 # --- approval authority ---------------------------------------------------------------------
 
 
