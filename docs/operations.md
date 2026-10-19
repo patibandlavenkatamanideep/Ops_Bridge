@@ -116,6 +116,26 @@ search logs for `cid=<id>` and the trace with that `opsbridge.correlation_id`.
 size is `OPSBRIDGE_DB_POOL_SIZE` (+2 overflow) per process. Artifact storage grows with
 documents and model/tool payloads; retention (Tenant settings) deletes them by age.
 
+## Scanned documents and OCR
+
+A PDF without a text layer is stored and marked *needs review*; the case goes to a person.
+Optional local OCR reads such pages so the reviewer sees their text and candidate values:
+
+- Enable with `OPSBRIDGE_OCR_ENABLED=true` on the API (uploads) and worker (source records).
+  The app image includes tesseract 5.3.0 with English data; on a host, install tesseract
+  yourself. Limits: `OPSBRIDGE_OCR_MAX_PAGES` (3), `OPSBRIDGE_OCR_PAGE_TIMEOUT_SECONDS` (15),
+  `OPSBRIDGE_OCR_LANGUAGE` (`eng`; needs the matching tesseract data).
+- The version detail says what happened: "text read by OCR (tesseract …) … not authoritative",
+  "OCR is not enabled", or "tesseract is not installed". OCR text appears under *Source text*
+  with a notice; OCR field values carry `ocr:` locators, status *needs review*, and cannot be
+  corrected in OpsBridge. Record confirmed values in the source system and re-run.
+- OCR never changes a decision: the rules see no record from an OCR'd document.
+- A document already stored is not re-read when OCR is switched on later: identical bytes
+  reuse the existing version. Upload it again under a new name to get a reading; a
+  source-system document is read again only when its bytes change.
+- Cost: about 0.7 s for one 200 dpi page in the app container on the development laptop; the
+  image is about 90 MB larger with tesseract.
+
 ## Migrations
 
 `make migrate` (Alembic, migrator role; dev, test and eval databases). Migrations are
