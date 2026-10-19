@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     artifact_s3_region: str | None = None
     artifact_s3_sse: str | None = None  # "AES256" or "aws:kms"
     artifact_s3_kms_key_id: str | None = None
+    # Tier quotas (investigations per hour, model calls per day). Off only in the isolated
+    # benchmark harness, which measures decisions, not throughput (as it lifts rate limits).
+    quotas_enabled: bool = True
     # Optional local OCR for PDFs without a text layer (needs tesseract). OCR text and the
     # field values read from it are shown for review and never used by the matching rules.
     ocr_enabled: bool = False
