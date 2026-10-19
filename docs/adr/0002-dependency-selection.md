@@ -48,6 +48,10 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
   `ghcr.io/astral-sh/uv:0.10.2` (the uv version used locally; 0.10.48 appeared in a tag listing
   but does not exist on ghcr.io).
 - `rhysd/actionlint:1.7.12` (workflow lint only).
+- Debian `tesseract-ocr=5.3.0-2` and `tesseract-ocr-eng=1:4.1.0-2` in the app image (optional
+  local OCR; Apache-2.0; adds about 90 MB). Hosted CI installs Ubuntu's `tesseract-ocr` package
+  (version printed in the log). No Python OCR wrapper: the CLI is called with a fixed argument
+  vector; page images come from pypdf and Pillow, already locked.
 - `prom/alertmanager:v0.34.1` (observability profile and `amtool` for routing tests;
   Apache-2.0; a patch release of 2026-09-17). The local alert sink runs on the same
   `python:3.12.15-slim-bookworm` image as the application, standard library only.
