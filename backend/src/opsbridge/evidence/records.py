@@ -51,6 +51,27 @@ def _refs(raw: dict[str, Any] | None) -> dict[str, SourceRef]:
     return {k: SourceRef(**v) for k, v in (raw or {}).items()}
 
 
+def case_identifiers(session: Session, case_id: uuid.UUID) -> list[str]:
+    """The case's own business identifiers (case, invoice and PO numbers), which outbound
+    redaction keeps even when they look like phone numbers."""
+    from opsbridge.persistence.models import Case
+
+    case = session.get(Case, case_id)
+    if case is None:
+        return []
+    values = {case.case_number, case.invoice_number, case.po_number}
+    if case.invoice_number:
+        values.update(
+            session.execute(
+                select(InvoiceRecord.po_number).where(
+                    InvoiceRecord.invoice_number == case.invoice_number,
+                    InvoiceRecord.superseded_at.is_(None),
+                )
+            ).scalars()
+        )
+    return sorted(v for v in values if v)
+
+
 def load_corrections(session: Session, version_ids: set[uuid.UUID]) -> Overlay:
     """Latest human correction per extracted field (the original extraction is untouched)."""
     if not version_ids:
