@@ -25,8 +25,12 @@ iCloud "Desktop & Documents" and the disk was ~96 % full (8 GB free). Observed e
   the checkout outside synced folders.
 
 ## Consequences
-- The old Desktop copy is left untouched (its evicted files may still sync back later);
-  it is not used by OpsBridge.
+- The old Desktop copy was left untouched at first; it is not used by OpsBridge.
+- 2026-10-19 (owner's decision): the old copy was removed. Its 32 uncommitted files were
+  compared with the repository first: 30 early Phase 1 drafts that the committed code supersedes
+  and two saved GitHub documentation pages (now linked from docs/integrations.md). They are kept
+  in `~/Projects/Ops_Bridge-desktop-leftovers-2026-10-14.zip`, outside the repository; the old
+  path holds only a `MOVED.md` note.
 - Development `.env` secrets from the first location were uploaded to iCloud before
   eviction. They are development-only values for local containers; rotate them with
   `make reset-demo CONFIRM=delete-local-demo-data` followed by `make setup` if that matters.
