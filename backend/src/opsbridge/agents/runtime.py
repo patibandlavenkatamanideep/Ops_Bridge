@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
@@ -305,8 +305,11 @@ def call_model(
     budget: RunBudget,
     settings: Settings,
     validate: Callable[[str], tuple[Any, list[str]]],
+    keep: Sequence[str] = (),
 ) -> tuple[Any | None, list[str], str]:
     """Run one bounded model call with redaction, budget, cost ceiling, recording and validation.
+
+    `keep`: the case's own identifiers, left intact by redaction before a hosted call.
 
     Returns (validated_output or None, problems, model_call_id). Never raises ModelError:
     failures are recorded and returned as problems so the caller can fall back.
@@ -315,7 +318,7 @@ def call_model(
     sent_user = request.user
     redaction: dict[str, Any] = {"applied": False}
     if caps.hosted:
-        rr = redact(request.user)
+        rr = redact(request.user, keep)
         sent_user = rr.text
         redaction = {"applied": True, **rr.metadata}
     req = ModelRequest(
