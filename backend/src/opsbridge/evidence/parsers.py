@@ -3,15 +3,19 @@
 Supported: application/json, text/csv, text/plain, application/pdf (text layer).
 Everything else is rejected. Declared content types are checked against the bytes.
 Parsers never fetch URLs, never execute embedded content, and run under size, page,
-row and time limits. A PDF without a text layer is `needs_review` (OCR is optional
-and never authoritative).
+row and time limits. A PDF without a text layer is `needs_review`. With OCR enabled and
+tesseract installed, its pages are read by OCR, but the document stays `needs_review`:
+OCR text is labelled as such and never becomes an authoritative business fact.
 """
 
 from __future__ import annotations
 
+import base64
 import csv
+import functools
 import io
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -41,13 +45,33 @@ class TextLine:
     page: int | None
     line: int
     text: str
+    origin: Literal["layer", "ocr"] = "layer"
 
     @property
     def locator(self) -> str:
-        return (
-            f"pdf:page={self.page};line={self.line}"
-            if self.page is not None
-            else f"text:line={self.line}"
+        if self.page is None:
+            return f"text:line={self.line}"
+        return f"{'ocr' if self.origin == 'ocr' else 'pdf'}:page={self.page};line={self.line}"
+
+
+@dataclass(frozen=True)
+class OcrSettings:
+    """The optional local OCR path for PDFs without a text layer (off unless enabled)."""
+
+    enabled: bool = False
+    max_pages: int = 3
+    page_timeout_seconds: float = 15.0
+    language: str = "eng"
+
+    @classmethod
+    def from_settings(cls, settings: Any) -> OcrSettings:
+        if settings is None:
+            return cls()
+        return cls(
+            enabled=bool(settings.ocr_enabled),
+            max_pages=int(settings.ocr_max_pages),
+            page_timeout_seconds=float(settings.ocr_page_timeout_seconds),
+            language=str(settings.ocr_language),
         )
 
 
@@ -63,6 +87,7 @@ class ParsedDocument:
     csv_header: list[str] | None = None
     page_count: int | None = None
     flags: list[str] = field(default_factory=list)
+    ocr_engine: str | None = None  # set when `text` came from OCR (never authoritative)
 
 
 def safe_filename(name: str | None) -> str | None:
@@ -91,7 +116,7 @@ def sniff(data: bytes) -> str | None:
     return "text/plain"
 
 
-def parse(data: bytes, declared_type: str) -> ParsedDocument:
+def parse(data: bytes, declared_type: str, ocr: OcrSettings | None = None) -> ParsedDocument:
     declared = declared_type.split(";")[0].strip().lower()
     if len(data) > MAX_BYTES:
         return ParsedDocument(declared, "none", "rejected", f"file exceeds {MAX_BYTES} bytes")
@@ -119,7 +144,7 @@ def parse(data: bytes, declared_type: str) -> ParsedDocument:
         return _parse_csv(data)
     if declared == "text/plain":
         return _parse_text(data)
-    return _parse_pdf(data)
+    return _parse_pdf(data, ocr or OcrSettings())
 
 
 def _depth(value: Any, limit: int, level: int = 0) -> bool:
@@ -221,7 +246,7 @@ def _parse_text(data: bytes) -> ParsedDocument:
     return ParsedDocument("text/plain", "text/1", "parsed", text=norm, lines=lines)
 
 
-def _parse_pdf(data: bytes) -> ParsedDocument:
+def _parse_pdf(data: bytes, ocr: OcrSettings) -> ParsedDocument:
     import pypdf
 
     parser = f"pypdf/{pypdf.__version__}"
@@ -267,9 +292,13 @@ def _parse_pdf(data: bytes) -> ParsedDocument:
     text = "".join(chunks)
     if len(text.strip()) < 20:
         reason = "no extractable text layer (likely a scanned image)"
-        ocr = ocr_unavailable_reason()
-        if ocr:
-            reason += f"; {ocr}"
+        unavailable = ocr_unavailable_reason(ocr)
+        if unavailable is None:
+            read = _ocr_pages(data, ocr, page_count or 0, parser, flags)
+            if read is not None:
+                return read
+            unavailable = "OCR produced no text"
+        reason += f"; {unavailable}"
         return ParsedDocument(
             "application/pdf",
             parser,
@@ -291,29 +320,117 @@ def _parse_pdf(data: bytes) -> ParsedDocument:
     )
 
 
-def ocr_unavailable_reason() -> str | None:
+_LANGUAGE = re.compile(r"^[a-z]{3}(\+[a-z]{3})*$")
+
+
+def ocr_unavailable_reason(ocr: OcrSettings | None = None) -> str | None:
     """Return why OCR cannot run here, or None when the optional OCR path is available."""
+    if ocr is None or not ocr.enabled:
+        return "OCR is not enabled"
+    if not _LANGUAGE.match(ocr.language):
+        return f"OCR language {ocr.language!r} is not valid"
     if shutil.which("tesseract") is None:
         return "OCR unavailable: tesseract is not installed"
     return None
 
 
-def ocr_image(image_bytes: bytes, timeout: float = 20.0) -> str | None:
-    """Optional OCR of one image via the tesseract CLI. Output is never authoritative."""
+@functools.lru_cache(maxsize=1)
+def tesseract_version() -> str:
+    """'tesseract 5.3.0' (first line of `tesseract --version`), or 'tesseract' if unknown."""
     binary = shutil.which("tesseract")
     if binary is None:
+        return "tesseract"
+    try:
+        out = subprocess.run(  # noqa: S603 - fixed argv: the resolved binary and a flag
+            [binary, "--version"], capture_output=True, text=True, timeout=10, check=False
+        )
+    except subprocess.TimeoutExpired:
+        return "tesseract"
+    first = (out.stdout or out.stderr).strip().splitlines()[:1]
+    return first[0].strip() if first and first[0].startswith("tesseract") else "tesseract"
+
+
+def _ocr_pages(
+    data: bytes, ocr: OcrSettings, page_count: int, parser: str, flags: list[str]
+) -> ParsedDocument | None:
+    """OCR the embedded images of the first pages; None if nothing could be read."""
+    pages = min(page_count, ocr.max_pages)
+    try:
+        proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
+            [
+                sys.executable,
+                "-m",
+                "opsbridge.evidence.pdf_worker",
+                str(MAX_PDF_PAGES),
+                "images",
+                str(pages),
+            ],
+            input=data,
+            capture_output=True,
+            timeout=PDF_TIMEOUT_SECONDS,
+            check=False,
+        )
+        result = json.loads(proc.stdout.decode("utf-8"))
+    except (subprocess.TimeoutExpired, ValueError, UnicodeDecodeError):
+        return None
+    if result.get("status") != "ok":
+        return None
+    engine = tesseract_version()
+    by_page: dict[int, list[str]] = {}
+    for page_no, b64 in result["images"]:
+        text = ocr_image(base64.b64decode(b64), ocr.page_timeout_seconds, ocr.language)
+        if text and text.strip():
+            by_page.setdefault(int(page_no), []).append(text)
+    if not by_page:
+        return None
+    lines: list[TextLine] = []
+    chunks: list[str] = []
+    for page_no in sorted(by_page):
+        page_text = normalize_text("\n".join(by_page[page_no]))
+        chunks.append(page_text)
+        for i, t in enumerate(page_text.splitlines()):
+            lines.append(TextLine(page_no, i + 1, t, origin="ocr"))
+    problems = [str(p) for p in result.get("problems", [])][:5]
+    skipped = page_count - pages
+    detail = (
+        f"no extractable text layer; text read by OCR ({engine}) from "
+        f"{len(by_page)} page(s) is not authoritative: check it against the page image"
+    )
+    if skipped > 0:
+        detail += f"; {skipped} later page(s) not read (OCR page limit {ocr.max_pages})"
+    if problems:
+        detail += "; " + "; ".join(problems)
+    return ParsedDocument(
+        "application/pdf",
+        f"{parser}+{engine.replace(' ', '/')}"[:64],
+        "needs_review",
+        detail,
+        text="".join(chunks),
+        lines=lines,
+        page_count=page_count,
+        flags=[*flags, "ocr_text_not_authoritative"],
+        ocr_engine=engine,
+    )
+
+
+def ocr_image(image_bytes: bytes, timeout: float = 15.0, language: str = "eng") -> str | None:
+    """OCR of one PNG image via the tesseract CLI. Output is never authoritative."""
+    binary = shutil.which("tesseract")
+    if binary is None or not _LANGUAGE.match(language):
         return None
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "page.png"
         src.write_bytes(image_bytes)
         try:
-            # Fixed argument vector: the resolved tesseract binary and our own temp file.
+            # Fixed argument vector: the resolved tesseract binary, our own temp file and a
+            # validated language code; one thread so a page cannot take every core.
             out = subprocess.run(  # noqa: S603
-                [binary, str(src), "stdout"],
+                [binary, str(src), "stdout", "-l", language],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
                 check=False,
+                env={**os.environ, "OMP_THREAD_LIMIT": "1"},
             )
         except subprocess.TimeoutExpired:
             return None
