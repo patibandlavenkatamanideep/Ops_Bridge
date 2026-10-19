@@ -83,6 +83,15 @@ explanations are labelled `model:replay`, responses `mocked`. A missing or diver
 recording fails the run before anything is sealed
 (`tests/integration/test_evaluation.py`).
 
+Since 2026-10-19 a replay also fails when any per-case verdict differs from the recorded run
+(exit 5), and `make eval-replay-check` runs the same comparison without sealing anything; it
+is a `make verify` gate and runs in hosted CI. It was added after a replay on 2026-10-19 no
+longer reproduced (agent mode 16/40 with 72 trial errors, rules 33/40 with 12) yet exited 0:
+the per-organization quotas added on 2026-10-16 throttled the benchmark harness itself. The
+harness now switches quotas off (as it lifts rate limits); the replay at e364dc0
+(`heldout-replay-20261019T173251Z`, `security-replay-20261019T173319Z`) reproduces both
+recordings case by case, and the ledger holds 22 verified records.
+
 ## Validation and security runs (development, not final evidence)
 
 | Run | Rules only | Mock | Notes |
