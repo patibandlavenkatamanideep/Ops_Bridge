@@ -542,3 +542,4 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   neighbouring phones/emails/cards still redacted) and `tests/privacy/test_trace_ids.py`; all
   four new tests fail on the old code. `make verify` 14/14 (unit 274 + 3 skipped, integration
   125, browser 23); observability test passed 6/6 repeats.
+- Hosted CI run 39208207212 at b22f5c0 (the fix): passed, all three jobs.
