@@ -398,6 +398,14 @@ def correct_field(
         if fld is None:
             raise NotFound("field")
         _linked_version(s, case_id, fld.version_id)  # field must belong to this case's evidence
+        if fld.method == "ocr":
+            # A correction would mark an OCR guess "corrected" without making it usable; the
+            # confirmed value belongs in the source system, from where a re-run picks it up.
+            raise Conflict(
+                "ocr_candidate",
+                "Values read by OCR are review candidates and are not used by the matching "
+                "rules. Record the confirmed value in the source system and re-run.",
+            )
         last = s.execute(
             select(FieldCorrection)
             .where(FieldCorrection.field_id == fld.id)
