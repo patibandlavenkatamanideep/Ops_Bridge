@@ -183,6 +183,17 @@ class AgentContext:
         )
         return label
 
+    def identifiers(self) -> list[str]:
+        """The case's own business identifiers (kept intact by redaction before hosted calls)."""
+        values = [
+            self.case.get("case_number"),
+            self.case.get("invoice_number"),
+            self.case.get("po_number"),
+            self.recon.get("resolved_po_number"),
+            self.recon.get("resolved_supplier_id"),
+        ]
+        return sorted({str(v) for v in values if v})
+
     def payload(self, round_no: int) -> dict[str, Any]:
         findings = []
         for f in self.recon["findings"]:
@@ -380,6 +391,7 @@ def explain(
             budget=budget,
             settings=settings,
             validate=lambda raw: validate_explanation(ctx, raw),
+            keep=ctx.identifiers(),
         )
         if value is None:
             problems_all += problems
@@ -515,6 +527,7 @@ def propose(
         budget=budget,
         settings=settings,
         validate=lambda raw: validate_proposal(ctx, raw),
+        keep=ctx.identifiers(),
     )
     if value is None:
         rules_draft["validation"] = {
