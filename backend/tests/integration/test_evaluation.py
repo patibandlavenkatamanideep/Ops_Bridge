@@ -192,3 +192,35 @@ def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> Non
     assert (
         get(st, "furn-requester", "/api/v1/tenants/demo-furniture/evaluations").status_code == 403
     )
+
+
+def test_tier_quotas_do_not_throttle_the_benchmark_harness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A held-out replay runs 240 investigations in minutes; tier quotas (60 per hour, 200
+    model calls per day) once turned most of them into QuotaExceeded errors and silently
+    pushed agent mode back to rules. The harness switches quotas off; prove it with tiny ones."""
+    import dataclasses
+
+    from opsbridge.auth import permissions
+
+    for tier in ("standard", "enhanced"):
+        monkeypatch.setitem(
+            permissions.TIERS,
+            tier,
+            dataclasses.replace(
+                permissions.TIERS[tier], max_investigations_per_hour=1, max_model_calls_per_day=1
+            ),
+        )
+    corpus = subset(IDS[:1])
+    with (
+        loopback_only(),
+        BenchEnvironment(get_settings(), corpus, tmp_path / "w", MockModelAdapter()) as env,
+    ):
+        trials = [
+            env.run_trial(corpus.scenarios[0], mode, r)
+            for mode in ("rules_only", "mock")
+            for r in range(3)
+        ]
+    assert [t.error for t in trials] == [None] * 6
+    assert all(t.explanation_origin == "model:mock" for t in trials if t.mode == "mock")
