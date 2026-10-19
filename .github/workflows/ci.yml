@@ -43,7 +43,11 @@ jobs:
       - run: make setup
       - run: make lint
       - run: make typecheck
+      - name: Install tesseract for the OCR tests
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr && tesseract --version
       - run: make test
+        env:
+          OPSBRIDGE_REQUIRE_OCR: "1" # the real-engine OCR test must run, not skip
       - run: make eval-canary
       - name: Verify sealed evaluation receipts
         run: uv --directory backend run --frozen python -m opsbridge.cli eval-verify
@@ -97,10 +101,13 @@ jobs:
       - run: make infra-up
       - run: make migrate
       - run: make seed-demo
+      - name: Install tesseract for the OCR browser test
+        run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends tesseract-ocr && tesseract --version
       - name: Start the dev stack
         run: |
           # the environment `make setup` created (the Makefile exports the same variable)
           export UV_PROJECT_ENVIRONMENT=.venv.nosync
+          export OPSBRIDGE_OCR_ENABLED=true
           nohup uv --directory backend run --frozen python ../scripts/devstack.py > devstack.log 2>&1 &
           for _ in $(seq 1 90); do
             curl -fsS http://127.0.0.1:8000/readyz >/dev/null && curl -fsS http://127.0.0.1:5173/ >/dev/null && exit 0
@@ -109,6 +116,8 @@ jobs:
           cat devstack.log; exit 1
       - run: cd frontend && npx playwright install --with-deps chromium
       - run: make test-e2e
+        env:
+          OPSBRIDGE_REQUIRE_OCR: "1"
       - name: Keep the Playwright report on failure
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
