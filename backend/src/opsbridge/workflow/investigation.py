@@ -527,6 +527,9 @@ def _reconcile(
             "corrections": loaded.corrections_applied,
             "policy_ref": result.policy_ref,
             "rules_version": result.rules_version,
+            # identifiers the matcher resolved; outbound redaction keeps them intact
+            "resolved_po_number": result.resolved_po_number,
+            "resolved_supplier_id": result.resolved_supplier_id,
         }
 
 
@@ -567,7 +570,9 @@ def _agent_runtime(
         max_tool_calls=4,
         max_output_tokens=2000,
         timeout_seconds=30.0,
-        tenant_model_calls_per_day=tier.max_model_calls_per_day,
+        tenant_model_calls_per_day=tier.max_model_calls_per_day
+        if getattr(deps.settings, "quotas_enabled", True)
+        else None,
     )
     with deps.db.session(_ctx(tenant_id)) as s:
         run = s.get(WorkflowRun, run_id)
