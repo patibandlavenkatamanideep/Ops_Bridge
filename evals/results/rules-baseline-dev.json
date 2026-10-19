@@ -1,0 +1,956 @@
+{
+  "schema_version": 1,
+  "mode": "rules_only",
+  "evidence_level": "engineering verification on synthetic data (no model, no live services)",
+  "corpus_id": "opsbridge-dev-seed-v1",
+  "corpus_file": "../fixtures/scenarios/dev.yaml",
+  "unit": "case (one invoice); labels hand-written; single deterministic run per case",
+  "generated_at": "2026-10-14T18:20:08.155774+00:00",
+  "code_version": "0.1.0",
+  "python": "3.12.12",
+  "summary": {
+    "cases": 37,
+    "case_correct": 37,
+    "outcome_correct": 37,
+    "types_correct": 37,
+    "action_correct": 37,
+    "by_split": {
+      "dev": 37
+    }
+  },
+  "verdicts": [
+    {
+      "case_id": "fur-dev-001",
+      "family": "FUR-QTY-SHORT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-002",
+      "family": "FUR-QTY-SHORT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-003",
+      "family": "FUR-QTY-SHORT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-004",
+      "family": "FUR-QTY-SHORT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-005",
+      "family": "FUR-QTY-RETURN",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-006",
+      "family": "FUR-QTY-RETURN",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-007",
+      "family": "FUR-PRICE",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-008",
+      "family": "FUR-PRICE",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-009",
+      "family": "FUR-PRICE",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "price_mismatch"
+      ],
+      "next_action": "propose_action:create_supplier_message_draft",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "price_mismatch"
+        ],
+        "next_action": "propose_action:create_supplier_message_draft"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "price_above_po_beyond_tolerance"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-010",
+      "family": "FUR-PRICE",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "price_mismatch"
+      ],
+      "next_action": "propose_action:create_supplier_message_draft",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "price_mismatch"
+        ],
+        "next_action": "propose_action:create_supplier_message_draft"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "price_above_po_beyond_tolerance"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-011",
+      "family": "FUR-PRICE",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-012",
+      "family": "FUR-MISSING-GR",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "needs_information",
+      "types": [
+        "missing_receipt"
+      ],
+      "next_action": "request_information:create_follow_up_task",
+      "expected": {
+        "outcome": "needs_information",
+        "types": [
+          "missing_receipt"
+        ],
+        "next_action": "request_information:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "receiving_record_unavailable"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-013",
+      "family": "FUR-MISSING-GR",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "needs_information",
+      "types": [
+        "missing_receipt"
+      ],
+      "next_action": "request_information:create_follow_up_task",
+      "expected": {
+        "outcome": "needs_information",
+        "types": [
+          "missing_receipt"
+        ],
+        "next_action": "request_information:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "receiving_record_unavailable",
+        "supplier_claim_unverified"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-014",
+      "family": "FUR-MIXED",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "price_mismatch",
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "price_mismatch",
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received",
+        "price_above_po_beyond_tolerance"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-015",
+      "family": "FUR-MIXED",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "needs_information",
+      "types": [
+        "missing_receipt"
+      ],
+      "next_action": "request_information:create_follow_up_task",
+      "expected": {
+        "outcome": "needs_information",
+        "types": [
+          "missing_receipt"
+        ],
+        "next_action": "request_information:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "receiving_record_unavailable"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-016",
+      "family": "FUR-ALLOC",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "receipt_quantity_already_allocated"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-017",
+      "family": "FUR-ALLOC",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-018",
+      "family": "FUR-ALLOC",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-019",
+      "family": "FUR-REVIEW",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "manual_review",
+      "types": [],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "unit_unknown"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-020",
+      "family": "FUR-REVIEW",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "manual_review",
+      "types": [],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "currency_unsupported"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-021",
+      "family": "FUR-REVIEW",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "manual_review",
+      "types": [],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "supplier_match_uncertain"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-022",
+      "family": "FUR-UNITS",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-023",
+      "family": "FUR-CONFLICT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received",
+        "conflict_resolved_by_precedence"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "fur-dev-024",
+      "family": "FUR-DOC-DEFECT",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "manual_review",
+      "types": [],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoice_extraction_needs_review"
+      ],
+      "problems": [
+        "invoices/INV-9024: invoice: line amount 3710.00 != 20 x 185.00 - 0"
+      ]
+    },
+    {
+      "case_id": "fur-dev-025",
+      "family": "FUR-MIXED",
+      "split": "dev",
+      "pack": "furniture",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "charges_not_evaluated"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-001",
+      "family": "IT-QTY",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-002",
+      "family": "IT-QTY",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-003",
+      "family": "IT-PRICE",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "discrepancies_found",
+      "types": [
+        "price_mismatch"
+      ],
+      "next_action": "propose_action:create_supplier_message_draft",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "price_mismatch"
+        ],
+        "next_action": "propose_action:create_supplier_message_draft"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "price_above_po_beyond_tolerance"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-004",
+      "family": "IT-PRICE",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-005",
+      "family": "IT-PRICE",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-006",
+      "family": "IT-MISSING",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "needs_information",
+      "types": [
+        "missing_receipt"
+      ],
+      "next_action": "request_information:create_follow_up_task",
+      "expected": {
+        "outcome": "needs_information",
+        "types": [
+          "missing_receipt"
+        ],
+        "next_action": "request_information:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "receiving_record_unavailable"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-007",
+      "family": "IT-CONFLICT",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "manual_review",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received",
+        "source_precedence_undefined"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-008",
+      "family": "IT-UNITS",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-009",
+      "family": "IT-QTY",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-010",
+      "family": "IT-QTY",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "discrepancies_found",
+      "types": [
+        "quantity_mismatch"
+      ],
+      "next_action": "propose_action:create_follow_up_task",
+      "expected": {
+        "outcome": "discrepancies_found",
+        "types": [
+          "quantity_mismatch"
+        ],
+        "next_action": "propose_action:create_follow_up_task"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "invoiced_exceeds_received"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-011",
+      "family": "IT-LINES",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "matched",
+      "types": [],
+      "next_action": "no_discrepancy:record_review_note",
+      "expected": {
+        "outcome": "matched",
+        "types": [],
+        "next_action": "no_discrepancy:record_review_note"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "po_line_matched_by_item_code",
+        "po_line_matched_by_item_code"
+      ],
+      "problems": []
+    },
+    {
+      "case_id": "it-dev-012",
+      "family": "IT-REVIEW",
+      "split": "dev",
+      "pack": "it_hardware",
+      "outcome": "manual_review",
+      "types": [],
+      "next_action": "escalate:assign_case",
+      "expected": {
+        "outcome": "manual_review",
+        "types": [],
+        "next_action": "escalate:assign_case"
+      },
+      "correct": {
+        "outcome": true,
+        "types": true,
+        "action": true,
+        "case": true
+      },
+      "finding_codes": [
+        "percent_tolerance_zero_price"
+      ],
+      "problems": []
+    }
+  ]
+}

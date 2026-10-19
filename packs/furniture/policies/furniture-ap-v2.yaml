@@ -1,0 +1,27 @@
+# Current furniture policy. Tolerance: a price difference passes if it is within
+# 0.50 USD per unit OR within 1% of the PO net unit price (inclusive boundaries).
+schema_version: 1
+policy_id: furniture-ap
+version: 2
+effective_from: 2026-01-01
+description: Furniture AP matching policy. Receiving records control over supplier messages.
+supported_currencies: [USD]
+price_tolerance: {absolute: "0.50", percent: "1.0", mode: either, direction: both}
+quantity_tolerance: {absolute: "0", percent: "0"}
+price_rounding: {places: 4, mode: ROUND_HALF_EVEN}
+unit_aliases:
+  EA: [each, ea, unit, units, pc, pcs, piece, pieces, chair, chairs]
+  SET: [set, sets]
+  BX10: [box of 10, bx10, box10]
+unit_conversions:
+  - {from_unit: BX10, to_unit: EA, factor: "10"}
+source_precedence: [goods_receipt, supplier_message]
+action_routes:
+  manual_review: {action_type: assign_case, assignee_group: ap-review, title_template: "Review {case}: {count} condition(s) need manual review"}
+  missing_receipt: {action_type: create_follow_up_task, assignee_group: receiving, title_template: "Provide receiving record for {po} ({case})"}
+  quantity_mismatch: {action_type: create_follow_up_task, assignee_group: receiving, title_template: "Confirm delivered quantity for {po} ({case})"}
+  price_mismatch: {action_type: create_supplier_message_draft, assignee_group: supplier-relations, title_template: "Request corrected invoice or credit note for {po} ({case})"}
+  matched: {action_type: record_review_note, title_template: "No discrepancy found for {case}"}
+allowed_actions: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]
+approval: {lifetime_minutes: 30, separation_of_duties: true}
+data_routing: hosted_permitted

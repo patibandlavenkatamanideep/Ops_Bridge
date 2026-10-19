@@ -1,0 +1,2002 @@
+# GENERATED from author_dev.py (hand-written table). Synthetic data only.
+# Expected labels are written by hand from the policy files, not produced by OpsBridge.
+# Families group near-duplicate templates; splits are assigned by family.
+schema_version: 1
+corpus_id: opsbridge-dev-seed-v1
+scenarios:
+- id: fur-dev-001
+  pack: furniture
+  family: FUR-QTY-SHORT
+  template: acme-pdf-v1
+  split: dev
+  description: Order 20 chairs, receipt 18, invoice 20.
+  supplier: &id001
+    id: SUP-ACME
+    name: Acme Office Furniture Inc
+  po:
+    number: PO-1001
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5001A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '18'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9001
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1001
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: 2 of 20 not received
+- id: fur-dev-002
+  pack: furniture
+  family: FUR-QTY-SHORT
+  template: acme-pdf-v1
+  split: dev
+  description: Clean three-way match for desks.
+  supplier: *id001
+  po:
+    number: PO-1002
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-200
+      desc: Sit-stand desk
+      qty: '10'
+      unit: EA
+      price: '420.00'
+  receipts:
+  - id: GR-5002A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9002
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1002
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-200
+      desc: Sit-stand desk
+      qty: '10'
+      unit: EA
+      price: '420.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: all equal
+- id: fur-dev-003
+  pack: furniture
+  family: FUR-QTY-SHORT
+  template: acme-pdf-v1
+  split: dev
+  description: Two partial receipts (7+3) against 12 invoiced.
+  supplier: *id001
+  po:
+    number: PO-1003
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CB-310
+      desc: Filing cabinet
+      qty: '12'
+      unit: EA
+      price: '310.00'
+  receipts:
+  - id: GR-5003A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '7'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5003B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '3'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9003
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1003
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CB-310
+      desc: Filing cabinet
+      qty: '12'
+      unit: EA
+      price: '310.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: 10 received cumulatively, 12 billed
+- id: fur-dev-004
+  pack: furniture
+  family: FUR-QTY-SHORT
+  template: acme-pdf-v1
+  split: dev
+  description: Full receipt of 30 chairs.
+  supplier: *id001
+  po:
+    number: PO-1004
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '30'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5004A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9004
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1004
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '30'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: fur-dev-005
+  pack: furniture
+  family: FUR-QTY-RETURN
+  template: northgate-pdf-v1
+  split: dev
+  description: Return of 4 after receiving 20; invoice for 20.
+  supplier: &id002
+    id: SUP-NGS
+    name: Northgate Seating Co
+  po:
+    number: PO-1005
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-150
+      desc: Stacking chair
+      qty: '20'
+      unit: EA
+      price: '150.00'
+  receipts:
+  - id: GR-5005A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5005B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: EA
+      kind: return
+      status: accepted
+  invoice:
+    number: INV-9005
+    date: '2026-09-30'
+    supplier_id: SUP-NGS
+    supplier_name: Northgate Seating Co
+    po_number: PO-1005
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-150
+      desc: Stacking chair
+      qty: '20'
+      unit: EA
+      price: '150.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: net 16 received
+- id: fur-dev-006
+  pack: furniture
+  family: FUR-QTY-RETURN
+  template: northgate-pdf-v1
+  split: dev
+  description: Return entry reversed; net 20 received.
+  supplier: *id002
+  po:
+    number: PO-1006
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-150
+      desc: Stacking chair
+      qty: '20'
+      unit: EA
+      price: '150.00'
+  receipts:
+  - id: GR-5006A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5006B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: EA
+      kind: return
+      status: reversed
+  invoice:
+    number: INV-9006
+    date: '2026-09-30'
+    supplier_id: SUP-NGS
+    supplier_name: Northgate Seating Co
+    po_number: PO-1006
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-150
+      desc: Stacking chair
+      qty: '20'
+      unit: EA
+      price: '150.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: reversed return ignored
+- id: fur-dev-007
+  pack: furniture
+  family: FUR-PRICE
+  template: acme-pdf-v1
+  split: dev
+  description: Price +0.50, exactly at absolute tolerance.
+  supplier: *id001
+  po:
+    number: PO-1007
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5007A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9007
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1007
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.50'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: boundary passes
+- id: fur-dev-008
+  pack: furniture
+  family: FUR-PRICE
+  template: acme-pdf-v1
+  split: dev
+  description: Price +1.85, exactly 1% of 185.00.
+  supplier: *id001
+  po:
+    number: PO-1008
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5008A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9008
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1008
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '186.85'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: percent boundary passes
+- id: fur-dev-009
+  pack: furniture
+  family: FUR-PRICE
+  template: acme-pdf-v1
+  split: dev
+  description: Price +1.86, one cent outside 1%.
+  supplier: *id001
+  po:
+    number: PO-1009
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5009A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9009
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1009
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '186.86'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: one minor unit outside
+- id: fur-dev-010
+  pack: furniture
+  family: FUR-PRICE
+  template: birch-pdf-v1
+  split: dev
+  description: Sofas billed at 960 vs PO 900.
+  supplier: &id003
+    id: SUP-BSD
+    name: Birch and Steel Desks Ltd
+  po:
+    number: PO-1010
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: SF-900
+      desc: Lounge sofa
+      qty: '5'
+      unit: EA
+      price: '900.00'
+  receipts:
+  - id: GR-5010A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '5'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9010
+    date: '2026-09-30'
+    supplier_id: SUP-BSD
+    supplier_name: Birch and Steel Desks Ltd
+    po_number: PO-1010
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: SF-900
+      desc: Lounge sofa
+      qty: '5'
+      unit: EA
+      price: '960.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: +60 per unit
+- id: fur-dev-011
+  pack: furniture
+  family: FUR-PRICE
+  template: birch-pdf-v1
+  split: dev
+  description: List 200 with a 200.00 line discount on 20 units = net 190; PO 190.
+  supplier: *id003
+  po:
+    number: PO-1011
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: BK-190
+      desc: Bookcase
+      qty: '20'
+      unit: EA
+      price: '190.00'
+  receipts:
+  - id: GR-5011A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9011
+    date: '2026-09-30'
+    supplier_id: SUP-BSD
+    supplier_name: Birch and Steel Desks Ltd
+    po_number: PO-1011
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: BK-190
+      desc: Bookcase
+      qty: '20'
+      unit: EA
+      price: '200.00'
+      kind: goods
+      discount: '200.00'
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: net price equal
+- id: fur-dev-012
+  pack: furniture
+  family: FUR-MISSING-GR
+  template: acme-pdf-v1
+  split: dev
+  description: No receiving record for lamps.
+  supplier: *id001
+  po:
+    number: PO-1012
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LP-45
+      desc: Desk lamp
+      qty: '15'
+      unit: EA
+      price: '45.00'
+  receipts: []
+  invoice:
+    number: INV-9012
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1012
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-45
+      desc: Desk lamp
+      qty: '15'
+      unit: EA
+      price: '45.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: missing receipt is not non-delivery
+- id: fur-dev-013
+  pack: furniture
+  family: FUR-MISSING-GR
+  template: acme-pdf-v1
+  split: dev
+  description: No receiving record; supplier email claims full delivery.
+  supplier: *id001
+  po:
+    number: PO-1013
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LP-45
+      desc: Desk lamp
+      qty: '15'
+      unit: EA
+      price: '45.00'
+  receipts: []
+  invoice:
+    number: INV-9013
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1013
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-45
+      desc: Desk lamp
+      qty: '15'
+      unit: EA
+      price: '45.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-F0130
+    text: 'Hello AP team,
+
+      We delivered all 15 lamps for PO-1013 on 18 September.
+
+      Regards, Acme billing'
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: a supplier claim does not establish delivery
+- id: fur-dev-014
+  pack: furniture
+  family: FUR-MIXED
+  template: birch-pdf-v1
+  split: dev
+  description: Line 1 short-received, line 2 overpriced.
+  supplier: *id003
+  po:
+    number: PO-1014
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+    - line: 2
+      item: TB-600
+      desc: Meeting table
+      qty: '4'
+      unit: EA
+      price: '600.00'
+  receipts:
+  - id: GR-5014A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '18'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '4'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9014
+    date: '2026-09-30'
+    supplier_id: SUP-BSD
+    supplier_name: Birch and Steel Desks Ltd
+    po_number: PO-1014
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: TB-600
+      desc: Meeting table
+      qty: '4'
+      unit: EA
+      price: '640.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: quantity route has priority
+- id: fur-dev-015
+  pack: furniture
+  family: FUR-MIXED
+  template: birch-pdf-v1
+  split: dev
+  description: Line 1 has no receiving record, line 2 received.
+  supplier: *id003
+  po:
+    number: PO-1015
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: PN-100
+      desc: Privacy panel
+      qty: '10'
+      unit: EA
+      price: '100.00'
+    - line: 2
+      item: CL-050
+      desc: Coat hook
+      qty: '10'
+      unit: EA
+      price: '50.00'
+  receipts:
+  - id: GR-5015A
+    date: '2026-09-20'
+    lines:
+    - line: 2
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9015
+    date: '2026-09-30'
+    supplier_id: SUP-BSD
+    supplier_name: Birch and Steel Desks Ltd
+    po_number: PO-1015
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: PN-100
+      desc: Privacy panel
+      qty: '10'
+      unit: EA
+      price: '100.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: CL-050
+      desc: Coat hook
+      qty: '10'
+      unit: EA
+      price: '50.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: line 1 receipt unavailable
+- id: fur-dev-016
+  pack: furniture
+  family: FUR-ALLOC
+  template: northgate-pdf-v1
+  split: dev
+  description: Receipt of 10 already matched to an earlier invoice.
+  supplier: *id002
+  po:
+    number: PO-1016
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5016A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9016
+    date: '2026-09-30'
+    supplier_id: SUP-NGS
+    supplier_name: Northgate Seating Co
+    po_number: PO-1016
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '10'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8016
+    line: 1
+    qty: '10'
+    state: active
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: no double allocation
+- id: fur-dev-017
+  pack: furniture
+  family: FUR-ALLOC
+  template: northgate-pdf-v1
+  split: dev
+  description: 20 received, 10 previously matched, 10 invoiced now.
+  supplier: *id002
+  po:
+    number: PO-1017
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5017A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9017
+    date: '2026-09-30'
+    supplier_id: SUP-NGS
+    supplier_name: Northgate Seating Co
+    po_number: PO-1017
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '10'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8017
+    line: 1
+    qty: '10'
+    state: active
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: fur-dev-018
+  pack: furniture
+  family: FUR-ALLOC
+  template: northgate-pdf-v1
+  split: dev
+  description: Earlier allocation cancelled, so the receipt is available.
+  supplier: *id002
+  po:
+    number: PO-1018
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5018A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9018
+    date: '2026-09-30'
+    supplier_id: SUP-NGS
+    supplier_name: Northgate Seating Co
+    po_number: PO-1018
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '10'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8018
+    line: 1
+    qty: '10'
+    state: cancelled
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: fur-dev-019
+  pack: furniture
+  family: FUR-REVIEW
+  template: acme-pdf-v1
+  split: dev
+  description: Invoice uses an undefined unit ('crate').
+  supplier: *id001
+  po:
+    number: PO-1019
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5019A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9019
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1019
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: crate
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: unit unknown
+- id: fur-dev-020
+  pack: furniture
+  family: FUR-REVIEW
+  template: acme-pdf-v1
+  split: dev
+  description: Invoice in EUR against a USD PO.
+  supplier: *id001
+  po:
+    number: PO-1020
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5020A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9020
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1020
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: no currency conversion
+- id: fur-dev-021
+  pack: furniture
+  family: FUR-REVIEW
+  template: acme-pdf-v1
+  split: dev
+  description: No supplier ID and a similar but different supplier name.
+  supplier: *id001
+  po:
+    number: PO-1021
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5021A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '18'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9021
+    date: '2026-09-30'
+    supplier_id: null
+    supplier_name: Acme Office Furnishings LLC
+    po_number: PO-1021
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: no silent cross-supplier join
+- id: fur-dev-022
+  pack: furniture
+  family: FUR-UNITS
+  template: birch-pdf-v1
+  split: dev
+  description: Invoice in boxes of 10; PO and receipt in each.
+  supplier: *id003
+  po:
+    number: PO-1022
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CT-018
+      desc: Cable tray
+      qty: '40'
+      unit: EA
+      price: '18.00'
+  receipts:
+  - id: GR-5022A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '40'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9022
+    date: '2026-09-30'
+    supplier_id: SUP-BSD
+    supplier_name: Birch and Steel Desks Ltd
+    po_number: PO-1022
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CT-018
+      desc: Cable tray
+      qty: '4'
+      unit: box of 10
+      price: '180.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: configured conversion
+- id: fur-dev-023
+  pack: furniture
+  family: FUR-CONFLICT
+  template: acme-pdf-v1
+  split: dev
+  description: Supplier email says 20 delivered; receiving record says 18.
+  supplier: *id001
+  po:
+    number: PO-1023
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5023A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '18'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9023
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1023
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-F0230
+    text: 'Hi,
+
+      We delivered all 20 chairs for PO-1023 last week, please pay the full invoice.
+
+      Thanks'
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: receiving record controls by policy
+- id: fur-dev-024
+  pack: furniture
+  family: FUR-DOC-DEFECT
+  template: acme-pdf-v1
+  split: dev
+  description: Invoice PDF line amount inconsistent with qty x price.
+  supplier: *id001
+  po:
+    number: PO-1024
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+  receipts:
+  - id: GR-5024A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9024
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1024
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CH-100
+      desc: Task chair, mesh back
+      qty: '20'
+      unit: EA
+      price: '185.00'
+      kind: goods
+    defect: amount_mismatch
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: extraction not authoritative
+- id: fur-dev-025
+  pack: furniture
+  family: FUR-MIXED
+  template: acme-pdf-v1
+  split: dev
+  description: Freight charge line alongside a matched goods line.
+  supplier: *id001
+  po:
+    number: PO-1025
+    currency: USD
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DR-300
+      desc: Pedestal drawer
+      qty: '10'
+      unit: EA
+      price: '300.00'
+  receipts:
+  - id: GR-5025A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9025
+    date: '2026-09-30'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-1025
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DR-300
+      desc: Pedestal drawer
+      qty: '10'
+      unit: EA
+      price: '300.00'
+      kind: goods
+    - line: 2
+      po_line: null
+      item: null
+      desc: Freight
+      qty: '1'
+      unit: EA
+      price: '75.00'
+      kind: charge
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: charges excluded and disclosed
+- id: it-dev-001
+  pack: it_hardware
+  family: IT-QTY
+  template: lumen-json-v1
+  split: dev
+  description: Laptops fully received.
+  supplier: &id004
+    id: VEN-LUMEN
+    name: Lumen Compute GmbH
+  po:
+    number: PO-2001
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts:
+  - id: GRN-6001A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7001
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2001
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-dev-002
+  pack: it_hardware
+  family: IT-QTY
+  template: lumen-json-v1
+  split: dev
+  description: 8 of 10 laptops received.
+  supplier: *id004
+  po:
+    number: PO-2002
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts:
+  - id: GRN-6002A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7002
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2002
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: ''
+- id: it-dev-003
+  pack: it_hardware
+  family: IT-PRICE
+  template: para-json-v1
+  split: dev
+  description: 'Monitor +5.00: absolute passes, 2% (4.40) fails; both rules required.'
+  supplier: &id005
+    id: VEN-PARA
+    name: Parallel Peripherals BV
+  po:
+    number: PO-2003
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GRN-6003A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '25'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7003
+    date: '2026-09-25'
+    supplier_id: VEN-PARA
+    supplier_name: Parallel Peripherals BV
+    po_number: PO-2003
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '225.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: both-rules policy
+- id: it-dev-004
+  pack: it_hardware
+  family: IT-PRICE
+  template: para-json-v1
+  split: dev
+  description: 'Monitor +4.40: exactly 2% and within 5.00.'
+  supplier: *id005
+  po:
+    number: PO-2004
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '220.00'
+  receipts:
+  - id: GRN-6004A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '25'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7004
+    date: '2026-09-25'
+    supplier_id: VEN-PARA
+    supplier_name: Parallel Peripherals BV
+    po_number: PO-2004
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '224.40'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: boundary
+- id: it-dev-005
+  pack: it_hardware
+  family: IT-PRICE
+  template: lumen-json-v1
+  split: dev
+  description: Invoice below PO price; policy checks over-billing only.
+  supplier: *id004
+  po:
+    number: PO-2005
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts:
+  - id: GRN-6005A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7005
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2005
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1400.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: over_only
+- id: it-dev-006
+  pack: it_hardware
+  family: IT-MISSING
+  template: lumen-json-v1
+  split: dev
+  description: No goods-received note yet.
+  supplier: *id004
+  po:
+    number: PO-2006
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts: []
+  invoice:
+    number: INV-7006
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2006
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: ''
+- id: it-dev-007
+  pack: it_hardware
+  family: IT-CONFLICT
+  template: lumen-json-v1
+  split: dev
+  description: Vendor says 10 delivered, GRN shows 8; no precedence defined.
+  supplier: *id004
+  po:
+    number: PO-2007
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts:
+  - id: GRN-6007A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7007
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2007
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-I0070
+    text: 'Dear customer,
+
+      Regarding PO-2007: all 10 laptops were delivered to your intake desk.
+
+      Vendor support'
+  expected:
+    outcome: manual_review
+    types:
+    - quantity_mismatch
+    next_action: escalate:assign_case
+    note: undefined precedence escalates
+- id: it-dev-008
+  pack: it_hardware
+  family: IT-UNITS
+  template: para-json-v1
+  split: dev
+  description: Keyboards invoiced in packs of 5.
+  supplier: *id005
+  po:
+    number: PO-2008
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: KB-030
+      desc: Keyboard
+      qty: '20'
+      unit: EA
+      price: '30.00'
+  receipts:
+  - id: GRN-6008A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7008
+    date: '2026-09-25'
+    supplier_id: VEN-PARA
+    supplier_name: Parallel Peripherals BV
+    po_number: PO-2008
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: KB-030
+      desc: Keyboard
+      qty: '4'
+      unit: pack of 5
+      price: '150.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-dev-009
+  pack: it_hardware
+  family: IT-QTY
+  template: para-json-v1
+  split: dev
+  description: USD order fully matched.
+  supplier: *id005
+  po:
+    number: PO-2009
+    currency: USD
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: DS-800
+      desc: Docking station
+      qty: '5'
+      unit: EA
+      price: '800.00'
+  receipts:
+  - id: GRN-6009A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '5'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7009
+    date: '2026-09-25'
+    supplier_id: VEN-PARA
+    supplier_name: Parallel Peripherals BV
+    po_number: PO-2009
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DS-800
+      desc: Docking station
+      qty: '5'
+      unit: EA
+      price: '800.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-dev-010
+  pack: it_hardware
+  family: IT-QTY
+  template: lumen-json-v1
+  split: dev
+  description: 10 received, 2 returned via RMA, 10 invoiced.
+  supplier: *id004
+  po:
+    number: PO-2010
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+  receipts:
+  - id: GRN-6010A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GRN-6010B
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: return
+      status: accepted
+  invoice:
+    number: INV-7010
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2010
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: net 8
+- id: it-dev-011
+  pack: it_hardware
+  family: IT-LINES
+  template: para-json-v1
+  split: dev
+  description: Invoice lines reference part numbers only.
+  supplier: *id005
+  po:
+    number: PO-2011
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '220.00'
+    - line: 2
+      item: KB-030
+      desc: Keyboard
+      qty: '20'
+      unit: EA
+      price: '30.00'
+  receipts:
+  - id: GRN-6011A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '25'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '20'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7011
+    date: '2026-09-25'
+    supplier_id: VEN-PARA
+    supplier_name: Parallel Peripherals BV
+    po_number: PO-2011
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: null
+      item: MN-27
+      desc: Monitor 27in
+      qty: '25'
+      unit: EA
+      price: '220.00'
+      kind: goods
+    - line: 2
+      po_line: null
+      item: KB-030
+      desc: Keyboard
+      qty: '20'
+      unit: EA
+      price: '30.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: exact item-code line match is disclosed
+- id: it-dev-012
+  pack: it_hardware
+  family: IT-REVIEW
+  template: lumen-json-v1
+  split: dev
+  description: Promotional zero-price dock billed at 15.00.
+  supplier: *id004
+  po:
+    number: PO-2012
+    currency: EUR
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+    - line: 2
+      item: DK-PROMO
+      desc: Promo dock
+      qty: '10'
+      unit: EA
+      price: '0.00'
+  receipts:
+  - id: GRN-6012A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7012
+    date: '2026-09-25'
+    supplier_id: VEN-LUMEN
+    supplier_name: Lumen Compute GmbH
+    po_number: PO-2012
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: LT-14
+      desc: Laptop 14in
+      qty: '10'
+      unit: EA
+      price: '1450.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: DK-PROMO
+      desc: Promo dock
+      qty: '10'
+      unit: EA
+      price: '15.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: percent tolerance undefined at zero price

@@ -1,0 +1,1182 @@
+# GENERATED from author_eval.py (hand-written table). Synthetic data only. Split: validation.
+# Expected labels are written by hand from the policy files, not produced by OpsBridge.
+# Families and templates are disjoint from every other split.
+schema_version: 1
+corpus_id: opsbridge-validation-v1
+scenarios:
+- id: fur-validation-101
+  pack: furniture
+  family: FUR-V-SHORT-MULTI
+  template: oak-pdf-v1
+  split: validation
+  description: Three lines; line 2 one unit short.
+  supplier: &id001
+    id: SUP-OAK
+    name: Oakline Contract Interiors
+  po:
+    number: PO-1101
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+    - line: 2
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+    - line: 3
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '8'
+      unit: EA
+      price: '140.00'
+  receipts:
+  - id: GR-5101A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '15'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 3
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9101
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1101
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+      kind: goods
+    - line: 3
+      po_line: 3
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '8'
+      unit: EA
+      price: '140.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: 15 of 16 chairs received
+- id: fur-validation-102
+  pack: furniture
+  family: FUR-V-SHORT-MULTI
+  template: oak-pdf-v1
+  split: validation
+  description: Three lines, all received and billed as ordered.
+  supplier: *id001
+  po:
+    number: PO-1102
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+    - line: 2
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+    - line: 3
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '8'
+      unit: EA
+      price: '140.00'
+  receipts:
+  - id: GR-5102A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 2
+      qty: '16'
+      unit: EA
+      kind: receipt
+      status: accepted
+    - line: 3
+      qty: '8'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9102
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1102
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: DK-410
+      desc: Height-adjustable desk
+      qty: '8'
+      unit: EA
+      price: '410.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: CH-220
+      desc: Ergonomic task chair
+      qty: '16'
+      unit: EA
+      price: '220.00'
+      kind: goods
+    - line: 3
+      po_line: 3
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '8'
+      unit: EA
+      price: '140.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: fur-validation-103
+  pack: furniture
+  family: FUR-V-PRICE-PCT
+  template: mer-pdf-v1
+  split: validation
+  description: 'Sofa 2400.00 billed 2424.00: exactly 1%.'
+  supplier: &id002
+    id: SUP-MER
+    name: Meridian Workplace Supply
+  po:
+    number: PO-1103
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '2'
+      unit: EA
+      price: '2400.00'
+  receipts:
+  - id: GR-5103A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9103
+    date: '2026-09-30'
+    supplier_id: SUP-MER
+    supplier_name: Meridian Workplace Supply
+    po_number: PO-1103
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '2'
+      unit: EA
+      price: '2424.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: percent boundary inclusive; either rule passes
+- id: fur-validation-104
+  pack: furniture
+  family: FUR-V-PRICE-PCT
+  template: mer-pdf-v1
+  split: validation
+  description: 'Sofa 2400.00 billed 2424.01: one cent beyond 1%.'
+  supplier: *id002
+  po:
+    number: PO-1104
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '2'
+      unit: EA
+      price: '2400.00'
+  receipts:
+  - id: GR-5104A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '2'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9104
+    date: '2026-09-30'
+    supplier_id: SUP-MER
+    supplier_name: Meridian Workplace Supply
+    po_number: PO-1104
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: SF-2400
+      desc: Reception sofa
+      qty: '2'
+      unit: EA
+      price: '2424.01'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: both rules fail
+- id: fur-validation-105
+  pack: furniture
+  family: FUR-V-UNDER
+  template: mer-pdf-v1
+  split: validation
+  description: Shelving billed 147.00 against 150.00 (direction both).
+  supplier: *id002
+  po:
+    number: PO-1105
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: SH-150
+      desc: Steel shelving unit
+      qty: '10'
+      unit: EA
+      price: '150.00'
+  receipts:
+  - id: GR-5105A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9105
+    date: '2026-09-30'
+    supplier_id: SUP-MER
+    supplier_name: Meridian Workplace Supply
+    po_number: PO-1105
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: SH-150
+      desc: Steel shelving unit
+      qty: '10'
+      unit: EA
+      price: '147.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: -3.00 exceeds 0.50 and 1% (1.50)
+- id: fur-validation-106
+  pack: furniture
+  family: FUR-V-ALLOC-PARTIAL
+  template: oak-pdf-v1
+  split: validation
+  description: 30 received; 10 and 5 already matched; 15 billed.
+  supplier: *id001
+  po:
+    number: PO-1106
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '60.00'
+  receipts:
+  - id: GR-5106A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9106
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1106
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '15'
+      unit: EA
+      price: '60.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8106
+    line: 1
+    qty: '10'
+    state: active
+  - invoice: INV-8107
+    line: 1
+    qty: '5'
+    state: active
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: 15 still available
+- id: fur-validation-107
+  pack: furniture
+  family: FUR-V-ALLOC-PARTIAL
+  template: oak-pdf-v1
+  split: validation
+  description: 30 received; 10 and 5 already matched; 16 billed.
+  supplier: *id001
+  po:
+    number: PO-1107
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '30'
+      unit: EA
+      price: '60.00'
+  receipts:
+  - id: GR-5107A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '30'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9107
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1107
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LP-060
+      desc: LED desk lamp
+      qty: '16'
+      unit: EA
+      price: '60.00'
+      kind: goods
+  allocations:
+  - invoice: INV-8108
+    line: 1
+    qty: '10'
+    state: active
+  - invoice: INV-8109
+    line: 1
+    qty: '5'
+    state: active
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: only 15 available
+- id: fur-validation-108
+  pack: furniture
+  family: FUR-V-MISSING-ALL
+  template: mer-pdf-v1
+  split: validation
+  description: Two lines, no receiving record at all.
+  supplier: *id002
+  po:
+    number: PO-1108
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: LK-300
+      desc: Staff locker bank
+      qty: '4'
+      unit: EA
+      price: '300.00'
+    - line: 2
+      item: ST-090
+      desc: Drafting stool
+      qty: '6'
+      unit: EA
+      price: '90.00'
+  receipts: []
+  invoice:
+    number: INV-9108
+    date: '2026-09-30'
+    supplier_id: SUP-MER
+    supplier_name: Meridian Workplace Supply
+    po_number: PO-1108
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: LK-300
+      desc: Staff locker bank
+      qty: '4'
+      unit: EA
+      price: '300.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: ST-090
+      desc: Drafting stool
+      qty: '6'
+      unit: EA
+      price: '90.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: no receipt is not non-delivery
+- id: fur-validation-109
+  pack: furniture
+  family: FUR-V-RETURN-ALL
+  template: oak-pdf-v1
+  split: validation
+  description: 6 received then all 6 returned; 6 billed.
+  supplier: *id001
+  po:
+    number: PO-1109
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '6'
+      unit: EA
+      price: '90.00'
+  receipts:
+  - id: GR-5109A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5109B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: return
+      status: accepted
+  invoice:
+    number: INV-9109
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1109
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: ST-090
+      desc: Drafting stool
+      qty: '6'
+      unit: EA
+      price: '90.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: net zero received
+- id: fur-validation-110
+  pack: furniture
+  family: FUR-V-UNIT-UNKNOWN
+  template: mer-pdf-v1
+  split: validation
+  description: Invoice unit 'pallet' is not defined by policy.
+  supplier: *id002
+  po:
+    number: PO-1110
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '40'
+      unit: EA
+      price: '12.00'
+  receipts:
+  - id: GR-5110A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '40'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9110
+    date: '2026-09-30'
+    supplier_id: SUP-MER
+    supplier_name: Meridian Workplace Supply
+    po_number: PO-1110
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: CO-012
+      desc: Cable organizer
+      qty: '2'
+      unit: pallet
+      price: '240.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: unknown unit
+- id: fur-validation-111
+  pack: furniture
+  family: FUR-V-CLAIM-ABOVE
+  template: oak-pdf-v1
+  split: validation
+  description: Receipts 10+5; supplier claims 18; 15 billed.
+  supplier: *id001
+  po:
+    number: PO-1111
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '18'
+      unit: EA
+      price: '140.00'
+  receipts:
+  - id: GR-5111A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  - id: GR-5111B
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '5'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9111
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1111
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: PN-140
+      desc: Acoustic desk panel
+      qty: '15'
+      unit: EA
+      price: '140.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-F1110
+    text: 'Hello,
+
+      We shipped 18 panels for PO-1111 in two drops.
+
+      Oakline billing'
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: billed quantity covered by receipts; receipts control by policy
+- id: fur-validation-112
+  pack: furniture
+  family: FUR-V-SET-UNITS
+  template: oak-pdf-v1
+  split: validation
+  description: PO and receipt in SET; invoice says 'sets'.
+  supplier: *id001
+  po:
+    number: PO-1112
+    currency: USD
+    status: open
+    date: '2026-09-01'
+    lines:
+    - line: 1
+      item: WS-900
+      desc: Workstation set
+      qty: '6'
+      unit: SET
+      price: '900.00'
+  receipts:
+  - id: GR-5112A
+    date: '2026-09-20'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: SET
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-9112
+    date: '2026-09-30'
+    supplier_id: SUP-OAK
+    supplier_name: Oakline Contract Interiors
+    po_number: PO-1112
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: WS-900
+      desc: Workstation set
+      qty: '6'
+      unit: sets
+      price: '900.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: alias of SET
+- id: it-validation-101
+  pack: it_hardware
+  family: IT-V-PRICE-BOUND
+  template: qtz-json-v1
+  split: validation
+  description: '3000.00 billed 3005.00: abs 5.00 inclusive, 2% passes.'
+  supplier: &id003
+    id: VEN-QUARTZ
+    name: Quartz Systems AG
+  po:
+    number: PO-2101
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '4'
+      unit: EA
+      price: '3000.00'
+  receipts:
+  - id: GRN-6101A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7101
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2101
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SV-2000
+      desc: Rack server
+      qty: '4'
+      unit: EA
+      price: '3005.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-validation-102
+  pack: it_hardware
+  family: IT-V-PRICE-BOUND
+  template: qtz-json-v1
+  split: validation
+  description: '100.00 billed 102.00: 2% inclusive, abs passes.'
+  supplier: *id003
+  po:
+    number: PO-2102
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: AP-100
+      desc: Wireless access point
+      qty: '50'
+      unit: EA
+      price: '100.00'
+  receipts:
+  - id: GRN-6102A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '50'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7102
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2102
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: AP-100
+      desc: Wireless access point
+      qty: '50'
+      unit: EA
+      price: '102.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: ''
+- id: it-validation-103
+  pack: it_hardware
+  family: IT-V-PRICE-BOUND
+  template: qtz-json-v1
+  split: validation
+  description: '100.00 billed 102.01: 2% fails; both rules required.'
+  supplier: *id003
+  po:
+    number: PO-2103
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: AP-100
+      desc: Wireless access point
+      qty: '50'
+      unit: EA
+      price: '100.00'
+  receipts:
+  - id: GRN-6103A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '50'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7103
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2103
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: AP-100
+      desc: Wireless access point
+      qty: '50'
+      unit: EA
+      price: '102.01'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - price_mismatch
+    next_action: propose_action:create_supplier_message_draft
+    note: ''
+- id: it-validation-104
+  pack: it_hardware
+  family: IT-V-PK5-RECEIPT
+  template: qtz-json-v1
+  split: validation
+  description: Received 4 packs of 5; 20 mice billed each.
+  supplier: *id003
+  po:
+    number: PO-2104
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '20'
+      unit: EA
+      price: '15.00'
+  receipts:
+  - id: GRN-6104A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '4'
+      unit: pack of 5
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7104
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2104
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '20'
+      unit: EA
+      price: '15.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: receipt converted to 20 EA
+- id: it-validation-105
+  pack: it_hardware
+  family: IT-V-PK5-RECEIPT
+  template: qtz-json-v1
+  split: validation
+  description: Received 3 packs of 5; 20 mice billed.
+  supplier: *id003
+  po:
+    number: PO-2105
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '20'
+      unit: EA
+      price: '15.00'
+  receipts:
+  - id: GRN-6105A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '3'
+      unit: pack of 5
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7105
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2105
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '20'
+      unit: EA
+      price: '15.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: 15 received
+- id: it-validation-106
+  pack: it_hardware
+  family: IT-V-MISSING-LINE
+  template: qtz-json-v1
+  split: validation
+  description: Switches received; access points have no GRN.
+  supplier: *id003
+  po:
+    number: PO-2106
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+    - line: 2
+      item: AP-100
+      desc: Wireless access point
+      qty: '12'
+      unit: EA
+      price: '100.00'
+  receipts:
+  - id: GRN-6106A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '6'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7106
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2106
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '6'
+      unit: EA
+      price: '400.00'
+      kind: goods
+    - line: 2
+      po_line: 2
+      item: AP-100
+      desc: Wireless access point
+      qty: '12'
+      unit: EA
+      price: '100.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types:
+    - missing_receipt
+    next_action: request_information:create_follow_up_task
+    note: ''
+- id: it-validation-107
+  pack: it_hardware
+  family: IT-V-CONFLICT-LOWER
+  template: qtz-json-v1
+  split: validation
+  description: GRN 10 = billed 10, vendor says 9 delivered.
+  supplier: *id003
+  po:
+    number: PO-2107
+    currency: EUR
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '10'
+      unit: EA
+      price: '400.00'
+  receipts:
+  - id: GRN-6107A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '10'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7107
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2107
+    currency: EUR
+    lines:
+    - line: 1
+      po_line: 1
+      item: SW-400
+      desc: Network switch 24p
+      qty: '10'
+      unit: EA
+      price: '400.00'
+      kind: goods
+  allocations: []
+  messages:
+  - id: MSG-I1070
+    text: 'Hello,
+
+      Regarding PO-2107: 9 devices were delivered; one is back-ordered.
+
+      Quartz support'
+  expected:
+    outcome: manual_review
+    types: []
+    next_action: escalate:assign_case
+    note: sources disagree and no precedence is defined
+- id: it-validation-108
+  pack: it_hardware
+  family: IT-V-USD-SHORT
+  template: qtz-json-v1
+  split: validation
+  description: 'USD order: 49 of 50 received, 50 billed.'
+  supplier: *id003
+  po:
+    number: PO-2108
+    currency: USD
+    status: open
+    date: '2026-08-15'
+    lines:
+    - line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '50'
+      unit: EA
+      price: '15.00'
+  receipts:
+  - id: GRN-6108A
+    date: '2026-09-10'
+    lines:
+    - line: 1
+      qty: '49'
+      unit: EA
+      kind: receipt
+      status: accepted
+  invoice:
+    number: INV-7108
+    date: '2026-09-25'
+    supplier_id: VEN-QUARTZ
+    supplier_name: Quartz Systems AG
+    po_number: PO-2108
+    currency: USD
+    lines:
+    - line: 1
+      po_line: 1
+      item: MS-015
+      desc: Wireless mouse
+      qty: '50'
+      unit: EA
+      price: '15.00'
+      kind: goods
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types:
+    - quantity_mismatch
+    next_action: propose_action:create_follow_up_task
+    note: ''

@@ -1,0 +1,41 @@
+# Designated synthetic demo tenants. `make seed-demo` creates or updates ONLY these
+# tenants (matched by slug and flagged synthetic_demo) and never touches others.
+# Subjects are the fixed user IDs in infra/identity/realm-opsbridge.json.
+issuer_env: OPSBRIDGE_OIDC_ISSUER
+tenants:
+  - slug: demo-furniture
+    name: Demo Furniture Org (synthetic)
+    tier: standard
+    pack: furniture
+    model_mode: mock
+    policies:
+      - furniture/policies/furniture-ap-v1.yaml
+      - furniture/policies/furniture-ap-v2.yaml
+    members:
+      - {username: furn-requester, subject: 11111111-0000-4000-8000-000000000001, display: Fran Requester, roles: [requester]}
+      - {username: furn-investigator, subject: 11111111-0000-4000-8000-000000000002, display: Ivy Investigator, roles: [investigator]}
+      - {username: furn-approver, subject: 11111111-0000-4000-8000-000000000003, display: Abe Approver, roles: [approver],
+         approval_scope: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]}
+      - {username: furn-approver2, subject: 11111111-0000-4000-8000-000000000004, display: Ana Notes-Approver, roles: [approver],
+         approval_scope: [record_review_note]}
+      - {username: furn-admin, subject: 11111111-0000-4000-8000-000000000005, display: Ada Admin, roles: [tenant_admin]}
+      - {username: furn-auditor, subject: 11111111-0000-4000-8000-000000000006, display: Aud Auditor, roles: [auditor]}
+      - {username: multi-member, subject: 33333333-0000-4000-8000-000000000001, display: Max Multi, roles: [investigator, approver],
+         approval_scope: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]}
+  - slug: demo-it
+    name: Demo IT Hardware Org (synthetic)
+    tier: enhanced
+    pack: it_hardware
+    model_mode: ollama  # IT policy requires local inference; without Ollama the model path is blocked
+    policies:
+      - it_hardware/policies/it-procurement-v1.yaml
+    members:
+      - {username: it-requester, subject: 22222222-0000-4000-8000-000000000001, display: Rex Requester, roles: [requester]}
+      - {username: it-investigator, subject: 22222222-0000-4000-8000-000000000002, display: Isa Investigator, roles: [investigator]}
+      - {username: it-approver, subject: 22222222-0000-4000-8000-000000000003, display: Ari Approver, roles: [approver],
+         approval_scope: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]}
+      - {username: multi-member, subject: 33333333-0000-4000-8000-000000000001, display: Max Multi, roles: [requester]}
+service_identities:
+  - {client_id: opsbridge-worker, kind: worker, description: Background worker executing investigation steps and approved operations}
+  - {client_id: opsbridge-records-mcp, kind: mcp_resource, description: Records MCP service (read tools)}
+  - {client_id: opsbridge-casework-mcp, kind: mcp_resource, description: Casework MCP service (follow-up task tools)}

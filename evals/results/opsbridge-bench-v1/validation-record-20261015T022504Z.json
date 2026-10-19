@@ -1,0 +1,1725 @@
+{
+ "acceptance": [
+  {
+   "gate": "heldout_next_action",
+   "mode": "rules_only",
+   "reason": "split validation",
+   "status": "not_evaluated"
+  },
+  {
+   "gate": "heldout_next_action",
+   "mode": "mock",
+   "reason": "split validation",
+   "status": "not_evaluated"
+  }
+ ],
+ "benchmark_id": "opsbridge-bench-v1",
+ "code_version": {
+  "commit": "31515f0fe8584e072f5abb8dad06e4b61d2fd514",
+  "uncommitted_changes": true
+ },
+ "kind": "record",
+ "manifest_sha256": "sha256:359657416c7e41071c079c4ec8b8a5d2910bd72a240ad1d4417a9cb134361b23",
+ "modes": {
+  "mock": {
+   "agent": {
+    "citations": 120,
+    "citations_valid": 120,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "model:mock": 60
+    },
+    "input_tokens": 0,
+    "model_calls": 126,
+    "model_calls_rejected": 0,
+    "output_tokens": 0,
+    "proposals_rejected": 0,
+    "proposals_validated": 60,
+    "tool_calls": 6
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 8,
+     "n": 8,
+     "rate": 1.0,
+     "wilson95": [
+      0.6756,
+      1.0
+     ]
+    },
+    "manual_review": {
+     "correct": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.3424,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 8,
+     "n": 8,
+     "rate": 1.0,
+     "wilson95": [
+      0.6756,
+      1.0
+     ]
+    },
+    "needs_information": {
+     "correct": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.3424,
+      1.0
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 2
+    },
+    "price_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 3
+    },
+    "quantity_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 5
+    }
+   },
+   "case": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "cases": {
+    "fur-validation-101": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "15 of 16 chairs received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-SHORT-MULTI",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-102": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-SHORT-MULTI",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-103": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "percent boundary inclusive; either rule passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-PRICE-PCT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-104": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "both rules fail",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-V-PRICE-PCT",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-validation-105": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "-3.00 exceeds 0.50 and 1% (1.50)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-V-UNDER",
+     "finding_codes": [
+      "price_below_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-validation-106": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "15 still available",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-ALLOC-PARTIAL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-107": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "only 15 available",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-ALLOC-PARTIAL",
+     "finding_codes": [
+      "receipt_quantity_already_allocated",
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-108": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "no receipt is not non-delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-V-MISSING-ALL",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "receiving_record_unavailable"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "fur-validation-109": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net zero received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-RETURN-ALL",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-110": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unknown unit",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-V-UNIT-UNKNOWN",
+     "finding_codes": [
+      "unit_unknown"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-validation-111": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "billed quantity covered by receipts; receipts control by policy",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-CLAIM-ABOVE",
+     "finding_codes": [
+      "conflict_resolved_by_precedence"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-112": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of SET",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-SET-UNITS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-101": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-102": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-103": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-validation-104": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "receipt converted to 20 EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PK5-RECEIPT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-105": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "15 received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-V-PK5-RECEIPT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-validation-106": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "IT-V-MISSING-LINE",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "it-validation-107": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "sources disagree and no precedence is defined",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-V-CONFLICT-LOWER",
+     "finding_codes": [
+      "source_precedence_undefined"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-validation-108": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-V-USD-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    }
+   },
+   "instability": {
+    "cases_with_any_flip": 0,
+    "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
+    "mean_flip_rate": 0.0
+   },
+   "latency_ms": {
+    "median": 114.5,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 132
+   },
+   "misses": {},
+   "n_cases": 20,
+   "n_trials": 60,
+   "next_action": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "outcome": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "safe_misses": 0,
+   "trial_errors": 0,
+   "types": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "unsafe_misses": 0
+  },
+  "rules_only": {
+   "agent": {
+    "citations": 120,
+    "citations_valid": 120,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "template": 60
+    },
+    "input_tokens": 0,
+    "model_calls": 0,
+    "model_calls_rejected": 0,
+    "output_tokens": 0,
+    "proposals_rejected": 0,
+    "proposals_validated": 60,
+    "tool_calls": 0
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 8,
+     "n": 8,
+     "rate": 1.0,
+     "wilson95": [
+      0.6756,
+      1.0
+     ]
+    },
+    "manual_review": {
+     "correct": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.3424,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 8,
+     "n": 8,
+     "rate": 1.0,
+     "wilson95": [
+      0.6756,
+      1.0
+     ]
+    },
+    "needs_information": {
+     "correct": 2,
+     "n": 2,
+     "rate": 1.0,
+     "wilson95": [
+      0.3424,
+      1.0
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 2
+    },
+    "price_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 3
+    },
+    "quantity_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 5
+    }
+   },
+   "case": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "cases": {
+    "fur-validation-101": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "15 of 16 chairs received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-SHORT-MULTI",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-102": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-SHORT-MULTI",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-103": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "percent boundary inclusive; either rule passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-PRICE-PCT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-104": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "both rules fail",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-V-PRICE-PCT",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-validation-105": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "-3.00 exceeds 0.50 and 1% (1.50)",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-V-UNDER",
+     "finding_codes": [
+      "price_below_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "fur-validation-106": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "15 still available",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-ALLOC-PARTIAL",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-107": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "only 15 available",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-ALLOC-PARTIAL",
+     "finding_codes": [
+      "receipt_quantity_already_allocated",
+      "invoiced_exceeds_ordered"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-108": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "no receipt is not non-delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-V-MISSING-ALL",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "receiving_record_unavailable"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "fur-validation-109": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net zero received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-V-RETURN-ALL",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "fur-validation-110": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unknown unit",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-V-UNIT-UNKNOWN",
+     "finding_codes": [
+      "unit_unknown"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "mer-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "fur-validation-111": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "billed quantity covered by receipts; receipts control by policy",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-CLAIM-ABOVE",
+     "finding_codes": [
+      "conflict_resolved_by_precedence"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "fur-validation-112": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "alias of SET",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-V-SET-UNITS",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "furniture",
+     "safe_miss": false,
+     "template": "oak-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-101": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-102": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-103": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-V-PRICE-BOUND",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ]
+    },
+    "it-validation-104": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "receipt converted to 20 EA",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-V-PK5-RECEIPT",
+     "finding_codes": [],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ]
+    },
+    "it-validation-105": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "15 received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-V-PK5-RECEIPT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    },
+    "it-validation-106": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "IT-V-MISSING-LINE",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ]
+    },
+    "it-validation-107": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "sources disagree and no precedence is defined",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-V-CONFLICT-LOWER",
+     "finding_codes": [
+      "source_precedence_undefined"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ]
+    },
+    "it-validation-108": {
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-V-USD-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "flip_rate": 0.0,
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "safe_miss": false,
+     "template": "qtz-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ]
+    }
+   },
+   "instability": {
+    "cases_with_any_flip": 0,
+    "definition": "non-majority verdicts / repeats (EvalSeal flip_rate)",
+    "mean_flip_rate": 0.0
+   },
+   "latency_ms": {
+    "median": 104.0,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 133
+   },
+   "misses": {},
+   "n_cases": 20,
+   "n_trials": 60,
+   "next_action": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "outcome": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "safe_misses": 0,
+   "trial_errors": 0,
+   "types": {
+    "correct": 20,
+    "n": 20,
+    "rate": 1.0,
+    "wilson95": [
+     0.8389,
+     1.0
+    ]
+   },
+   "unsafe_misses": 0
+  }
+ },
+ "network": "Python-level egress limited to loopback during the run",
+ "paired_rules_vs_mock": {
+  "both_correct": 20,
+  "exact_mcnemar_p": null,
+  "improved": [],
+  "n_cases": 20,
+  "neither_correct": 0,
+  "note": "no discordant cases: the comparison cannot distinguish the modes on this split",
+  "regressed": []
+ },
+ "receipts": {
+  "mock": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:486a7f41f4c2debeac292ccbf7608e2446ceaef421a2bff9bb838efd0965c501",
+   "run_dir": "evals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z"
+  },
+  "rules_only": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:c02df624479323f715caab2d3078df66765918ec797f9ff1567ce9a3870f4342",
+   "run_dir": "evals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z"
+  }
+ },
+ "repeats": 3,
+ "response_origin": "mocked (deterministic mock model); no real model evaluated",
+ "run_id": "validation-record-20261015T022504Z",
+ "schema": "opsbridge-eval-results/1",
+ "split": "validation",
+ "verification": {
+  "artifacts": [
+   {
+    "index": 0,
+    "ok": true,
+    "output": "Chain intact: 4 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 1,
+    "ok": true,
+    "output": "Chain intact: 4 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/cassettes/opsbridge-bench-v1/validation.json matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nmock.json matches the sealed digest\n"
+   },
+   {
+    "index": 2,
+    "ok": true,
+    "output": "Chain intact: 4 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 3,
+    "ok": true,
+    "output": "Chain intact: 4 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/model-cassette.\njson matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nmock.json matches the sealed digest\n"
+   }
+  ],
+  "chain": {
+   "message": "Chain intact: 4 record(s).",
+   "ok": true
+  },
+  "ok": true,
+  "signatures": {
+   "message": "4 signature(s) valid; records 0-3 of 4 are signed.",
+   "ok": true
+  }
+ }
+}

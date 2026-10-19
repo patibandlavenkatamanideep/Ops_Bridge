@@ -1,0 +1,134 @@
+# OpsBridge alert rules. Thresholds are starting points for a pilot, not tuned SLOs.
+# Tested by `make alerts-test` (promtool, synthetic series) and the live drill in
+# docs/operations.md (injected failures against the running stack).
+groups:
+  - name: opsbridge-availability
+    rules:
+      - alert: OpsBridgeTargetDown
+        expr: up{job=~"opsbridge-.*"} == 0
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: "{{ $labels.job }} is not being scraped (process down or unreachable)"
+          runbook: docs/operations.md#api-or-worker-down
+      - alert: OpsBridgeDependencyDown
+        expr: opsbridge_dependency_up == 0
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "{{ $labels.job }} cannot use {{ $labels.dependency }}"
+          runbook: docs/operations.md#dependency-unavailable
+      - alert: OpsBridgeStateUnknown
+        expr: opsbridge_state_scrape_ok == 0
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: The worker cannot read queue/backlog state from the database
+          runbook: docs/operations.md#dependency-unavailable
+
+  - name: opsbridge-work
+    rules:
+      - alert: OpsBridgeQueueStalled
+        expr: max by (kind) (opsbridge_queue_oldest_age_seconds) > 300
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "{{ $labels.kind }} jobs have waited more than 5 minutes"
+          runbook: docs/operations.md#queue-stalled
+      - alert: OpsBridgeExpiredLeases
+        expr: opsbridge_queue_expired_leases > 0
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: Leased jobs are past their lease and not reclaimed
+          runbook: docs/operations.md#queue-stalled
+      - alert: OpsBridgeJobsExhausted
+        expr: sum by (kind) (increase(opsbridge_jobs_processed_total{result=~"dead|failed|crash_dead|crash_failed"}[15m])) > 0
+        labels: {severity: ticket}
+        annotations:
+          summary: "{{ $labels.kind }} jobs exhausted their retries"
+          runbook: docs/operations.md#retries-and-dead-jobs
+      - alert: OpsBridgeOutcomeUnknown
+        expr: opsbridge_state{metric="operations_outcome_unknown"} > 0
+        labels: {severity: ticket}
+        annotations:
+          summary: "{{ $value }} operation(s) need human review: the external outcome is unknown"
+          runbook: docs/operations.md#ambiguous-outcomes
+      - alert: OpsBridgeApprovalBacklogAging
+        expr: opsbridge_state{metric="approval_backlog_oldest_age_seconds"} > 14400
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: A proposal has waited more than 4 hours for approval
+          runbook: docs/operations.md#approval-backlog
+      - alert: OpsBridgeConnectorFailures
+        expr: |
+          sum(rate(opsbridge_connector_attempts_total{result!="succeeded"}[10m]))
+            / sum(rate(opsbridge_connector_attempts_total[10m])) > 0.2
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: More than 20% of connector attempts are failing or ambiguous
+          runbook: docs/operations.md#connector-failures
+      - alert: OpsBridgeInvestigationFailures
+        expr: opsbridge_state{metric="runs_failed_last_hour"} > 3
+        labels: {severity: ticket}
+        annotations:
+          summary: "{{ $value }} investigation runs failed in the last hour"
+          runbook: docs/operations.md#retries-and-dead-jobs
+      - alert: OpsBridgeModelErrors
+        expr: |
+          sum(rate(opsbridge_model_calls_total{outcome!="ok"}[15m]))
+            / sum(rate(opsbridge_model_calls_total[15m])) > 0.25
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: More than 25% of model calls fail or are rejected (template fallback in use)
+          runbook: docs/operations.md#model-errors
+
+  - name: opsbridge-api
+    rules:
+      - alert: OpsBridgeApiErrors
+        expr: |
+          sum(rate(opsbridge_http_requests_total{status_class="5xx"}[5m]))
+            / sum(rate(opsbridge_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: More than 5% of API requests fail with 5xx
+          runbook: docs/operations.md#api-errors
+      - alert: OpsBridgeApiLatency
+        expr: histogram_quantile(0.95, sum by (le) (rate(opsbridge_http_request_duration_seconds_bucket[5m]))) > 2
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: API p95 latency above 2 s
+          runbook: docs/operations.md#api-errors
+
+  - name: opsbridge-capacity
+    rules:
+      - alert: OpsBridgeDbPoolSaturated
+        expr: |
+          sum by (job, pool) (opsbridge_db_pool_connections{state="checked_out"})
+            / sum by (job, pool) (opsbridge_db_pool_connections{state="capacity"}) > 0.9
+        for: 5m
+        labels: {severity: ticket}
+        annotations:
+          summary: "{{ $labels.job }} database pool {{ $labels.pool }} above 90%"
+          runbook: docs/operations.md#capacity
+      - alert: OpsBridgeArtifactDiskLow
+        expr: |
+          opsbridge_artifact_fs_bytes{state="free"}
+            / ignoring(state) opsbridge_artifact_fs_bytes{state="total"} < 0.10
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: Less than 10% free space where artifacts are stored
+          runbook: docs/operations.md#capacity
+      - alert: OpsBridgeProcessMemoryHigh
+        expr: process_resident_memory_bytes{job=~"opsbridge-.*"} > 1.5e9
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "{{ $labels.job }} resident memory above 1.5 GB"
+          runbook: docs/operations.md#capacity

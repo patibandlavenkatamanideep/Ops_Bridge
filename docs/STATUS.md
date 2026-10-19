@@ -1,0 +1,568 @@
+# OpsBridge status
+
+Last updated: 2026-10-19 · Branch: `feat/opsbridge-foundation` (pushed to
+github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
+Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
+
+## Summary by validation level
+
+| Level | State |
+|---|---|
+| Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
+| Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
+| External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
+| Hosted CI | passing — PR #1 to `main` (opened with the owner's authorization, not merged), run 39000811947 at 1f29197: all three jobs green on ubuntu-24.04 |
+| Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
+| Operator pilot measured | no |
+
+## Workspace inventory (Phase 0, 2026-10-14)
+
+- Initial contents: `CLAUDE.md`, `OPSBRIDGE_BUILD_PROMPT.md`. No repository, code or tests.
+- Toolchain: uv 0.10.2 (CPython 3.12.12), Node 25.9.0 / npm 11.12.1, Docker CLI 29.8.1 +
+  Compose 5.5.1 (Docker Desktop daemon **not running**), Podman 5.7.1 machine running with a
+  Docker-compatible socket, GNU Make 3.81, git 2.50.1, gh 2.92.0. Homebrew PostgreSQL 16 on
+  :5432 hosts unrelated databases and is never used by OpsBridge.
+- Missing: Java (Keycloak runs in a container), Ollama, Tesseract OCR.
+- The owner created the public GitHub repo during Phase 1 and authorized pushing the
+  feature branch after each phase. Its initial commit (MIT LICENSE, README, .gitignore) was
+  merged, not rewritten.
+
+## Completed
+
+### Phase 0 — audit, contract, discovery assumptions
+- docs/discovery.md, docs/IMPLEMENTATION_PLAN.md, docs/requirements-traceability.md,
+  ADRs 0001–0009.
+- Upstream interfaces inspected locally: evalseal 2.2.0 (API, CLI, docs at tag v2.2.0),
+  mcp 2.3.0 (`MCPServer`, `Client`, `streamable_http_client`, `TokenVerifier`),
+  Authlib 1.9.1 Starlette client (PKCE, nonce, ID-token validation path).
+
+### Phase 1 — authenticated skeleton and durable data (exit gate passed locally)
+- Domain: Decimal money, units, versioned policies, three-way matcher, rules-only routing
+  (`backend/src/opsbridge/domain/`), furniture and IT policy packs (`packs/`).
+- Infra: `infra/compose/docker-compose.yml` (pgvector PG16 with baked role init on :5433,
+  Keycloak 26.8.1 on :8081 with realm import using env placeholders).
+- Persistence: 40 tables, composite tenant FKs, Alembic 0001 (schema) + 0002 (RLS on all
+  40 tables, FORCE RLS, least-privilege grants; app/worker/mcp roles are NOSUPERUSER
+  NOBYPASSRLS non-owners). Transaction-local tenant context re-applied on every transaction.
+- Identity: OIDC Authorization Code + PKCE via Authlib against Keycloak; server-side hashed
+  sessions (absolute 8 h, idle 30 min), CSRF synchronizer token + Origin check, RP-initiated
+  logout; worker client-credentials identity with MCP audiences.
+- API: `/api/v1/me`, case intake (idempotency key, duplicate-invoice guard), keyset-paginated
+  queue, case detail; consistent error bodies; correlation IDs; security headers; body-size
+  and per-session/IP rate limits; liveness/readiness.
+- UI: React 19/Vite 8 shell with sign-in, tenant switcher, case queue (loading/empty/
+  denied/error states), new case form, case detail; types generated from OpenAPI.
+- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants.
+- Commands: Makefile (`doctor setup infra-up migrate seed-demo dev demo lint typecheck test
+  test-integration test-e2e verify build down reset-demo openapi`); direct equivalents in
+  docs/developer-commands.md. `eval-offline` and `demo --seed-records` targets exist but
+  depend on Phase 2/7 commands not yet implemented.
+
+### Phase 2 — deterministic investigation (exit gate passed locally)
+- Purchasing simulator (`backend/src/opsbridge/simulator/`): separate FastAPI service, SQLite
+  store, per-org HMAC credentials, native record formats per organization, task tracker and
+  fault-injection controls (refused in production mode).
+- Bounded parsers (`evidence/parsers.py`): JSON/CSV/text/PDF with type sniffing, size/depth/
+  row/page limits; PDFs parsed in a killable subprocess (`evidence/pdf_worker.py`); image-only
+  PDFs → `needs_review` (OCR unavailable, never invented); active PDF content flagged.
+- Ingestion (`evidence/ingest.py`): raw bytes + raw SHA-256 in tenant-scoped artifact storage,
+  separate normalized digest (`opsbridge-norm/1`), versioning only when bytes change, chunks
+  with page/line/row locators, extracted fields, canonical records with superseding.
+- Pack mappings (`packs/*/pack.yaml`, `mapping.py`): furniture (snake_case JSON, CSV, PDF
+  text patterns with amount checks, email assertions) and IT (camelCase JSON) through one
+  generic engine.
+- Investigation workflow (`workflow/investigation.py`) with durable steps
+  collect_context → retrieve_policy → reconcile_records → explain_findings; leased job queue
+  with fencing tokens (`workflow/jobs.py`); worker (`workflow/worker.py`).
+- Citations (`evidence/citations.py`) resolved against tenant, version, digest and locator.
+- Corrections keep the original extraction; latest correction applied as an overlay and
+  bound into the investigation's source manifest. Evidence-based resolution guard.
+- UI: investigation tab (outcome, explanation, uncertainty, cited findings, run progress)
+  and evidence tab (documents/versions, fields beside source text, highlighted citation,
+  correction form, original download).
+- Corpus: `fixtures/scenarios/dev.yaml` — 37 hand-labelled synthetic scenarios (25
+  furniture, 12 IT) authored in `author_dev.py`. Rules-only baseline:
+  `uv --directory backend run python -m opsbridge.cli eval-rules` →
+  `evals/results/rules-baseline-dev.json`: **37/37 case-correct on the development split**.
+  This is development verification: the labels and rules were written together; it is not
+  held-out evidence and says nothing about model quality.
+
+### Phase 3 — bounded agent assistance and model adapters (exit gate passed locally)
+- Model contract and adapters (`agents/contracts.py`, `agents/adapters.py`): deterministic
+  mock (labelled mocked), Anthropic via official SDK 1.13.0 (`output_config` JSON schema),
+  Ollama via `/api/chat` (`format` schema); unsupported parameters rejected.
+- Routing, budgets, spend ceiling and recording (`agents/runtime.py`); prompt registry with
+  digests (`agents/prompts.py`); validators and capped read-only evidence search
+  (`agents/steps.py`); pattern redaction (`privacy/redaction.py`); authorized PostgreSQL
+  full-text retrieval (`evidence/retrieval.py`, lexical only).
+- Workflow now: collect_context → retrieve_policy → reconcile_records → explain_findings →
+  propose_follow_up → validate_proposal (`investigation/1.1.0`). Tenant settings
+  (migration 0003) hold the default model mode; furniture = mock, IT = ollama.
+- UI: model-mode selector (tier-limited), explanation origin, gated draft follow-up.
+- Details and limits: docs/agents-and-models.md.
+
+Phase 3 exit gate evidence:
+- Mock-backed full flow: `tests/integration/test_agent_flow.py::test_mock_backed_full_flow_records_model_and_tool_calls`, `frontend/e2e/phase3.spec.ts`.
+- Malformed output / injected instructions cannot act: `test_injected_document_instructions_cannot_change_authority`
+  (compromised scripted model), `test_model_failure_preserves_deterministic_findings`,
+  `tests/agents/test_routing_and_validation.py` (15 rejection cases).
+- Local-required with no local model → blocked, no hosted fallback: `test_local_required_policy_blocks_model_without_hosted_fallback`.
+- Hosted/local live checks: **blocked** (no key/opt-in; Ollama not installed). Adapter
+  contracts verified against local fakes only.
+
+### Phase 4 — approvals, execution and recovery (exit gate passed locally)
+- Versioned proposals with canonical payload digests; approvals bound to version, digest,
+  policy, source manifest, expiry, scope and separation of duties (`services/proposals.py`).
+- Approval consumption + operation + outbox event + dispatch job in one transaction.
+- Executor with attempt ledger, read-back confirmation, reconciliation by declared connector
+  capability, fencing-token guards, dispatch-time revalidation, cancellation and human review
+  of unknown outcomes (`workflow/execution.py`, `connectors/tasks.py`).
+- UI: Proposals & execution tab (create from validated draft, approve/reject the reviewed
+  version, attempt timeline, cancellation, unknown-outcome review).
+- Details, state machines and residual risks: docs/execution-and-recovery.md.
+- Defects found and fixed while building this phase (evidence for the case study):
+  1. Simulator route ordering captured `/orgs/{org}/tasks/{id}` with the generic records route;
+     the executor's read-back check refused to confirm and marked `outcome_unknown` instead of
+     claiming success. Fixed by registering task routes first.
+  2. Setting `consumed_at` by UPDATE violated the insert-only grant on approvals; consumption is
+     now written at insert time.
+  3. Dispatch resolved a task connector before routing local actions; fixed.
+  4. UI did not refresh the case after asynchronous operation completion; fixed.
+
+Phase 4 exit gate evidence: `tests/integration/test_approvals_execution.py` (18 tests; see the
+table in docs/execution-and-recovery.md) and `frontend/e2e/phase4.spec.ts` (investigator
+proposes, a different approver approves, worker dispatches, read-back confirms, case stays
+"Follow-up pending").
+
+### Phase 5 — MCP services and sandbox adapter (exit gate passed locally; live GitHub blocked)
+- Records MCP and Casework MCP on the official SDK (streamable HTTP), two-credential
+  authorization (Keycloak service token + Ed25519 delegation token), server-side membership
+  re-check, audited denials (`mcp_services/`).
+- Executor can run through Casework MCP (`McpCaseworkConnector`); agent evidence search can
+  run through Records MCP. The dev stack uses MCP transport; tests default to in-process and
+  have dedicated MCP tests.
+- GitHub Issues connector with declared capabilities (no idempotency, eventual lookup),
+  repository allow-list and explicit write authorization; tier-gated per tenant.
+- Details: docs/integrations.md.
+
+Phase 5 exit gate evidence: `tests/integration/test_mcp.py` (16, real transport and Keycloak
+tokens; permitted discovery/calls and denied calls), `tests/contracts/test_github_connector.py`
+(10), `tests/integration/test_github_execution.py` (3). Browser tests (10) pass with the dev
+stack in MCP mode; the dev audit trail shows `mcp.casework.create_follow_up_task` and
+`get_follow_up_task`. Live GitHub run: **blocked** (no repo/token/authorization);
+`tests/live/test_github_live.py` is skipped unless explicitly enabled.
+
+### Phase 6 — privacy, retention and adversarial hardening (exit gate passed locally)
+- Uploads (`POST /cases/{id}/documents`, `services/casework_admin.py`): kind allow-list,
+  size cap enforced from `Content-Length` before buffering and chunked bodies refused (411),
+  content sniffed against the declared type, safe basename, re-upload of a name = new version,
+  same parsers/pack mappings as source records, audited.
+- Case conversation (`/cases/{id}/messages`): author-only corrections via `supersedes_id`;
+  deletion by author or tenant admin clears text, keeps who/when/why and digest.
+- Tenant settings (`/settings`): default model mode, task connector and retention, gated by
+  tier entitlements and by `tenant.manage_policy` / `tenant.manage_connectors`; read-only for
+  auditors; members listed.
+- Retention sweep (`workflow/retention.py`, job `retention_sweep`): deletes original bytes and
+  their chunks, model/tool artifacts and message text past the configured days; keeps
+  digests, findings and audit; API reports "deleted by retention policy". No schedule yet.
+- Log redaction (`telemetry/logging.py`) on API, worker, simulator and MCP processes,
+  including uvicorn access logs (OIDC `code`/`state`) and tracebacks.
+- UI: Tenant settings page, Conversation tab, upload form on the Evidence tab.
+- Docs: docs/privacy-and-retention.md, docs/security-and-threat-model.md (T1–T19).
+- Defects found while building this phase:
+  1. The dev access log printed full request URLs, so OIDC callback codes reached local
+     process output (never committed). Fixed by the redacting filter; covered by a test that
+     applies uvicorn's real logging config.
+  2. Chunked request bodies bypassed the `Content-Length` limit check; now refused with 411.
+  3. Connector changes were checked against `tenant.manage_policy` instead of
+     `tenant.manage_connectors`; fixed.
+  4. A retrieval isolation test first passed vacuously (query matched nothing); rewritten to
+     prove the foreign term matches under its own tenant and returns nothing under another.
+
+Phase 6 exit gate evidence: `tests/integration/test_hardening.py` (16): uploads (parse +
+versioning; HTML disguised as text/PDF, bad image, unknown kind; size, traversal filename,
+cross-tenant and role denial; chunked body 411; download no-store/attachment), conversation
+correction/deletion, settings roles vs tiers, retention deletion with honest API state,
+policy published before dispatch → `cancelled_before_dispatch` with no remote task, changed
+PO → new version 2 and new manifest digest, retrieval isolation before ranking, artifact key
+traversal/cross-tenant, pooled worker connection reuse across tenants;
+`tests/privacy/test_log_redaction.py` (14); `frontend/e2e/phase6.spec.ts` (4).
+Explicitly unverified with safe fallback: OCR (tesseract absent → `needs_review`), semantic
+retrieval (not built; lexical only), live local inference (Ollama absent → blocked, no hosted
+fallback).
+
+### Phase 7 — evaluation, replay and EvalSeal (exit gate passed locally)
+- Frozen benchmark `opsbridge-bench-v1` (commit 31515f0, before any held-out run): plan
+  (docs/evaluation-plan.md), machine-readable acceptance policy, digest manifest of splits,
+  document rendering, policies, prompts, scoring, modes and repeats. Corpus: dev 37,
+  validation 20, held-out 40, security 7 (104; target ~120 not reached), hand-labelled,
+  families and templates disjoint across splits; held-out includes an unseen invoice layout.
+- Stack-level harness (`evaluation/bench.py`): each trial runs through simulator HTTP,
+  services, worker and PostgreSQL (`opsbridge_eval`); rules_only and mock modes on the same
+  cases; 3 fixed repeats.
+- Strict replay (`evaluation/cassette.py`): keyed by case/mode/repeat/call with request
+  digests; a missing or diverged call fails the run (never a fallback or live call);
+  Python-level egress limited to loopback (`evaluation/egress.py`).
+- EvalSeal 2.2.0 receipts (`evaluation/receipt.py`): OpsBridge as `LocalCallableTarget`,
+  bound artifacts incl. `tool_acl`/`tool_responses` in EvalSeal's agent schemas, chained
+  ledger signed with a local Ed25519 key; `eval-verify` fails on changed or missing files.
+- Metrics (`evaluation/metrics.py`): case-majority, Wilson intervals, per-type
+  precision/recall, safe vs unsafe misses, EvalSeal flip rate, paired McNemar, frozen gate.
+- UI: Evaluation page (runs, comparability, uncertainty, gate, per-case verdicts for the
+  user's own pack, receipt download); API `/api/v1/tenants/{t}/evaluations`.
+- Worker survives a database outage with backoff (found when the DB container was
+  recreated); idempotent `opsbridge_eval` database creation for existing volumes.
+- **Held-out result (mocked responses):** next action 36/40 = 0.90 (Wilson 95% 0.77–0.96)
+  in both modes; all 4 misses are the unseen-layout family and are safe escalations; 0
+  unsafe misses; no discordant cases between modes. Gate: "pass (interval includes values
+  below the target)". Real-model quality: not evaluated. Details: docs/evaluation-results.md.
+- Defects found by validation/security runs and fixed before held-out: findings stating
+  numbers missing from their values (rules 1.0.1), validator rejecting magnitudes and
+  rule-title counts; harness ledger-linking bug.
+
+Phase 7 exit gate evidence: edited bound artifact fails verification and a missing one
+fails too (`tests/integration/test_evaluation.py::test_receipt_detects_edited_and_missing_artifacts_and_replay_miss_seals_nothing`);
+missing/diverged replay response fails closed with nothing sealed (same file,
+`test_strict_replay_reproduces_recorded_runs_and_fails_closed`); egress guard and manifest
+drift (`tests/evaluation/test_offline_guards.py`); results state mode, units, splits,
+settings, failures and uncertainty (docs/evaluation-results.md, results JSON);
+`make eval-offline` reproduced identical held-out verdicts; 14 ledger records verified.
+
+### Phase 8 — operations and staging preparation (exit gate passed locally; staging not deployed)
+- Telemetry: OpenTelemetry spans from the API request (perimeter server span; client trace
+  context not trusted; FastAPI native telemetry disabled) through the job (trace context in
+  the payload), durable steps, model and tool calls and connector attempts, with case, run,
+  operation, attempt, remote-reference and correlation ids; OTLP/HTTP or JSON-lines export
+  when configured. Prometheus metrics with bounded labels on API `/metrics` (optional token)
+  and worker `:9101/metrics`; queue gauges; tenant-scoped backlogs only via the aggregate
+  `ops.metrics_snapshot()` (migration 0004, NOLOGIN owner role, column-level grants). Logs
+  carry trace and correlation ids.
+- Health: worker `/healthz` (loop heartbeat) and `/readyz` (loop + database); API `/readyz`.
+- Alerts: 16 Prometheus rules with runbook links; `make alerts-test` (promtool, 9 cases);
+  live drills with injected failures (IdP down, worker down) fired and resolved.
+- Containers: one image (non-root, allow-list build context) for every role; compose
+  profile `app` with bootstrap, health probes and volumes; clean launch from empty volumes
+  and recovery drills (worker exit, database restart) passed; 12 browser tests passed
+  against the containers.
+- Backup/restore: `make backup`, `make restore-drill` (isolated database; counts, RLS,
+  artifact digests, citations; tampering detected).
+- Canary: `make eval-canary` against a pinned 64-case baseline (offline, egress-guarded).
+- CI: `.github/workflows/ci.yml` (least privilege, pinned actions, no secrets) — not run.
+- Docs: architecture.md, operations.md, deployment.md; threat model T20–T25.
+- Defects found in this phase:
+  1. The worker crashed when PostgreSQL restarted (fixed: backoff; re-verified in containers).
+  2. An alert rule could never fire (free/total ratio with mismatched labels; caught by promtool).
+  3. FastAPI 0.143 creates its own server spans that trust incoming `traceparent` and record
+     raw URLs; disabled in favour of the perimeter span (found by a failing trace test).
+  4. Podman re-splits exec-form health checks with spaces (`python -c "…"` became `import`);
+     replaced by an `opsbridge probe` command.
+  5. The MCP SDK's default DNS-rebinding allow-list rejected container hostnames; now an
+     explicit allow-list derived from each service's URL.
+  6. `verify-restore` with a relative path reported every artifact missing (uv changes the
+     working directory); relative paths are now refused.
+- Observed, not a defect of OpsBridge: the development laptop's data volume is ~90% full
+  (23 GiB free); the disk alert went pending.
+
+Phase 8 exit gate evidence: clean local launch (38 s from empty volumes, all health checks,
+browser tests) and recovery drills (worker exit → restarted in 7 s; database restart → API
+ready in 3 s, worker backed off without restarting; backup → isolated restore verified) —
+docs/operations.md "Drills". Staging plan with resources, secrets, cost considerations and
+rollback: docs/deployment.md. External deployment: not performed (no account/authorization).
+
+### Phase 9 — portability and handoff (exit gate passed locally; pilot not run)
+- Portability: `tests/integration/test_portability.py` runs the same core for both packs
+  (investigation, citations, pack-specific routing and approvers, execution, cross-tenant
+  denial, per-tenant roles for one user); `tests/portability/` proves no core package names
+  an organization.
+- Demo: docs/demo-script.md, with steps 4 (timeout reconciliation; unknown outcome recorded
+  by a person) and 6 (IT local-only policy) automated in `frontend/e2e/demo.spec.ts`.
+- UI: investigation shows model use and why a model was blocked; evidence table no longer
+  squeezed at 1280 px; README screenshots from the running app (synthetic data).
+- Docs: README, data-contracts, demo-script, operator-guide, pilot-plan,
+  integration-onboarding, case-study, final-report; traceability 24 verified_local,
+  3 implemented_unverified, 1 in_progress.
+- Handoff checks: `make verify` 14/14; fresh clone from GitHub (doctor, setup, lint,
+  typecheck, unit, canary, build, 18 receipts verify); offline replay at the final code
+  reproduced held-out verdicts; documented make targets and CLI commands exist; claims review.
+- Defects found in this phase:
+  1. **Duplicate external effect**: with the task tracker no longer honouring idempotency
+     keys and lookup unavailable, a resend after a timeout created a second task, because the
+     simulator connector hard-coded its capabilities. Fixed by capability discovery (weakest
+     contract when unknown); regression tests in-process and through MCP; recorded in
+     docs/evaluation-results.md and docs/case-study.md.
+  2. `make doctor` failed on a fresh checkout because `.env` did not exist yet (README order);
+     now reported as the next step.
+  3. The agents doc overstated what the validators guarantee; corrected.
+
+Phase 9 exit gate evidence: the owner-facing material exists and the demo's recovery and
+portability steps pass as browser tests; local completion is marked separately from live
+model, sandbox, staging and pilot validation (docs/final-report.md).
+
+## Verification evidence (local, macOS arm64, 2026-10-15)
+
+`make verify` → **14 passed, 0 failed, 0 skipped** (final, after Phase 9):
+
+| Gate | Result |
+|---|---|
+| backend ruff lint + format | passed |
+| backend mypy --strict (102 files) | passed |
+| backend unit + contract tests | 246 passed, 2 skipped (live GitHub test; one dev scenario with no reconcilable invoice in the finding-number invariant) |
+| frontend eslint (incl. jsx-a11y-x strict) + tsc | passed |
+| frontend unit tests (vitest) | 8 passed |
+| evaluation canary (pinned baseline) | 64 cases, 0 changes |
+| evaluation receipts (`eval-verify`: chain, signatures, bound artifacts) | 18 records ok |
+| migration drift (`alembic check`) | passed |
+| alert rules (promtool check + 9 unit cases) | passed |
+| integration tests (real PostgreSQL roles, Keycloak, simulator HTTP, MCP transport, benchmark harness, telemetry, portability, quotas, retention schedule) | 120 passed |
+| browser tests (Playwright, dev stack in MCP mode, incl. demo steps and axe accessibility scans) | 23 passed |
+| frontend production build | passed |
+| `make eval-offline` (run separately; appends replay records) | at commit 05081df: held-out and security replays identical to recordings; 18 receipts verified |
+| fresh clone from GitHub (separate directory) | doctor, setup, lint, typecheck, test (243 + 8), eval-canary, build pass; receipts verify |
+
+Phase 2 exit gate evidence:
+- 20 ordered / 18 received: `tests/integration/test_investigation_stack.py::test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch`
+  (citations to PO JSON pointer, receipt CSV row and invoice PDF line, all `valid`) and
+  `frontend/e2e/phase2.spec.ts` (citation opens highlighted source line).
+- Missing/unsupported inputs → needs_information/manual_review: `test_missing_receipt_is_needs_information_without_asserting_non_delivery`,
+  dev corpus cases fur-dev-012/013/015/019/020/021/024, it-dev-006/007/012.
+- Unreachable source retried, not treated as missing: `test_unreachable_source_is_retried_not_treated_as_missing`.
+- Worker restart resumes without re-running completed steps; stale worker cannot complete:
+  `test_worker_restart_resumes_from_durable_steps`.
+- Rules-only baseline on the seed corpus: `tests/evaluation/test_rules_baseline.py` (37 cases).
+
+Phase 1 exit gate evidence:
+- Logged-in user creates/reads own case: `tests/integration/test_api_cases.py::test_requester_creates_and_reads_own_case`, `frontend/e2e/phase1.spec.ts` (real login).
+- Other tenant denied via API: `test_other_tenant_cannot_access_case_by_any_route`; via
+  browser: `e2e/phase1.spec.ts::a user cannot open another organization's case`.
+- Other tenant denied via database role: `tests/integration/test_rls.py` (12 tests incl.
+  pooled-connection reuse across tenants and after an error).
+- Restart preserves the case: `test_case_survives_application_restart` (engine disposed,
+  new app instance).
+- No paid API used.
+
+## Blockers (affect only dependent work)
+
+| Blocker | Blocks | Unblocked by |
+|---|---|---|
+| No Anthropic credentials / live opt-in | Live hosted-model checks | Owner provides key, purpose and spend ceiling |
+| Ollama not installed | Live local-inference checks | Install Ollama and pull a pinned model |
+| No GitHub sandbox repo/token/authorization for issue writes | Live connector run (OB-22) | Owner names a sandbox repo, provides a fine-grained token, authorizes writes |
+| No genuine paper scan (only a clean raster) | Measuring OCR on real scans (skew, noise, stamps) | Owner provides approved scanned samples |
+| No cloud account/authorization | Staging deployment | Owner authorizes and provides account |
+| No operator participants | Pilot measurements | Pilot owner recruits participants |
+
+## Known defects and limitations
+
+- Rate limiting is per process and in memory; not a DDoS control.
+- Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
+  Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
+  queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
+- No genuine scanned paper document is in the fixtures. The OCR fixture is a clean raster made
+  by macOS from a hand-written invoice; OCR quality was measured on that one page only.
+  Tesseract is not installed on the development host (the real-engine tests skip there and
+  run in the app container and in hosted CI).
+- Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
+  route to needs_review rather than parse.
+- Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
+- Retention runs daily per configured tenant and on request; backups are outside its reach. Extracted
+  field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
+- Uploads are not malware-scanned; there is no in-app member editor (memberships are seeded).
+- Browser tests add conversation notes and upload versions to the local demo case INV-9001.
+- A run of a different model mode is refused (409) while another run is active, instead of
+  silently returning the active run (found by a browser test; fixed in Phase 3).
+- Development `.env` from the original Desktop location was uploaded to iCloud before
+  eviction (ADR 0009); values are local-only development secrets.
+
+- Benchmark: 104 cases (not ~120); labels authored by the same agent that wrote the rules;
+  mocked responses only; held-out pass sits exactly at the 0.90 target with a 0.77 lower
+  bound; supplier invoice layouts outside the pack mappings are escalated, not read.
+- The egress guard covers Python sockets; libpq connects only to the configured local DB.
+- The S3 artifact store is tested against SeaweedFS only: server-side encryption, IAM and
+  lifecycle behaviour on AWS S3 are unverified (docs/deployment.md).
+- Alerts are routed (Alertmanager: page and ticket receivers) but locally reach only a sink;
+  no real pager, queue or email is connected. Quota values are starting points.
+- Application processes must have synchronized clocks (NTP); comparisons against
+  database-written timestamps use the database clock (found when the Podman VM clock drifted
+  3 h 44 min after the laptop slept; fixed for quotas and retention).
+
+## Next executable task
+
+The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
+review and, if you choose, merge PR #1 (hosted CI passes; merging is yours); with authorization, the live
+GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
+pilot owner. Local improvement that needs no authorization: the next supplier invoice
+layout for the furniture pack (from approved real samples, not the held-out layout).
+
+### After-handoff hardening (2026-10-16)
+- Per-organization quotas: investigations per hour (429 `quota_exceeded`, `Retry-After`) and
+  model calls per day (recorded; rules fallback) — `test_quotas.py`.
+- Database clock for quota windows and retention cut-offs — regression test with a skewed
+  application clock.
+- Delegation key from a secret (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`); production never
+  generates one — `tests/mcp/test_delegation_key.py`.
+- Containers: read-only root filesystems, capabilities dropped, no-new-privileges; hardened
+  clean launch passed 12 browser tests.
+- Scheduled retention (daily per configured tenant via `ops.tenants_with_retention()`,
+  migration 0005) — `test_retention_schedule.py`.
+- Accessibility: axe-core WCAG 2.1 A/AA scans of every main screen, no serious or critical
+  violations — `e2e/a11y.spec.ts`.
+- Execution attempts keep their request and response as digest-matched artifacts.
+- Traceability: 25 verified_local, 3 implemented_unverified (OB-01, OB-22, OB-25).
+- `make verify` 14/14: unit 246 (+2 skipped), integration 120, browser 23.
+- S3-compatible artifact store (`S3ArtifactStore`, boto3 1.43.107), chosen when
+  `OPSBRIDGE_ARTIFACT_S3_BUCKET` is set: same tenant-prefixed content-addressed keys, every
+  read re-hashed, optional SSE-KMS request parameters, one cached client per endpoint. Uploads,
+  downloads, worker and retention go through `artifact_store(settings)`.
+  `verify-restore --artifact-bucket` checks a restored database against a bucket. Local
+  SeaweedFS 4.47 in `make infra-up` (:8333) for tests.
+  - Evidence: `tests/evidence/test_s3_store.py` (4: SSE/KMS and prefix passed through,
+    content-addressed puts, tenant keys, tamper detection, restore check through either
+    store); `tests/integration/test_s3_store.py` (3, SeaweedFS: round trip, cross-tenant key
+    refused, overwritten object refused, upload and download through the API stored only in
+    the bucket, retention deletes from the bucket, restore check reports a lost object);
+    `make restore-drill` still ok (190 artifacts, 18/18 citations).
+  - Found while testing: SeaweedFS's default 8 volume slots ran out after one or two buckets
+    (InternalError on PutObject); compose now sizes slots from free disk and tests delete their
+    buckets. SeaweedFS rejects SSE headers without its own KMS setup, so SSE is unit-tested
+    only. With AWS, `s3:ListBucket` is required (otherwise a missing object is 403, not 404)
+    and versioned buckets need a noncurrent-version lifecycle rule for retention.
+  - `make verify` 14/14 (2026-10-16): unit 250 (+2 skipped), integration 123, browser 23.
+  - `make image` rebuilt from the lock (28 s); an S3 round trip from that image with a
+    read-only root, all capabilities dropped and uid 10001 succeeded against SeaweedFS. The
+    full container stack was not relaunched with a bucket configured.
+- Alert routing: Alertmanager v0.34.1 in the observability profile routes `severity=page` to
+  a `page` receiver and everything else (including a rule without severity) to `ticket`, both
+  with resolution notices; a local sink (`scripts/alert_sink.py`) stands in for the pager and
+  the queue. `alert_drill.py --sink` waits for delivery, not just firing.
+  - Evidence: `make alerts-test` (amtool config check and 6 expected routes; a deliberately
+    wrong expectation fails the gate); `tests/contracts/test_alerting_config.py` (3: every rule's
+    severity reaches its own receiver, resolution on, runbook sections exist). Live drill:
+    Keycloak stopped → firing in Prometheus 145 s, delivered to `page` 155 s; restarted →
+    resolution delivered 296 s; synthetic ticket alert delivered to `ticket` 30 s, resolution
+    301 s.
+  - Observed: resolutions arrive at the next group interval (5 min), documented in the runbook.
+    The ticket route was drilled with an alert injected into Alertmanager, not one raised by
+    Prometheus (no ticket condition could be produced safely in the dev data).
+  - `make verify` 14/14 (2026-10-16): unit 253 (+2 skipped), integration 123, browser 23.
+
+### Hosted CI (2026-10-17)
+- PR #1 (`feat/opsbridge-foundation` → `main`) opened with the owner's authorization so the
+  workflow runs; not merged. Workflow: `.github/workflows/ci.yml`, three jobs on
+  ubuntu-24.04 with Docker, no secrets, no paid or external calls.
+- Run 38999032200 (60af83d): **failed**. checks: `make lint` (import order in
+  `mcp_services/client.py`); integration: passed (123); browser: 8 of 23 failed.
+- Run 38999754931 (30864ee): **failed**. checks and integration passed; browser: 4 of 23
+  failed.
+- Run 39000811947 (1f29197): **passed**. checks: ruff, mypy (103 files), unit 253 passed and 2
+  skipped, vitest 8, canary 64/64, 18 receipts, build; integration: promtool 16 rules,
+  amtool config and routes, 123 passed in 117 s; browser: 23 passed in 1.5 min.
+- Run 39001110996 (f2268a1, adds the MCP error description and its tests): **passed**. unit
+  255 passed and 2 skipped, integration 123, browser 23.
+- Defects the hosted runs found (details: docs/case-study.md, section 6):
+  1. A stale ruff cache passed an import-order error locally (`tests/mcp` made the MCP SDK
+     first-party). Fixed: `mcp` declared third-party; lint runs without the cache.
+  2. On a fresh machine `make dev` started an empty simulator, so every investigation ended in
+     needs-information; the README quickstart had the same gap. Fixed: the dev stack loads the
+     dev corpus before starting the simulator.
+  3. Browser tests depended on leftover data and could leak an injected simulator fault after
+     a timeout. Fixed: tests create their own case; faults are cleared before each demo test
+     and after the file. Reproduced on a fresh local database first (old test failed
+     identically); after the fix 23/23 there twice and on the long-lived dev database.
+  4. While diagnosing 3: MCP transport failures recorded only "ExceptionGroup … (2
+     sub-exceptions)". Fixed: attempt records name the leaf errors
+     (`tests/mcp/test_client_errors.py`).
+- Traceability: 19 verified_ci (every listed test also passed in run 39000811947),
+  6 verified_local (local-only drills, recorded benchmark, offline replay or review),
+  3 implemented_unverified (OB-01, OB-22, OB-25).
+
+### Optional local OCR (2026-10-19)
+- Brief §9 asked for an optional local OCR path; `ocr_image` existed but nothing called it.
+  Now, with `OPSBRIDGE_OCR_ENABLED=true` and tesseract present, image-only PDF pages are
+  decoded in the PDF worker subprocess (40 MP cap, 4 images per page, `ocr_max_pages` 3) and
+  read by tesseract (per-page timeout, one thread, validated language). The document stays
+  `needs_review`; OCR text is stored as `ocr:` evidence with a notice in the UI; field values
+  read from it are `ocr` / `needs_review` candidates, never records, so the rules never use
+  them; corrections of them are refused (409 `ocr_candidate`). Off by default.
+- App image: Debian tesseract 5.3.0 pinned (+about 90 MB). CI installs Ubuntu's tesseract and
+  sets `OPSBRIDGE_REQUIRE_OCR=1`, so the OCR tests fail instead of skipping there.
+- Fixture `fixtures/documents/rasterized_invoice.pdf`: the hand-written CUPS invoice rendered
+  by macOS Quick Look at about 200 dpi, grayscale JPEG in a PDF (no text layer). Oracle: the
+  hand-written text. Not a paper scan.
+- Evidence:
+  - Unit `tests/evidence/test_ocr.py` (9): off by default, missing tesseract reported, language
+    validated, 1-bit image round trip, decompression bomb refused, labelled `ocr:` lines,
+    page limit reported, candidates only.
+  - Real engine `tests/evidence/test_ocr_tesseract.py`: token recall ≥ 0.9 (threshold set before
+    measuring). In the app container, tesseract 5.3.0 read the page in 0.7 s with recall
+    0.938 (45/48): `ST-150` was read as `ST-15@`, the date gained a period, `Line`/`Amount`
+    became `pits`/`mount`. Passed in hosted CI with tesseract 5.3.4.
+  - Integration `tests/integration/test_ocr_path.py`: a perfect OCR reading of INV-9001 (whose
+    text-layer version is a cited quantity mismatch) still ends in human review, with OCR
+    candidates stored and no invoice record; a correction is refused.
+  - Browser `frontend/e2e/ocr.spec.ts` with real tesseract: passed against the hardened app
+    containers (13/13 with phases 1, 2, 4, 6) and in hosted CI.
+- Found by the new browser test on a fresh case: the upload confirmation vanished after the
+  first upload into an empty case (the uploader was remounted). Fixed.
+- `make verify` 14/14 locally (unit 264 + 3 skipped, integration 124, browser 23 + the OCR
+  spec skipped without tesseract). Hosted CI run 39204032292 at ed1e99b: passed (unit 265 +
+  2 skipped including the real OCR test, integration 124, browser 24 including the OCR spec).
+
+### Acceptance-scenario audit (2026-10-19)
+- `docs/acceptance-scenarios.md` maps each of the brief's 24 required scenarios (§19, wording
+  copied) to the tests that check its required result; `tests/contracts/test_acceptance_matrix.py`
+  fails if the table drifts from the brief or names a test that does not exist (checked by
+  pointing it at a missing test: it failed).
+- Gaps found and closed:
+  1. Scenario 8 (instructions in an *uploaded* document) had no test; only the source-system
+     email path did. Added `test_uploaded_document_instructions_are_data_not_authority`
+     (compromised model; the uploaded copy is marked so the test proves it was retrieved).
+  2. Scenario 21 (evaluator configuration changes): the frozen plan stored the scoring
+     definitions but `verify` never compared them with the code. Now a changed scoring stops
+     a benchmark run ("a grading change, not evidence of a model or rules change"), and the
+     evaluation API/view marks runs from another plan or scoring as not comparable.
+  3. Scenario 20 (repeated outputs differ): instability had no test and no sampling limit.
+     The summary now reports repeats per case, a Wilson interval over flipping cases and
+     what the repeat count cannot show; tested with synthetic disagreeing repeats.
+- `make verify` 14/14 locally (unit 270 + 3 skipped, integration 125, browser 23 + OCR spec
+  skipped without tesseract). Hosted CI run 39206261166 at 519a973: passed (unit 271 + 2
+  skipped, integration 125, browser 24).
+
+### Redaction corrupted identifiers (2026-10-19)
+- Found by hosted CI run 39207047346 on a docs-only commit: the observability integration test
+  failed because a case UUID ending in a 12-digit group was replaced by `[REDACTED:phone]` in
+  a trace attribute. Re-running locally then hit the same class with a simulator task
+  reference `T-1705292356`. The phone pattern matched digit runs right after a hyphen, and
+  digit-only UUID groups; the old redactor altered 2,306 of 200,000 random UUIDs (1.15%; 2,277
+  as phone, 30 as card numbers). It applies to logs, span attributes, hosted-model prompts and
+  external task titles/bodies, so ids and long hyphenated business numbers could be lost there.
+- Fix (`opsbridge-redact/2`): UUIDs are set aside before matching; no phone match right after a
+  hyphen; span correlation ids skip the identifier patterns (credentials still removed). Bare
+  long business numbers can still be redacted as phone numbers (documented).
+- Evidence: `tests/privacy/test_log_redaction.py` (20,000 random UUIDs unchanged; ids kept,
+  neighbouring phones/emails/cards still redacted) and `tests/privacy/test_trace_ids.py`; all
+  four new tests fail on the old code. `make verify` 14/14 (unit 274 + 3 skipped, integration
+  125, browser 23); observability test passed 6/6 repeats.
+- Hosted CI run 39208207212 at b22f5c0 (the fix): passed, all three jobs.
+
+### Outbound identifiers, benchmark replay, old Desktop copy (2026-10-19)
+- Old working copy: the 32 uncommitted files in `~/Desktop/Projects/Ops_Bridge` were checked
+  against the repository (30 superseded Phase 1 drafts; `perms.md` and `search.md` were saved
+  GitHub documentation pages, now cited by URL in docs/integrations.md). With the owner's
+  choice, they were zipped to `~/Projects/Ops_Bridge-desktop-leftovers-2026-10-14.zip` and the
+  old copy removed (ADR 0009).
+- External follow-up tasks lost a bare numeric PO number to redaction
+  (`Confirm delivered quantity for [REDACTED:phone]`), and hosted-model prompts the same way.
+  Outbound redaction now keeps the case's own identifiers exactly; personal data next to them
+  is still redacted. Tests through the executor, the Casework MCP hop and the hosted-call path
+  (a fake hosted provider records what would leave) fail on the old code; the hosted path had
+  no wiring test before.
+- Benchmark replay regression: `make eval-offline` no longer reproduced the held-out recording
+  (agent mode 16/40 with 72 `QuotaExceeded` errors, rules 33/40 with 12) and still exited 0. The
+  per-organization quotas of 2026-10-16 throttled the harness. Fixed: the harness switches
+  quotas off (`quotas_enabled`); a replay fails when a verdict differs from its recording;
+  `make eval-replay-check` (seals nothing) is a `make verify` gate and runs in hosted CI. The
+  receipts of the failed replay came from uncommitted code and were not kept; the replay at
+  e364dc0 reproduces held-out (36/40 both modes) and security (7/7) case by case; ledger 22
+  records verified.
+- `make verify` 15/15 (unit 278 + 3 skipped, integration 129, browser 23, replay check). Hosted
+  CI run 39295328458 at 4becef9: passed, including the benchmark replay on Linux.

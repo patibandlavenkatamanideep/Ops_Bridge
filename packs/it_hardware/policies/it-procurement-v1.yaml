@@ -1,0 +1,27 @@
+# IT hardware policy. Different tolerances, units and routing from furniture, and NO
+# defined precedence between receiving records and supplier messages, so conflicts
+# escalate. Sensitive data must stay on local inference (or go to a human).
+schema_version: 1
+policy_id: it-procurement
+version: 1
+effective_from: 2026-03-01
+description: IT hardware three-way match policy. Both price rules must pass; over-billing only.
+supported_currencies: [EUR, USD]
+price_tolerance: {absolute: "5.00", percent: "2.0", mode: both, direction: over_only}
+quantity_tolerance: {absolute: "0", percent: "0"}
+price_rounding: {places: 2, mode: ROUND_HALF_UP}
+unit_aliases:
+  EA: [each, ea, unit, piece, pcs, device, devices]
+  PK5: [pack of 5, pk5, 5-pack]
+unit_conversions:
+  - {from_unit: PK5, to_unit: EA, factor: "5"}
+source_precedence: []
+action_routes:
+  manual_review: {action_type: assign_case, assignee_group: it-procurement-leads, title_template: "Escalate {case} for review ({count} open condition(s))"}
+  missing_receipt: {action_type: create_follow_up_task, assignee_group: it-asset-intake, title_template: "Register asset intake for {po} ({case})"}
+  quantity_mismatch: {action_type: create_follow_up_task, assignee_group: it-asset-intake, title_template: "Reconcile delivered device count for {po} ({case})"}
+  price_mismatch: {action_type: create_supplier_message_draft, assignee_group: vendor-management, title_template: "Draft price query to vendor for {po} ({case})"}
+  matched: {action_type: record_review_note, title_template: "Matched: {case}"}
+allowed_actions: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]
+approval: {lifetime_minutes: 20, separation_of_duties: true}
+data_routing: local_required

@@ -1,0 +1,165 @@
+# promtool unit tests for alerts.yml (synthetic series). Run: make alerts-test
+rule_files: [alerts.yml]
+evaluation_interval: 1m
+tests:
+  - name: worker down for a minute pages; a single missed scrape does not
+    interval: 1m
+    input_series:
+      - series: 'up{job="opsbridge-worker",instance="w:9101"}'
+        values: '1 1 0 0 0'
+      - series: 'up{job="opsbridge-api",instance="a:8000"}'
+        values: '1 0 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OpsBridgeTargetDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: OpsBridgeTargetDown
+        exp_alerts:
+          - exp_labels: {severity: page, job: opsbridge-worker, instance: "w:9101"}
+            exp_annotations:
+              summary: "opsbridge-worker is not being scraped (process down or unreachable)"
+              runbook: docs/operations.md#api-or-worker-down
+
+  - name: identity provider down for two minutes
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_dependency_up{job="opsbridge-api",dependency="identity_provider"}'
+        values: '1 0 0 0 0'
+      - series: 'opsbridge_dependency_up{job="opsbridge-api",dependency="database"}'
+        values: '1 1 1 1 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: OpsBridgeDependencyDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: OpsBridgeDependencyDown
+        exp_alerts:
+          - exp_labels: {severity: page, job: opsbridge-api, dependency: identity_provider}
+            exp_annotations:
+              summary: "opsbridge-api cannot use identity_provider"
+              runbook: docs/operations.md#dependency-unavailable
+
+  - name: queue stalled only after five minutes above five minutes of age
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_queue_oldest_age_seconds{job="opsbridge-worker",kind="investigate"}'
+        values: '0+60x12'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: OpsBridgeQueueStalled
+        exp_alerts: []
+      - eval_time: 11m
+        alertname: OpsBridgeQueueStalled
+        exp_alerts:
+          - exp_labels: {severity: page, kind: investigate}
+            exp_annotations:
+              summary: "investigate jobs have waited more than 5 minutes"
+              runbook: docs/operations.md#queue-stalled
+
+  - name: an operation with an unknown outcome is surfaced immediately
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_state{job="opsbridge-worker",metric="operations_outcome_unknown"}'
+        values: '0 0 1 1'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: OpsBridgeOutcomeUnknown
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: OpsBridgeOutcomeUnknown
+        exp_alerts:
+          - exp_labels: {severity: ticket, job: opsbridge-worker, metric: operations_outcome_unknown}
+            exp_annotations:
+              summary: "1 operation(s) need human review: the external outcome is unknown"
+              runbook: docs/operations.md#ambiguous-outcomes
+
+  - name: dead jobs raise a ticket
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_jobs_processed_total{job="opsbridge-worker",kind="dispatch_operation",result="dead"}'
+        values: '0 0 1 1'
+      - series: 'opsbridge_jobs_processed_total{job="opsbridge-worker",kind="investigate",result="completed"}'
+        values: '0 5 10 15'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: OpsBridgeJobsExhausted
+        exp_alerts:
+          - exp_labels: {severity: ticket, kind: dispatch_operation}
+            exp_annotations:
+              summary: "dispatch_operation jobs exhausted their retries"
+              runbook: docs/operations.md#retries-and-dead-jobs
+
+  - name: connector failure ratio above 20% for ten minutes pages
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_connector_attempts_total{job="opsbridge-worker",phase="dispatch",result="succeeded"}'
+        values: '0+6x30'
+      - series: 'opsbridge_connector_attempts_total{job="opsbridge-worker",phase="dispatch",result="ambiguous_failure"}'
+        values: '0+4x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: OpsBridgeConnectorFailures
+        exp_alerts: []
+      - eval_time: 25m
+        alertname: OpsBridgeConnectorFailures
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: More than 20% of connector attempts are failing or ambiguous
+              runbook: docs/operations.md#connector-failures
+
+  - name: healthy connector traffic does not alert
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_connector_attempts_total{job="opsbridge-worker",phase="dispatch",result="succeeded"}'
+        values: '0+10x30'
+      - series: 'opsbridge_connector_attempts_total{job="opsbridge-worker",phase="dispatch",result="ambiguous_failure"}'
+        values: '0+1x30'
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: OpsBridgeConnectorFailures
+        exp_alerts: []
+
+  - name: API 5xx ratio
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_http_requests_total{job="opsbridge-api",method="GET",route="/api/v1/me",status_class="2xx"}'
+        values: '0+90x20'
+      - series: 'opsbridge_http_requests_total{job="opsbridge-api",method="GET",route="/api/v1/me",status_class="5xx"}'
+        values: '0+10x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OpsBridgeApiErrors
+        exp_alerts:
+          - exp_labels: {severity: page}
+            exp_annotations:
+              summary: More than 5% of API requests fail with 5xx
+              runbook: docs/operations.md#api-errors
+
+  - name: capacity
+    interval: 1m
+    input_series:
+      - series: 'opsbridge_artifact_fs_bytes{job="opsbridge-api",state="free"}'
+        values: '5x20'
+      - series: 'opsbridge_artifact_fs_bytes{job="opsbridge-api",state="total"}'
+        values: '100x20'
+      - series: 'opsbridge_db_pool_connections{job="opsbridge-api",pool="app",state="checked_out"}'
+        values: '7x20'
+      - series: 'opsbridge_db_pool_connections{job="opsbridge-api",pool="app",state="capacity"}'
+        values: '7x20'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: OpsBridgeArtifactDiskLow
+        exp_alerts:
+          - exp_labels: {severity: page, job: opsbridge-api}
+            exp_annotations:
+              summary: Less than 10% free space where artifacts are stored
+              runbook: docs/operations.md#capacity
+      - eval_time: 15m
+        alertname: OpsBridgeDbPoolSaturated
+        exp_alerts:
+          - exp_labels: {severity: ticket, job: opsbridge-api, pool: app}
+            exp_annotations:
+              summary: "opsbridge-api database pool app above 90%"
+              runbook: docs/operations.md#capacity
