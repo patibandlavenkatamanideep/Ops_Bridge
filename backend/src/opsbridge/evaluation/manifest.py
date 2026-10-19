@@ -155,6 +155,13 @@ def freeze(root: Path, benchmark_id: str, *, modes: list[str], repeats: int) -> 
     return body
 
 
+SCORING_CHANGED = (
+    "scoring definitions in this code differ from the frozen plan: results would be graded "
+    "differently, so they are not comparable with this benchmark's earlier runs (a grading "
+    "change, not evidence of a model or rules change); freeze a new benchmark id"
+)
+
+
 def verify(manifest: dict[str, Any], root: Path) -> list[str]:
     """Problems that make a run incomparable with the frozen plan (empty = comparable)."""
     problems: list[str] = []
@@ -180,6 +187,8 @@ def verify(manifest: dict[str, Any], root: Path) -> list[str]:
         problems.append(f"{path} was added after freezing")
     if now["prompts"] != manifest.get("prompts"):
         problems.append("prompt templates changed since freezing")
+    if manifest.get("scoring") != SCORING:
+        problems.append(SCORING_CHANGED)
     return problems
 
 
