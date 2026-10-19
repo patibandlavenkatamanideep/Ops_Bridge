@@ -17,6 +17,11 @@ interface Gate {
   detail?: string;
   reason?: string;
 }
+interface Comparability {
+  comparable: boolean;
+  reasons: string[];
+  note: string | null;
+}
 interface RunSummary {
   benchmark_id: string;
   run_id: string;
@@ -28,6 +33,7 @@ interface RunSummary {
     trial_errors: number }>;
   acceptance: Gate[];
   receipts_verified: boolean;
+  comparability?: Comparability;
 }
 interface PackCase {
   case_id: string;
@@ -51,7 +57,8 @@ interface ModeDetail {
   safe_misses: number;
   unsafe_misses: number;
   by_type: Record<string, { tp: number; fp: number; fn: number; precision: number | null; recall: number | null }>;
-  instability: { definition: string; cases_with_any_flip: number; mean_flip_rate: number | null };
+  instability: { definition: string; cases_with_any_flip: number; mean_flip_rate: number | null;
+    sampling_limit?: string };
   agent: { explanation_origins: Record<string, number>; model_calls: number; model_calls_rejected: number;
     citations: number; citations_valid: number; tool_calls: number; cost_usd: string };
   latency_ms: { median: number | null; p95: number | null };
@@ -73,6 +80,7 @@ interface RunDetail {
     improved: string[]; exact_mcnemar_p: number | null; note: string } | null;
   acceptance: Gate[];
   verification: { ok: boolean; chain: string | null; signatures: string | null };
+  comparability?: Comparability;
   not_evaluated: string[];
 }
 
@@ -145,7 +153,14 @@ function RunList({ tenant }: { tenant: string }) {
                   <td className="small">
                     {gates.length ? gates.map((g) => `${g.mode}: ${g.detail || g.status}`).join("; ") : "not evaluated"}
                   </td>
-                  <td>{r.receipts_verified ? "verified" : "NOT verified"}</td>
+                  <td>
+                    {r.receipts_verified ? "verified" : "NOT verified"}
+                    {r.comparability && !r.comparability.comparable && (
+                      <div className="small" title={r.comparability.reasons.join("; ")}>
+                        Not comparable: {r.comparability.reasons.join("; ")}
+                      </div>
+                    )}
+                  </td>
                 </tr>
               );
             })}
@@ -197,6 +212,11 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
           <a href={tenantPath(tenant, `/evaluations/${benchmark}/${runId}/receipt`)}>Download EvalSeal records</a>
         </dd>
       </dl>
+      {d.comparability && !d.comparability.comparable && (
+        <p className="notice" role="note">
+          {d.comparability.note} Reasons: {d.comparability.reasons.join("; ")}.
+        </p>
+      )}
       <p className="muted small">
         A valid signature shows the sealed files are unchanged relative to the local signing key. It does not show
         when the run happened, that the inputs were true, or that no other runs were made.
@@ -237,6 +257,7 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
             <dd>
               {m.instability.cases_with_any_flip} case(s) with any flip; mean {m.instability.mean_flip_rate ?? "—"} (
               {m.instability.definition})
+              {m.instability.sampling_limit && <div className="muted small">Limit: {m.instability.sampling_limit}</div>}
             </dd>
             <dt>Evidence</dt>
             <dd>
