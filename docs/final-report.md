@@ -84,8 +84,9 @@ Details and reproduction: docs/case-study.md.
 
 - 104 synthetic benchmark cases, labelled by the same author that wrote the rules; held-out
   pass exactly at the target with a wide interval.
-- Supplier invoice layouts outside the pack mappings are escalated, not read; OCR not
-  installed; retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
+- Supplier invoice layouts outside the pack mappings are escalated, not read; optional OCR
+  (off by default) reads scanned pages for review only and is untested on a real paper scan;
+  retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
   (encryption and IAM unverified); quota values are starting points.
 - Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
 - Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
