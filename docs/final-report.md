@@ -7,7 +7,7 @@ github.com/patibandlavenkatamanideep/Ops_Bridge (PR #1 to `main` open for hosted
 
 | Level | Result |
 |---|---|
-| **Local application complete** | Yes. Phases 0–9 built and verified on one macOS machine (Podman); `make verify` 14/14 gates; clean-clone and clean-container launches reproduced. |
+| **Local application complete** | Yes. Phases 0–9 built and verified on one macOS machine (Podman); `make verify` 15/15 gates; clean-clone and clean-container launches reproduced. |
 | **Real model validated** | No. No API key, opt-in or local model was available. The agent path is verified with a deterministic mock; real-model quality is *not evaluated*. |
 | **External connector validated** | No. The GitHub Issues connector is contract-tested against a fake of the documented API; a live run needs a sandbox repository, a fine-grained token and your authorization. |
 | **Hosted CI** | Passing. GitHub Actions on ubuntu-24.04 (PR #1, run 39000811947 at 1f29197): checks, integration 123, browser 23. The first two runs failed and exposed three real defects, fixed (docs/case-study.md, section 6). |
@@ -34,7 +34,7 @@ backups, containers and an evaluation view are in place. See README.md for scree
 
 | Check | Result |
 |---|---|
-| `make verify` (2026-10-16) | 14 passed, 0 failed, 0 skipped — backend lint/format/mypy (103 files); unit + contract 253 passed, 2 skipped (live GitHub; one corpus case without a reconcilable invoice); vitest 8; canary 64/64, 0 changes; receipts 18 records ok; migration drift none; promtool rules and amtool routes ok; integration 123 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe accessibility scans); build ok |
+| `make verify` (2026-10-19) | 15 passed, 0 failed, 0 skipped — backend lint/format/mypy (104 files); unit + contract 278 passed, 3 skipped (live GitHub; one corpus case without a reconcilable invoice; the real-engine OCR test where tesseract is not installed); vitest 8; canary 64/64, 0 changes; receipts 22 records ok; migration drift none; promtool rules and amtool routes ok; benchmark replay reproduces held-out and security recordings case by case; integration 129 passed (real PostgreSQL roles, Keycloak, simulator HTTP, MCP, S3-compatible store); browser 23 passed (incl. axe scans; the OCR spec skips without tesseract); build ok |
 | Hosted CI (2026-10-17) | Run 39000811947 at 1f29197, ubuntu-24.04: ruff, mypy, unit 253 passed and 2 skipped, vitest 8, canary 64/64, 18 receipts, build; promtool and amtool; integration 123 passed; browser 23 passed |
 | Acceptance scenarios (brief §19) | 24 of 24 mapped to automated tests that check the required result (docs/acceptance-scenarios.md, kept true by a contract test); all pass locally and in hosted CI. The audit found three gaps, now closed: no test for instructions in an *uploaded* document, scoring definitions missing from the frozen-plan check, instability reported without its sampling limit |
 | Clean clone from GitHub | `make doctor`, `setup`, `lint`, `typecheck`, `test` (243 + 8), `eval-canary`, `build` pass; all 18 receipts verify |
@@ -44,8 +44,9 @@ backups, containers and an evaluation view are in place. See README.md for scree
 | Held-out benchmark (40 cases, mocked responses) | Next action 36/40 = 0.90 (Wilson 95% 0.77–0.96) in rules-only and agent-assisted modes; 4 safe misses (unseen invoice layout), 0 unsafe; gate "pass (interval includes values below the target)"; strict offline replay at the final commit reproduced identical verdicts |
 | Demo script | Steps 4 and 6 automated in `frontend/e2e/demo.spec.ts` and passing |
 
-The two skipped unit tests are not failures being hidden: one is the live GitHub test (runs
-only with `OPSBRIDGE_RUN_LIVE`), the other a parametrized case with nothing to check.
+The skipped tests are not failures being hidden: the live GitHub test (runs only with
+`OPSBRIDGE_RUN_LIVE`), a parametrized case with nothing to check, and the real-engine OCR tests
+on a machine without tesseract (hosted CI installs it and requires them).
 
 ## Start and demo
 
