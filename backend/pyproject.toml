@@ -88,5 +88,6 @@ markers = [
     "integration: needs PostgreSQL (and other local services) from the compose stack",
     "keycloak: needs the local Keycloak container",
     "live: contacts a real external provider; never runs by default",
+    "ocr: runs the real tesseract engine; skipped where it is missing unless OPSBRIDGE_REQUIRE_OCR=1",
 ]
 filterwarnings = ["error::pytest.PytestUnraisableExceptionWarning"]
