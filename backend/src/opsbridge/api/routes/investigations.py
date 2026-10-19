@@ -187,6 +187,7 @@ def start(
             case_id,
             body.model_mode if body else None,
             request.state.correlation_id,
+            enforce_quota=state.settings.quotas_enabled,
         )
     except (svc.NotFound, svc.Conflict) as exc:
         raise _map_errors(exc) from exc
