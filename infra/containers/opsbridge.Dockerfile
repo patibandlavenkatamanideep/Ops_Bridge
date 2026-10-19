@@ -23,6 +23,11 @@ COPY backend/src ./src
 RUN uv sync --frozen --no-dev
 
 FROM docker.io/library/python:3.12.15-slim-bookworm
+# Optional local OCR for PDFs without a text layer (off unless OPSBRIDGE_OCR_ENABLED=true):
+# Debian's tesseract with English data, pinned. OCR text is never authoritative.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends tesseract-ocr=5.3.0-2 tesseract-ocr-eng=1:4.1.0-2 \
+ && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 opsbridge \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --shell /usr/sbin/nologin opsbridge
 COPY --from=python /app/backend /app/backend
