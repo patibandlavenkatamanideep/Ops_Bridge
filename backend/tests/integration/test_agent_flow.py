@@ -6,6 +6,7 @@ embedded in a supplier document. The system's guarantees must hold anyway.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from pathlib import Path
@@ -13,7 +14,7 @@ from typing import Any
 
 import httpx
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import Engine, func, select, text
 
 from opsbridge.agents.adapters import ScriptedModelAdapter
 from opsbridge.agents.contracts import ModelUnavailable
@@ -213,6 +214,71 @@ def test_uploaded_document_instructions_are_data_not_authority(stack, worker_db:
         case = s.get(Case, uuid.UUID(case_id))
         assert case is not None and case.status == "awaiting_review"
         assert s.execute(select(func.count()).select_from(Operation)).scalar_one() == 0
+
+
+class _HostedCapture(ScriptedModelAdapter):
+    """Stands in for a hosted provider: records exactly what would leave the deployment."""
+
+    name = "fake-hosted"
+    capabilities = dataclasses.replace(
+        ScriptedModelAdapter.capabilities, provider="fake-hosted", hosted=True, local=False
+    )
+
+
+def test_hosted_calls_are_redacted_but_keep_the_cases_own_identifiers(
+    stack, worker_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    from .test_approvals_execution import NUMERIC_PO, seed_numeric_po_case
+
+    st = stack
+    invoice = seed_numeric_po_case(st)
+    httpx.put(
+        f"{st['base']}/_control/records/demo-furniture/messages/MSG-HOSTED-1?po_number={NUMERIC_PO}",
+        content=f"Re PO {NUMERIC_PO}: call Dana on +1 415 555 0134 or dana@acme.example.".encode(),
+        headers={"content-type": "text/plain"},
+    ).raise_for_status()
+    with migrator_engine.begin() as conn:  # this test only: a tier that may use a hosted model
+        conn.execute(text("UPDATE tenants SET tier = 'enhanced' WHERE slug = 'demo-furniture'"))
+    hosted = _HostedCapture(
+        [_explanation(evidence_requests=[{"tool": "search_case_evidence", "query": "call Dana"}])]
+    )
+    st["deps"].adapter_overrides = {"anthropic": hosted}
+    st["deps"].settings = st["settings"].model_copy(
+        update={
+            "live_model_opt_in": True,
+            "live_spend_ceiling_usd": "1.00",
+            "anthropic_price_input_per_mtok_usd": "3",
+            "anthropic_price_output_per_mtok_usd": "15",
+            "anthropic_model": "fake-hosted-model",
+        }
+    )
+    try:
+        case_id = open_case(st, "furn-investigator", "demo-furniture", invoice)
+        r = call(
+            st["client"],
+            st["actors"]["furn-investigator"],
+            "POST",
+            f"{T}/cases/{case_id}/investigations",
+            json={"model_mode": "anthropic"},
+        )
+        assert r.status_code == 202, r.text
+        while st["worker"].run_once():
+            pass
+    finally:
+        st["deps"].adapter_overrides = None
+        st["deps"].settings = st["settings"]
+
+    sent = [q.user for q in hosted.requests]
+    assert len(sent) >= 2  # the explanation, then the round with the searched message
+    assert all(NUMERIC_PO in u for u in sent)  # the case's own PO number reaches the model
+    assert (
+        "call Dana" in sent[1] and "[REDACTED:phone]" in sent[1] and "[REDACTED:email]" in sent[1]
+    )
+    assert not any("415 555 0134" in u or "dana@acme.example" in u for u in sent)
+    tenant_id = _tenant_of(worker_db, r.json()["run_id"])
+    calls = _rows(worker_db, tenant_id, ModelCall, r.json()["run_id"])
+    assert calls and all(c.redaction.get("applied") for c in calls)
+    assert {c.redaction.get("version") for c in calls} == {"opsbridge-redact/2"}
 
 
 def test_local_required_policy_blocks_model_without_hosted_fallback(
