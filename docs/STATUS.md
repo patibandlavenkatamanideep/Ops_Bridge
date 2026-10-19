@@ -543,3 +543,26 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   four new tests fail on the old code. `make verify` 14/14 (unit 274 + 3 skipped, integration
   125, browser 23); observability test passed 6/6 repeats.
 - Hosted CI run 39208207212 at b22f5c0 (the fix): passed, all three jobs.
+
+### Outbound identifiers, benchmark replay, old Desktop copy (2026-10-19)
+- Old working copy: the 32 uncommitted files in `~/Desktop/Projects/Ops_Bridge` were checked
+  against the repository (30 superseded Phase 1 drafts; `perms.md` and `search.md` were saved
+  GitHub documentation pages, now cited by URL in docs/integrations.md). With the owner's
+  choice, they were zipped to `~/Projects/Ops_Bridge-desktop-leftovers-2026-10-14.zip` and the
+  old copy removed (ADR 0009).
+- External follow-up tasks lost a bare numeric PO number to redaction
+  (`Confirm delivered quantity for [REDACTED:phone]`), and hosted-model prompts the same way.
+  Outbound redaction now keeps the case's own identifiers exactly; personal data next to them
+  is still redacted. Tests through the executor, the Casework MCP hop and the hosted-call path
+  (a fake hosted provider records what would leave) fail on the old code; the hosted path had
+  no wiring test before.
+- Benchmark replay regression: `make eval-offline` no longer reproduced the held-out recording
+  (agent mode 16/40 with 72 `QuotaExceeded` errors, rules 33/40 with 12) and still exited 0. The
+  per-organization quotas of 2026-10-16 throttled the harness. Fixed: the harness switches
+  quotas off (`quotas_enabled`); a replay fails when a verdict differs from its recording;
+  `make eval-replay-check` (seals nothing) is a `make verify` gate and runs in hosted CI. The
+  receipts of the failed replay came from uncommitted code and were not kept; the replay at
+  e364dc0 reproduces held-out (36/40 both modes) and security (7/7) case by case; ledger 22
+  records verified.
+- `make verify` 15/15 (unit 278 + 3 skipped, integration 129, browser 23, replay check). Hosted
+  CI run 39295328458 at 4becef9: passed, including the benchmark replay on Linux.
