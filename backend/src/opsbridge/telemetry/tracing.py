@@ -28,7 +28,7 @@ from opentelemetry.trace import Span, SpanKind, Status, StatusCode
 
 from opsbridge import __version__
 
-from .logging import scrub
+from .logging import scrub, scrub_credentials
 
 tracer = trace.get_tracer("opsbridge", __version__)
 
@@ -109,12 +109,19 @@ def _safe(value: Any) -> Any:
     return scrub(str(value))[:200]
 
 
+def _safe_id(value: Any) -> str:
+    # System-generated identifiers are not personal data, and the identifier patterns would
+    # corrupt some of them (digit-only UUID groups, numeric task references); credentials are
+    # still removed in case one is ever passed by mistake.
+    return scrub_credentials(str(value))[:200]
+
+
 def set_ids(span: Span | None = None, **ids: Any) -> None:
     """Attach correlation identifiers (opsbridge.<name>) to a span; None values are skipped."""
     target = span or trace.get_current_span()
     for name, value in ids.items():
         if value is not None:
-            target.set_attribute(f"opsbridge.{name}", _safe(value))
+            target.set_attribute(f"opsbridge.{name}", _safe_id(value))
 
 
 @contextmanager
