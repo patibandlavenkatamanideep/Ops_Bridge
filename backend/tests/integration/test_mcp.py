@@ -335,6 +335,24 @@ def test_approved_operation_executes_through_casework_mcp(stack, mcp, mcp_db: Da
     assert actions[:2] == ["mcp.casework.create_follow_up_task", "mcp.casework.get_follow_up_task"]
 
 
+def test_a_bare_numeric_po_number_survives_the_mcp_hop(stack, mcp) -> None:  # type: ignore[no-untyped-def]
+    from .test_approvals_execution import NUMERIC_PO, seed_numeric_po_case
+
+    st = stack
+    original = st["exec"]["exec"]
+    _via_mcp(st, mcp, {})
+    try:
+        case_id, prop = prepared(st, seed_numeric_po_case(st))
+        assert approve(st, case_id, prop).status_code == 200
+        drain(st)
+    finally:
+        st["exec"]["exec"] = original
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed"
+    [task] = remote_tasks(st, op)
+    assert NUMERIC_PO in task["title"] and "[REDACTED" not in task["title"]
+
+
 def test_timeout_after_commit_behind_the_mcp_hop_is_reconciled(stack, mcp) -> None:  # type: ignore[no-untyped-def]
     st = stack
     original = st["exec"]["exec"]
