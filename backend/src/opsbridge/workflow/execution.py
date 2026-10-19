@@ -45,6 +45,7 @@ from opsbridge.connectors.tasks import (
     TaskConnector,
     TaskRequest,
 )
+from opsbridge.evidence.records import case_identifiers
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
@@ -152,7 +153,7 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         op.status = "executing"
         op.executed_by = EXECUTOR
         op.row_version += 1
-        snapshot = _snapshot(op, attempts)
+        snapshot = _snapshot(op, attempts, case_identifiers(s, op.case_id))
     if snapshot["action_type"] != "create_follow_up_task":
         _execute_local(deps, job, snapshot)
         return
@@ -169,7 +170,7 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
     _create(deps, job, snapshot, connector)
 
 
-def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
+def _snapshot(op: Operation, attempts: list[Attempt], keep: list[str]) -> dict[str, Any]:
     return {
         "operation_id": op.id,
         "tenant_id": op.tenant_id,
@@ -182,6 +183,7 @@ def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
         "retry_index": len(attempts),
         "last_attempt_id": attempts[-1].id if attempts else None,
         "approved_by": op.approved_by,
+        "keep": keep,  # the case's own identifiers survive outbound redaction
     }
 
 
@@ -422,10 +424,11 @@ def _complete(
 def _task_request(snap: dict[str, Any]) -> TaskRequest:
     params = snap["payload"]["parameters"]
     # Only synthetic/redacted content leaves OpsBridge; the marker enables reconciliation.
-    body = redact(params.get("body") or "").text
+    keep = snap.get("keep", [])
+    body = redact(params.get("body") or "", keep).text
     body = f"{body}\n\nOpsBridge operation marker: {snap['marker']}"
     return TaskRequest(
-        title=redact(params["title"]).text,
+        title=redact(params["title"], keep).text,
         body=body,
         assignee_group=params.get("assignee_group"),
         marker=snap["marker"],
