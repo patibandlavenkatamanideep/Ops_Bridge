@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
+        test-e2e eval-offline eval-replay-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -64,10 +64,13 @@ test-integration: ## Integration tests against real PostgreSQL, Keycloak, HTTP a
 test-e2e: ## Playwright browser tests against the running dev stack
 	cd frontend && npm run e2e
 
-eval-offline: ## Replay the declared benchmark offline (no paid calls, network egress blocked)
+eval-offline: ## Replay the declared benchmark offline and seal receipts; fails if verdicts differ
 	$(PY) python -m opsbridge.cli eval-bench --split heldout --replay
 	$(PY) python -m opsbridge.cli eval-bench --split security --replay
 	$(PY) python -m opsbridge.cli eval-verify
+
+eval-replay-check: ## Replay recorded runs offline and compare verdicts case by case (seals and writes nothing tracked)
+	$(PY) python -m opsbridge.cli eval-replay-check
 
 eval-canary: ## Offline regression check (rules path, dev/validation/security) against the pinned baseline
 	$(PY) python -m opsbridge.cli eval-canary
