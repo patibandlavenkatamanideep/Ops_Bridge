@@ -77,6 +77,8 @@ jobs:
       - run: make migrate
       - run: make alerts-test
       - run: make test-integration
+      - name: Benchmark replay reproduces the recorded runs (offline, seals nothing)
+        run: make eval-replay-check
 
   e2e:
     name: browser tests against the dev stack
