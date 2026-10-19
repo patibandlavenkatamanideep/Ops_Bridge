@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-17 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-19 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -347,7 +347,7 @@ Phase 1 exit gate evidence:
 | No Anthropic credentials / live opt-in | Live hosted-model checks | Owner provides key, purpose and spend ceiling |
 | Ollama not installed | Live local-inference checks | Install Ollama and pull a pinned model |
 | No GitHub sandbox repo/token/authorization for issue writes | Live connector run (OB-22) | Owner names a sandbox repo, provides a fine-grained token, authorizes writes |
-| Tesseract not installed | OCR path for scanned PDFs | Install tesseract; otherwise scanned documents route to needs_review |
+| No genuine paper scan (only a clean raster) | Measuring OCR on real scans (skew, noise, stamps) | Owner provides approved scanned samples |
 | No cloud account/authorization | Staging deployment | Owner authorizes and provides account |
 | No operator participants | Pilot measurements | Pilot owner recruits participants |
 
@@ -357,8 +357,10 @@ Phase 1 exit gate evidence:
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
   queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
-- No genuine scanned paper document is in the fixtures; the scanned case is a synthetic
-  image-only PDF. OCR is unverified (tesseract not installed) and routes to needs_review.
+- No genuine scanned paper document is in the fixtures. The OCR fixture is a clean raster made
+  by macOS from a hand-written invoice; OCR quality was measured on that one page only.
+  Tesseract is not installed on the development host (the real-engine tests skip there and
+  run in the app container and in hosted CI).
 - Pack regexes for PDF/email extraction are template-specific; unseen supplier layouts will
   route to needs_review rather than parse.
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
@@ -472,3 +474,35 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Traceability: 19 verified_ci (every listed test also passed in run 39000811947),
   6 verified_local (local-only drills, recorded benchmark, offline replay or review),
   3 implemented_unverified (OB-01, OB-22, OB-25).
+
+### Optional local OCR (2026-10-19)
+- Brief §9 asked for an optional local OCR path; `ocr_image` existed but nothing called it.
+  Now, with `OPSBRIDGE_OCR_ENABLED=true` and tesseract present, image-only PDF pages are
+  decoded in the PDF worker subprocess (40 MP cap, 4 images per page, `ocr_max_pages` 3) and
+  read by tesseract (per-page timeout, one thread, validated language). The document stays
+  `needs_review`; OCR text is stored as `ocr:` evidence with a notice in the UI; field values
+  read from it are `ocr` / `needs_review` candidates, never records, so the rules never use
+  them; corrections of them are refused (409 `ocr_candidate`). Off by default.
+- App image: Debian tesseract 5.3.0 pinned (+about 90 MB). CI installs Ubuntu's tesseract and
+  sets `OPSBRIDGE_REQUIRE_OCR=1`, so the OCR tests fail instead of skipping there.
+- Fixture `fixtures/documents/rasterized_invoice.pdf`: the hand-written CUPS invoice rendered
+  by macOS Quick Look at about 200 dpi, grayscale JPEG in a PDF (no text layer). Oracle: the
+  hand-written text. Not a paper scan.
+- Evidence:
+  - Unit `tests/evidence/test_ocr.py` (9): off by default, missing tesseract reported, language
+    validated, 1-bit image round trip, decompression bomb refused, labelled `ocr:` lines,
+    page limit reported, candidates only.
+  - Real engine `tests/evidence/test_ocr_tesseract.py`: token recall ≥ 0.9 (threshold set before
+    measuring). In the app container, tesseract 5.3.0 read the page in 0.7 s with recall
+    0.938 (45/48): `ST-150` was read as `ST-15@`, the date gained a period, `Line`/`Amount`
+    became `pits`/`mount`. Passed in hosted CI with tesseract 5.3.4.
+  - Integration `tests/integration/test_ocr_path.py`: a perfect OCR reading of INV-9001 (whose
+    text-layer version is a cited quantity mismatch) still ends in human review, with OCR
+    candidates stored and no invoice record; a correction is refused.
+  - Browser `frontend/e2e/ocr.spec.ts` with real tesseract: passed against the hardened app
+    containers (13/13 with phases 1, 2, 4, 6) and in hosted CI.
+- Found by the new browser test on a fresh case: the upload confirmation vanished after the
+  first upload into an empty case (the uploader was remounted). Fixed.
+- `make verify` 14/14 locally (unit 264 + 3 skipped, integration 124, browser 23 + the OCR
+  spec skipped without tesseract). Hosted CI run 39204032292 at ed1e99b: passed (unit 265 +
+  2 skipped including the real OCR test, integration 124, browser 24 including the OCR spec).
