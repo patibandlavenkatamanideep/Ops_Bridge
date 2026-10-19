@@ -105,7 +105,7 @@ Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
 [operations](docs/operations.md) · [deployment](docs/deployment.md) ·
 [operator guide](docs/operator-guide.md) · [pilot plan](docs/pilot-plan.md) ·
 [integration onboarding](docs/integration-onboarding.md) · [case study](docs/case-study.md) ·
-[final report](docs/final-report.md) · [status](docs/STATUS.md) ·
+[acceptance scenarios](docs/acceptance-scenarios.md) · [final report](docs/final-report.md) · [status](docs/STATUS.md) ·
 [requirements traceability](docs/requirements-traceability.md)
 
 ## License
