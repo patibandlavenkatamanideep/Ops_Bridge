@@ -5,6 +5,8 @@ from __future__ import annotations
 import io
 import logging
 import logging.config
+import random
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -33,6 +35,39 @@ CODE = "f3a9c1d2-synthetic-auth-code"
 )
 def test_scrub_removes_credentials_and_identifiers(raw: str, leak: str) -> None:
     assert leak not in scrub(raw)
+
+
+def test_uuids_are_never_altered_even_when_their_groups_look_like_numbers() -> None:
+    # Hosted CI run 39207047346 failed when a case id ended in a 12-digit group that the phone
+    # pattern redacted inside a trace attribute.
+    for uid in (
+        "2760c078-1f10-4f77-983b-978115788294",
+        "12345678-1234-4234-9234-123456789012",
+        "41111111-1111-4111-8111-111111111111",
+    ):
+        assert scrub(f"case {uid} dispatched") == f"case {uid} dispatched"
+    rng = random.Random(20261019)
+    for _ in range(20_000):
+        uid = str(uuid.UUID(int=rng.getrandbits(128), version=4))
+        assert scrub(uid) == uid
+
+
+def test_identifiers_next_to_a_uuid_are_still_redacted() -> None:
+    uid = "2760c078-1f10-4f77-983b-978115788294"
+    out = scrub(
+        f"{uid} call +1 415 555 0134 or ap@acme-furniture.example; card 4111 1111 1111 1111"
+    )
+    assert uid in out
+    assert "555 0134" not in out and "ap@acme" not in out and "4111 1111" not in out
+
+
+def test_hyphen_joined_ids_are_kept_and_phone_numbers_are_not() -> None:
+    # Task references (T-1705292356) and long business numbers (INV-100023456) are ids; the
+    # simulator's random task reference was redacted as a phone number in a trace attribute.
+    for ident in ("T-1705292356", "INV-100023456", "PO-4500012345", "GRN-123456789"):
+        assert scrub(f"created {ident}") == f"created {ident}"
+    for phone in ("call 4155550134", "call +1 415 555 0134", "call (415) 555-0134 today"):
+        assert "[REDACTED:phone]" in scrub(phone), phone
 
 
 def test_scrub_keeps_operational_detail() -> None:
