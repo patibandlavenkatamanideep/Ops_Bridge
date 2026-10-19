@@ -20,6 +20,7 @@ from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import TIERS, Principal, require
 from opsbridge.canonical import digest
 from opsbridge.evidence.ingest import IngestRejected, ingest
+from opsbridge.evidence.parsers import OcrSettings
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
@@ -77,6 +78,7 @@ def upload_document(
     content_type: str,
     data: bytes,
     correlation_id: str | None,
+    ocr: OcrSettings | None = None,
 ) -> dict[str, Any]:
     require(p, "evidence.upload")
     if kind not in UPLOAD_KINDS:
@@ -110,6 +112,7 @@ def upload_document(
                 content_type=content_type,
                 filename=filename,
                 created_by=p.user_id,
+                ocr=ocr,
             )
         except IngestRejected as exc:
             raise Conflict("upload_rejected", exc.reason) from exc
