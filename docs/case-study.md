@@ -78,6 +78,7 @@ route template. Test: `test_incoming_trace_context_is_not_trusted`.
 | Findings stated numbers missing from their own values, so faithful model text failed validation (Phase 7) | validation benchmark: 12 rejected model outputs | values completed (rules 1.0.1) + invariant test over dev and validation corpora |
 | Podman re-split health-check arguments (`python -c "…"` became `import`) (Phase 8) | clean-launch drill: simulator never healthy | `opsbridge probe` command with no spaces in arguments |
 | MCP SDK rejected container hostnames (DNS-rebinding default) (Phase 8) | container profile design review | explicit allowed hosts from each service URL; protection kept on |
+| The upload confirmation disappeared after the first upload into a case with no documents: the form moved in the component tree and was remounted (after hosted CI) | the new OCR browser test, run on a fresh case | the uploader keeps one position in the tree |
 | Evidence table squeezed into unreadable columns at 1280 px (Phase 9) | inspecting the real UI for README screenshots | document list moves above the panels below 1440 px |
 
 ## 6. What the first hosted CI runs found (2026-10-17)
