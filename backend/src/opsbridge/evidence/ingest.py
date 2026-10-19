@@ -21,7 +21,14 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from opsbridge.domain.records import SourceRef
-from opsbridge.mapping import DocRef, MappingResult, PackSpec, RecordType, map_document
+from opsbridge.mapping import (
+    DocRef,
+    MappingResult,
+    PackSpec,
+    RecordType,
+    map_document,
+    map_ocr_candidates,
+)
 
 from ..persistence.models import (
     Artifact,
@@ -40,7 +47,7 @@ from ..persistence.models import (
     SupplierRecord,
 )
 from .normalize import NORMALIZATION_VERSION, normalized_digest
-from .parsers import MAX_BYTES, ParsedDocument, parse, safe_filename
+from .parsers import MAX_BYTES, OcrSettings, ParsedDocument, parse, safe_filename
 from .storage import ArtifactStore
 
 CHUNK_LINES = 12
@@ -91,11 +98,12 @@ def ingest(
     filename: str | None = None,
     created_by: uuid.UUID | None = None,
     classification: str = "internal",
+    ocr: OcrSettings | None = None,
 ) -> IngestResult:
     """Ingest one document inside the caller's tenant-scoped transaction."""
     if len(data) > MAX_BYTES:
         raise IngestRejected(f"file exceeds {MAX_BYTES} bytes")
-    parsed = parse(data, content_type)
+    parsed = parse(data, content_type, ocr)
     if parsed.status == "rejected" and parsed.parser == "none":
         # Unsupported or mismatched type: nothing is stored.
         raise IngestRejected(parsed.detail or "unsupported document")
@@ -187,6 +195,13 @@ def ingest(
             result.parse_status = "needs_review"
             result.parse_detail = version.parse_detail
             result.problems.extend(mapping.problems)
+    elif pack is not None and record_type is not None and parsed.ocr_engine:
+        # OCR text: candidate values for review only; no records, so no matching input.
+        candidates = map_ocr_candidates(
+            pack, record_type, parsed, DocRef(str(doc.id), str(version.id), raw_sha, classification)
+        )
+        _store_fields(session, tenant_id, version.id, candidates)
+        result.problems.extend(f"ocr: {p}" for p in candidates.problems)
     return result
 
 
@@ -219,8 +234,9 @@ def _store_chunks(
         for start in range(0, len(lines), CHUNK_LINES):
             part = lines[start : start + CHUNK_LINES]
             first, last = part[0].line, part[-1].line
+            prefix = "ocr" if part[0].origin == "ocr" else "pdf"
             locator = (
-                f"pdf:page={page};lines={first}-{last}"
+                f"{prefix}:page={page};lines={first}-{last}"
                 if page is not None
                 else f"text:lines={first}-{last}"
             )
