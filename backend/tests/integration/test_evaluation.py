@@ -167,6 +167,9 @@ def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> Non
     held = next(r for r in runs if r["split"] == "heldout" and r["kind"] == "record")
     url = f"/api/v1/tenants/demo-furniture/evaluations/{held['benchmark_id']}/{held['run_id']}"
     detail = get(st, "furn-investigator", url).json()
+    # every committed run was graded under the current frozen plan and scoring
+    assert all(r["comparability"]["comparable"] for r in runs)
+    assert detail["comparability"] == {"comparable": True, "reasons": [], "note": None}
     cases = detail["modes"]["rules_only"]["pack_cases"]
     assert cases and all(c["case_id"].startswith("fur-") for c in cases)  # no IT-pack case detail
     assert detail["modes"]["rules_only"]["n_cases"] == 40  # aggregates cover the whole benchmark
