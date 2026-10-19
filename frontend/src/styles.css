@@ -379,6 +379,13 @@ textarea {
 .finding-informational {
   border-left-color: var(--accent);
 }
+.notice {
+  background: var(--warn-soft);
+  border-left: 4px solid var(--warn);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  margin: 0 0 0.5rem;
+}
 .finding-head {
   display: flex;
   gap: 0.75rem;
