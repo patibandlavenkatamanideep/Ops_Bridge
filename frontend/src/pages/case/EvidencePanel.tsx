@@ -40,46 +40,44 @@ export function EvidencePanel({ tenant, caseId, focus }: { tenant: string; caseI
 
   if (docs.isPending) return <Loading label="Loading evidence" />;
   if (docs.isError) return <ErrorState error={docs.error} onRetry={() => docs.refetch()} />;
-  if (docs.data.items.length === 0) {
-    return (
-      <>
-        <EmptyState title="No evidence collected">
-          <p>Run an investigation to collect source documents for this case, or upload one.</p>
-        </EmptyState>
-        {uploader}
-      </>
-    );
-  }
+  // The uploader keeps one position in the tree, so the first upload into an empty case does
+  // not remount it and drop its result.
   return (
     <>
       {uploader}
-      <div className="evidence">
-        <nav aria-label="Source documents" className="doc-list">
-          <ul>
-            {docs.data.items.map((d) => (
-              <li key={d.document_id}>
-                <span className="doc-title">{d.title}</span>
-                <span className="muted small"> {statusLabel(d.kind)}</span>
-                <ul>
-                  {d.versions.map((v) => (
-                    <li key={v.version_id}>
-                      <button
-                        type="button"
-                        className={`link-button ${v.version_id === versionId ? "current" : ""}`}
-                        aria-current={v.version_id === versionId ? "true" : undefined}
-                        onClick={() => setSelected(v.version_id)}
-                      >
-                        v{v.version_no} · {statusLabel(v.parse_status)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        </nav>
-        {versionId && <VersionView tenant={tenant} caseId={caseId} versionId={versionId} focus={focus} />}
-      </div>
+      {docs.data.items.length === 0 ? (
+        <EmptyState title="No evidence collected">
+          <p>Run an investigation to collect source documents for this case, or upload one.</p>
+        </EmptyState>
+      ) : (
+        <div className="evidence">
+          <nav aria-label="Source documents" className="doc-list">
+            <ul>
+              {docs.data.items.map((d) => (
+                <li key={d.document_id}>
+                  <span className="doc-title">{d.title}</span>
+                  <span className="muted small"> {statusLabel(d.kind)}</span>
+                  <ul>
+                    {d.versions.map((v) => (
+                      <li key={v.version_id}>
+                        <button
+                          type="button"
+                          className={`link-button ${v.version_id === versionId ? "current" : ""}`}
+                          aria-current={v.version_id === versionId ? "true" : undefined}
+                          onClick={() => setSelected(v.version_id)}
+                        >
+                          v{v.version_no} · {statusLabel(v.parse_status)}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ul>
+          </nav>
+          {versionId && <VersionView tenant={tenant} caseId={caseId} versionId={versionId} focus={focus} />}
+        </div>
+      )}
     </>
   );
 }
@@ -221,6 +219,12 @@ function VersionView({ tenant, caseId, versionId, focus }: { tenant: string; cas
       </section>
       <section aria-labelledby="source-title">
         <h3 id="source-title">Source text</h3>
+        {d.chunks.some((c) => c.locator.startsWith("ocr:")) && (
+          <p className="notice small" role="note">
+            Read by OCR from the page image. It may contain errors and is not used by the
+            matching rules; compare it with the original.
+          </p>
+        )}
         {d.chunks.length === 0 ? (
           <p className="muted">No text representation (see the original).</p>
         ) : (
@@ -271,7 +275,7 @@ function FieldRow({ tenant, caseId, versionId, field, focused, rowRef }: { tenan
         <td>
           <span className="small">{statusLabel(field.status)}</span>
           {field.note && <div className="muted small">{field.note}</div>}
-          {can(tenant, "evidence.correct") && !editing && (
+          {can(tenant, "evidence.correct") && !editing && field.method !== "ocr" && (
             <button type="button" className="button link small" onClick={() => setEditing(true)}>
               Correct
             </button>
