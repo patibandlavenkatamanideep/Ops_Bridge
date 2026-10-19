@@ -33,6 +33,7 @@ from opsbridge.connectors.tasks import (
     TaskConnector,
     TaskRequest,
 )
+from opsbridge.evidence.records import case_identifiers
 from opsbridge.persistence.db import Database
 from opsbridge.persistence.models import ApprovalDecision, Membership, Operation, Proposal
 from opsbridge.privacy.redaction import redact
@@ -115,13 +116,13 @@ def build_casework_server(
 
         def go() -> dict[str, Any]:
             op, conn = load(cc, operation_id, need_executing=True)
+            with db.session(cc.db_ctx) as s:
+                keep = case_identifiers(s, op.case_id)  # the case's own ids stay readable
             params = op.payload["parameters"]
             marker = f"opsbridge-op:{op.operation_key}"
-            body = (
-                f"{redact(params.get('body') or '').text}\n\nOpsBridge operation marker: {marker}"
-            )
+            body = f"{redact(params.get('body') or '', keep).text}\n\nOpsBridge operation marker: {marker}"
             req = TaskRequest(
-                redact(params["title"]).text, body, params.get("assignee_group"), marker
+                redact(params["title"], keep).text, body, params.get("assignee_group"), marker
             )
             key = op.operation_key if conn.capabilities.idempotency_keys else None
             try:
