@@ -6,7 +6,7 @@ been applied anywhere. Production readiness is not claimed.
 
 | Target | How | Verified |
 |---|---|---|
-| Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (14 gates) on macOS + Podman 5.7.1 |
+| Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (15 gates) on macOS + Podman 5.7.1 |
 | Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
 | Local observability | `make observability-up` (Prometheus :9090, Alertmanager :9093, alert sink :9099) | yes — alert drills with injected failures, delivered through Alertmanager to the local sink |
 | Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | yes — PR #1, run 39000811947 at 1f29197 (2026-10-17): all three jobs passed on ubuntu-24.04 with Docker |
