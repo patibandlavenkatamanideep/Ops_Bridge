@@ -22,7 +22,7 @@ repeats × 2 modes; unit = case, majority over repeats.
 | Correct outcome / discrepancy types / whole case | 36 / 37 / 36 of 40 | 36 / 37 / 36 of 40 |
 | Misses: safe (escalated to a person) / unsafe | 4 / 0 | 4 / 0 |
 | Trial errors | 0 of 120 | 0 of 120 |
-| Instability (non-majority verdicts / repeats) | 0 cases with any flip | 0 cases with any flip |
+| Instability (non-majority verdicts / repeats) | 0 cases with any flip | 0 cases with any flip (deterministic mock: 3 repeats cannot show flip rates below 1/3, and no flips are expected from a mock) |
 | Citations valid | 204/204 | 204/204 |
 | Model calls (rejected by validators) | 0 | 243 (0) |
 | Explanation origin | template ×120 | model:mock ×120 |
