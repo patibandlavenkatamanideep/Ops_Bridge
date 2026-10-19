@@ -87,8 +87,10 @@ Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
 
 - Synthetic data only; 104 benchmark cases (target ~120), labelled by the same author that
   wrote the rules.
-- Supplier PDF layouts outside the pack mappings are escalated, not read; OCR is not
-  installed (scanned invoices go to manual review). Retrieval is lexical, not semantic.
+- Supplier PDF layouts outside the pack mappings are escalated, not read. Scanned invoices
+  go to a person; optional local OCR (off by default) shows their text and field values for
+  review but never feeds the rules, and has not been tried on a real paper scan. Retrieval is
+  lexical, not semantic.
 - No real model, live connector, cloud deployment or operator trial has been performed. Rate limits are per process; there is no WAF.
 - Not production-ready. No compliance, fraud-detection or cost-saving claims.
 
