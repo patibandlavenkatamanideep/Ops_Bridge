@@ -30,7 +30,8 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `backup` / `restore-drill` | `python3 scripts/backup_restore.py backup` / `… restore-drill [DIR] [--keep]` | macOS + Podman |
 | `image` | `docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .` | macOS + Podman |
 | `demo-containers` | `image`, then `docker compose … --profile app up -d --wait` (stop `make dev` first) | macOS + Podman |
-| `eval-offline` | `uv --directory backend run --frozen python -m opsbridge.cli eval-bench --split heldout --replay`, same for `--split security`, then `… eval-verify` | macOS |
+| `eval-offline` | `uv --directory backend run --frozen python -m opsbridge.cli eval-bench --split heldout --replay`, same for `--split security`, then `… eval-verify`; appends sealed replay receipts to the ledger and fails if any verdict differs from the recording | macOS |
+| `eval-replay-check` | `uv --directory backend run --frozen python -m opsbridge.cli eval-replay-check` (held-out and security; `--split` to choose); compares verdicts with the recordings, seals and writes nothing tracked | macOS; Linux in hosted CI |
 | `verify` | `python3 scripts/verify.py` | macOS |
 | `build` | `uv --directory backend build --wheel --out-dir ../dist && (cd frontend && npm run build)` | macOS |
 | `down` | `docker compose --env-file .env -f infra/compose/docker-compose.yml stop` | macOS |
