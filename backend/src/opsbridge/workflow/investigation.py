@@ -29,6 +29,7 @@ from opsbridge.domain.matching import Finding, MatchResult, reconcile
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest
+from opsbridge.evidence.parsers import OcrSettings
 from opsbridge.evidence.records import load_match_input, source_manifest
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
@@ -269,6 +270,7 @@ def _ingest_record(
                 data=fetched.body,
                 content_type=fetched.content_type,
                 filename=None,
+                ocr=OcrSettings.from_settings(deps.settings),
             )
         except IngestRejected as exc:
             problems.append(f"{record_type} {key}: rejected ({exc.reason})")
