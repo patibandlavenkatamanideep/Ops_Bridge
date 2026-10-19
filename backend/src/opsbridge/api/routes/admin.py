@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import BaseModel, Field
 
 from opsbridge.auth.permissions import require
+from opsbridge.evidence.parsers import OcrSettings
 from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import DbContext
@@ -193,6 +194,7 @@ async def upload(
             content_type=file.content_type or "application/octet-stream",
             data=data,
             correlation_id=request.state.correlation_id,
+            ocr=OcrSettings.from_settings(state.settings),
         )
     except (NotFound, Conflict) as exc:
         raise _map(exc) from exc
