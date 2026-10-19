@@ -2,18 +2,70 @@
 
 Run as a subprocess so the parent can enforce a hard timeout and kill it; pypdf never
 executes embedded content, but malformed files can be slow to parse.
+
+`pdf_worker MAX_PAGES images N` instead returns the embedded images of the first N pages as
+grayscale PNGs (base64) for the optional OCR path. Images are decoded here, inside the
+subprocess, with a pixel limit, so a hostile image cannot stall or exhaust the parent.
 """
 
 from __future__ import annotations
 
+import base64
 import io
 import json
 import sys
+import warnings
+
+MAX_IMAGE_PIXELS = 40_000_000  # about 300 dpi for an A3 page
+MAX_IMAGES_PER_PAGE = 4
+
+
+def page_images(reader: object, pages: int) -> tuple[list[list[object]], list[str]]:
+    """[page, base64 PNG] for each embedded image of the first `pages` pages, plus problems."""
+    from PIL import Image
+
+    previous = Image.MAX_IMAGE_PIXELS
+    Image.MAX_IMAGE_PIXELS = MAX_IMAGE_PIXELS
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            return _decode(reader, pages)
+    finally:
+        Image.MAX_IMAGE_PIXELS = previous
+
+
+def _decode(reader: object, pages: int) -> tuple[list[list[object]], list[str]]:
+    found: list[list[object]] = []
+    problems: list[str] = []
+    for page_no, page in enumerate(reader.pages[:pages], start=1):  # type: ignore[attr-defined]
+        try:
+            images = list(page.images)
+        except Exception as exc:
+            problems.append(f"page {page_no}: images unreadable ({type(exc).__name__})")
+            continue
+        if len(images) > MAX_IMAGES_PER_PAGE:
+            problems.append(f"page {page_no}: only the first {MAX_IMAGES_PER_PAGE} images read")
+        for img in images[:MAX_IMAGES_PER_PAGE]:
+            try:
+                pil = img.image
+                if pil is None:
+                    raise ValueError("no decoder")
+                if pil.width * pil.height > MAX_IMAGE_PIXELS:
+                    raise ValueError("too many pixels")
+                buf = io.BytesIO()
+                pil.convert("L").save(buf, format="PNG")
+            except Exception as exc:
+                problems.append(f"page {page_no}: image not decoded ({type(exc).__name__})")
+                continue
+            found.append([page_no, base64.b64encode(buf.getvalue()).decode("ascii")])
+    return found, problems
 
 
 def main() -> int:
     data = sys.stdin.buffer.read()
     max_pages = int(sys.argv[1]) if len(sys.argv) > 1 else 50
+    if len(sys.argv) > 3 and sys.argv[2] == "images":
+        return _images(data, max_pages, int(sys.argv[3]))
     try:
         from pypdf import PdfReader
 
@@ -57,6 +109,22 @@ def main() -> int:
             "pages": [],
             "images": 0,
         }
+    sys.stdout.write(json.dumps(out))
+    return 0
+
+
+def _images(data: bytes, max_pages: int, ocr_pages: int) -> int:
+    try:
+        from pypdf import PdfReader
+
+        reader = PdfReader(io.BytesIO(data), strict=False)
+        if reader.is_encrypted or len(reader.pages) > max_pages:
+            out: dict[str, object] = {"status": "rejected", "images": [], "problems": []}
+        else:
+            found, problems = page_images(reader, ocr_pages)
+            out = {"status": "ok", "images": found, "problems": problems}
+    except Exception as exc:  # malformed PDFs raise many exception types
+        out = {"status": "rejected", "images": [], "problems": [type(exc).__name__]}
     sys.stdout.write(json.dumps(out))
     return 0
 
