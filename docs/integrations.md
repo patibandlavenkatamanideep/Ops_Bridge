@@ -55,7 +55,11 @@ MCP).
 ## GitHub Issues sandbox connector (`connectors/github.py`)
 
 Verified against GitHub REST documentation fetched 2026-10-14 (API version header
-`X-GitHub-Api-Version: 2026-03-10`):
+`X-GitHub-Api-Version: 2026-03-10`): [Issues](https://docs.github.com/en/rest/issues/issues),
+[Search](https://docs.github.com/en/rest/search/search) (the source for "search can return
+incomplete results") and [permissions required for fine-grained personal access
+tokens](https://docs.github.com/en/rest/authentication/permissions-required-for-fine-grained-personal-access-tokens).
+Re-check them before a live run; the pages are not copied into this repository.
 
 | Use | Endpoint | Fine-grained token permission |
 |---|---|---|
