@@ -70,7 +70,15 @@ rejected model outputs, citation validity. Rules-vs-agent comparison is paired b
 cost is zero for mock and not measured otherwise.
 
 Repeated trials of one case are not treated as independent cases. With 40 held-out cases a
-Wilson interval is wide; an inconclusive result will be reported as such.
+Wilson interval is wide; an inconclusive result will be reported as such. Instability is
+reported with its sampling limit: with *r* repeats per case, a per-case flip rate below 1/*r*
+cannot be observed, and no flips do not show a case is stable (added 2026-10-19; it does not
+change the frozen scoring definitions).
+
+Comparability: the frozen plan includes the scoring definitions. If the code's scoring
+differs from the frozen plan, a benchmark run refuses to start, and the evaluation view marks
+runs graded under another plan or scoring as *not comparable*: a change of grading, not
+evidence of a model or rules regression (`tests/evaluation/test_comparability.py`).
 
 ## Acceptance
 
