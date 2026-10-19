@@ -66,9 +66,13 @@ before hosted model calls, in logs and in the text of external follow-up tasks; 
 free-text addresses and context-dependent identifiers pass through. Version 2 (2026-10-19)
 never alters UUIDs and does not treat digits joined to a prefix by a hyphen
 (`INV-100023456`, `T-1705292356`) as phone numbers: version 1 corrupted about 1.2% of random
-UUIDs and any such id with nine or more digits. Bare long business numbers (a 10-digit
-purchase order number on its own) still look like phone numbers and are redacted. Span
-correlation ids skip the identifier patterns (credentials are still removed). Local-required policies never fall back to a
+UUIDs and any such id with nine or more digits. Before hosted model calls and external
+follow-up tasks, the case's own identifiers (case, invoice and PO numbers, resolved supplier
+id) are kept exactly, so a bare 10-digit PO number survives; personal data next to them is
+still redacted (`test_hosted_calls_are_redacted_but_keep_the_cases_own_identifiers`,
+`test_a_bare_numeric_po_number_stays_readable_in_the_created_task`). In logs such a bare
+number can still be redacted. Span correlation ids skip the identifier patterns (credentials
+are still removed). Local-required policies never fall back to a
 hosted model (`test_local_required_policy_blocks_model_without_hosted_fallback`).
 
 ## Logs
