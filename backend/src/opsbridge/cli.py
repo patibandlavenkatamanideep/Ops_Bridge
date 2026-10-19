@@ -336,6 +336,16 @@ def _eval_bench(args: argparse.Namespace) -> int:
     policy = json.loads(Path("evals/acceptance-policy.json").read_text(encoding="utf-8"))
     summary["acceptance"] = metrics.acceptance(summary, policy, args.split)
     summary["verification"] = receipt.verify(ledger, public_key)
+    if kind == "replay":
+        from opsbridge.evaluation.reproduce import differences, recorded_results
+
+        results_dir = Path(f"evals/results/{args.benchmark}")
+        diffs = differences(recorded_results(results_dir, source), mode_results)
+        summary["reproduces"] = {
+            "recorded_run": source.parent.name,
+            "ok": not diffs,
+            "differences": diffs[:100],
+        }
     out = Path(f"evals/results/{args.benchmark}/{run_id}.json")
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8")
@@ -349,7 +359,99 @@ def _eval_bench(args: argparse.Namespace) -> int:
         )
     ok = bool(summary["verification"]["ok"])
     print(f"  receipts {'verified' if ok else 'FAILED VERIFICATION'}; results → {out}")
-    return 0 if ok else 4
+    if not ok:
+        return 4
+    if kind == "replay":
+        diffs = summary["reproduces"]["differences"]
+        if diffs:
+            print(f"  REPLAY DIFFERS from {summary['reproduces']['recorded_run']} ({len(diffs)}):")
+            for d in diffs[:20]:
+                print(f"    - {d}")
+            return 5
+        print(f"  replay reproduces {summary['reproduces']['recorded_run']} case by case")
+    return 0
+
+
+def _eval_replay_check(args: argparse.Namespace) -> int:
+    """Replay each split's latest recorded run under the egress guard and compare verdicts
+    case by case. No receipts are sealed and nothing under evals/ is written, so it can run
+    in CI and in `make verify` without the signing key."""
+    import os
+    from datetime import UTC, datetime
+    from typing import Any, cast
+
+    from opsbridge.agents.contracts import ModelAdapter
+    from opsbridge.config import REPO_ROOT, get_settings
+    from opsbridge.evaluation import manifest as mf
+    from opsbridge.evaluation import metrics
+    from opsbridge.evaluation.bench import environment
+    from opsbridge.evaluation.cassette import ReplayAdapter, ReplayFailure
+    from opsbridge.evaluation.egress import EgressBlocked, loopback_only
+    from opsbridge.evaluation.reproduce import differences, recorded_results
+    from opsbridge.simulator.scenarios import load_corpus
+
+    os.chdir(REPO_ROOT)
+    frozen = mf.load(Path("evals/manifests") / f"{args.benchmark}.json")
+    problems = mf.verify(frozen, REPO_ROOT)
+    if problems:
+        print("Refusing: inputs differ from the frozen benchmark:")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 2
+    failed = False
+    for split_name in args.split or ["heldout", "security"]:
+        recorded = sorted(
+            Path(f"evals/runs/{args.benchmark}").glob(f"{split_name}-record-*/model-cassette.json")
+        )
+        if not recorded:
+            print(f"{split_name}: no recorded run to replay")
+            failed = True
+            continue
+        cassette = recorded[-1]
+        expected = recorded_results(Path(f"evals/results/{args.benchmark}"), cassette)
+        corpus = load_corpus(Path(frozen["splits"][split_name]["path"]))
+        repeats = int(frozen["repeats"])
+        adapter = ReplayAdapter.load(cassette)
+        check_id = f"check-{split_name}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+        replayed: dict[str, Any] = {}
+        try:
+            with (
+                loopback_only(),
+                environment(
+                    get_settings(),
+                    corpus,
+                    REPO_ROOT / "var" / "eval" / check_id,
+                    cast(ModelAdapter, adapter),
+                ) as env,
+            ):
+                for mode in [m for m in frozen["modes"] if m in expected["modes"]]:
+                    trials = []
+                    for scenario in corpus.scenarios:
+                        for repeat in range(repeats):
+                            t = env.run_trial(scenario, mode, repeat).to_dict()
+                            if (t["error"] or "").startswith("ReplayFailure"):
+                                raise ReplayFailure(t["error"])  # fail closed, as recording does
+                            trials.append(t)
+                    replayed[mode] = metrics.summarize_mode(trials)
+        except (ReplayFailure, EgressBlocked) as exc:
+            print(f"{split_name}: FAILED CLOSED ({type(exc).__name__}): {exc}")
+            failed = True
+            continue
+        diffs = differences(expected, replayed)
+        counts = ", ".join(
+            f"{m} {r['next_action']['correct']}/{r['next_action']['n']}"
+            for m, r in replayed.items()
+        )
+        if diffs:
+            failed = True
+            print(
+                f"{split_name}: replay DIFFERS from {cassette.parent.name} ({len(diffs)}): {counts}"
+            )
+            for d in diffs[:20]:
+                print(f"  - {d}")
+        else:
+            print(f"{split_name}: reproduces {cassette.parent.name} case by case ({counts})")
+    return 1 if failed else 0
 
 
 def _eval_verify(_args: argparse.Namespace) -> int:
@@ -583,6 +685,14 @@ def main(argv: list[str] | None = None) -> int:
         "--from-run", default=None, help="record run directory to replay (default: latest)"
     )
     p.set_defaults(func=_eval_bench)
+
+    p = sub.add_parser(
+        "eval-replay-check",
+        help="replay recorded runs offline and compare verdicts; seals and writes nothing tracked",
+    )
+    p.add_argument("--benchmark", default="opsbridge-bench-v1")
+    p.add_argument("--split", action="append", choices=["dev", "validation", "heldout", "security"])
+    p.set_defaults(func=_eval_replay_check)
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
     p.set_defaults(func=_eval_verify)
