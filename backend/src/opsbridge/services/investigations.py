@@ -99,6 +99,8 @@ def start_investigation(
     case_id: uuid.UUID,
     model_mode: str | None,
     correlation_id: str | None,
+    *,
+    enforce_quota: bool = True,
 ) -> tuple[WorkflowRun, bool]:
     require(p, "investigation.run")
     with db.session(_ctx(p)) as s:
@@ -114,7 +116,8 @@ def start_investigation(
         case = _case(s, p, case_id, lock=True)
         if case.status in ("resolved", "closed_without_resolution"):
             raise Conflict("case_closed", "A closed case cannot be investigated again.")
-        _check_run_quota(s, p)
+        if enforce_quota:
+            _check_run_quota(s, p)
         active = (
             s.execute(
                 select(WorkflowRun).where(
