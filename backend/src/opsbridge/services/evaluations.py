@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from opsbridge.auth.permissions import Forbidden, Principal
+from opsbridge.evaluation.manifest import SCORING
 
 RUN_ID = re.compile(r"^(dev|validation|heldout|security)-(record|replay)-\d{8}T\d{6}Z$")
 BENCHMARK = re.compile(r"^[a-z0-9-]{1,64}$")
@@ -35,6 +36,28 @@ def _results(evals_dir: Path) -> list[Path]:
 def _load(path: Path) -> dict[str, Any]:
     data: dict[str, Any] = json.loads(path.read_text(encoding="utf-8"))
     return data
+
+
+def _comparability(evals_dir: Path, d: dict[str, Any]) -> dict[str, Any]:
+    """Whether a run was graded under the benchmark's current frozen plan and this code's
+    scoring; if not, its numbers must not be compared with current runs."""
+    reasons = []
+    plan_path = evals_dir / "manifests" / f"{d['benchmark_id']}.json"
+    plan = _load(plan_path) if BENCHMARK.match(d["benchmark_id"]) and plan_path.is_file() else {}
+    if not plan:
+        reasons.append("the benchmark's frozen plan is missing")
+    elif d.get("manifest_sha256") != plan.get("manifest_sha256"):
+        reasons.append("graded under a different frozen plan than the current one")
+    if plan and plan.get("scoring") != SCORING:
+        reasons.append("this code's scoring definitions differ from the frozen plan")
+    return {
+        "comparable": not reasons,
+        "reasons": reasons,
+        "note": None
+        if not reasons
+        else "Not comparable with current runs: a change of grading or plan, "
+        "not evidence of a model or rules regression.",
+    }
 
 
 def _mode_headline(m: dict[str, Any]) -> dict[str, Any]:
@@ -65,6 +88,7 @@ def list_runs(evals_dir: Path, p: Principal) -> list[dict[str, Any]]:
                 "modes": {k: _mode_headline(v) for k, v in d["modes"].items()},
                 "acceptance": d.get("acceptance", []),
                 "receipts_verified": bool((d.get("verification") or {}).get("ok")),
+                "comparability": _comparability(evals_dir, d),
             }
         )
     return out
@@ -146,6 +170,7 @@ def run_detail(evals_dir: Path, p: Principal, benchmark: str, run_id: str) -> di
             "signatures": (d.get("verification") or {}).get("signatures", {}).get("message"),
         },
         "receipts": d.get("receipts", {}),
+        "comparability": _comparability(evals_dir, d),
         "not_evaluated": [
             "Real-model quality (no live or recorded real-model dataset; mock responses only)",
             "Operator time and business outcomes (no pilot participants)",
