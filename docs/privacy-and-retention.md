@@ -59,11 +59,16 @@ or tenant administrator) clears the text and records who, when and why. Evidence
 
 ## Redaction before model calls
 
-`privacy/redaction.py` (`opsbridge-redact/1`) replaces emails, IBAN-like strings,
+`privacy/redaction.py` (`opsbridge-redact/2`) replaces emails, IBAN-like strings,
 Luhn-valid card numbers, US SSN patterns, phone numbers and labelled bank account numbers
-before hosted model calls; the metadata (`version`, counts, "pattern-based; not
-anonymization") is stored with the model call. Names, free-text addresses and
-context-dependent identifiers pass through. Local-required policies never fall back to a
+before hosted model calls, in logs and in the text of external follow-up tasks; the metadata
+(`version`, counts, "pattern-based; not anonymization") is stored with the model call. Names,
+free-text addresses and context-dependent identifiers pass through. Version 2 (2026-10-19)
+never alters UUIDs and does not treat digits joined to a prefix by a hyphen
+(`INV-100023456`, `T-1705292356`) as phone numbers: version 1 corrupted about 1.2% of random
+UUIDs and any such id with nine or more digits. Bare long business numbers (a 10-digit
+purchase order number on its own) still look like phone numbers and are redacted. Span
+correlation ids skip the identifier patterns (credentials are still removed). Local-required policies never fall back to a
 hosted model (`test_local_required_policy_blocks_model_without_hosted_fallback`).
 
 ## Logs
