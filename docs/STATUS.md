@@ -506,3 +506,23 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - `make verify` 14/14 locally (unit 264 + 3 skipped, integration 124, browser 23 + the OCR
   spec skipped without tesseract). Hosted CI run 39204032292 at ed1e99b: passed (unit 265 +
   2 skipped including the real OCR test, integration 124, browser 24 including the OCR spec).
+
+### Acceptance-scenario audit (2026-10-19)
+- `docs/acceptance-scenarios.md` maps each of the brief's 24 required scenarios (§19, wording
+  copied) to the tests that check its required result; `tests/contracts/test_acceptance_matrix.py`
+  fails if the table drifts from the brief or names a test that does not exist (checked by
+  pointing it at a missing test: it failed).
+- Gaps found and closed:
+  1. Scenario 8 (instructions in an *uploaded* document) had no test; only the source-system
+     email path did. Added `test_uploaded_document_instructions_are_data_not_authority`
+     (compromised model; the uploaded copy is marked so the test proves it was retrieved).
+  2. Scenario 21 (evaluator configuration changes): the frozen plan stored the scoring
+     definitions but `verify` never compared them with the code. Now a changed scoring stops
+     a benchmark run ("a grading change, not evidence of a model or rules change"), and the
+     evaluation API/view marks runs from another plan or scoring as not comparable.
+  3. Scenario 20 (repeated outputs differ): instability had no test and no sampling limit.
+     The summary now reports repeats per case, a Wilson interval over flipping cases and
+     what the repeat count cannot show; tested with synthetic disagreeing repeats.
+- `make verify` 14/14 locally (unit 270 + 3 skipped, integration 125, browser 23 + OCR spec
+  skipped without tesseract). Hosted CI run 39206261166 at 519a973: passed (unit 271 + 2
+  skipped, integration 125, browser 24).
