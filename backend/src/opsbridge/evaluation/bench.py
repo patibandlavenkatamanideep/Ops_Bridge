@@ -126,6 +126,7 @@ class BenchEnvironment:
                 "artifact_dir": self.workdir / "artifacts",
                 "tool_transport": "inprocess",
                 "rate_limit_per_minute": 1_000_000,
+                "quotas_enabled": False,  # 240 runs per split would exceed tier quotas
             }
         )
         migrator = make_engine("migrator", self.settings, database=EVAL_DB)
@@ -203,7 +204,14 @@ class BenchEnvironment:
         started = time.monotonic()
         try:
             case_id = self._case_for(s, p)
-            run, _ = start_investigation(self.app_db, p, case_id, mode, correlation_id=None)
+            run, _ = start_investigation(
+                self.app_db,
+                p,
+                case_id,
+                mode,
+                correlation_id=None,
+                enforce_quota=self.settings.quotas_enabled,
+            )
             while self.worker.run_once():
                 if len(getattr(adapter, "failures", [])) > failures_before:
                     break  # replay failed: stop; never retry into a different path
