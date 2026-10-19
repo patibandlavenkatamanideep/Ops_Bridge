@@ -23,7 +23,10 @@ record and line carries `refs` (field → `SourceRef`) for citations.
 `SourceRef` = `document_id`, `version_id`, `sha256` (raw bytes), `locator`, `field`
 (canonical name such as `invoice_line.quantity`), `classification`. Locators:
 `json:/lines/0/qty_ordered` (JSON pointer), `csv:row=2;col=qty`, `pdf:page=1;line=9`,
-`text:line=4`. A citation is valid only if the tenant, version, digest and locator still
+`ocr:page=1;line=3` (text read by OCR, never authoritative), `text:line=4`. Extracted fields
+read by OCR have `method = ocr` and `status = needs_review`, and no record is built from them,
+so the matching rules never use them; corrections of them are refused (`ocr_candidate`).
+A citation is valid only if the tenant, version, digest and locator still
 resolve (`evidence/citations.py`).
 
 ## Pack mapping (`backend/src/opsbridge/mapping.py`, `packs/<pack>/pack.yaml`)
