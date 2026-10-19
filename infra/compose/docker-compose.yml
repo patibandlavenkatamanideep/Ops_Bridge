@@ -91,6 +91,7 @@ services:
     profiles: [app]
     environment: &app-env
       OPSBRIDGE_ENV: development
+      OPSBRIDGE_OCR_ENABLED: ${OPSBRIDGE_OCR_ENABLED:-false}
       OPSBRIDGE_DB_HOST: postgres
       OPSBRIDGE_DB_PORT: "5432"
       OPSBRIDGE_DB_NAME: opsbridge
