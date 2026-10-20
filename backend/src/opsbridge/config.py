@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     session_idle_minutes: int = 30
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     rate_limit_per_minute: int = 240
+    rate_limit_window_seconds: int = 60
+    # Count in PostgreSQL so every API instance shares one limit; in-process fallback when the
+    # database is unavailable. Off only for single-process tooling.
+    rate_limit_shared: bool = True
     max_upload_bytes: int = 5 * 1024 * 1024
     max_request_bytes: int = 6 * 1024 * 1024
 
