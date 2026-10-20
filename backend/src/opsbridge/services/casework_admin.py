@@ -28,6 +28,8 @@ from opsbridge.persistence.models import (
     Case,
     ConversationMessage,
     Membership,
+    Operation,
+    PolicyVersion,
     Tenant,
     TenantSettings,
     User,
@@ -282,6 +284,18 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
     members = s.execute(
         select(Membership, User).join(User, User.id == Membership.user_id).order_by(User.username)
     ).all()
+    today = s.execute(text("SELECT current_date")).scalar_one()  # the database clock
+    versions = list(
+        s.execute(
+            select(PolicyVersion).order_by(
+                PolicyVersion.policy_id, PolicyVersion.effective_from, PolicyVersion.version
+            )
+        ).scalars()
+    )
+    active = {}
+    for v in versions:  # same ordering as investigations: latest (effective_from, version)
+        if v.effective_from <= today:
+            active[v.policy_id] = v.id
     return {
         "tenant": {
             "slug": tenant.slug,
@@ -301,6 +315,18 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
             "task_connector": ts.task_connector if ts else "sim_tasks",
             "retention": (ts.retention if ts else {}) or {},
         },
+        "policies": [
+            {
+                "policy_id": v.policy_id,
+                "version": v.version,
+                "effective_from": v.effective_from.isoformat(),
+                "sha256": v.sha256,
+                "state": "active"
+                if active.get(v.policy_id) == v.id
+                else ("scheduled" if v.effective_from > today else "superseded"),
+            }
+            for v in versions
+        ],
         "members": [
             {
                 "username": u.username,
@@ -311,6 +337,93 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
             }
             for m, u in members
         ],
+    }
+
+
+def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any]:
+    """The tenant's follow-up task connector: what it currently promises (advertised live by
+    the simulator; declared for GitHub, which is not contacted without authorization) and how
+    its attempts went in the last 24 hours. Capabilities decide whether an ambiguous create can
+    be retried safely, so an operator should see when they change."""
+    require(p, "tenant.read_settings")
+    with db.session(_ctx(p)) as s:
+        ts = s.get(TenantSettings, p.tenant_id)
+        tenant = s.get(Tenant, p.tenant_id)
+        assert tenant is not None
+        name = ts.task_connector if ts else "sim_tasks"
+        rows = s.execute(
+            text(
+                "SELECT a.kind, a.status, count(*), max(a.started_at) FROM attempts a "
+                "JOIN operations o ON o.id = a.operation_id "
+                "WHERE o.connector = :c AND a.started_at > now() - interval '24 hours' "
+                "GROUP BY a.kind, a.status ORDER BY a.kind, a.status"
+            ),
+            {"c": name},
+        ).all()
+        awaiting_review = s.execute(
+            select(func.count())
+            .select_from(Operation)
+            .where(Operation.connector == name, Operation.status == "outcome_unknown")
+        ).scalar_one()
+        checked_at = s.execute(text("SELECT now()")).scalar_one()
+    configuration: dict[str, Any] = {}
+    if name == "sim_tasks":
+        from opsbridge.connectors.tasks import SimTaskConnector
+
+        conn = SimTaskConnector(
+            settings.simulator_url, settings.sim_master_secret.get_secret_value(), tenant.slug
+        )
+        try:
+            found = conn.discover()
+        finally:
+            conn.close()
+        reachable: bool | None = found is not None
+        idem, lookup = found or (False, "none")
+        source = (
+            "advertised by the task tracker just now"
+            if found
+            else "assumed weakest: the task tracker did not answer"
+        )
+    elif name == "github_issues":
+        from opsbridge.connectors.github import GitHubIssuesConnector
+
+        reachable = None
+        idem = GitHubIssuesConnector.capabilities.idempotency_keys
+        lookup = GitHubIssuesConnector.capabilities.lookup
+        source = "declared from GitHub's documentation; GitHub is not contacted from here"
+        configuration = {
+            "repository_configured": bool(settings.github_sandbox_repo),
+            "token_configured": bool(
+                settings.github_token and settings.github_token.get_secret_value()
+            ),
+            "live_writes_authorized": bool(settings.github_live_writes_authorized),
+        }
+    else:
+        raise Conflict("unknown_connector", f"Unknown task connector {name!r}.")
+    if idem:
+        meaning = "An ambiguous create can be resent with the same idempotency key."
+    elif lookup in ("strong", "eventual"):
+        meaning = "An ambiguous create is reconciled by lookup before any resend."
+    else:
+        meaning = "An ambiguous create cannot be checked: it goes to human review, never resent."
+    return {
+        "connector": name,
+        "checked_at": checked_at.isoformat(),
+        "reachable": reachable,
+        "capabilities": {"idempotency_keys": idem, "lookup": lookup},
+        "capability_source": source,
+        "meaning": meaning,
+        "configuration": configuration,
+        "attempts_24h": [
+            {
+                "kind": k,
+                "status": st,
+                "count": int(n),
+                "last_at": last.isoformat() if last else None,
+            }
+            for k, st, n, last in rows
+        ],
+        "awaiting_review": int(awaiting_review),
     }
 
 
