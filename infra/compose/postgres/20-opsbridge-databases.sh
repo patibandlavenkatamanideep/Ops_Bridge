@@ -5,6 +5,8 @@
 #   opsbridge       development/demo data
 #   opsbridge_test  integration tests (truncated per test)
 #   opsbridge_eval  offline benchmark runs (truncated per run)
+#   opsbridge_demo  the all-container demo (make demo-containers), apart from `make dev` data,
+#                   because the containers keep their artifacts in their own volume
 set -euo pipefail
 
 # NOLOGIN role that owns the aggregate-only metrics function (migration 0004). It has no
@@ -19,7 +21,7 @@ END $$;
 GRANT opsbridge_ops_reader TO opsbridge_migrator;
 SQL
 
-for db in opsbridge opsbridge_test opsbridge_eval; do
+for db in opsbridge opsbridge_test opsbridge_eval opsbridge_demo; do
   exists=$(psql -tA --username "$POSTGRES_USER" --dbname postgres \
     -c "SELECT 1 FROM pg_database WHERE datname = '${db}'")
   if [ "$exists" != "1" ]; then
