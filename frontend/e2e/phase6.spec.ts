@@ -59,6 +59,23 @@ test("a disguised upload is rejected with an explanation", async ({ page }) => {
   await expect(page.getByRole("status").filter({ hasText: "Stored as version" })).toHaveCount(0);
 });
 
+test("tenant settings show the policy in force and the connector's current promises", async ({ page }) => {
+  await signIn(page, "furn-admin");
+  await page.goto("/t/demo-furniture/settings");
+  const health = page.getByRole("region", { name: "Connector health" });
+  await expect(health.locator("dd").filter({ hasText: /^sim_tasks$/ })).toBeVisible();
+  await expect(health).toContainText("Reachable");
+  await expect(health).toContainText(/idempotency keys|no idempotency keys/);
+  await expect(health).toContainText("After an ambiguous create");
+  await health.getByRole("button", { name: "Check again" }).click();
+  await expect(health.getByRole("button", { name: "Check again" })).toBeEnabled();
+  const policies = page.getByRole("region", { name: "Policies" });
+  await expect(policies.getByRole("row").filter({ hasText: "furniture-ap" }).filter({ hasText: "v2" }))
+    .toContainText(/active/i);
+  await expect(policies.getByRole("row").filter({ hasText: "furniture-ap" }).filter({ hasText: "v1" }))
+    .toContainText(/superseded/i);
+});
+
 test("tenant settings: admins see tier-limited options; investigators are denied", async ({ page }) => {
   await signIn(page, "furn-admin");
   await page.getByRole("link", { name: "Tenant settings" }).click();
