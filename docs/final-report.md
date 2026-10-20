@@ -90,7 +90,8 @@ Details and reproduction: docs/case-study.md.
   (off by default) reads scanned pages for review only and is untested on a real paper scan;
   retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
   (encryption and IAM unverified); quota values are starting points.
-- Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
+- No WAF (application rate limits, shared across API instances, are not a DDoS defence);
+  processes need synchronized clocks (NTP).
 - Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
   queue or email receiver is connected.
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
