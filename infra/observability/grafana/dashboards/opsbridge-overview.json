@@ -1,0 +1,886 @@
+{
+  "uid": "opsbridge-overview",
+  "title": "OpsBridge overview",
+  "description": "Service, queue, business state, integrations and capacity. Aggregates only: no tenant, case or user ids. Alerts and runbooks: docs/operations.md.",
+  "tags": [
+    "opsbridge"
+  ],
+  "timezone": "utc",
+  "editable": false,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Service",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Scrape targets up",
+      "description": "1 = Prometheus can scrape the process. Runbook: docs/operations.md#api-or-worker-down",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "up{job=~\"opsbridge-.*\"}",
+          "legendFormat": "{{job}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Dependencies usable",
+      "description": "API readiness checks. Runbook: docs/operations.md#dependency-unavailable",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_dependency_up",
+          "legendFormat": "{{dependency}}"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Worker can read state",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_state_scrape_ok",
+          "legendFormat": "state query"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "API requests per second by status class",
+      "description": "Route templates only; no tenant or case ids in labels.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (status_class) (rate(opsbridge_http_requests_total[5m]))",
+          "legendFormat": "{{status_class}}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "API p95 latency by route",
+      "description": "Runbook: docs/operations.md#api-errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 9
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(opsbridge_http_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{route}}"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "row",
+      "title": "Work queue",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 17
+      },
+      "panels": []
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Jobs by status",
+      "description": "Runbook: docs/operations.md#queue-stalled",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (status) (opsbridge_queue_jobs)",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Oldest runnable job age",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "max by (kind) (opsbridge_queue_oldest_age_seconds)",
+          "legendFormat": "{{kind}}"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Jobs processed per second",
+      "description": "Runbook: docs/operations.md#retries-and-dead-jobs",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (kind, result) (rate(opsbridge_jobs_processed_total[5m]))",
+          "legendFormat": "{{kind}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Expired leases",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 26
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_queue_expired_leases",
+          "legendFormat": "expired leases"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "row",
+      "title": "Cases, approvals and execution",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 34
+      },
+      "panels": []
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "Business backlog",
+      "description": "Aggregate counts across tenants (no tenant labels). Outcome unknown: docs/operations.md#ambiguous-outcomes",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_state{metric=~\"approval_backlog|operations_in_flight|operations_review_required|operations_outcome_unknown|runs_active\"}",
+          "legendFormat": "{{metric}}"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Oldest approval waiting",
+      "description": "Runbook: docs/operations.md#approval-backlog",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 35
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_state{metric=\"approval_backlog_oldest_age_seconds\"}",
+          "legendFormat": "oldest approval"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Investigation p95 duration by mode",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le, mode) (rate(opsbridge_investigation_duration_seconds_bucket[15m])))",
+          "legendFormat": "{{mode}}"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Approval wait p95",
+      "description": "Human time from proposal to decision, kept apart from machine durations.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(opsbridge_approval_wait_seconds_bucket[1h])))",
+          "legendFormat": "p95"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Operations finished (last hour)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 43
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (status) (increase(opsbridge_operations_finished_total[1h]))",
+          "legendFormat": "{{status}}"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "row",
+      "title": "Connectors, tools and models",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 51
+      },
+      "panels": []
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Connector attempts per second",
+      "description": "Runbook: docs/operations.md#connector-failures",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (phase, result) (rate(opsbridge_connector_attempts_total[5m]))",
+          "legendFormat": "{{phase}} {{result}}"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Tool calls per second",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 52
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (tool, outcome) (rate(opsbridge_tool_calls_total[5m]))",
+          "legendFormat": "{{tool}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "Model calls per second",
+      "description": "Runbook: docs/operations.md#model-errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (provider, outcome) (rate(opsbridge_model_calls_total[5m]))",
+          "legendFormat": "{{provider}} {{outcome}}"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Model tokens (last 24 h)",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (provider, direction) (increase(opsbridge_model_tokens_total[24h]))",
+          "legendFormat": "{{provider}} {{direction}}"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "stat",
+      "title": "Estimated model cost (last 24 h)",
+      "description": "Estimated from configured prices; 0 when no priced (live) calls were made. Mock and replay calls cost 0.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 60
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum(increase(opsbridge_model_cost_estimated_usd_total[24h])) or vector(0)",
+          "legendFormat": "all providers"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none"
+      }
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "Capacity",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 68
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "Database pool connections",
+      "description": "Runbook: docs/operations.md#capacity",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 69
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "sum by (pool, state) (opsbridge_db_pool_connections)",
+          "legendFormat": "{{pool}} {{state}}"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "Artifact filesystem free",
+      "description": "Local artifact store only (absent with the S3 store).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 69
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "opsbridge_artifact_fs_bytes{state=\"free\"} / ignoring(state) opsbridge_artifact_fs_bytes{state=\"total\"}",
+          "legendFormat": "free fraction"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "Artifact store size",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 77
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "max(opsbridge_artifact_store_bytes)",
+          "legendFormat": "bytes"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "type": "timeseries",
+      "title": "Process resident memory",
+      "description": "Reported on Linux (containers, CI); macOS host processes do not export it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "opsbridge-prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 77
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "opsbridge-prometheus"
+          },
+          "expr": "process_resident_memory_bytes{job=~\"opsbridge-.*\"}",
+          "legendFormat": "{{job}}"
+        }
+      ]
+    }
+  ]
+}
