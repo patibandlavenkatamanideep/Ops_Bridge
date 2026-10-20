@@ -26,7 +26,8 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `test-e2e` | `cd frontend && npx playwright test` (needs the dev stack running) | macOS, Chromium 156 |
 | `eval-canary` | `uv --directory backend run --frozen python -m opsbridge.cli eval-canary` (offline rules path vs `evals/baselines/canary-rules.json`) | macOS |
 | `alerts-test` | `docker run --rm -v "$PWD/infra/observability/prometheus":/etc/prom:ro --workdir /etc/prom --entrypoint promtool prom/prometheus:v3.13.4 test rules alerts.test.yml` (and `check rules alerts.yml`); then in `prom/alertmanager:v0.34.1`, `amtool check-config alertmanager.local.yml` and `amtool config routes test --verify.receivers=<expected> <labels>` for each line of `infra/observability/alertmanager/routes.test` | macOS + Podman |
-| `observability-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml --profile observability up -d prometheus alertmanager alert-sink` | macOS + Podman |
+| `observability-up` | `python3 scripts/setup_env.py` (adds a missing Grafana admin password), then `docker compose --env-file .env -f infra/compose/docker-compose.yml --profile observability up -d prometheus alertmanager alert-sink grafana` | macOS + Podman |
+| `dashboard-check` | `python3 scripts/dashboard_check.py` (after `observability-up`) | macOS + Podman |
 | `backup` / `restore-drill` | `python3 scripts/backup_restore.py backup` / `… restore-drill [DIR] [--keep]` | macOS + Podman |
 | `image` | `docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .` | macOS + Podman |
 | `demo-containers` | `image`, then `docker compose … --profile app up -d --wait` (stop `make dev` first) | macOS + Podman |

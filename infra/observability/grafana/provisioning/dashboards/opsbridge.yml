@@ -1,0 +1,11 @@
+# Dashboards are files in this repository (infra/observability/grafana/dashboards), read-only
+# in Grafana: change them here and review them like code.
+apiVersion: 1
+providers:
+  - name: opsbridge
+    folder: OpsBridge
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /etc/grafana/dashboards

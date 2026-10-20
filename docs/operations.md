@@ -20,8 +20,14 @@ is an observation, not a recovery-time objective.
 | Audit | `audit_events` (who, on whose behalf, what, outcome) per tenant |
 
 `make observability-up` starts Prometheus (scrapes `make dev` processes; alerts at
-http://localhost:9090/alerts), Alertmanager (http://localhost:9093) and the local alert sink
-(http://localhost:9099/notifications). Metric labels never contain tenant, case or user
+http://localhost:9090/alerts), Alertmanager (http://localhost:9093), the local alert sink
+(http://localhost:9099/notifications) and Grafana (http://localhost:3000, dashboard
+"OpsBridge overview": service, work queue, cases/approvals/execution, connectors/tools/models,
+capacity). Grafana is read-only for an anonymous viewer on localhost; dashboards are files in
+`infra/observability/grafana/dashboards` and change only by a reviewed commit.
+`tests/contracts/test_dashboards.py` checks that every panel queries exported metrics and
+labels; `make dashboard-check` runs every panel query through Grafana and fails on any error
+(panels for series that have not been emitted yet report "no data"). Metric labels never contain tenant, case or user
 ids; use the correlation id from an error response or log line to find the trace.
 
 ## Alert routing

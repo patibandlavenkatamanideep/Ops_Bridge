@@ -19,6 +19,8 @@ only after a different person approves the exact version they reviewed.
 | ![Evidence](docs/images/03-evidence.png) | ![Proposal and execution](docs/images/04-proposals-execution.png) |
 | **Benchmark runs with intervals and receipts** | **Tenant settings: tier gates features, not authority** |
 | ![Evaluation](docs/images/05-evaluation.png) | ![Tenant settings](docs/images/07-tenant-settings.png) |
+| **Operations dashboard (Grafana, local profile)** | |
+| ![Grafana overview](docs/images/08-grafana-overview.png) | |
 
 ## What it does
 

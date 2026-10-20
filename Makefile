@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline eval-replay-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
+        test-e2e eval-offline eval-replay-check dashboard-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -96,8 +96,12 @@ alerts-test: ## Check and unit-test alert rules (promtool) and alert routing (am
 	  'amtool check-config alertmanager.local.yml && grep -v "^\#" routes.test | while read -r want labels; do \
 	   amtool config routes test --config.file=alertmanager.local.yml --verify.receivers="$$want" $$labels || exit 1; done'
 
-observability-up: ## Start Prometheus, Alertmanager and the local alert sink (scrapes make dev processes)
-	$(COMPOSE) --profile observability up -d prometheus alertmanager alert-sink
+observability-up: ## Start Prometheus, Alertmanager, the alert sink and Grafana (http://localhost:3000)
+	python3 scripts/setup_env.py >/dev/null
+	$(COMPOSE) --profile observability up -d prometheus alertmanager alert-sink grafana
+
+dashboard-check: ## Run every Grafana panel query (after make observability-up); fails on any query error
+	python3 scripts/dashboard_check.py
 
 image: ## Build the application image (API+UI, worker, MCP, simulator) from the locks
 	$(CONTAINER_ENV) && docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .
