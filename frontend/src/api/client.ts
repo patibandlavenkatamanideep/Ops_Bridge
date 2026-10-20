@@ -19,6 +19,7 @@ export type OperationItem = components["schemas"]["OperationOut"];
 export type OperationList = components["schemas"]["OperationList"];
 export type DecisionResult = components["schemas"]["DecisionOut"];
 export type SettingsView = components["schemas"]["SettingsOut"];
+export type ConnectorHealth = components["schemas"]["ConnectorHealthOut"];
 export type UploadResult = components["schemas"]["UploadOut"];
 export type Message = components["schemas"]["MessageOut"];
 export type MessageList = components["schemas"]["MessageList"];
