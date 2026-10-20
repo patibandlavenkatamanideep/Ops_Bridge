@@ -580,3 +580,18 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   no tokens from the mock model, process memory not exported on macOS); rendered in a
   headless browser (docs/images/08-grafana-overview.png, synthetic local metrics).
 - `make verify` 15/15 (unit 280 + 3 skipped, integration 129, browser 23, replay check).
+
+### Tenant settings: policy versions and connector health (2026-10-19)
+- Brief §15 lists policies, members, connector health, retention and model mode on the tenant
+  settings screen; policies and connector health were missing.
+- Policies: every policy version with its state (active = in force today by the database
+  clock, using the same ordering as investigations; superseded; scheduled) and digest.
+- Connector health (`GET /api/v1/tenants/{tenant}/connectors/health`, administrators and
+  auditors): reachability and the capabilities the simulator advertises now (live discovery,
+  3 s timeout; discovery failure is reported as "assumed weakest", not hidden), what they mean
+  after an ambiguous create, attempts of the last 24 hours by phase and result, operations with
+  an unknown outcome. For GitHub: configuration flags only; GitHub is not contacted.
+- Evidence: `tests/integration/test_connector_health.py` (4: policy states; live capabilities,
+  attempt counts after a confirmed operation, and the change when the tracker stops promising
+  idempotency and lookup; unreachable tracker reported; investigators and other tenants
+  refused); browser test in `e2e/phase6.spec.ts`; the accessibility scan covers the new sections.
