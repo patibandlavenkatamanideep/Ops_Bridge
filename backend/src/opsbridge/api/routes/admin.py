@@ -67,10 +67,38 @@ class MemberOut(BaseModel):
     status: str
 
 
+class PolicyOut(BaseModel):
+    policy_id: str
+    version: int
+    effective_from: str
+    sha256: str
+    state: str  # active | superseded | scheduled
+
+
+class AttemptStat(BaseModel):
+    kind: str
+    status: str
+    count: int
+    last_at: str | None
+
+
+class ConnectorHealthOut(BaseModel):
+    connector: str
+    checked_at: str
+    reachable: bool | None  # None: not checked live (needs authorization)
+    capabilities: dict[str, Any]
+    capability_source: str
+    meaning: str
+    configuration: dict[str, bool]
+    attempts_24h: list[AttemptStat]
+    awaiting_review: int
+
+
 class SettingsOut(BaseModel):
     tenant: TenantInfo
     entitlements: Entitlements
     settings: SettingsValues
+    policies: list[PolicyOut]
     members: list[MemberOut]
     retention_keys: list[str] = list(svc.RETENTION_KEYS)
 
@@ -132,6 +160,16 @@ def _msg(m: Any, author: str | None) -> MessageOut:
 @tenant_router.get("/settings", response_model=SettingsOut)
 def get_settings(principal: CurrentPrincipal, state: State) -> SettingsOut:
     return SettingsOut.model_validate(svc.get_settings_view(state.db, principal))
+
+
+@tenant_router.get("/connectors/health", response_model=ConnectorHealthOut)
+def connector_health(principal: CurrentPrincipal, state: State) -> ConnectorHealthOut:
+    try:
+        return ConnectorHealthOut.model_validate(
+            svc.connector_health(state.db, principal, state.settings)
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
 
 
 @tenant_router.put("/settings", response_model=SettingsOut)
