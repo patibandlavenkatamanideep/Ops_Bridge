@@ -133,6 +133,41 @@
         "title": "AttemptOut",
         "type": "object"
       },
+      "AttemptStat": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "count",
+          "last_at"
+        ],
+        "title": "AttemptStat",
+        "type": "object"
+      },
       "Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post": {
         "properties": {
           "file": {
@@ -376,6 +411,73 @@
           "text"
         ],
         "title": "ChunkOut",
+        "type": "object"
+      },
+      "ConnectorHealthOut": {
+        "properties": {
+          "attempts_24h": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptStat"
+            },
+            "title": "Attempts 24H",
+            "type": "array"
+          },
+          "awaiting_review": {
+            "title": "Awaiting Review",
+            "type": "integer"
+          },
+          "capabilities": {
+            "additionalProperties": true,
+            "title": "Capabilities",
+            "type": "object"
+          },
+          "capability_source": {
+            "title": "Capability Source",
+            "type": "string"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "configuration": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Configuration",
+            "type": "object"
+          },
+          "connector": {
+            "title": "Connector",
+            "type": "string"
+          },
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reachable"
+          }
+        },
+        "required": [
+          "connector",
+          "checked_at",
+          "reachable",
+          "capabilities",
+          "capability_source",
+          "meaning",
+          "configuration",
+          "attempts_24h",
+          "awaiting_review"
+        ],
+        "title": "ConnectorHealthOut",
         "type": "object"
       },
       "CorrectionCreated": {
@@ -1483,6 +1585,39 @@
         "title": "OperationOut",
         "type": "object"
       },
+      "PolicyOut": {
+        "properties": {
+          "effective_from": {
+            "title": "Effective From",
+            "type": "string"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy_id",
+          "version",
+          "effective_from",
+          "sha256",
+          "state"
+        ],
+        "title": "PolicyOut",
+        "type": "object"
+      },
       "ProposalCreateIn": {
         "properties": {
           "body": {
@@ -1971,6 +2106,13 @@
             "title": "Members",
             "type": "array"
           },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyOut"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
           "retention_keys": {
             "default": [
               "raw_documents_days",
@@ -1995,6 +2137,7 @@
           "tenant",
           "entitlements",
           "settings",
+          "policies",
           "members"
         ],
         "title": "SettingsOut",
@@ -3732,6 +3875,51 @@
         "summary": "Run Status",
         "tags": [
           "investigations"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/connectors/health": {
+      "get": {
+        "operationId": "connector_health_api_v1_tenants__tenant__connectors_health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorHealthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector Health",
+        "tags": [
+          "tenant"
         ]
       }
     },

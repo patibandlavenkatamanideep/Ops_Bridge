@@ -331,6 +331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/connectors/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Connector Health */
+        get: operations["connector_health_api_v1_tenants__tenant__connectors_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/evaluations": {
         parameters: {
             query?: never;
@@ -505,6 +522,17 @@ export interface components {
             /** Worker Id */
             worker_id: string | null;
         };
+        /** AttemptStat */
+        AttemptStat: {
+            /** Count */
+            count: number;
+            /** Kind */
+            kind: string;
+            /** Last At */
+            last_at: string | null;
+            /** Status */
+            status: string;
+        };
         /** Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post */
         Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post: {
             /** File */
@@ -583,6 +611,31 @@ export interface components {
             page: number | null;
             /** Text */
             text: string;
+        };
+        /** ConnectorHealthOut */
+        ConnectorHealthOut: {
+            /** Attempts 24H */
+            attempts_24h: components["schemas"]["AttemptStat"][];
+            /** Awaiting Review */
+            awaiting_review: number;
+            /** Capabilities */
+            capabilities: {
+                [key: string]: unknown;
+            };
+            /** Capability Source */
+            capability_source: string;
+            /** Checked At */
+            checked_at: string;
+            /** Configuration */
+            configuration: {
+                [key: string]: boolean;
+            };
+            /** Connector */
+            connector: string;
+            /** Meaning */
+            meaning: string;
+            /** Reachable */
+            reachable: boolean | null;
         };
         /** CorrectionCreated */
         CorrectionCreated: {
@@ -933,6 +986,19 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /** PolicyOut */
+        PolicyOut: {
+            /** Effective From */
+            effective_from: string;
+            /** Policy Id */
+            policy_id: string;
+            /** Sha256 */
+            sha256: string;
+            /** State */
+            state: string;
+            /** Version */
+            version: number;
+        };
         /** ProposalCreateIn */
         ProposalCreateIn: {
             /** Body */
@@ -1094,6 +1160,8 @@ export interface components {
             entitlements: components["schemas"]["Entitlements"];
             /** Members */
             members: components["schemas"]["MemberOut"][];
+            /** Policies */
+            policies: components["schemas"]["PolicyOut"][];
             /**
              * Retention Keys
              * @default [
@@ -1965,6 +2033,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    connector_health_api_v1_tenants__tenant__connectors_health_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConnectorHealthOut"];
                 };
             };
             /** @description Validation Error */
