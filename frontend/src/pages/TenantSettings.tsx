@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type SettingsView } from "../api/client";
+import { ApiError, api, tenantPath, type ConnectorHealth, type SettingsView } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -163,6 +163,40 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
         </section>
       )}
 
+      <ConnectorHealthPanel tenant={tenant} />
+
+      <section aria-labelledby="policies-title">
+        <h2 id="policies-title">Policies</h2>
+        <table className="table">
+          <caption className="visually-hidden">Policy versions of this organization</caption>
+          <thead>
+            <tr>
+              <th scope="col">Policy</th>
+              <th scope="col">Version</th>
+              <th scope="col">Effective from</th>
+              <th scope="col">State</th>
+              <th scope="col">Digest</th>
+            </tr>
+          </thead>
+          <tbody>
+            {view.policies.map((p) => (
+              <tr key={`${p.policy_id}-${p.version}`}>
+                <th scope="row" className="mono">{p.policy_id}</th>
+                <td>v{p.version}</td>
+                <td>{p.effective_from}</td>
+                <td>{statusLabel(p.state)}</td>
+                <td className="mono small" title={p.sha256}>{p.sha256.slice(7, 19)}…</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="muted small">
+          Active means in force today. Each investigation uses the version in force on the invoice’s decision date, so
+          older invoices can still be judged by an earlier version. Policies change by publishing a new version, not
+          by editing one.
+        </p>
+      </section>
+
       <section aria-labelledby="members-title">
         <h2 id="members-title">Members</h2>
         <table className="table">
@@ -194,3 +228,85 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
     </section>
   );
 }
+
+const LOOKUP_LABELS: Record<string, string> = {
+  strong: "reliable lookup",
+  eventual: "lookup may lag",
+  none: "no lookup",
+};
+
+/** What the follow-up connector promises right now, and how its recent attempts went. */
+function ConnectorHealthPanel({ tenant }: { tenant: string }) {
+  const health = useQuery<ConnectorHealth, ApiError>({
+    queryKey: ["connector-health", tenant],
+    queryFn: ({ signal }) => api<ConnectorHealth>(tenantPath(tenant, "/connectors/health"), { signal }),
+  });
+  return (
+    <section aria-labelledby="connector-title">
+      <h2 id="connector-title">Connector health</h2>
+      {health.isPending ? (
+        <Loading label="Checking the connector" />
+      ) : health.isError ? (
+        <ErrorState error={health.error} onRetry={() => health.refetch()} />
+      ) : (
+        <>
+          <dl className="facts">
+            <dt>Connector</dt>
+            <dd className="mono">{health.data.connector}</dd>
+            <dt>Reachable</dt>
+            <dd>{health.data.reachable === null ? "not checked live" : health.data.reachable ? "yes" : "no"}</dd>
+            <dt>Promises</dt>
+            <dd>
+              {health.data.capabilities.idempotency_keys ? "idempotency keys" : "no idempotency keys"},{" "}
+              {LOOKUP_LABELS[String(health.data.capabilities.lookup)] ?? String(health.data.capabilities.lookup)}
+              <div className="muted small">{health.data.capability_source}</div>
+            </dd>
+            <dt>After an ambiguous create</dt>
+            <dd>{health.data.meaning}</dd>
+            {Object.entries(health.data.configuration).map(([k, v]) => (
+              <div key={k} className="contents">
+                <dt>{statusLabel(k)}</dt>
+                <dd>{v ? "yes" : "no"}</dd>
+              </div>
+            ))}
+            <dt>Awaiting human review</dt>
+            <dd>{health.data.awaiting_review} operation(s) with an unknown outcome</dd>
+          </dl>
+          {health.data.attempts_24h.length === 0 ? (
+            <p className="muted">No attempts in the last 24 hours.</p>
+          ) : (
+            <table className="table compact">
+              <caption>Attempts in the last 24 hours</caption>
+              <thead>
+                <tr>
+                  <th scope="col">Phase</th>
+                  <th scope="col">Result</th>
+                  <th scope="col">Count</th>
+                  <th scope="col">Latest</th>
+                </tr>
+              </thead>
+              <tbody>
+                {health.data.attempts_24h.map((a) => (
+                  <tr key={`${a.kind}-${a.status}`}>
+                    <th scope="row">{statusLabel(a.kind)}</th>
+                    <td>{statusLabel(a.status)}</td>
+                    <td>{a.count}</td>
+                    <td>{a.last_at ? new Date(a.last_at).toLocaleString() : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          <p className="muted small">
+            Checked {new Date(health.data.checked_at).toLocaleString()}.{" "}
+            <button type="button" className="button link small" onClick={() => health.refetch()}
+                    disabled={health.isFetching}>
+              {health.isFetching ? "Checking…" : "Check again"}
+            </button>
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
