@@ -566,3 +566,17 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   records verified.
 - `make verify` 15/15 (unit 278 + 3 skipped, integration 129, browser 23, replay check). Hosted
   CI run 39295328458 at 4becef9: passed, including the benchmark replay on Linux.
+
+### Grafana dashboards (2026-10-19)
+- `CLAUDE.md` and the brief name an optional Prometheus/Grafana profile; Grafana was missing.
+  Added `grafana/grafana:13.2.3` to the observability profile: provisioned Prometheus data source
+  and one file-based, read-only dashboard ("OpsBridge overview", 23 panels: service, work queue,
+  cases/approvals/execution, connectors/tools/models, capacity; aggregates only, no tenant or
+  case ids). Anonymous Viewer on localhost, login form and basic auth off, no reporting or
+  update checks; an admin password is generated into `.env` by `make setup` anyway.
+- Evidence: `tests/contracts/test_dashboards.py` (every metric and label used is exported;
+  fails on a misspelled metric or label); `make dashboard-check` against the running stack:
+  23 panel queries, 0 errors, 4 without data yet (no runnable jobs, no tool calls since restart,
+  no tokens from the mock model, process memory not exported on macOS); rendered in a
+  headless browser (docs/images/08-grafana-overview.png, synthetic local metrics).
+- `make verify` 15/15 (unit 280 + 3 skipped, integration 129, browser 23, replay check).
