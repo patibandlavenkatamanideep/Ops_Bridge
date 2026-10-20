@@ -129,6 +129,16 @@ class Membership(Base):
     )
 
 
+class RateLimitWindow(Base):
+    """Shared API rate-limit counters (perimeter state, not tenant data): one row per key and
+    fixed window. Keys are a session-cookie hash or a client address, never raw tokens."""
+
+    __tablename__ = "rate_limit_windows"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
+
+
 class UserSession(Base):
     __tablename__ = "user_sessions"
     # SHA-256 of the opaque cookie value; the raw value is never stored.
