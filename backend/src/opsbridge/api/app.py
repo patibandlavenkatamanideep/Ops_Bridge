@@ -65,10 +65,20 @@ def create_app(
         same_site="lax",
         https_only=settings.secure_cookies,
     )
+    limiter = None
+    if settings.rate_limit_shared:
+        from .ratelimit import SharedWindowLimiter
+
+        limiter = SharedWindowLimiter(
+            app.state.opsbridge.db.engine,
+            settings.rate_limit_per_minute,
+            settings.rate_limit_window_seconds,
+        )
     app.add_middleware(
         PerimeterMiddleware,
         max_body_bytes=settings.max_request_bytes,
         rate_limit_per_minute=settings.rate_limit_per_minute,
+        limiter=limiter,
     )
 
     app.include_router(health.router)
