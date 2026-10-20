@@ -1,8 +1,8 @@
 import { expect, test, type Page } from "@playwright/test";
-import { openCase, rerunInvestigation, signIn } from "./helpers";
+import { createOrOpenCase, rerunInvestigation, signIn } from "./helpers";
 
 async function openInvoiceCase(page: Page): Promise<void> {
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await expect(page.getByRole("button", { name: /Run investigation|Re-run investigation/ })).toBeEnabled();
 }
 
