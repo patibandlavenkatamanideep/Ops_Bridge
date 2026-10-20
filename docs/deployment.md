@@ -7,7 +7,7 @@ been applied anywhere. Production readiness is not claimed.
 | Target | How | Verified |
 |---|---|---|
 | Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (15 gates) on macOS + Podman 5.7.1 |
-| Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
+| Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000; own database `opsbridge_demo`) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
 | Local observability | `make observability-up` (Prometheus :9090, Alertmanager :9093, alert sink :9099, Grafana :3000) | yes — alert drills with injected failures, delivered through Alertmanager to the local sink; all 23 dashboard queries ran in Grafana without error |
 | Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | yes — PR #1, run 39000811947 at 1f29197 (2026-10-17): all three jobs passed on ubuntu-24.04 with Docker |
 | Staging (AWS, below) | not provisioned | **no** |
@@ -125,5 +125,6 @@ copy) to the same point into a new environment, verify with
 store's encryption, IAM and lifecycle settings against the real bucket (tested locally against
 SeaweedFS only); connect the page and ticket receivers to real on-call and queue services and
 repeat the routing drill there (locally they reach only the alert sink);
-add the WAF/rate-limit edge (application rate limits are per process); run the restore drill
+add the WAF/rate-limit edge (application rate limits are shared across API tasks through
+PostgreSQL but are not a DDoS defence); run the restore drill
 there with synthetic data.
