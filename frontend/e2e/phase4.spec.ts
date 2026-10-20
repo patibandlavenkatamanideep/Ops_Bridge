@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { openCase, rerunInvestigation, signIn } from "./helpers";
+import { createOrOpenCase, openCase, rerunInvestigation, signIn } from "./helpers";
 
 test("investigator proposes, approver approves, execution is confirmed and the case stays open", async ({ browser }) => {
   const inv = await browser.newPage();
   await signIn(inv, "furn-investigator");
-  await openCase(inv, "INV-9001");
+  await createOrOpenCase(inv, "INV-9001");
   // Fresh evidence state, then a proposal from the validated draft.
   await rerunInvestigation(inv, "rules_only");
   await inv.getByRole("tab", { name: "Proposals & execution" }).click();
