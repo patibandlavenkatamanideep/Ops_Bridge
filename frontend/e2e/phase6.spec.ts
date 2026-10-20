@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { openCase, signIn } from "./helpers";
+import { createOrOpenCase, signIn } from "./helpers";
 
 test("case notes can be added, corrected and have their text deleted with a reason", async ({ page }) => {
   const stamp = Date.now().toString(36);
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Conversation" }).click();
 
   await page.getByLabel("Add a note").fill(`Receiving counted 18 chairs (${stamp})`);
@@ -29,7 +29,7 @@ test("case notes can be added, corrected and have their text deleted with a reas
 
 test("an uploaded supplier message is parsed and shown as evidence", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Evidence" }).click();
   await page.getByRole("button", { name: "Upload a document" }).click();
   await page.getByLabel("Document type").selectOption("supplier_message");
@@ -46,7 +46,7 @@ test("an uploaded supplier message is parsed and shown as evidence", async ({ pa
 
 test("a disguised upload is rejected with an explanation", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Evidence" }).click();
   await page.getByRole("button", { name: "Upload a document" }).click();
   await page.getByLabel(/^File/).setInputFiles({
