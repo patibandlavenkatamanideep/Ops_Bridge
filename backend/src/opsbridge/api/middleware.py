@@ -1,7 +1,8 @@
 """Perimeter middleware: correlation IDs, security headers, size and rate limits.
 
 Application rate limits protect the service from accidental overload and simple
-abuse. They are per process and are NOT a DDoS defence; see docs/security-and-threat-model.md
+abuse. They are shared by all API instances through PostgreSQL (api/ratelimit.py, with a
+per-process fallback) and are NOT a DDoS defence; see docs/security-and-threat-model.md
 for the reverse-proxy/WAF boundary.
 """
 
@@ -12,8 +13,10 @@ import secrets
 import threading
 import time
 from collections.abc import Awaitable, Callable
+from typing import Any
 
 from opentelemetry.trace import SpanKind
+from starlette.concurrency import run_in_threadpool
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
@@ -33,10 +36,12 @@ SPA_CSP = (
 
 
 class PerimeterMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app, *, max_body_bytes: int, rate_limit_per_minute: int) -> None:  # type: ignore[no-untyped-def]
+    def __init__(  # type: ignore[no-untyped-def]
+        self, app, *, max_body_bytes: int, rate_limit_per_minute: int, limiter: Any = None
+    ) -> None:
         super().__init__(app)
         self.max_body_bytes = max_body_bytes
-        self.limiter = FixedWindowLimiter(rate_limit_per_minute, 60.0)
+        self.limiter = limiter or FixedWindowLimiter(rate_limit_per_minute, 60.0)
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
@@ -96,7 +101,8 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
             cookie = request.cookies.get(COOKIE_NAME)
             client = request.client.host if request.client else "unknown"
             key = f"s:{hash_token(cookie)}" if cookie else f"ip:{client}"
-            allowed, retry_after = self.limiter.hit(key)
+            # The shared limiter waits on the database: keep it off the event loop.
+            allowed, retry_after = await run_in_threadpool(self.limiter.hit, key)
             if not allowed:
                 resp = _error(429, "rate_limited", "Too many requests; slow down.", cid, True)
                 resp.headers["Retry-After"] = str(retry_after)
