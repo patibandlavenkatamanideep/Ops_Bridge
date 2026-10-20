@@ -52,6 +52,10 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
   local OCR; Apache-2.0; adds about 90 MB). Hosted CI installs Ubuntu's `tesseract-ocr` package
   (version printed in the log). No Python OCR wrapper: the CLI is called with a fixed argument
   vector; page images come from pypdf and Pillow, already locked.
+- `grafana/grafana:13.2.3` (optional observability profile only; AGPL-3.0, run unmodified as a
+  separate container, not distributed with or linked into OpsBridge; a patch release of
+  2026-09-29, the newest at least two weeks old). Reporting, update checks and the news feed
+  are switched off.
 - `prom/alertmanager:v0.34.1` (observability profile and `amtool` for routing tests;
   Apache-2.0; a patch release of 2026-09-17). The local alert sink runs on the same
   `python:3.12.15-slim-bookworm` image as the application, standard library only.
