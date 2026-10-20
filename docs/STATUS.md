@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-19 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-20 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -11,7 +11,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | passing — PR #1 to `main` (opened with the owner's authorization, not merged), run 39000811947 at 1f29197: all three jobs green on ubuntu-24.04 |
+| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; all three jobs on ubuntu-24.04 |
 | Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
@@ -353,7 +353,7 @@ Phase 1 exit gate evidence:
 
 ## Known defects and limitations
 
-- Rate limiting is per process and in memory; not a DDoS control.
+- Rate limiting is shared across API instances (PostgreSQL) but is not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
   queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
@@ -388,7 +388,7 @@ Phase 1 exit gate evidence:
 ## Next executable task
 
 The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
-review and, if you choose, merge PR #1 (hosted CI passes; merging is yours); with authorization, the live
+review and, if you choose, merge the open PR (#3 at the time of writing; merging is yours); with authorization, the live
 GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
 pilot owner. Local improvement that needs no authorization: the next supplier invoice
 layout for the furniture pack (from approved real samples, not the held-out layout).
@@ -595,3 +595,36 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   attempt counts after a confirmed operation, and the change when the tracker stops promising
   idempotency and lookup; unreachable tracker reported; investigators and other tenants
   refused); browser test in `e2e/phase6.spec.ts`; the accessibility scan covers the new sections.
+
+### Shared API rate limit (2026-10-20)
+- The limit was counted per process in memory, so two API instances (the staging plan runs
+  two) allowed twice the configured rate and a restart reset it. Now one fixed window per
+  session hash or client address is counted in PostgreSQL (`rate_limit_windows`, migration
+  0006, RLS forced, API role only), aligned by the database clock, off the event loop; expired
+  windows are pruned. If the database is unavailable, each process falls back to its own
+  window, so a limit still applies. `rate_limit_shared` (on) and `rate_limit_window_seconds`.
+- Evidence: `tests/integration/test_rate_limit_shared.py` (4): two app instances allow 3 of 6
+  requests together (the old per-process mode, kept as a control, allowed all 6); the window
+  rolls over after the stated `Retry-After`; a database outage still limits per process;
+  expired windows are pruned. Cost measured locally: median 1.32 ms vs 0.55 ms per API request.
+
+### Container demo database and restore-drill finding (2026-10-20)
+- The restore drill failed: 4 attempt artifacts referenced by the dev database were missing
+  from `var/artifacts`. Cause: `make demo-containers` used the same database as `make dev`,
+  but the containers write artifacts to their own volume, so the container worker recorded
+  rows pointing at files the dev store does not have. Repaired by copying the 4 files from
+  the volume (sha256 checked); the drill then passed.
+- Prevention: the containers now use their own database `opsbridge_demo` (created by the
+  Postgres init script; `demo-containers` now runs `infra-up`, which rebuilds that image and
+  reruns the script). Evidence: after the container stack ran browser specs on :8000, the dev
+  database was unchanged (97 cases, 1022 audit events, 439 artifacts), `opsbridge_demo` had 3
+  cases, 19 audit events and 12 artifacts, and all 12 artifact files were in the volume.
+- Found on the way: phase3, phase4 and phase6 opened `INV-9001` and so passed only after
+  phase2 had created it. On the fresh demo database phase4 failed. They now create-or-open
+  the case; each spec passes alone against the containers (phase4 2, phase3 2, phase6 5).
+- Operational note: when `infra-up` recreates the Postgres container (its image changed),
+  Keycloak keeps dead pooled connections and the first sign-ins fail with an identity-provider
+  error until the pool replaces them (about a minute here). Seen once; not fixed.
+- Evidence: `make verify` 15/15 (unit 280 + 3 skipped, integration 137, browser 24); new
+  backup at revision 0006 and `make restore-drill` ok (5598 rows, 0 tables without forced
+  RLS, no artifact problems).
