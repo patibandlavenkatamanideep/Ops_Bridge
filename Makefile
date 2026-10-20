@@ -106,9 +106,7 @@ dashboard-check: ## Run every Grafana panel query (after make observability-up);
 image: ## Build the application image (API+UI, worker, MCP, simulator) from the locks
 	$(CONTAINER_ENV) && docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .
 
-demo-containers: image ## Run the whole stack in containers (stop `make dev` first); UI on http://localhost:8000
-	$(COMPOSE) --profile app up -d --wait postgres keycloak
-	$(COMPOSE) exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh >/dev/null
+demo-containers: image infra-up ## Run the whole stack in containers (own database opsbridge_demo; stop `make dev` first); UI on http://localhost:8000
 	$(COMPOSE) --profile app up -d --wait
 
 backup: ## Back up the local database and artifact store to var/backups/<UTC timestamp>
