@@ -23,7 +23,13 @@ OIDC subject (`iss` + `sub`). Tenant membership is stored in OpsBridge, not in K
 | it-investigator | demo-it: investigator |
 | it-approver | demo-it: approver |
 | multi-member | demo-furniture: investigator + approver; demo-it: requester |
+| new-hire | none: joins through an invitation (email verified by Keycloak) |
+| unverified-hire | none: email **not** verified, so invitations are refused (negative test) |
 
 Clients: `opsbridge-web` (confidential, authorization code + PKCE S256),
 `opsbridge-worker` (client credentials; audiences `opsbridge-records-mcp` and
 `opsbridge-casework-mcp`), and the two bearer-only MCP resource clients.
+
+Keycloak imports this file only when the realm does not exist yet. After users are added
+here, `make identity-sync` adds the missing ones to a running local Keycloak (Keycloak's
+partial import with skip-if-exists; existing users and passwords are left alone).
