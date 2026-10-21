@@ -52,7 +52,8 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   and per-session/IP rate limits; liveness/readiness.
 - UI: React 19/Vite 8 shell with sign-in, tenant switcher, case queue (loading/empty/
   denied/error states), new case form, case detail; types generated from OpenAPI.
-- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants.
+- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants
+  (since 2026-10-20 it creates missing memberships and leaves existing ones as administrators set them).
 - Commands: Makefile (`doctor setup infra-up migrate seed-demo dev demo lint typecheck test
   test-integration test-e2e verify build down reset-demo openapi`); direct equivalents in
   docs/developer-commands.md. `eval-offline` and `demo --seed-records` targets exist but
@@ -366,7 +367,8 @@ Phase 1 exit gate evidence:
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
 - Retention runs daily per configured tenant and on request; backups are outside its reach. Extracted
   field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
-- Uploads are not malware-scanned; there is no in-app member editor (memberships are seeded).
+- Uploads are not malware-scanned. Administrators change roles, approval scope and access of
+  existing members in the app; adding a person still needs provisioning (no invitation flow).
 - Browser tests add conversation notes and upload versions to the local demo case INV-9001.
 - A run of a different model mode is refused (409) while another run is active, instead of
   silently returning the active run (found by a browser test; fixed in Phase 3).
@@ -628,3 +630,31 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Evidence: `make verify` 15/15 (unit 280 + 3 skipped, integration 137, browser 24); new
   backup at revision 0006 and `make restore-drill` ok (5598 rows, 0 tables without forced
   RLS, no artifact problems).
+
+### Member management (2026-10-20)
+- The brief gives tenant administrators membership management; memberships could only be
+  seeded. Now `PATCH /api/v1/tenants/{tenant}/members/{id}` (and the Members section of
+  tenant settings) changes another member's roles, approval scope or access (revoke,
+  reinstate) with a required reason. Changes apply on the person's next request.
+- Controls: `tenant.manage_members`; the tenant's membership rows are locked and the actor's
+  own authority is re-read under the lock; nobody changes their own membership, so an active
+  administrator always remains; unknown roles/action types refused; dropping the approver
+  role clears the scope. The audit event holds before/after only; the free-text reason is on
+  the membership row (`change_reason`, `updated_by`, migration 0007). The dispatch recheck of
+  the approver now filters by tenant explicitly instead of relying only on RLS.
+- Finding: `seed-demo` reset every existing demo membership to the fixture (roles, scope and
+  status `active`), and the container bootstrap runs it on every start, so a revoked member
+  would have regained access. Seeding now only creates missing memberships.
+- Evidence: `tests/integration/test_member_management.py` (8, real PostgreSQL): a role change
+  takes effect and is audited without the reason text; revoke and reinstate; a revoked
+  approver's earlier approval is cancelled before dispatch and nothing reaches the tracker;
+  validation and non-admin refusals; no cross-tenant change; an administrator demoted while
+  their request is in flight is refused; two administrators demoting each other while both
+  wait on the lock leave exactly one (with the re-check disabled both succeed and no
+  administrator remains, and the in-flight request goes through, so both tests fail);
+  re-seeding keeps in-app changes. Browser: `e2e/phase6.spec.ts` revokes and reinstates a
+  member with reasons; the accessibility scan covers the open editor. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 145, browser 25); restore drill ok at revision 0007.
+- Not built: inviting a new person (needs a decision on binding an invitation to an identity:
+  OIDC subject or verified email); two colluding administrators can still grant each other
+  any role.
