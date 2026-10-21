@@ -34,7 +34,10 @@ class SeedReport:
     tenants_created: list[str] = field(default_factory=list)
     tenants_existing: list[str] = field(default_factory=list)
     users_upserted: int = 0
-    memberships_upserted: int = 0
+    memberships_created: int = 0
+    # Existing memberships are left as they are: administrators manage them in the app, and
+    # re-seeding must never reinstate a revoked member or undo a role change.
+    memberships_kept: int = 0
     policies_created: list[str] = field(default_factory=list)
     policies_existing: list[str] = field(default_factory=list)
 
@@ -101,19 +104,18 @@ def seed_demo(
                     )
                 ).scalar_one_or_none()
                 if mem is None:
-                    mem = Membership(
-                        tenant_id=tenant.id,
-                        user_id=user.id,
-                        roles=m["roles"],
-                        approval_scope=m.get("approval_scope", []),
-                        status="active",
+                    s.add(
+                        Membership(
+                            tenant_id=tenant.id,
+                            user_id=user.id,
+                            roles=m["roles"],
+                            approval_scope=m.get("approval_scope", []),
+                            status="active",
+                        )
                     )
-                    s.add(mem)
+                    report.memberships_created += 1
                 else:
-                    mem.roles = m["roles"]
-                    mem.approval_scope = m.get("approval_scope", [])
-                    mem.status = "active"
-                report.memberships_upserted += 1
+                    report.memberships_kept += 1
 
     packs_dir = settings.packs_dir
     for t in spec["tenants"]:
