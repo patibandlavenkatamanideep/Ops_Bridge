@@ -29,7 +29,8 @@ def _seed_demo(_args: argparse.Namespace) -> int:
     db.engine.dispose()
     print(
         f"tenants created={report.tenants_created} existing={report.tenants_existing}; "
-        f"memberships={report.memberships_upserted}; policies created={report.policies_created}"
+        f"memberships created={report.memberships_created} kept as they are="
+        f"{report.memberships_kept}; policies created={report.policies_created}"
     )
     return 0
 
