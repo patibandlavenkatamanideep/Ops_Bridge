@@ -94,8 +94,9 @@ Details and reproduction: docs/case-study.md.
   processes need synchronized clocks (NTP).
 - Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
   queue or email receiver is connected.
-- Administrators change roles, approval scope and access of existing members in the app;
-  adding a person to an organization still needs provisioning (no invitation flow).
+- Administrators manage members in the app and add people with a single-use invitation link
+  that they deliver themselves (OpsBridge sends no email); acceptance relies on the identity
+  provider's email verification.
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
 
