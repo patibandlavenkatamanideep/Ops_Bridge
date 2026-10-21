@@ -94,3 +94,32 @@ test("tenant settings: admins see tier-limited options; investigators are denied
   await page.goto("/t/demo-furniture/settings");
   await expect(page.getByRole("heading", { name: "You don't have access to this" })).toBeVisible();
 });
+
+test("an administrator revokes and reinstates a member, giving a reason each time", async ({ page }) => {
+  await signIn(page, "furn-admin");
+  await page.goto("/t/demo-furniture/settings");
+  const members = page.getByRole("table", { name: "Members of this organization" });
+  await expect(members.getByRole("row", { name: /Ada Admin/ })).toContainText("You");
+  await expect(members.getByRole("button", { name: "Change Ada Admin" })).toHaveCount(0); // not their own
+
+  const row = members.getByRole("row", { name: /Ana Notes-Approver/ });
+  // Reinstate first if an interrupted earlier run left the member revoked.
+  const steps: [string, string, RegExp][] = [
+    ["Revoked: no access to this organization", "E2E: access paused", /revoked/i],
+    ["Active", "E2E: access restored", /active/i],
+  ];
+  if (/revoked/i.test(await row.getByRole("cell").nth(2).innerText())) steps.reverse();
+  for (const [access, reason, shown] of steps) {
+    await members.getByRole("button", { name: "Change Ana Notes-Approver" }).click();
+    const form = page.getByRole("form", { name: "Change membership of Ana Notes-Approver" });
+    await expect(form.getByRole("heading")).toBeFocused();
+    await form.getByLabel(access).check();
+    await form.getByLabel("Reason for the change").fill(reason);
+    await form.getByRole("button", { name: "Save change" }).click();
+    await expect(page.getByText("Membership of Ana Notes-Approver updated.")).toBeVisible();
+    await expect(form).toHaveCount(0);
+    await expect(row.getByRole("cell").nth(2)).toHaveText(shown);
+    await expect(row).toContainText(reason);
+  }
+  await expect(row.getByRole("cell").nth(2)).toHaveText(/active/i);
+});
