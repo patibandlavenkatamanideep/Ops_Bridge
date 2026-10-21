@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, StringConstraints
 
-from opsbridge.auth.permissions import require
+from opsbridge.auth.permissions import Role, require
+from opsbridge.domain.policy import ActionType
 from opsbridge.evidence.parsers import OcrSettings
 from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
@@ -60,11 +61,23 @@ class SettingsValues(BaseModel):
 
 
 class MemberOut(BaseModel):
+    id: str
     username: str
     display_name: str | None
     roles: list[str]
     approval_scope: list[str]
     status: str
+    change_reason: str | None  # the latest in-app change; seeded memberships have none
+    changed_at: str | None
+
+
+class MemberUpdateIn(BaseModel):
+    """Fields left out stay as they are; dropping the approver role clears the scope."""
+
+    roles: list[Role] | None = Field(default=None, max_length=5)
+    approval_scope: list[ActionType] | None = Field(default=None, max_length=10)
+    status: Literal["active", "revoked"] | None = None
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=500)]
 
 
 class PolicyOut(BaseModel):
@@ -183,6 +196,30 @@ def put_settings(
             model_mode=body.model_mode,
             task_connector=body.task_connector,
             retention=body.retention,
+            correlation_id=request.state.correlation_id,
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+    return SettingsOut.model_validate(view)
+
+
+@tenant_router.patch("/members/{membership_id}", response_model=SettingsOut)
+def update_member(
+    membership_id: uuid.UUID,
+    body: MemberUpdateIn,
+    principal: CurrentPrincipal,
+    state: State,
+    request: Request,
+) -> SettingsOut:
+    try:
+        view = svc.update_membership(
+            state.db,
+            principal,
+            membership_id,
+            roles=list(body.roles) if body.roles is not None else None,
+            approval_scope=list(body.approval_scope) if body.approval_scope is not None else None,
+            status=body.status,
+            reason=body.reason,
             correlation_id=request.state.correlation_id,
         )
     except (NotFound, Conflict) as exc:
