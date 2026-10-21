@@ -154,6 +154,53 @@ def test_user_without_membership_gets_no_tenant_access(
     assert client.get("/api/v1/tenants/demo-it/cases").status_code == 200
 
 
+def _sign_in(client: TestClient, username: str, password: str) -> str:
+    """Sign in through Keycloak's form; return the session's CSRF token."""
+    client.cookies.clear()
+    kc = _keycloak_login(_start_login(client), username, password)
+    assert client.get(f"/auth/callback?{urlparse(kc.headers['location']).query}").status_code == 303
+    return str(client.get("/api/v1/me").json()["csrf_token"])
+
+
+def test_invitations_trust_only_an_address_the_provider_verified(
+    client: TestClient, settings: Settings
+) -> None:
+    """new-hire and unverified-hire belong to no organization; Keycloak verified only the
+    first one's address, and says so in the ID token's `email_verified` claim."""
+    password = settings.demo_user_password.get_secret_value()  # type: ignore[union-attr]
+    csrf = _sign_in(client, "furn-admin", password)
+    tokens = {}
+    for name in ("new-hire", "unverified-hire"):
+        r = client.post(
+            "/api/v1/tenants/demo-furniture/invitations",
+            json={"email": f"{name}@example.test", "roles": ["auditor"]},
+            headers={"X-CSRF-Token": csrf},
+        )
+        assert r.status_code == 201, r.text
+        tokens[name] = r.json()["token"]
+
+    csrf = _sign_in(client, "unverified-hire", password)
+    r = client.post(
+        "/api/v1/invitations/accept",
+        json={"token": tokens["unverified-hire"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r.status_code == 403 and r.json()["error"]["code"] == "email_not_verified"
+
+    csrf = _sign_in(client, "new-hire", password)
+    assert client.get("/api/v1/me").json()["memberships"] == []
+    r = client.post(
+        "/api/v1/invitations/accept",
+        json={"token": tokens["new-hire"]},
+        headers={"X-CSRF-Token": csrf},
+    )
+    assert r.status_code == 200, r.text
+    me = client.get("/api/v1/me").json()
+    assert [(m["tenant_slug"], m["roles"]) for m in me["memberships"]] == [
+        ("demo-furniture", ["auditor"])
+    ]
+
+
 def test_machine_identity_token_is_audience_scoped(settings: Settings) -> None:
     """Worker client-credentials token: verifiable via JWKS, audience-restricted, no user."""
     secret = settings.worker_client_secret.get_secret_value()
