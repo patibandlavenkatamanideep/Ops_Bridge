@@ -60,6 +60,9 @@ class Settings(BaseSettings):
     # Count in PostgreSQL so every API instance shares one limit; in-process fallback when the
     # database is unavailable. Off only for single-process tooling.
     rate_limit_shared: bool = True
+    # Membership invitations: how long a link stays valid, and how many may be open per tenant.
+    invitation_ttl_hours: int = 168
+    max_open_invitations: int = 50
     max_upload_bytes: int = 5 * 1024 * 1024
     max_request_bytes: int = 6 * 1024 * 1024
 
