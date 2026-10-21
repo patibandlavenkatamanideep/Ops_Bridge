@@ -50,6 +50,12 @@ test("administrator settings", async ({ page }) => {
   await page.getByRole("button", { name: "Change Ana Notes-Approver" }).click();
   await expect(page.getByRole("form", { name: "Change membership of Ana Notes-Approver" })).toBeVisible();
   await expectNoSeriousViolations(page, "tenant settings with the member editor open");
+  await page.getByRole("button", { name: "Invite a person" }).click();
+  await expect(page.getByRole("form", { name: "Invite a person" })).toBeVisible();
+  await expectNoSeriousViolations(page, "tenant settings with the invitation form open");
+  await page.goto("/invite"); // no token: the standalone invitation page and its header
+  await expect(page.getByRole("heading", { name: "No invitation found" })).toBeVisible();
+  await expectNoSeriousViolations(page, "invitation page without a link");
 });
 
 test("the scanner reports a planted violation (self-check)", async ({ page }) => {
