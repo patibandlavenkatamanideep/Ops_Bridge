@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline eval-replay-check dashboard-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary
+        test-e2e eval-offline eval-replay-check dashboard-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary identity-sync
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -114,6 +114,9 @@ backup: ## Back up the local database and artifact store to var/backups/<UTC tim
 
 restore-drill: ## Restore the latest backup into an isolated database, verify, and drop it
 	python3 scripts/backup_restore.py restore-drill
+
+identity-sync: ## Add realm users missing from a running local Keycloak (keeps existing users)
+	python3 scripts/identity_sync.py
 
 down: ## Stop containers WITHOUT deleting persistent volumes
 	$(COMPOSE) stop
