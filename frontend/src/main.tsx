@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { ApiError } from "./api/client";
 import { App } from "./App";
+import { captureInviteToken } from "./pages/AcceptInvitation";
 import "./styles.css";
 
 const queryClient = new QueryClient({
@@ -14,6 +15,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+captureInviteToken(); // before the first render, so sign-in cannot drop it
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
