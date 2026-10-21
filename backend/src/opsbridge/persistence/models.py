@@ -120,6 +120,9 @@ class Membership(Base):
     # Action types this member may approve when they hold the approver role.
     approval_scope: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
     status: Mapped[str] = mapped_column(String(16), default="active")
+    # Who last changed this membership in the app, and why (seeded rows have neither).
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    change_reason: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = created()
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     __table_args__ = (
