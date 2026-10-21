@@ -94,6 +94,8 @@ Details and reproduction: docs/case-study.md.
   processes need synchronized clocks (NTP).
 - Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
   queue or email receiver is connected.
+- Administrators change roles, approval scope and access of existing members in the app;
+  adding a person to an organization still needs provisioning (no invitation flow).
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
 
@@ -103,7 +105,7 @@ Details and reproduction: docs/case-study.md.
 |---|---|
 | Anthropic API key + explicit live opt-in + spend ceiling, or install Ollama with a pinned model | Real-model evaluation (OB-07 live, real-model quality gate) |
 | A GitHub sandbox repository, a fine-grained token (Issues read/write on that repo) and written authorization for writes | Live connector validation (OB-22) |
-| Reviewing PR #1 and deciding whether to merge it | `main` containing the build (CI already passes on the PR) |
+| Reviewing the open pull request (#3 at the time of writing) and deciding whether to merge it | `main` containing the latest work (PRs #1 and #2 are merged) |
 | A cloud account and authorization | Staging deployment |
 | A pilot owner, participants and approved data | Operator pilot (OB-25 outcomes) |
 
