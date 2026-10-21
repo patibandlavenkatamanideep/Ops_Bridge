@@ -88,6 +88,7 @@ def create_app(
     app.include_router(proposals.router)
     app.include_router(admin.tenant_router)
     app.include_router(admin.case_router)
+    app.include_router(admin.invitation_router)
     app.include_router(evaluations.router)
 
     if static_dir is not None and static_dir.is_dir():
