@@ -1,7 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type ConnectorHealth, type SettingsView } from "../api/client";
+import {
+  ApiError,
+  api,
+  tenantPath,
+  type ConnectorHealth,
+  type Member,
+  type MemberUpdate,
+  type SettingsView,
+} from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -197,35 +205,199 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
         </p>
       </section>
 
-      <section aria-labelledby="members-title">
-        <h2 id="members-title">Members</h2>
-        <table className="table">
-          <thead>
-            <tr>
-              <th scope="col">User</th>
-              <th scope="col">Roles</th>
-              <th scope="col">Approval scope</th>
-              <th scope="col">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {view.members.map((m) => (
-              <tr key={m.username}>
-                <th scope="row">
-                  {m.display_name ?? m.username} <span className="muted small mono">{m.username}</span>
-                </th>
-                <td>{m.roles.map(statusLabel).join(", ")}</td>
-                <td className="small">{m.approval_scope.length ? m.approval_scope.join(", ") : "—"}</td>
-                <td>{statusLabel(m.status)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted small">
-          In this build, memberships and roles come from the seed configuration; there is no in-app member editor.
-        </p>
-      </section>
+      <MembersSection tenant={tenant} view={view} />
     </section>
+  );
+}
+
+type Role = NonNullable<MemberUpdate["roles"]>[number];
+type ActionType = NonNullable<MemberUpdate["approval_scope"]>[number];
+const ROLE_OPTIONS: Role[] = ["requester", "investigator", "approver", "tenant_admin", "auditor"];
+const ACTION_OPTIONS: ActionType[] = [
+  "create_follow_up_task",
+  "assign_case",
+  "create_supplier_message_draft",
+  "record_review_note",
+];
+
+function toggled<T>(list: T[], value: T, on: boolean): T[] {
+  return on ? [...list, value] : list.filter((x) => x !== value);
+}
+
+/** Members, and for administrators the change form (never for their own membership). */
+function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }) {
+  const { me, can } = useSession();
+  const canManage = can(tenant, "tenant.manage_members");
+  const [editing, setEditing] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const selected = view.members.find((m) => m.id === editing);
+  return (
+    <section aria-labelledby="members-title">
+      <h2 id="members-title">Members</h2>
+      <table className="table">
+        <caption className="visually-hidden">Members of this organization</caption>
+        <thead>
+          <tr>
+            <th scope="col">User</th>
+            <th scope="col">Roles</th>
+            <th scope="col">Approval scope</th>
+            <th scope="col">Status</th>
+            <th scope="col">Last change</th>
+            {canManage && (
+              <th scope="col">
+                <span className="visually-hidden">Actions</span>
+              </th>
+            )}
+          </tr>
+        </thead>
+        <tbody>
+          {view.members.map((m) => (
+            <tr key={m.id}>
+              <th scope="row">
+                {m.display_name ?? m.username} <span className="muted small mono">{m.username}</span>
+              </th>
+              <td>{m.roles.map(statusLabel).join(", ")}</td>
+              <td className="small">{m.approval_scope.length ? m.approval_scope.join(", ") : "—"}</td>
+              <td>{statusLabel(m.status)}</td>
+              <td className="small">
+                {m.change_reason ? (
+                  <>
+                    {m.change_reason}
+                    {m.changed_at && <div className="muted">{new Date(m.changed_at).toLocaleString()}</div>}
+                  </>
+                ) : (
+                  "—"
+                )}
+              </td>
+              {canManage && (
+                <td>
+                  {m.username === me.username ? (
+                    <span className="muted small">You</span>
+                  ) : (
+                    <button type="button" className="button link small"
+                            aria-label={`Change ${m.display_name ?? m.username}`}
+                            onClick={() => {
+                              setNotice(null);
+                              setEditing(m.id);
+                            }}>
+                      Change
+                    </button>
+                  )}
+                </td>
+              )}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {notice && (
+        <p role="status" className="small">
+          {notice}
+        </p>
+      )}
+      {canManage && selected && (
+        <MemberEditor key={selected.id} tenant={tenant} member={selected}
+                      onDone={(message) => {
+                        setEditing(null);
+                        setNotice(message);
+                      }} />
+      )}
+      <p className="muted small">
+        {canManage
+          ? "A change applies on the person’s next request. Nobody can change their own membership; another " +
+            "administrator must. Approvals given by someone who is revoked or loses that approval scope are not " +
+            "carried out. "
+          : "Tenant administrators manage memberships. "}
+        People join an organization through provisioning; there is no invitation flow yet.
+      </p>
+    </section>
+  );
+}
+
+function MemberEditor({ tenant, member, onDone }: {
+  tenant: string;
+  member: Member;
+  onDone: (message: string | null) => void;
+}) {
+  const qc = useQueryClient();
+  const name = member.display_name ?? member.username;
+  const [roles, setRoles] = useState<Role[]>(() => ROLE_OPTIONS.filter((r) => member.roles.includes(r)));
+  const [scope, setScope] = useState<ActionType[]>(() =>
+    ACTION_OPTIONS.filter((a) => member.approval_scope.includes(a)),
+  );
+  const [status, setStatus] = useState<"active" | "revoked">(member.status === "revoked" ? "revoked" : "active");
+  const [reason, setReason] = useState("");
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => heading.current?.focus(), []);
+  const approver = roles.includes("approver");
+
+  const save = useMutation<SettingsView, ApiError>({
+    mutationFn: () => {
+      const body: MemberUpdate = { roles, approval_scope: approver ? scope : [], status, reason };
+      return api<SettingsView>(tenantPath(tenant, `/members/${member.id}`), { method: "PATCH", body });
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(["settings", tenant], data);
+      onDone(`Membership of ${name} updated.`);
+    },
+  });
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    save.mutate();
+  }
+
+  return (
+    <form className="form member-editor" onSubmit={submit} aria-labelledby="member-editor-title">
+      <h3 id="member-editor-title" ref={heading} tabIndex={-1}>
+        Change membership of {name}
+      </h3>
+      <fieldset>
+        <legend>Roles</legend>
+        {ROLE_OPTIONS.map((r) => (
+          <label key={r} className="check">
+            <input type="checkbox" checked={roles.includes(r)}
+                   onChange={(e) => setRoles(toggled(roles, r, e.target.checked))} />
+            {statusLabel(r)}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset disabled={!approver}>
+        <legend>Approval scope{approver ? "" : " (approvers only)"}</legend>
+        {ACTION_OPTIONS.map((a) => (
+          <label key={a} className="check">
+            <input type="checkbox" checked={approver && scope.includes(a)}
+                   onChange={(e) => setScope(toggled(scope, a, e.target.checked))} />
+            {statusLabel(a)}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset>
+        <legend>Access</legend>
+        <label className="check">
+          <input type="radio" name="member-status" checked={status === "active"} onChange={() => setStatus("active")} />
+          Active
+        </label>
+        <label className="check">
+          <input type="radio" name="member-status" checked={status === "revoked"}
+                 onChange={() => setStatus("revoked")} />
+          Revoked: no access to this organization
+        </label>
+      </fieldset>
+      <label>
+        Reason for the change
+        <textarea required minLength={5} maxLength={500} rows={2} value={reason}
+                  onChange={(e) => setReason(e.target.value)} />
+      </label>
+      {save.isError && <ErrorState error={save.error} />}
+      <div className="actions">
+        <button type="submit" className="button primary" disabled={save.isPending || roles.length === 0}>
+          Save change
+        </button>
+        <button type="button" className="button secondary" onClick={() => onDone(null)}>
+          Cancel
+        </button>
+      </div>
+    </form>
   );
 }
 
