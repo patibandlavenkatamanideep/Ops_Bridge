@@ -2,21 +2,38 @@ import { NavLink, Outlet, useNavigate, useParams } from "react-router-dom";
 import { api } from "../api/client";
 import { useSession } from "../session";
 
+async function signOut() {
+  try {
+    const out = await api<{ logout_url: string | null }>("/auth/logout", { method: "POST" });
+    window.location.assign(out.logout_url ?? "/");
+  } catch {
+    window.location.assign("/");
+  }
+}
+
+/** Header for signed-in pages outside an organization (no access yet, accepting an invitation). */
+export function PlainHeader() {
+  const { me } = useSession();
+  return (
+    <header className="topbar">
+      <div className="brand">OpsBridge</div>
+      <div className="spacer" />
+      <div className="user">
+        <span>{me.display_name}</span>
+      </div>
+      <button type="button" className="button link" onClick={signOut}>
+        Sign out
+      </button>
+    </header>
+  );
+}
+
 export function Layout() {
   const { tenant = "" } = useParams();
   const { me, membership } = useSession();
   const navigate = useNavigate();
   const current = membership(tenant);
   const perms = current?.permissions ?? [];
-
-  async function signOut() {
-    try {
-      const out = await api<{ logout_url: string | null }>("/auth/logout", { method: "POST" });
-      window.location.assign(out.logout_url ?? "/");
-    } catch {
-      window.location.assign("/");
-    }
-  }
 
   return (
     <div className="shell">
