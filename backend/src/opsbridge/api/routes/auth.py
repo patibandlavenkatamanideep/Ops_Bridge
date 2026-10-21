@@ -92,6 +92,7 @@ async def callback(request: Request, state: State) -> Any:
         username=username,
         display_name=display,
         email=str(email)[:320] if email else None,
+        email_verified=claims.get("email_verified") is True,  # only an explicit claim counts
     )
     raw = await run_in_threadpool(
         create_session, state.db, settings, user_id, token.get("id_token")
