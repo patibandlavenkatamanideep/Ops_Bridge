@@ -6,6 +6,8 @@ import {
   api,
   tenantPath,
   type ConnectorHealth,
+  type Invitation,
+  type InvitationCreated,
   type Member,
   type MemberUpdate,
   type SettingsView,
@@ -224,13 +226,72 @@ function toggled<T>(list: T[], value: T, on: boolean): T[] {
   return on ? [...list, value] : list.filter((x) => x !== value);
 }
 
-/** Members, and for administrators the change form (never for their own membership). */
+/** Moves keyboard and screen-reader focus to a heading when its panel opens. */
+function useFocusOnMount() {
+  const ref = useRef<HTMLHeadingElement>(null);
+  useEffect(() => ref.current?.focus(), []);
+  return ref;
+}
+
+/** Role and approval-scope checkboxes, shared by the member editor and the invitation form. */
+function GrantFields({ roles, setRoles, scope, setScope }: {
+  roles: Role[];
+  setRoles: (r: Role[]) => void;
+  scope: ActionType[];
+  setScope: (a: ActionType[]) => void;
+}) {
+  const approver = roles.includes("approver");
+  return (
+    <>
+      <fieldset>
+        <legend>Roles</legend>
+        {ROLE_OPTIONS.map((r) => (
+          <label key={r} className="check">
+            <input type="checkbox" checked={roles.includes(r)}
+                   onChange={(e) => setRoles(toggled(roles, r, e.target.checked))} />
+            {statusLabel(r)}
+          </label>
+        ))}
+      </fieldset>
+      <fieldset disabled={!approver}>
+        <legend>Approval scope{approver ? "" : " (approvers only)"}</legend>
+        {ACTION_OPTIONS.map((a) => (
+          <label key={a} className="check">
+            <input type="checkbox" checked={approver && scope.includes(a)}
+                   onChange={(e) => setScope(toggled(scope, a, e.target.checked))} />
+            {statusLabel(a)}
+          </label>
+        ))}
+      </fieldset>
+    </>
+  );
+}
+
+/** Members and open invitations; administrators change others' memberships and invite people. */
 function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }) {
   const { me, can } = useSession();
   const canManage = can(tenant, "tenant.manage_members");
+  const qc = useQueryClient();
   const [editing, setEditing] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
+  const [created, setCreated] = useState<{ email: string; link: string; expires: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const selected = view.members.find((m) => m.id === editing);
+  const withdraw = useMutation<SettingsView, ApiError, Invitation>({
+    mutationFn: (inv) => api<SettingsView>(tenantPath(tenant, `/invitations/${inv.id}/revoke`), { method: "POST" }),
+    onSuccess: (data, inv) => {
+      qc.setQueryData(["settings", tenant], data);
+      setNotice(`Invitation for ${inv.email} withdrawn.`);
+    },
+  });
+
+  function openPanel(panel: "invite" | string) {
+    setNotice(null);
+    setCreated(null);
+    setInviting(panel === "invite");
+    setEditing(panel === "invite" ? null : panel);
+  }
+
   return (
     <section aria-labelledby="members-title">
       <h2 id="members-title">Members</h2>
@@ -275,11 +336,7 @@ function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }
                     <span className="muted small">You</span>
                   ) : (
                     <button type="button" className="button link small"
-                            aria-label={`Change ${m.display_name ?? m.username}`}
-                            onClick={() => {
-                              setNotice(null);
-                              setEditing(m.id);
-                            }}>
+                            aria-label={`Change ${m.display_name ?? m.username}`} onClick={() => openPanel(m.id)}>
                       Change
                     </button>
                   )}
@@ -289,11 +346,69 @@ function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }
           ))}
         </tbody>
       </table>
+
+      {view.invitations.length > 0 && (
+        <table className="table compact">
+          <caption>Open invitations</caption>
+          <thead>
+            <tr>
+              <th scope="col">Email address</th>
+              <th scope="col">Roles</th>
+              <th scope="col">Invited by</th>
+              <th scope="col">Expires</th>
+              {canManage && (
+                <th scope="col">
+                  <span className="visually-hidden">Actions</span>
+                </th>
+              )}
+            </tr>
+          </thead>
+          <tbody>
+            {view.invitations.map((i) => (
+              <tr key={i.id}>
+                <th scope="row" className="mono">{i.email}</th>
+                <td>
+                  {i.roles.map(statusLabel).join(", ")}
+                  {i.approval_scope.length > 0 && <div className="muted small">{i.approval_scope.join(", ")}</div>}
+                </td>
+                <td>{i.invited_by ?? "—"}</td>
+                <td>{i.expired ? "expired" : new Date(i.expires_at).toLocaleString()}</td>
+                {canManage && (
+                  <td>
+                    <button type="button" className="button link small" aria-label={`Withdraw invitation for ${i.email}`}
+                            disabled={withdraw.isPending} onClick={() => withdraw.mutate(i)}>
+                      Withdraw
+                    </button>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {withdraw.isError && <ErrorState error={withdraw.error} />}
+
       {notice && (
         <p role="status" className="small">
           {notice}
         </p>
       )}
+      {canManage && !inviting && !created && (
+        <div className="actions">
+          <button type="button" className="button secondary" onClick={() => openPanel("invite")}>
+            Invite a person
+          </button>
+        </div>
+      )}
+      {canManage && inviting && (
+        <InviteForm tenant={tenant}
+                    onCreated={(c) => {
+                      setInviting(false);
+                      setCreated(c);
+                    }}
+                    onCancel={() => setInviting(false)} />
+      )}
+      {canManage && created && <CreatedLink {...created} onClose={() => setCreated(null)} />}
       {canManage && selected && (
         <MemberEditor key={selected.id} tenant={tenant} member={selected}
                       onDone={(message) => {
@@ -305,11 +420,113 @@ function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }
         {canManage
           ? "A change applies on the person’s next request. Nobody can change their own membership; another " +
             "administrator must. Approvals given by someone who is revoked or loses that approval scope are not " +
-            "carried out. "
-          : "Tenant administrators manage memberships. "}
-        People join an organization through provisioning; there is no invitation flow yet.
+            "carried out. People join through an invitation link that works once, for the invited address only."
+          : "Tenant administrators manage memberships and invite people."}
       </p>
     </section>
+  );
+}
+
+function InviteForm({ tenant, onCreated, onCancel }: {
+  tenant: string;
+  onCreated: (created: { email: string; link: string; expires: string }) => void;
+  onCancel: () => void;
+}) {
+  const qc = useQueryClient();
+  const [email, setEmail] = useState("");
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [scope, setScope] = useState<ActionType[]>([]);
+  const heading = useFocusOnMount();
+  const create = useMutation<InvitationCreated, ApiError>({
+    mutationFn: () =>
+      api<InvitationCreated>(tenantPath(tenant, "/invitations"), {
+        method: "POST",
+        body: { email, roles, approval_scope: roles.includes("approver") ? scope : [] },
+      }),
+    onSuccess: (r) => {
+      qc.setQueryData(["settings", tenant], r.settings);
+      const invited = r.settings.invitations.find((i) => i.id === r.invitation_id);
+      onCreated({
+        email: invited?.email ?? email,
+        link: `${window.location.origin}/invite#${r.token}`,
+        expires: new Date(r.expires_at).toLocaleString(),
+      });
+    },
+  });
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    create.mutate();
+  }
+
+  return (
+    <form className="form member-editor" onSubmit={submit} aria-labelledby="invite-title">
+      <h3 id="invite-title" ref={heading} tabIndex={-1}>
+        Invite a person
+      </h3>
+      <label>
+        Email address
+        <input type="email" required maxLength={320} autoComplete="off" value={email}
+               onChange={(e) => setEmail(e.target.value)} />
+      </label>
+      <GrantFields roles={roles} setRoles={setRoles} scope={scope} setScope={setScope} />
+      {create.isError && <ErrorState error={create.error} />}
+      <div className="actions">
+        <button type="submit" className="button primary" disabled={create.isPending || roles.length === 0}>
+          Create invitation
+        </button>
+        <button type="button" className="button secondary" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/** The invitation link, shown once: only a hash of its token is stored. */
+function CreatedLink({ email, link, expires, onClose }: {
+  email: string;
+  link: string;
+  expires: string;
+  onClose: () => void;
+}) {
+  const heading = useFocusOnMount();
+  const [copied, setCopied] = useState<boolean | null>(null);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  }
+  return (
+    <div className="form member-editor" role="region" aria-labelledby="invite-link-title">
+      <h3 id="invite-link-title" ref={heading} tabIndex={-1}>
+        Invitation link for {email}
+      </h3>
+      <p className="small">
+        OpsBridge sends no email: give this link to the person yourself. It works once, until {expires}, and only
+        for someone signed in with that address verified by your identity provider. It is shown only now.
+      </p>
+      <label>
+        Invitation link
+        <input readOnly value={link} onFocus={(e) => e.target.select()} className="mono" />
+      </label>
+      {copied !== null && (
+        <p role="status" className="small">
+          {copied ? "Link copied." : "Copying is not available here; select the link and copy it."}
+        </p>
+      )}
+      <div className="actions">
+        <button type="button" className="button primary" onClick={copy}>
+          Copy link
+        </button>
+        <button type="button" className="button secondary" onClick={onClose}>
+          Done
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -326,8 +543,7 @@ function MemberEditor({ tenant, member, onDone }: {
   );
   const [status, setStatus] = useState<"active" | "revoked">(member.status === "revoked" ? "revoked" : "active");
   const [reason, setReason] = useState("");
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => heading.current?.focus(), []);
+  const heading = useFocusOnMount();
   const approver = roles.includes("approver");
 
   const save = useMutation<SettingsView, ApiError>({
@@ -351,26 +567,7 @@ function MemberEditor({ tenant, member, onDone }: {
       <h3 id="member-editor-title" ref={heading} tabIndex={-1}>
         Change membership of {name}
       </h3>
-      <fieldset>
-        <legend>Roles</legend>
-        {ROLE_OPTIONS.map((r) => (
-          <label key={r} className="check">
-            <input type="checkbox" checked={roles.includes(r)}
-                   onChange={(e) => setRoles(toggled(roles, r, e.target.checked))} />
-            {statusLabel(r)}
-          </label>
-        ))}
-      </fieldset>
-      <fieldset disabled={!approver}>
-        <legend>Approval scope{approver ? "" : " (approvers only)"}</legend>
-        {ACTION_OPTIONS.map((a) => (
-          <label key={a} className="check">
-            <input type="checkbox" checked={approver && scope.includes(a)}
-                   onChange={(e) => setScope(toggled(scope, a, e.target.checked))} />
-            {statusLabel(a)}
-          </label>
-        ))}
-      </fieldset>
+      <GrantFields roles={roles} setRoles={setRoles} scope={scope} setScope={setScope} />
       <fieldset>
         <legend>Access</legend>
         <label className="check">
