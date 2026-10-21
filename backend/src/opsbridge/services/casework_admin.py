@@ -29,6 +29,7 @@ from opsbridge.persistence.models import (
     Case,
     ConversationMessage,
     Membership,
+    MembershipInvitation,
     Operation,
     PolicyVersion,
     Tenant,
@@ -286,6 +287,12 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
         select(Membership, User).join(User, User.id == Membership.user_id).order_by(User.username)
     ).all()
     today = s.execute(text("SELECT current_date")).scalar_one()  # the database clock
+    invitations = s.execute(
+        select(MembershipInvitation, User.username, MembershipInvitation.expires_at <= func.now())
+        .outerjoin(User, User.id == MembershipInvitation.invited_by)
+        .where(MembershipInvitation.status == "pending")
+        .order_by(MembershipInvitation.created_at)
+    ).all()
     versions = list(
         s.execute(
             select(PolicyVersion).order_by(
@@ -340,6 +347,19 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
                 "changed_at": m.updated_at.isoformat() if m.change_reason else None,
             }
             for m, u in members
+        ],
+        "invitations": [
+            {
+                "id": str(i.id),
+                "email": i.email,
+                "roles": list(i.roles),
+                "approval_scope": list(i.approval_scope or []),
+                "invited_by": inviter,
+                "created_at": i.created_at.isoformat(),
+                "expires_at": i.expires_at.isoformat(),
+                "expired": bool(expired),
+            }
+            for i, inviter, expired in invitations
         ],
     }
 
@@ -503,6 +523,54 @@ MEMBER_STATUSES = ("active", "revoked")
 ACTION_TYPES: tuple[str, ...] = get_args(ActionType)
 
 
+def can_manage_members(m: Membership | None) -> bool:
+    return (
+        m is not None
+        and m.status == "active"
+        and "tenant.manage_members" in permissions_for(list(m.roles))
+    )
+
+
+def lock_members(s: Session, tenant_id: uuid.UUID) -> list[Membership]:
+    """Lock every membership of the tenant: membership changes in a tenant run one at a time."""
+    return list(
+        s.execute(
+            select(Membership)
+            .where(Membership.tenant_id == tenant_id)
+            .order_by(Membership.id)
+            .with_for_update()
+        ).scalars()
+    )
+
+
+def lock_members_as_admin(s: Session, p: Principal) -> tuple[Membership, list[Membership]]:
+    """Lock the tenant's memberships and re-check, under the lock, that the actor may still
+    manage members: the principal was resolved before the lock and may be stale."""
+    rows = lock_members(s, p.tenant_id)
+    actor = next((m for m in rows if m.user_id == p.user_id), None)
+    if actor is None or not can_manage_members(actor):
+        raise Conflict(
+            "authority_changed", "Your membership changed; you can no longer manage members."
+        )
+    return actor, rows
+
+
+def check_grant(roles: list[str], approval_scope: list[str]) -> None:
+    """Roles and approval scope a membership or invitation may carry."""
+    if not roles or any(r not in ROLES for r in roles):
+        raise Conflict(
+            "invalid_roles",
+            "A member needs at least one known role; to remove access, revoke the membership.",
+            {"allowed": list(ROLES)},
+        )
+    if any(a not in ACTION_TYPES for a in approval_scope):
+        raise Conflict(
+            "invalid_approval_scope", "Unknown action type.", {"allowed": list(ACTION_TYPES)}
+        )
+    if approval_scope and "approver" not in roles:
+        raise Conflict("invalid_approval_scope", "Only approvers have an approval scope.")
+
+
 def update_membership(
     db: Database,
     p: Principal,
@@ -525,23 +593,7 @@ def update_membership(
     """
     require(p, "tenant.manage_members")
     with db.session(_ctx(p)) as s:
-        rows = list(
-            s.execute(
-                select(Membership)
-                .where(Membership.tenant_id == p.tenant_id)
-                .order_by(Membership.id)
-                .with_for_update()
-            ).scalars()
-        )
-        actor = next((m for m in rows if m.user_id == p.user_id), None)
-        if (
-            actor is None
-            or actor.status != "active"
-            or "tenant.manage_members" not in permissions_for(list(actor.roles))
-        ):
-            raise Conflict(
-                "authority_changed", "Your membership changed; you can no longer manage members."
-            )
+        actor, rows = lock_members_as_admin(s, p)
         target = next((m for m in rows if m.id == membership_id), None)
         if target is None:
             raise NotFound("member")
@@ -557,22 +609,11 @@ def update_membership(
             "status": target.status,
         }
         new_roles = sorted(set(roles)) if roles is not None else old_roles
-        if not new_roles or any(r not in ROLES for r in new_roles):
-            raise Conflict(
-                "invalid_roles",
-                "A member needs at least one known role; to remove access, revoke the membership.",
-                {"allowed": list(ROLES)},
-            )
         if approval_scope is not None:
             new_scope = sorted(set(approval_scope))
         else:  # losing the approver role clears a scope that would no longer mean anything
             new_scope = old_scope if "approver" in new_roles else []
-        if any(a not in ACTION_TYPES for a in new_scope):
-            raise Conflict(
-                "invalid_approval_scope", "Unknown action type.", {"allowed": list(ACTION_TYPES)}
-            )
-        if new_scope and "approver" not in new_roles:
-            raise Conflict("invalid_approval_scope", "Only approvers have an approval scope.")
+        check_grant(new_roles, new_scope)
         new_status = status if status is not None else target.status
         if new_status not in MEMBER_STATUSES:
             raise Conflict("invalid_status", "Status must be active or revoked.")
