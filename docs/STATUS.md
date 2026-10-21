@@ -367,8 +367,9 @@ Phase 1 exit gate evidence:
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
 - Retention runs daily per configured tenant and on request; backups are outside its reach. Extracted
   field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
-- Uploads are not malware-scanned. Administrators change roles, approval scope and access of
-  existing members in the app; adding a person still needs provisioning (no invitation flow).
+- Uploads are not malware-scanned. People join by an invitation link the administrator
+  delivers (OpsBridge sends no email); acceptance trusts the identity provider's email
+  verification. Invitation addresses are not covered by retention.
 - Browser tests add conversation notes and upload versions to the local demo case INV-9001.
 - A run of a different model mode is refused (409) while another run is active, instead of
   silently returning the active run (found by a browser test; fixed in Phase 3).
@@ -655,6 +656,35 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   re-seeding keeps in-app changes. Browser: `e2e/phase6.spec.ts` revokes and reinstates a
   member with reasons; the accessibility scan covers the open editor. `make verify` 15/15
   (unit 280 + 3 skipped, integration 145, browser 25); restore drill ok at revision 0007.
-- Not built: inviting a new person (needs a decision on binding an invitation to an identity:
-  OIDC subject or verified email); two colluding administrators can still grant each other
-  any role.
+- Not built: protection against two colluding administrators, who can still grant each
+  other any role. (Inviting new people followed; see "Membership invitations".)
+
+### Membership invitations (2026-10-20)
+- Administrators can now add people: `POST /api/v1/tenants/{tenant}/invitations` (email,
+  roles, approval scope) returns a single-use link `/invite#<token>` once; open invitations
+  are listed in tenant settings and can be withdrawn. The person signs in and accepts
+  (`POST /api/v1/invitations/accept`). OpsBridge sends no email.
+- Binding (chosen because a link can be forwarded): a 256-bit token, stored only as SHA-256,
+  single use, 7-day expiry on the database clock, accepted only by a signed-in user whose
+  identity provider verified the invited address (`email_verified`, now recorded at every
+  sign-in), and only while the inviting administrator may still manage members. An active
+  member cannot accept; a revoked member is reinstated with the invited roles. The tenant is
+  found by token hash under its own RLS policy (read-only, only that row) and the change is
+  made in the tenant's context with its memberships locked (migration 0008).
+- The token travels in the URL fragment (not sent to servers, logs or Referer), is moved to
+  sessionStorage before the first render so it survives sign-in, and is removed from the
+  address bar. Pages outside an organization now have a header with Sign out.
+- Keycloak imports the realm file only once, so `make identity-sync` adds users that were
+  added to it later (`new-hire` verified, `unverified-hire` not; no memberships).
+- Evidence: `tests/integration/test_invitations.py` (7): join with the invited roles
+  (address normalized; single use; only the hash stored; token and address not audited); a
+  forwarded link and an unverified address are refused; expired and withdrawn links fail;
+  rules and non-admin refusals; an invitation lapses when its inviter is demoted; a revoked
+  member rejoins with new roles; RLS outside a tenant shows only the matching row,
+  read-only. Disabling the verified-address check or the inviter check makes a test fail.
+  `test_oidc_login.py` drives real Keycloak: the unverified account is refused, the
+  verified one joins. Browser: `e2e/invitations.spec.ts` (2, repeatable on the same
+  database: invite, sign in from the link, accept, land in the queue; a forwarded link is
+  refused); the accessibility scan covers the invitation form and page. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 153, browser 27); restore drill ok at revision 0008
+  (row counts equal, every table with forced RLS).
