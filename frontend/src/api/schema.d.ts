@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/api/v1/invitations/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accept Invitation */
+        post: operations["accept_invitation_api_v1_invitations_accept_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -399,6 +416,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/invitations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Invitation */
+        post: operations["create_invitation_api_v1_tenants__tenant__invitations_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/invitations/{invitation_id}/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Invitation */
+        post: operations["revoke_invitation_api_v1_tenants__tenant__invitations__invitation_id__revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/members/{membership_id}": {
         parameters: {
             query?: never;
@@ -506,6 +557,20 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AcceptIn */
+        AcceptIn: {
+            /** Token */
+            token: string;
+        };
+        /** AcceptOut */
+        AcceptOut: {
+            /** Roles */
+            roles: string[];
+            /** Tenant Name */
+            tenant_name: string;
+            /** Tenant Slug */
+            tenant_slug: string;
+        };
         /** AttemptOut */
         AttemptOut: {
             /** Connector Version */
@@ -862,6 +927,44 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** InvitationCreatedOut */
+        InvitationCreatedOut: {
+            /** Expires At */
+            expires_at: string;
+            /** Invitation Id */
+            invitation_id: string;
+            settings: components["schemas"]["SettingsOut"];
+            /** Token */
+            token: string;
+        };
+        /** InvitationIn */
+        InvitationIn: {
+            /** Approval Scope */
+            approval_scope?: ("create_follow_up_task" | "assign_case" | "create_supplier_message_draft" | "record_review_note")[];
+            /** Email */
+            email: string;
+            /** Roles */
+            roles: ("requester" | "investigator" | "approver" | "tenant_admin" | "auditor")[];
+        };
+        /** InvitationOut */
+        InvitationOut: {
+            /** Approval Scope */
+            approval_scope: string[];
+            /** Created At */
+            created_at: string;
+            /** Email */
+            email: string;
+            /** Expired */
+            expired: boolean;
+            /** Expires At */
+            expires_at: string;
+            /** Id */
+            id: string;
+            /** Invited By */
+            invited_by: string | null;
+            /** Roles */
+            roles: string[];
+        };
         /** LogoutResponse */
         LogoutResponse: {
             /** Logout Url */
@@ -1195,6 +1298,8 @@ export interface components {
         /** SettingsOut */
         SettingsOut: {
             entitlements: components["schemas"]["Entitlements"];
+            /** Invitations */
+            invitations: components["schemas"]["InvitationOut"][];
             /** Members */
             members: components["schemas"]["MemberOut"][];
             /** Policies */
@@ -1299,6 +1404,39 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    accept_invitation_api_v1_invitations_accept_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AcceptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AcceptOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     me_api_v1_me_get: {
         parameters: {
             query?: never;
@@ -2202,6 +2340,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_invitation_api_v1_tenants__tenant__invitations_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["InvitationIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InvitationCreatedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_invitation_api_v1_tenants__tenant__invitations__invitation_id__revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                invitation_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
                 };
             };
             /** @description Validation Error */
