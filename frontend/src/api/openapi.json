@@ -1184,6 +1184,28 @@
             "title": "Approval Scope",
             "type": "array"
           },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
           "display_name": {
             "anyOf": [
               {
@@ -1194,6 +1216,10 @@
               }
             ],
             "title": "Display Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
           },
           "roles": {
             "items": {
@@ -1212,13 +1238,90 @@
           }
         },
         "required": [
+          "id",
           "username",
           "display_name",
           "roles",
           "approval_scope",
-          "status"
+          "status",
+          "change_reason",
+          "changed_at"
         ],
         "title": "MemberOut",
+        "type": "object"
+      },
+      "MemberUpdateIn": {
+        "description": "Fields left out stay as they are; dropping the approver role clears the scope.",
+        "properties": {
+          "approval_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "create_follow_up_task",
+                    "assign_case",
+                    "create_supplier_message_draft",
+                    "record_review_note"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Scope"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "requester",
+                    "investigator",
+                    "approver",
+                    "tenant_admin",
+                    "auditor"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "revoked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "MemberUpdateIn",
         "type": "object"
       },
       "MembershipOut": {
@@ -4093,6 +4196,71 @@
         "summary": "Receipt",
         "tags": [
           "evaluations"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/members/{membership_id}": {
+      "patch": {
+        "operationId": "update_member_api_v1_tenants__tenant__members__membership_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Member",
+        "tags": [
+          "tenant"
         ]
       }
     },

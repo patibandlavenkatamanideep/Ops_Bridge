@@ -399,6 +399,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/members/{membership_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Member */
+        patch: operations["update_member_api_v1_tenants__tenant__members__membership_id__patch"];
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/retention/run": {
         parameters: {
             query?: never;
@@ -871,14 +888,34 @@ export interface components {
         MemberOut: {
             /** Approval Scope */
             approval_scope: string[];
+            /** Change Reason */
+            change_reason: string | null;
+            /** Changed At */
+            changed_at: string | null;
             /** Display Name */
             display_name: string | null;
+            /** Id */
+            id: string;
             /** Roles */
             roles: string[];
             /** Status */
             status: string;
             /** Username */
             username: string;
+        };
+        /**
+         * MemberUpdateIn
+         * @description Fields left out stay as they are; dropping the approver role clears the scope.
+         */
+        MemberUpdateIn: {
+            /** Approval Scope */
+            approval_scope?: ("create_follow_up_task" | "assign_case" | "create_supplier_message_draft" | "record_review_note")[] | null;
+            /** Reason */
+            reason: string;
+            /** Roles */
+            roles?: ("requester" | "investigator" | "approver" | "tenant_admin" | "auditor")[] | null;
+            /** Status */
+            status?: ("active" | "revoked") | null;
         };
         /** MembershipOut */
         MembershipOut: {
@@ -2165,6 +2202,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_member_api_v1_tenants__tenant__members__membership_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                membership_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MemberUpdateIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
                 };
             };
             /** @description Validation Error */
