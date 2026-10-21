@@ -1,4 +1,4 @@
-"""Tenant settings, retention, uploads and case conversations."""
+"""Tenant settings, members and invitations, retention, uploads and case conversations."""
 
 from __future__ import annotations
 
@@ -15,13 +15,16 @@ from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import DbContext
 from opsbridge.services import casework_admin as svc
+from opsbridge.services import invitations as inv_svc
 from opsbridge.services.investigations import Conflict, NotFound
 from opsbridge.workflow import jobs
 
-from ..deps import CurrentPrincipal, State
+from ..deps import CurrentPrincipal, CurrentSession, State
 from ..errors import ApiError, conflict, not_found
 
 tenant_router = APIRouter(prefix="/api/v1/tenants/{tenant}", tags=["tenant"])
+# Accepting an invitation happens before the person belongs to the tenant: no tenant path.
+invitation_router = APIRouter(prefix="/api/v1/invitations", tags=["invitations"])
 case_router = APIRouter(prefix="/api/v1/tenants/{tenant}/cases/{case_id}", tags=["case-extras"])
 
 
@@ -80,6 +83,33 @@ class MemberUpdateIn(BaseModel):
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=5, max_length=500)]
 
 
+class InvitationOut(BaseModel):
+    id: str
+    email: str
+    roles: list[str]
+    approval_scope: list[str]
+    invited_by: str | None
+    created_at: str
+    expires_at: str
+    expired: bool
+
+
+class InvitationIn(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    roles: list[Role] = Field(min_length=1, max_length=5)
+    approval_scope: list[ActionType] = Field(default_factory=list, max_length=10)
+
+
+class AcceptIn(BaseModel):
+    token: str = Field(min_length=20, max_length=100)
+
+
+class AcceptOut(BaseModel):
+    tenant_slug: str
+    tenant_name: str
+    roles: list[str]
+
+
 class PolicyOut(BaseModel):
     policy_id: str
     version: int
@@ -113,7 +143,15 @@ class SettingsOut(BaseModel):
     settings: SettingsValues
     policies: list[PolicyOut]
     members: list[MemberOut]
+    invitations: list[InvitationOut]
     retention_keys: list[str] = list(svc.RETENTION_KEYS)
+
+
+class InvitationCreatedOut(BaseModel):
+    invitation_id: str
+    token: str  # returned once; only its SHA-256 is stored
+    expires_at: str
+    settings: SettingsOut
 
 
 class UploadOut(BaseModel):
@@ -225,6 +263,59 @@ def update_member(
     except (NotFound, Conflict) as exc:
         raise _map(exc) from exc
     return SettingsOut.model_validate(view)
+
+
+@tenant_router.post("/invitations", status_code=201, response_model=InvitationCreatedOut)
+def create_invitation(
+    body: InvitationIn, principal: CurrentPrincipal, state: State, request: Request
+) -> InvitationCreatedOut:
+    try:
+        view, token, inv = inv_svc.create_invitation(
+            state.db,
+            principal,
+            email=body.email,
+            roles=list(body.roles),
+            approval_scope=list(body.approval_scope),
+            ttl_hours=state.settings.invitation_ttl_hours,
+            max_open=state.settings.max_open_invitations,
+            correlation_id=request.state.correlation_id,
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+    return InvitationCreatedOut(
+        invitation_id=str(inv.id),
+        token=token,
+        expires_at=inv.expires_at.isoformat(),
+        settings=SettingsOut.model_validate(view),
+    )
+
+
+@tenant_router.post("/invitations/{invitation_id}/revoke", response_model=SettingsOut)
+def revoke_invitation(
+    invitation_id: uuid.UUID, principal: CurrentPrincipal, state: State, request: Request
+) -> SettingsOut:
+    try:
+        view = inv_svc.revoke_invitation(
+            state.db, principal, invitation_id, request.state.correlation_id
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+    return SettingsOut.model_validate(view)
+
+
+@invitation_router.post("/accept", response_model=AcceptOut)
+def accept_invitation(
+    body: AcceptIn, info: CurrentSession, state: State, request: Request
+) -> AcceptOut:
+    try:
+        joined = inv_svc.accept_invitation(
+            state.db, info.user_id, body.token, request.state.correlation_id
+        )
+    except inv_svc.NotForThisAccount as exc:
+        raise ApiError(403, exc.code, str(exc)) from exc
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+    return AcceptOut.model_validate(joined)
 
 
 @tenant_router.post("/retention/run", status_code=202)
