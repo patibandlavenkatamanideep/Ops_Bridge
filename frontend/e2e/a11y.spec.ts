@@ -47,6 +47,9 @@ test("administrator settings", async ({ page }) => {
   await page.goto("/t/demo-furniture/settings");
   await expect(page.getByRole("heading", { name: "Tenant settings" })).toBeVisible();
   await expectNoSeriousViolations(page, "tenant settings");
+  await page.getByRole("button", { name: "Change Ana Notes-Approver" }).click();
+  await expect(page.getByRole("form", { name: "Change membership of Ana Notes-Approver" })).toBeVisible();
+  await expectNoSeriousViolations(page, "tenant settings with the member editor open");
 });
 
 test("the scanner reports a planted violation (self-check)", async ({ page }) => {
