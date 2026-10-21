@@ -575,3 +575,12 @@ fieldset {
 .form textarea {
   width: 100%;
 }
+.form.member-editor {
+  margin-top: 1.25rem;
+}
+.form label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
+}
