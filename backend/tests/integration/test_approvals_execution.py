@@ -652,10 +652,10 @@ def _expire_approval(worker_db: Database, prop: dict[str, Any]) -> None:
         )
 
 
-def _publish_policy_v3(worker_db: Database) -> None:
+def _publish_policy_v3(worker_db: Database, tenant_id: uuid.UUID | None = None) -> None:
     mdb = Database(make_engine("migrator", database="opsbridge_test"))
     try:
-        with mdb.session(DbContext(tenant_id=_tenant(worker_db))) as s:
+        with mdb.session(DbContext(tenant_id=tenant_id or _tenant(worker_db))) as s:
             v2 = s.execute(select(PolicyVersion).where(PolicyVersion.version == 2)).scalar_one()
             s.add(
                 PolicyVersion(
