@@ -225,6 +225,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
         store=artifact_store(settings),
+        github_repo=settings.github_sandbox_repo,
     )
 
 
