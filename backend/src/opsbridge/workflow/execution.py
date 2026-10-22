@@ -67,14 +67,11 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 from .investigation import StepFailed
+from .jobs import LeaseLost as LeaseLost  # re-exported
 
 EXECUTOR = "service:opsbridge-worker"
 LOCAL_CONNECTOR = "opsbridge-local/1"
 TERMINAL = frozenset({"confirmed", "failed", "outcome_unknown", "cancelled_before_dispatch"})
-
-
-class LeaseLost(Exception):
-    """This worker no longer holds the job; it must stop without writing results."""
 
 
 @dataclass
