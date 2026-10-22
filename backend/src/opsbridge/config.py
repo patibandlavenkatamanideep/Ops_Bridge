@@ -55,8 +55,13 @@ class Settings(BaseSettings):
     session_absolute_hours: int = 8
     session_idle_minutes: int = 30
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # Per verified user (after the session is checked), and per client address for every
+    # API request with or without a cookie: an unverified cookie never selects a budget.
     rate_limit_per_minute: int = 240
+    rate_limit_per_address_per_minute: int = 1200
     rate_limit_window_seconds: int = 60
+    # CIDRs of reverse proxies whose X-Forwarded-For is believed (empty: the direct peer).
+    trusted_proxies: list[str] = Field(default_factory=list)
     # Count in PostgreSQL so every API instance shares one limit; in-process fallback when the
     # database is unavailable. Off only for single-process tooling.
     rate_limit_shared: bool = True
