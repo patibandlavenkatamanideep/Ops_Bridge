@@ -52,6 +52,7 @@ from opsbridge.telemetry import metrics
 from opsbridge.workflow import jobs
 
 from .cases import _visible_filter, transition
+from .freshness import stale_reason
 from .investigations import Conflict, NotFound
 
 PROPOSAL_SCHEMA = "opsbridge.proposal/1"
@@ -257,6 +258,8 @@ def check_current(s: Session, case: Case, pr: Proposal, github_repo: str | None)
     latest, effective_policy = evidence_state(s, case)
     if latest is None or latest.source_manifest_digest != pr.source_manifest_digest:
         reasons.append("source evidence changed since the proposal was made")
+    elif (changed := stale_reason(s, case.id, latest)) is not None:
+        reasons.append(changed)
     if (
         latest is not None
         and latest.id != pr.investigation_version_id
@@ -301,6 +304,9 @@ def create_from_investigation(
             )
         if effective_policy != latest.policy_version_id:
             raise Conflict("stale_investigation", "The policy changed; re-run the investigation.")
+        changed = stale_reason(s, case.id, latest)
+        if changed is not None:
+            raise Conflict("stale_investigation", changed[0].upper() + changed[1:] + ".")
         action = draft["action_type"]
         params = _params_for(action, {**_draft_params(action, draft), **overrides})
         policy = _policy(s, latest.policy_version_id)
