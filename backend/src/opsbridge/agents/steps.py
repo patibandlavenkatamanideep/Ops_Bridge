@@ -31,7 +31,7 @@ import jsonschema
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.telemetry import metrics, tracing
 
-from .contracts import ModelAdapter, ModelRequest
+from .contracts import ModelAdapter, ModelRequest, ReplayFailure
 from .prompts import EXPLAIN_V1, PROPOSE_V1
 from .runtime import Recorder, RunBudget, call_model
 
@@ -355,7 +355,19 @@ def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | Non
     return (out if not problems else None), problems
 
 
-SearchFn = Callable[[str], list[dict[str, Any]]]
+@dataclass(frozen=True)
+class SearchResult:
+    """One evidence-search call. `response` is what the call returned and is bound to its
+    record; `hits` are what the agent may cite. They differ only in offline replay, where
+    `response` is served from the recording (`origin` "recorded") and `hits` carry the replay
+    database's ids for the same document versions."""
+
+    response: list[dict[str, Any]]
+    hits: list[dict[str, Any]]
+    origin: str = "live"
+
+
+SearchFn = Callable[[str], SearchResult]
 
 
 def explain(
@@ -411,9 +423,12 @@ def explain(
                         attributes={"opsbridge.tool.transport": tool_transport},
                         step="explain_findings",
                     ):
-                        hits = search(req["query"])
+                        result = search(req["query"])
+                except ReplayFailure:
+                    raise  # an unmatched or diverged replay stops the run
                 except Exception as exc:  # denied or failed tool calls are data, not crashes
-                    denied = type(exc).__name__ == "McpDenied"
+                    # A replayed denial or error carries its recorded outcome and origin.
+                    denied = type(exc).__name__ == "McpDenied" or getattr(exc, "denied", False)
                     metrics.TOOL_CALLS.labels(
                         SEARCH_TOOL, "denied" if denied else "error", tool_transport
                     ).inc()
@@ -425,6 +440,7 @@ def explain(
                         args={"query": req["query"]},
                         response=None,
                         outcome="denied" if denied else "error",
+                        origin=getattr(exc, "origin", "live"),
                         transport=tool_transport,
                         error=str(exc)[:300],
                     )
@@ -439,11 +455,12 @@ def explain(
                     tool=SEARCH_TOOL,
                     version=TOOL_VERSION,
                     args={"query": req["query"]},
-                    response=hits,
+                    response=result.response,
                     outcome="ok",
+                    origin=result.origin,
                     transport=tool_transport,
                 )
-                for hit in hits[:3]:
+                for hit in result.hits[:3]:
                     excerpts.append(_excerpt(ctx, hit))
             continue
         text = _render(value, ctx)
