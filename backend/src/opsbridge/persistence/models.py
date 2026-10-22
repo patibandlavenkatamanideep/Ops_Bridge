@@ -968,6 +968,18 @@ class Attempt(Base):
             "status in ('started','succeeded','definite_failure','ambiguous_failure')",
             name="ck_attempts_status",
         ),
+        # A local action is applied in the same transaction as its succeeded attempt, so this
+        # allows it to take effect once per operation.
+        Index(
+            "uq_attempts_one_local_effect",
+            "tenant_id",
+            "operation_id",
+            unique=True,
+            postgresql_where=text(
+                "kind = 'dispatch' AND status = 'succeeded' "
+                "AND connector_version = 'opsbridge-local/1'"
+            ),
+        ),
     )
 
 
