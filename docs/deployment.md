@@ -126,5 +126,6 @@ store's encryption, IAM and lifecycle settings against the real bucket (tested l
 SeaweedFS only); connect the page and ticket receivers to real on-call and queue services and
 repeat the routing drill there (locally they reach only the alert sink);
 add the WAF/rate-limit edge (application rate limits are shared across API tasks through
-PostgreSQL but are not a DDoS defence); run the restore drill
+PostgreSQL but are not a DDoS defence); set `OPSBRIDGE_TRUSTED_PROXIES` to the ALB's subnet
+CIDRs, or every client is counted under the ALB's address; run the restore drill
 there with synthetic data.
