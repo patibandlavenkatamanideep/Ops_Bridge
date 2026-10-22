@@ -91,12 +91,28 @@ def load_corrections(session: Session, version_ids: set[uuid.UUID]) -> Overlay:
     return overlay
 
 
+# The fields whose human corrections matching applies (below, in load_match_input). Any other
+# field is refused at correction time: a correction must change what the next run uses.
+CORRECTABLE_FIELDS = frozenset(
+    {
+        "invoice.supplier_id",
+        "invoice_line.po_line_number",
+        "invoice_line.quantity",
+        "invoice_line.unit_price",
+        "po_line.quantity",
+        "po_line.unit_price",
+        "receipt_line.quantity",
+    }
+)
+
+
 @dataclass
 class _Applier:
     overlay: Overlay
     applied: list[dict[str, str]] = field(default_factory=list)
 
     def dec(self, value: Decimal, refs: dict[str, SourceRef], name: str) -> Decimal:
+        assert name in CORRECTABLE_FIELDS, name
         ref = refs.get(name)
         if ref is None:
             return value
@@ -121,6 +137,7 @@ class _Applier:
         return new
 
     def text(self, value: str | None, refs: dict[str, SourceRef], name: str) -> str | None:
+        assert name in CORRECTABLE_FIELDS, name
         ref = refs.get(name)
         if ref is None:
             return value
