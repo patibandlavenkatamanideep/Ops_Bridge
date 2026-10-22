@@ -29,6 +29,7 @@ from typing import Any
 import jsonschema
 
 from opsbridge.domain.policy import ReconciliationPolicy
+from opsbridge.domain.units import canonical_unit
 from opsbridge.telemetry import metrics, tracing
 
 from .contracts import ModelAdapter, ModelRequest, ReplayFailure
@@ -253,6 +254,86 @@ def _numbers(text: str) -> set[str]:
     return out
 
 
+# Words that give a nearby number a role, and the finding values that role must match. A
+# number is checked only when such a word sits right next to it (back to the previous number
+# or punctuation, else just after it); everything else is left to the numeric-support check.
+_ROLE_WORDS = {
+    "invoiced": ("invoice", "invoiced", "invoices", "bill", "bills", "billed", "charged"),
+    "ordered": ("ordered", "order", "orders", "po"),
+    "received": ("received", "receive", "delivered", "receipt", "receipts", "arrived", "accepted"),
+    "returned": ("returned", "return", "returns"),
+    "allocated": ("allocated", "allocation", "previously"),
+    "claimed": ("claims", "claimed", "says"),
+}
+# Finding value keys belong to a role by stem (invoiced, cumulative_invoiced and
+# invoice_net_unit_price are all "invoiced"); excess figures are differences, not a role.
+_ROLE_STEMS = {
+    "invoiced": ("invoic",),
+    "ordered": ("order", "po_"),
+    "received": ("receiv",),
+    "returned": ("return",),
+    "allocated": ("allocat",),
+    "claimed": ("claim",),
+}
+_ROLE_OF = {w: role for role, words in _ROLE_WORDS.items() for w in words}
+_NOT_A_QUANTITY = frozenset({"line", "lines", "row", "page", "no", "number", "version"})
+_CLAUSE_END = re.compile(r"[;:,!?]|\.(?:\s|$)")
+
+
+def _role_problems(ctx: AgentContext, text: str) -> list[str]:
+    """Numbers stated in the wrong role ("bills 18" when 18 were received) or with a unit the
+    findings do not use. Deterministic and conservative: a rejection only means the template
+    explanation is used instead."""
+    values: dict[str, set[str]] = {}
+    units: set[str] = set()
+    for f in ctx.recon["findings"]:
+        for k, v in (f.get("values") or {}).items():
+            if k == "unit" and v:
+                units.add(str(v))
+            elif v not in (None, ""):
+                values.setdefault(k, set()).update(_numbers(str(v).lstrip("-")))
+    spans = [m for m in _NUMBER.finditer(text)]
+    problems = []
+    for i, m in enumerate(spans):
+        if text[m.end() : m.end() + 1] == "-":
+            continue  # part of a date or identifier (2026-09-20)
+        before = text[spans[i - 1].end() if i else 0 : m.start()]
+        before = _CLAUSE_END.split(before)[-1]
+        after_parts = _CLAUSE_END.split(
+            text[m.end() : spans[i + 1].start() if i + 1 < len(spans) else len(text)]
+        )
+        # Words after the number name its role only if no later number shares the clause
+        # ("1.86 above the PO price 185": "PO" belongs to 185).
+        followed = i + 1 < len(spans) and len(after_parts) == 1
+        after = "" if followed else after_parts[0]
+        words_before = re.findall(r"[a-z]+", before.lower())
+        words_after = re.findall(r"[a-z]+", after.lower())
+        if words_before and words_before[-1] in _NOT_A_QUANTITY:
+            continue
+        number = format(Decimal(m.group().replace(",", "")).normalize(), "f")
+        role = next((_ROLE_OF[w] for w in reversed(words_before[-4:]) if w in _ROLE_OF), None)
+        role = role or next((_ROLE_OF[w] for w in words_after[:3] if w in _ROLE_OF), None)
+        if role is not None:
+            keys = [
+                k
+                for k in values
+                if not k.startswith("excess") and any(st in k for st in _ROLE_STEMS[role])
+            ]
+            expected = set().union(*(values[k] for k in keys))
+            if expected and number not in expected:
+                problems.append(
+                    f"{m.group()} is stated as {role}, but the findings record {sorted(expected)}"
+                )
+        unit_word = re.match(r"\s*([A-Za-z][A-Za-z0-9]*)", text[m.end() :])
+        if units and ctx.policy is not None and unit_word:
+            unit = canonical_unit(unit_word.group(1), ctx.policy.unit_aliases)
+            if unit is not None and unit not in units:
+                problems.append(
+                    f"{m.group()} {unit_word.group(1)} uses unit {unit}, not {sorted(units)}"
+                )
+    return problems
+
+
 def _allowed_numbers(ctx: AgentContext, labels: list[str]) -> set[str]:
     nums: set[str] = set()
     for f in ctx.recon["findings"]:
@@ -314,6 +395,7 @@ def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | 
             problems.append(
                 f"statement {i + 1} uses numbers not in its evidence: {sorted(unsupported)}"
             )
+        problems += [f"statement {i + 1}: {p}" for p in _role_problems(ctx, st["text"])]
         problems += [f"statement {i + 1}: {p}" for p in _common_text_problems(st["text"])]
     for text in [out["summary"], *out["uncertainties"]]:
         problems += _common_text_problems(text)
@@ -346,6 +428,7 @@ def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | Non
         problems.append("cites unknown evidence")
     for field_name in ("title", "body", "rationale"):
         problems += [f"{field_name}: {p}" for p in _common_text_problems(out[field_name])]
+        problems += [f"{field_name}: {p}" for p in _role_problems(ctx, out[field_name])]
     allowed = _allowed_numbers(ctx, out["citations"] or [e.label for e in ctx.evidence])
     # The rule-selected title comes from the policy's template (e.g. a condition count).
     allowed |= _numbers(str(rec.get("title") or ""))
