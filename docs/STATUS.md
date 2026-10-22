@@ -831,7 +831,12 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Found on the way: the host disk was 99% full (127 MB free) during a local image rebuild,
   which failed with corrupted blobs. The images, scan files and replay-check work
   directories this work created were removed (2.3 GB free afterwards); other projects'
-  images were left alone. The rebuilt image was therefore scanned only in CI.
+  images were left alone. The rebuilt image was therefore scanned only in CI. Later the
+  shared Podman VM could not start any new container (writeback errors on its disk while the
+  host was full; overlayfs then refused mounts); running containers were unaffected. Cleared
+  without restarting the VM by `sync -f` on its container storage (the file that lost writes
+  was the failed build's deleted temp file); the alert-rule gate and `make verify` pass again.
+  Before building images locally, check that several GB are free.
 - Next: Package 11's local part (a source-contract harness), F15 (claim meaning in model
   validation) and F18 (operator UX); integration with a real purchasing system and the pilot
   need the owner (docs/review-findings.md).
