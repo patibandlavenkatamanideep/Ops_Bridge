@@ -9,8 +9,9 @@ Algorithm for one `dispatch_operation` job (delivery is at-least-once):
 3. Every NEW write needs current eligibility: on the first dispatch, on a retry after a
    definite failure, and after reconciliation proved an earlier write absent. Cancellation
    requested → cancelled_before_dispatch; otherwise re-validate (proposal still approved and
-   current, approval unexpired, approver still authorized, evidence and policy unchanged),
-   failure → cancelled_before_dispatch. Recovering a write that may have landed (read-back,
+   current, approval unexpired, approver still authorized, evidence and policy unchanged,
+   settings still resolve to the approved destination, the approved text is still what
+   would be sent), failure → cancelled_before_dispatch. Recovering a write that may have landed (read-back,
    reconciliation) is not a new write and is not refused: it was authorized when made.
 5. Reconciliation by connector capability:
    - strong lookup: exactly one marker match → confirmed; none → safe to create;
@@ -48,7 +49,6 @@ from opsbridge.connectors.tasks import (
     TaskConnector,
     TaskRequest,
 )
-from opsbridge.evidence.records import case_identifiers
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
@@ -61,7 +61,6 @@ from opsbridge.persistence.models import (
     OutboxEvent,
     Proposal,
 )
-from opsbridge.privacy.redaction import redact
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
 
@@ -87,6 +86,7 @@ class ExecutionDeps:
     # Where attempt requests/responses are kept (content-addressed, tenant-scoped); without
     # one only digests are recorded.
     store: ArtifactStore | None = None
+    github_repo: str | None = None  # the configured sandbox repository, part of a destination
 
 
 def _ctx(tenant_id: uuid.UUID) -> DbContext:
@@ -134,12 +134,12 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         succeeded = [
             a for a in attempts if a.status == "succeeded" and a.kind == "dispatch" and a.remote_ref
         ]
-        if not succeeded and not needs_reconcile and _refused(s, op):
+        if not succeeded and not needs_reconcile and _refused(deps, s, op):
             return  # nothing can have landed, so what follows would be a new write
         op.status = "executing"
         op.executed_by = EXECUTOR
         op.row_version += 1
-        snapshot = _snapshot(op, attempts, case_identifiers(s, op.case_id))
+        snapshot = _snapshot(op, attempts)
     if snapshot["action_type"] != "create_follow_up_task":
         _execute_local(deps, job, snapshot)
         return
@@ -158,7 +158,7 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
     _create(deps, job, snapshot, connector)
 
 
-def _refused(s: Session, op: Operation) -> bool:
+def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
     """Finish the operation instead of a new write if it was cancelled or is no longer
     eligible; True when finished."""
     if op.cancellation == "requested":
@@ -170,7 +170,7 @@ def _refused(s: Session, op: Operation) -> bool:
             cancellation="confirmed",
         )
         return True
-    problems = _revalidate(s, op)
+    problems = _revalidate(s, op, deps.github_repo)
     if problems:
         _finish(
             s,
@@ -189,10 +189,10 @@ def _refused_now(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]
         op = s.execute(
             select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
         ).scalar_one()
-        return _refused(s, op)
+        return _refused(deps, s, op)
 
 
-def _snapshot(op: Operation, attempts: list[Attempt], keep: list[str]) -> dict[str, Any]:
+def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
     return {
         "operation_id": op.id,
         "tenant_id": op.tenant_id,
@@ -205,11 +205,10 @@ def _snapshot(op: Operation, attempts: list[Attempt], keep: list[str]) -> dict[s
         "retry_index": len(attempts),
         "last_attempt_id": attempts[-1].id if attempts else None,
         "approved_by": op.approved_by,
-        "keep": keep,  # the case's own identifiers survive outbound redaction
     }
 
 
-def _revalidate(s: Session, op: Operation) -> list[str]:
+def _revalidate(s: Session, op: Operation, github_repo: str | None) -> list[str]:
     from opsbridge.services.proposals import approver_still_authorized, check_current, payload_of
 
     problems = []
@@ -232,7 +231,7 @@ def _revalidate(s: Session, op: Operation) -> list[str]:
         problems.append("approval expired before dispatch")
     if not approver_still_authorized(s, op.tenant_id, ad.approver_id, op.action_type):
         problems.append("approver no longer holds approval authority for this action")
-    stale = check_current(s, case, pr)
+    stale = check_current(s, case, pr, github_repo)
     problems += stale.reasons
     return problems
 
@@ -444,15 +443,13 @@ def _complete(
 
 
 def _task_request(snap: dict[str, Any]) -> TaskRequest:
-    params = snap["payload"]["parameters"]
-    # Only synthetic/redacted content leaves OpsBridge; the marker enables reconciliation.
-    keep = snap.get("keep", [])
-    body = redact(params.get("body") or "", keep).text
-    body = f"{body}\n\nOpsBridge operation marker: {snap['marker']}"
+    # Exactly the approved outbound text (re-checked before this write); the marker line lets
+    # reconciliation find the task.
+    out = snap["payload"]["outbound"]
     return TaskRequest(
-        title=redact(params["title"], keep).text,
-        body=body,
-        assignee_group=params.get("assignee_group"),
+        title=out["title"],
+        body=f"{out['body']}\n\nOpsBridge operation marker: {snap['marker']}",
+        assignee_group=out["assignee_group"],
         marker=snap["marker"],
     )
 
@@ -466,8 +463,10 @@ def _create(
 ) -> None:
     req = _task_request(snap)
     key = snap["operation_key"] if connector.capabilities.idempotency_keys else None
-    args = {
+    args = {  # the complete request as sent, so the attempt's digest covers the body too
+        "destination": snap["payload"]["destination"],
         "title": req.title,
+        "body": req.body,
         "assignee_group": req.assignee_group,
         "marker": req.marker,
         "idempotency_key": key,
@@ -680,7 +679,7 @@ def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, An
         op = s.execute(
             select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
         ).scalar_one()
-        if op.status in TERMINAL or _refused(s, op):
+        if op.status in TERMINAL or _refused(deps, s, op):
             return
         case = s.execute(
             select(Case).where(Case.id == snap["case_id"]).with_for_update()
