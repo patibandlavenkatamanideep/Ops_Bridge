@@ -677,17 +677,37 @@ def approver_still_authorized(
 # --- listing, cancellation, review --------------------------------------------------------
 
 
-def list_proposals(db: Database, p: Principal, case_id: uuid.UUID) -> list[Proposal]:
+def list_proposals(
+    db: Database, p: Principal, case_id: uuid.UUID
+) -> list[tuple[Proposal, str | None]]:
+    """Proposals, newest first, each with why this viewer cannot decide it now (None: they
+    can). The client shows that reason instead of re-deriving policy."""
     require(p, "proposal.read")
     with db.session(_ctx(p)) as s:
         _case(s, p, case_id)
-        return list(
+        rows = list(
             s.execute(
                 select(Proposal)
                 .where(Proposal.case_id == case_id)
                 .order_by(Proposal.generated_at.desc(), Proposal.version.desc())
             ).scalars()
         )
+        return [(pr, decision_blocked(s, p, pr)) for pr in rows]
+
+
+def decision_blocked(s: Session, p: Principal, pr: Proposal) -> str | None:
+    """Why `p` cannot approve or reject `pr` now, by the same rules `decide` applies."""
+    if pr.status != "awaiting_approval":
+        return "not_awaiting_approval"
+    if pr.expires_at <= _now():
+        return "expired"
+    if not p.has("proposal.decide"):
+        return "no_permission"
+    if not p.can_approve(pr.action_type):
+        return "out_of_scope"
+    if _policy(s, pr.policy_version_id).approval.separation_of_duties and pr.author_id == p.user_id:
+        return "separation_of_duties"
+    return None
 
 
 def list_operations(
