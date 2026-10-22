@@ -71,8 +71,14 @@ def _check_run_quota(s: Session, p: Principal) -> None:
     """Organization-wide run quota per rolling hour (tier entitlement; not an authority).
 
     The window is computed with the database clock, the same clock that wrote `created_at`;
-    mixing it with the application host's clock breaks the window when they drift.
+    mixing it with the application host's clock breaks the window when they drift. Starts in
+    the organization are serialized (a transaction lock held until the new run commits), so
+    concurrent starts on different cases cannot all see room.
     """
+    s.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+        {"k": f"investigation-quota:{p.tenant_id}"},
+    )
     limit = p.tier.max_investigations_per_hour
     row = s.execute(
         text(
