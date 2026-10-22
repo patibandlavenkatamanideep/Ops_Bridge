@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from ipaddress import ip_network
 from pathlib import Path
+from typing import Any
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +18,7 @@ from opsbridge.persistence.db import Database, get_database
 
 from . import errors
 from .deps import AppState
-from .middleware import PerimeterMiddleware
+from .middleware import FixedWindowLimiter, PerimeterMiddleware
 from .routes import admin, auth, cases, evaluations, health, investigations, proposals
 
 
@@ -65,20 +67,31 @@ def create_app(
         same_site="lax",
         https_only=settings.secure_cookies,
     )
-    limiter = None
+    # One limiter per address (every API request, in the middleware) and one per verified
+    # user (after the session check, in api/deps.py).
     if settings.rate_limit_shared:
         from .ratelimit import SharedWindowLimiter
 
-        limiter = SharedWindowLimiter(
-            app.state.opsbridge.db.engine,
-            settings.rate_limit_per_minute,
-            settings.rate_limit_window_seconds,
+        engine = app.state.opsbridge.db.engine
+        window = settings.rate_limit_window_seconds
+        address_limiter: Any = SharedWindowLimiter(
+            engine, settings.rate_limit_per_address_per_minute, window
         )
+        user_limiter: Any = SharedWindowLimiter(engine, settings.rate_limit_per_minute, window)
+    else:
+        address_limiter = FixedWindowLimiter(
+            settings.rate_limit_per_address_per_minute, float(settings.rate_limit_window_seconds)
+        )
+        user_limiter = FixedWindowLimiter(
+            settings.rate_limit_per_minute, float(settings.rate_limit_window_seconds)
+        )
+    app.state.opsbridge.user_limiter = user_limiter
     app.add_middleware(
         PerimeterMiddleware,
         max_body_bytes=settings.max_request_bytes,
-        rate_limit_per_minute=settings.rate_limit_per_minute,
-        limiter=limiter,
+        address_limit_per_minute=settings.rate_limit_per_address_per_minute,
+        limiter=address_limiter,
+        trusted_proxies=[ip_network(c, strict=False) for c in settings.trusted_proxies],
     )
 
     app.include_router(health.router)

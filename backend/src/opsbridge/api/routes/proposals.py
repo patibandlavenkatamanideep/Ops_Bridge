@@ -30,6 +30,8 @@ class ProposalOut(BaseModel):
     source_manifest_digest: str
     investigation_version_id: str
     policy_ref: str
+    destination: dict[str, str] | None  # connector and organization/repository; no credentials
+    outbound: dict[str, Any] | None  # what leaves OpsBridge for an external action
     required_permission: str
     payload_digest: str
     canonicalization: str
@@ -38,6 +40,17 @@ class ProposalOut(BaseModel):
     status: str
     generated_at: str
     expires_at: str
+    # Why the viewer cannot decide this proposal now (null: they can). Listed proposals only.
+    decision_blocked: (
+        Literal[
+            "not_awaiting_approval",
+            "expired",
+            "no_permission",
+            "out_of_scope",
+            "separation_of_duties",
+        ]
+        | None
+    ) = None
 
 
 class ProposalList(BaseModel):
@@ -119,8 +132,9 @@ class ReviewIn(BaseModel):
     note: str = Field(min_length=5, max_length=500)
 
 
-def proposal_out(p: Proposal) -> ProposalOut:
+def proposal_out(p: Proposal, decision_blocked: str | None = None) -> ProposalOut:
     return ProposalOut(
+        decision_blocked=decision_blocked,
         id=str(p.id),
         proposal_key=str(p.proposal_key),
         version=p.version,
@@ -132,6 +146,8 @@ def proposal_out(p: Proposal) -> ProposalOut:
         source_manifest_digest=p.source_manifest_digest,
         investigation_version_id=str(p.investigation_version_id),
         policy_ref=p.policy_ref,
+        destination=p.destination,
+        outbound=p.outbound,
         required_permission=p.required_permission,
         payload_digest=p.payload_digest,
         canonicalization=p.canonicalization,
@@ -204,7 +220,10 @@ ERRORS = (svc.NotFound, svc.Conflict, svc.Forbidden)
 def list_proposals(case_id: uuid.UUID, principal: CurrentPrincipal, state: State) -> ProposalList:
     try:
         return ProposalList(
-            items=[proposal_out(p) for p in svc.list_proposals(state.db, principal, case_id)]
+            items=[
+                proposal_out(p, blocked)
+                for p, blocked in svc.list_proposals(state.db, principal, case_id)
+            ]
         )
     except ERRORS as exc:
         raise _map(exc) from exc
@@ -222,7 +241,12 @@ def create_proposal(
     try:
         return proposal_out(
             svc.create_from_investigation(
-                state.db, principal, case_id, overrides, request.state.correlation_id
+                state.db,
+                principal,
+                case_id,
+                overrides,
+                request.state.correlation_id,
+                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -253,6 +277,7 @@ def edit_proposal(
                 body.expected_payload_digest,
                 changes,
                 request.state.correlation_id,
+                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -279,6 +304,7 @@ def decide(
             payload_digest=body.payload_digest,
             reason=body.reason,
             correlation_id=request.state.correlation_id,
+            github_repo=state.settings.github_sandbox_repo,
         )
     except ERRORS as exc:
         raise _map(exc) from exc

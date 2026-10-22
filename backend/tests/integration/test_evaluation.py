@@ -1,4 +1,5 @@
 """Benchmark harness: strict replay fails closed; receipts detect tampering (Phase 7 exit gate).
+Agent tool calls replay from the recording, without running the tool.
 
 Uses validation cases only (never held-out) and scratch ledgers/cassettes under tmp_path.
 """
@@ -11,12 +12,19 @@ from pathlib import Path
 import pytest
 
 from opsbridge.agents.adapters import MockModelAdapter
+from opsbridge.canonical import digest
 from opsbridge.config import REPO_ROOT, get_settings
 from opsbridge.evaluation import receipt
 from opsbridge.evaluation.bench import BenchEnvironment
-from opsbridge.evaluation.cassette import RecordingAdapter, ReplayAdapter, ReplayFailure
+from opsbridge.evaluation.cassette import (
+    TOOL_CASSETTE,
+    RecordingAdapter,
+    ReplayAdapter,
+    ReplayFailure,
+)
 from opsbridge.evaluation.egress import loopback_only
 from opsbridge.evaluation.manifest import file_digest
+from opsbridge.evidence import retrieval
 from opsbridge.simulator.scenarios import Corpus, load_corpus
 
 pytestmark = pytest.mark.integration
@@ -87,6 +95,97 @@ def test_strict_replay_reproduces_recorded_runs_and_fails_closed(tmp_path: Path)
     ):
         t = env.run_trial(corpus.scenarios[0], "mock", 0)
     assert t.error is not None and "diverged from the recording" in t.error
+
+
+def test_tool_calls_replay_from_the_recording_and_fail_closed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    corpus = subset(["it-validation-107"])  # the mock's one evidence search finds a document
+    [scenario] = corpus.scenarios
+    rec = RecordingAdapter(inner=MockModelAdapter())
+    with loopback_only(), BenchEnvironment(get_settings(), corpus, tmp_path / "w1", rec) as env:
+        first = env.run_trial(scenario, "mock", 0)
+    assert first.error is None and [c["origin"] for c in first.tool_calls] == ["live"]
+    cassette = tmp_path / "cassette.json"
+    rec.save(cassette, benchmark_id="test", split="validation")
+    tools = tmp_path / TOOL_CASSETTE
+    recorded = json.loads(tools.read_text())
+    assert recorded["response_mode"] == "live" and len(recorded["entries"]) == 1
+    assert recorded["entries"][0]["response"]  # hits to re-bind to the replay database
+
+    def no_search(*_a: object, **_k: object) -> list[object]:
+        raise AssertionError("replay executed the search tool")
+
+    def replay(workdir: str, body: dict[str, object] | None = None):  # type: ignore[no-untyped-def]
+        if body is not None:
+            tools.write_text(json.dumps(body))
+        adapter = ReplayAdapter.load(cassette)
+        with (
+            loopback_only(),
+            BenchEnvironment(get_settings(), corpus, tmp_path / workdir, adapter) as env,
+        ):
+            return env.run_trial(scenario, "mock", 0)
+
+    monkeypatch.setattr(retrieval, "search", no_search)
+    again = replay("w2")
+    assert again.error is None and verdict(again) == verdict(first)
+    # The same response (by digest) is bound to the call, now labelled as recorded.
+    assert [{**c, "origin": "live"} for c in again.tool_calls] == first.tool_calls
+    assert [c["origin"] for c in again.tool_calls] == ["recorded"]
+
+    def edited(change) -> dict[str, object]:  # type: ignore[no-untyped-def]
+        body = json.loads(json.dumps(recorded))
+        change(body["entries"][0])
+        return body
+
+    missing = {**recorded, "entries": []}
+    other_query = edited(lambda e: e.update(args_sha256=digest({"query": "something else"})))
+    other_tool = edited(lambda e: e.update(version="2"))
+
+    def foreign(e: dict[str, object]) -> None:  # a hit for a document this case does not have
+        e["response"][0]["sha256"] = "sha256:" + "1" * 64  # type: ignore[index]
+        e["response_sha256"] = digest(e["response"])
+
+    for name, body, message in (
+        ("missing", missing, "ReplayFailure: no recorded tool response"),
+        ("query", other_query, "ReplayFailure: tool call diverged from the recording"),
+        ("tool", other_tool, "recorded search_case_evidence v2, now search_case_evidence v1"),
+        ("foreign", edited(foreign), "does not fit this environment"),
+    ):
+        t = replay(f"w-{name}", body)
+        assert t.error is not None and message in t.error, (name, t.error)
+        assert t.explanation_origin is None, name  # no template fallback, no live search
+        assert t.tool_calls == [], name  # not recorded as an ordinary tool error either
+
+    # A recorded response that no longer matches its digest is refused before any run.
+    tools.write_text(json.dumps(edited(lambda e: e["response"][0].update(text="edited"))))
+    with pytest.raises(ReplayFailure, match="does not match its digest"):
+        ReplayAdapter.load(cassette)
+
+
+def test_a_recorded_tool_error_replays_as_the_same_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    corpus = subset(["it-validation-107"])
+    [scenario] = corpus.scenarios
+
+    def broken(*_a: object, **_k: object) -> list[object]:
+        raise RuntimeError("search index unavailable")
+
+    monkeypatch.setattr(retrieval, "search", broken)
+    rec = RecordingAdapter(inner=MockModelAdapter())
+    with loopback_only(), BenchEnvironment(get_settings(), corpus, tmp_path / "w1", rec) as env:
+        first = env.run_trial(scenario, "mock", 0)
+    assert first.error is None and [c["outcome"] for c in first.tool_calls] == ["error"]
+    rec.save(tmp_path / "cassette.json", benchmark_id="test", split="validation")
+    [entry] = json.loads((tmp_path / TOOL_CASSETTE).read_text())["entries"]
+    assert entry["error"] == "search index unavailable" and "response" not in entry
+
+    replay = ReplayAdapter.load(tmp_path / "cassette.json")
+    with loopback_only(), BenchEnvironment(get_settings(), corpus, tmp_path / "w2", replay) as env:
+        again = env.run_trial(scenario, "mock", 0)
+    assert again.error is None and verdict(again) == verdict(first)
+    assert [(c["outcome"], c["origin"]) for c in again.tool_calls] == [("error", "recorded")]
 
 
 def _run(

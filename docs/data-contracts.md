@@ -64,6 +64,28 @@ over the original bytes; normalized-text digests are separate (`opsbridge-norm/1
 - Operation key: `opk-` + first 40 hex of SHA-256 over tenant, proposal key, version and
   payload digest — one per logical operation; attempts have their own ids.
 - External marker: `opsbridge-op:<operation key>` in every created task, used for lookup.
+- Proposal payload (`opsbridge.proposal/1`, `services/proposals.py::payload_of`): tenant,
+  case, proposal key and version, action and parameters, policy and investigation versions,
+  source-manifest digest, expiry and, since migration 0011, `destination`
+  (`{connector, organization|repository}`; never credentials) and `outbound` (the title,
+  body and assignee group exactly as sent, with `transform`
+  `opsbridge-outbound/1+opsbridge-redact/2`; null for local actions). Proposals made before
+  0011 omit both keys, so their digests still hold. A dispatch attempt's request records
+  destination, title, the full body including the marker line, assignee group, marker and
+  idempotency key.
+- Investigation `evidence_state` (`services/freshness.py`, migration 0012):
+  `{invoice_number, po_number, supplier_id, digest}`, the digest covering the versions
+  matching would load, every version of the case's linked documents and the corrections on
+  them, taken before matching.
+- Business identifiers (`domain/identifiers.py`): trimmed, upper-cased, inner whitespace
+  collapsed; punctuation and leading zeros kept. The similarity key (alphanumerics only,
+  leading zeros folded) only prompts a person (`possible_duplicate`, overridden with
+  `confirm_distinct`). Current invoice records are unique per tenant, supplier and number
+  (migration 0013); a case may name `supplier_id`. Before 2026-10-22 intake removed every
+  character except letters, digits and hyphens. An `Idempotency-Key` reused with a different
+  request is refused (`idempotency_key_reused`); the key and a digest of the request are
+  recorded when the case is created (migration 0014), and another key for an invoice that
+  already has a case is a duplicate (`duplicate_case`).
 
 ## API (`/api/v1`, OpenAPI at `/api/v1/openapi.json`)
 
@@ -86,6 +108,7 @@ Outbox events are written in the approval transaction and marked delivered on co
 | Frozen benchmark manifest | `opsbridge-eval-manifest/1` | `evaluation/manifest.py` |
 | Acceptance policy | `opsbridge-acceptance/1` | `evals/acceptance-policy.json` |
 | Model cassette | `opsbridge-model-cassette/1` | `evaluation/cassette.py` |
+| Tool cassette | `opsbridge-tool-cassette/1` | `evaluation/cassette.py` |
 | Results | `opsbridge-eval-results/1` | CLI `eval-bench` |
 | Canary baseline | `opsbridge-canary/1` | `evaluation/canary.py` |
 | Tool manifest / responses | `evalseal.agent-tools/1`, `evalseal.agent-tool-responses/1` | EvalSeal 2.2.0 (documented schemas) |

@@ -275,7 +275,7 @@ function FieldRow({ tenant, caseId, versionId, field, focused, rowRef }: { tenan
         <td>
           <span className="small">{statusLabel(field.status)}</span>
           {field.note && <div className="muted small">{field.note}</div>}
-          {can(tenant, "evidence.correct") && !editing && field.method !== "ocr" && (
+          {can(tenant, "evidence.correct") && !editing && field.correctable && (
             <button type="button" className="button link small" onClick={() => setEditing(true)}>
               Correct
             </button>

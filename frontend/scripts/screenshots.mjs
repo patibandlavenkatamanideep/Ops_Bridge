@@ -74,10 +74,11 @@ try {
 
   await inv.goto(`${BASE}/t/demo-furniture/evaluation`);
   const held = inv.getByRole("row").filter({ hasText: "heldout" }).filter({ hasText: "record" });
+  await held.first().waitFor(); // the run list, not the session check that precedes it
   await inv.screenshot({ path: `${OUT}05-evaluation.png` });
-  await held.getByRole("link").click();
+  await held.first().getByRole("link").click();
   await inv.getByRole("heading", { name: /heldout · record/i }).waitFor();
-  await inv.screenshot({ path: `${OUT}06-evaluation-run.png`, fullPage: true });
+  await inv.screenshot({ path: `${OUT}06-evaluation-run.png` }); // the summary, not every case
 
   const admin = await session(browser, "furn-admin");
   await admin.goto(`${BASE}/t/demo-furniture/settings`);

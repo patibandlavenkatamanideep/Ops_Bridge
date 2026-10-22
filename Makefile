@@ -13,7 +13,7 @@ CONTAINER_ENV := eval "$$(scripts/container-env.sh)"
 COMPOSE := $(CONTAINER_ENV) && docker compose --env-file .env -f $(COMPOSE_FILE)
 
 .PHONY: help doctor setup dev infra-up migrate seed-demo demo lint typecheck test test-integration \
-        test-e2e eval-offline eval-replay-check dashboard-check verify build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary identity-sync
+        test-e2e eval-offline eval-replay-check dashboard-check verify verify-strict build down reset-demo openapi alerts-test observability-up backup restore-drill image demo-containers eval-canary identity-sync
 
 help: ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-18s %s\n", $$1, $$2}'
@@ -55,7 +55,7 @@ typecheck: ## mypy --strict + tsc
 	cd frontend && npm run typecheck
 
 test: ## Unit tests (no services, no network)
-	$(PY) pytest -q -m "not integration and not keycloak"
+	$(PY) pytest -q -m "not integration and not keycloak and not live"
 	cd frontend && npm test
 
 test-integration: ## Integration tests against real PostgreSQL, Keycloak, HTTP and MCP (fails if services are down)
@@ -81,6 +81,9 @@ openapi: ## Regenerate OpenAPI document and frontend types
 
 verify: ## Run every available local gate and name missing prerequisites
 	@python3 scripts/verify.py
+
+verify-strict: ## Release gate: like verify, but any skipped gate or skipped test fails
+	@python3 scripts/verify.py --strict
 
 build: ## Build backend wheel and frontend bundle from the locked dependencies
 	$(UV) build --wheel --out-dir ../dist

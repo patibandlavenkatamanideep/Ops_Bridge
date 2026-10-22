@@ -256,5 +256,5 @@ def app_from_env() -> FastAPI:
         db,
         settings.sim_master_secret.get_secret_value(),
         fault_controls=settings.simulator_fault_controls,
-        production=settings.env == "production",
+        production=settings.deployed,
     )

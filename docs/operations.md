@@ -51,7 +51,9 @@ during maintenance: `amtool silence add` against Alertmanager, with an end time 
 off, not exit. Containers restart on their own exit (`restart: unless-stopped`); an
 operator `kill`/`stop` is not restarted. Jobs held by a dead worker become claimable when
 their lease (30 s) expires; durable steps resume and fencing prevents the old worker from
-writing late results.
+writing late results. A running investigation step renews its lease (and the worker counts as
+alive) for up to `OPSBRIDGE_INVESTIGATION_STEP_LIMIT_SECONDS` (300 s); a step stuck longer
+lets the lease lapse and `/healthz` turn stale, so another worker takes the run over.
 
 ## Dependency unavailable
 
@@ -71,16 +73,19 @@ FROM jobs WHERE status IN ('queued', 'leased') ORDER BY run_after LIMIT 20;
 ```
 
 A kind with no registered handler is never claimed (a new job kind deployed before the
-worker). Expired leases are reclaimed automatically; persistent expiry means jobs run longer
-than the lease — raise `OPSBRIDGE_WORKER_LEASE_SECONDS` (it must stay ≥ 2 × connector
-timeout).
+worker). Expired leases are reclaimed automatically while attempts remain; persistent expiry
+means steps run longer than the step limit or workers die mid-job (out of memory, killed) —
+check worker logs before raising `OPSBRIDGE_INVESTIGATION_STEP_LIMIT_SECONDS` or
+`OPSBRIDGE_WORKER_LEASE_SECONDS` (it must stay ≥ 2 × connector timeout).
 
 ## Retries and dead jobs
 
 `OpsBridgeJobsExhausted`, `OpsBridgeInvestigationFailures`. Retryable failures back off
-exponentially with jitter up to `max_attempts` (5). An exhausted investigation marks the run
-`failed` (the case shows the error and a re-run button); an exhausted dispatch marks the
-operation `outcome_unknown` for review — never a blind re-send. `last_error` holds the
+exponentially with jitter up to `max_attempts` (5). A job whose worker died on every attempt
+(the lease expired on the last one) is given up the same way (`last_error`: "lease expired on
+the last attempt"). An exhausted investigation marks the run `failed` (the case shows the
+error and a re-run button); an exhausted dispatch marks the operation `outcome_unknown` for
+review — never a blind re-send. `last_error` holds the
 reason; the trace for the job shows which step failed.
 
 ## Ambiguous outcomes

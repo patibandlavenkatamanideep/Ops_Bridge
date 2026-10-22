@@ -24,6 +24,9 @@ class CaseCreateIn(BaseModel):
     description: str = Field(default="", max_length=5000)
     invoice_number: str | None = Field(default=None, max_length=100)
     po_number: str | None = Field(default=None, max_length=100)
+    supplier_id: str | None = Field(default=None, max_length=100)
+    # Set after checking that a similar-looking invoice number is a different document.
+    confirm_distinct: bool = False
 
 
 class CaseOut(BaseModel):
@@ -34,6 +37,7 @@ class CaseOut(BaseModel):
     description: str
     invoice_number: str | None
     po_number: str | None
+    supplier_id: str | None
     status: str
     discrepancy_types: list[str]
     evidence_readiness: str
@@ -71,6 +75,7 @@ def case_out(c: Case) -> CaseOut:
         description=c.description,
         invoice_number=c.invoice_number,
         po_number=c.po_number,
+        supplier_id=c.supplier_id,
         status=c.status,
         discrepancy_types=list(c.discrepancy_types or []),
         evidence_readiness=c.evidence_readiness,
@@ -98,7 +103,14 @@ def create_case(
         case, created = svc.create_case(
             state.db,
             principal,
-            svc.CaseCreate(body.title, body.description, body.invoice_number, body.po_number),
+            svc.CaseCreate(
+                body.title,
+                body.description,
+                body.invoice_number,
+                body.po_number,
+                body.supplier_id,
+                body.confirm_distinct,
+            ),
             idempotency_key,
             correlation_id=request.state.correlation_id,
         )
@@ -107,6 +119,23 @@ def create_case(
             "duplicate_case",
             "A case already exists for this invoice.",
             {"existing_case_id": str(exc.existing_id)} if exc.existing_id else None,
+        ) from exc
+    except svc.PossibleDuplicate as exc:
+        raise conflict(
+            "possible_duplicate",
+            "A case exists for an invoice number that differs only in punctuation, spacing or "
+            "leading zeros. If it is a different invoice, submit again with confirm_distinct.",
+            {
+                "existing_case_id": str(exc.existing_id),
+                "existing_invoice_number": exc.existing_invoice_number,
+            }
+            if exc.existing_id
+            else None,
+        ) from exc
+    except svc.IdempotencyKeyReused as exc:
+        raise conflict(
+            "idempotency_key_reused",
+            "This Idempotency-Key was already used for a different request.",
         ) from exc
     if not created:
         response.status_code = 200

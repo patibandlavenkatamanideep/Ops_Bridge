@@ -91,9 +91,22 @@ class Worker:
     def register(self, kind: str, handler: Handler) -> None:
         self.handlers[kind] = handler
 
+    def lease_for(self, job: jobs.ClaimedJob) -> jobs.Lease:
+        """The job's lease; renewing it counts as liveness for the health check."""
+        return jobs.Lease(self.db, job, self.settings.worker_lease_seconds, on_renew=self._touch)
+
+    def _touch(self) -> None:
+        self.last_loop = time.monotonic()
+
     def run_once(self) -> bool:
         """Claim and process at most one job. Returns True if a job was processed."""
         self.last_loop = time.monotonic()
+        for dead in jobs.reap_exhausted(self.db, list(self.handlers)):
+            log.warning(
+                "job %s %s given up: its worker stopped on every attempt", dead.kind, dead.id
+            )
+            metrics.JOBS.labels(dead.kind, "dead").inc()
+            self._on_exhausted(dead, "the worker stopped on every attempt (lease expired)")
         job = jobs.claim(
             self.db, self.worker_id, self.settings.worker_lease_seconds, list(self.handlers)
         )
@@ -225,6 +238,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
         store=artifact_store(settings),
+        github_repo=settings.github_sandbox_repo,
     )
 
 
@@ -233,7 +247,7 @@ def make_worker(settings: Settings | None = None, db: Database | None = None) ->
     db = db or get_database("worker")
     worker = Worker(db=db, settings=settings)
     deps = build_investigation_deps(settings, db)
-    worker.register("investigate", lambda job: _investigate(deps, job))
+    worker.register("investigate", lambda job: _investigate(deps, job, worker.lease_for(job)))
     exec_deps = build_execution_deps(settings, db)
     worker.register("dispatch_operation", lambda job: dispatch(exec_deps, job))
     store = artifact_store(settings)
@@ -299,8 +313,8 @@ def serve_health(worker: Worker, host: str, port: int) -> ThreadingHTTPServer:
     return server
 
 
-def _investigate(deps: InvestigationDeps, job: jobs.ClaimedJob) -> None:
-    run_investigation(deps, job.tenant_id, uuid.UUID(job.payload["run_id"]))
+def _investigate(deps: InvestigationDeps, job: jobs.ClaimedJob, lease: jobs.Lease) -> None:
+    run_investigation(deps, job.tenant_id, uuid.UUID(job.payload["run_id"]), lease)
 
 
 def main() -> None:

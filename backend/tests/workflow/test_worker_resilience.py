@@ -32,6 +32,7 @@ def test_worker_backs_off_on_database_errors_and_recovers(monkeypatch: pytest.Mo
         return worker.stop_event.is_set()
 
     monkeypatch.setattr(jobs, "claim", claim)
+    monkeypatch.setattr(jobs, "reap_exhausted", lambda *_a, **_k: [])  # runs before each claim
     monkeypatch.setattr(worker.stop_event, "wait", wait)
     worker.run_forever()
     assert calls["n"] == 4

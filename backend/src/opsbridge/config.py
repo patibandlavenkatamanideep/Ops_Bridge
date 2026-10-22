@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -28,7 +29,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    env: Literal["development", "test", "production"] = "development"
+    # staging: deployed, with synthetic data (the purchasing simulator is allowed);
+    # production: deployed, real data. Both refuse development defaults (_deployment_guards).
+    env: Literal["development", "test", "staging", "production"] = "development"
 
     db_host: str = "localhost"
     db_port: int = 5433
@@ -55,8 +58,13 @@ class Settings(BaseSettings):
     session_absolute_hours: int = 8
     session_idle_minutes: int = 30
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
+    # Per verified user (after the session is checked), and per client address for every
+    # API request with or without a cookie: an unverified cookie never selects a budget.
     rate_limit_per_minute: int = 240
+    rate_limit_per_address_per_minute: int = 1200
     rate_limit_window_seconds: int = 60
+    # CIDRs of reverse proxies whose X-Forwarded-For is believed (empty: the direct peer).
+    trusted_proxies: list[str] = Field(default_factory=list)
     # Count in PostgreSQL so every API instance shares one limit; in-process fallback when the
     # database is unavailable. Off only for single-process tooling.
     rate_limit_shared: bool = True
@@ -118,6 +126,9 @@ class Settings(BaseSettings):
     github_live_writes_authorized: bool = False
 
     worker_lease_seconds: int = 30
+    # A step that runs longer stops renewing its job's lease: another worker may take the
+    # run over, and the stuck worker's late writes are refused (fencing).
+    investigation_step_limit_seconds: int = 300
     worker_poll_seconds: float = 1.0
     connector_timeout_seconds: float = 5.0
 
@@ -131,29 +142,74 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _production_guards(self) -> Settings:
-        if self.env != "production":
+    def _amounts_are_finite(self) -> Settings:
+        """The spend ceiling and prices reserve real money: refuse what cannot be compared."""
+        for name in (
+            "live_spend_ceiling_usd",
+            "anthropic_price_input_per_mtok_usd",
+            "anthropic_price_output_per_mtok_usd",
+        ):
+            raw = getattr(self, name)
+            if raw is None:
+                continue
+            try:
+                value = Decimal(raw)
+            except InvalidOperation as exc:
+                raise ValueError(f"{name} is not a decimal amount: {raw!r}") from exc
+            if not value.is_finite() or value < 0:
+                raise ValueError(f"{name} must be a finite, non-negative amount, got {raw!r}")
+        return self
+
+    @model_validator(mode="after")
+    def _deployment_guards(self) -> Settings:
+        """A deployed environment refuses to start with development defaults. These are
+        settings checks only: they do not show that the bucket encrypts, the proxy is the load
+        balancer or the secrets are rotated (docs/deployment.md)."""
+        if not self.deployed:
             return self
+        env = self.env
         problems: list[str] = []
         if urlparse(self.public_url).scheme != "https":
-            problems.append("public_url must use https in production")
+            problems.append(f"public_url must use https in {env}")
         if urlparse(self.oidc_issuer).scheme != "https":
-            problems.append("oidc_issuer must use https in production")
+            problems.append(f"oidc_issuer must use https in {env}")
         if "localhost" in self.oidc_issuer or "127.0.0.1" in self.oidc_issuer:
-            problems.append("the local development identity provider is not allowed in production")
-        if self.demo_user_password is not None and self.demo_user_password.get_secret_value():
-            problems.append("demo user credentials must not be configured in production")
+            problems.append(f"the local development identity provider is not allowed in {env}")
         if self.simulator_fault_controls:
-            problems.append("simulator fault-injection controls must be disabled in production")
+            problems.append(f"simulator fault-injection controls must be disabled in {env}")
         if len(self.session_secret.get_secret_value()) < 32:
-            problems.append("session_secret must be at least 32 characters in production")
+            problems.append(f"session_secret must be at least 32 characters in {env}")
+        if not self.artifact_s3_bucket:
+            problems.append(f"the local artifact store is not allowed in {env}; set a bucket")
+        elif self.artifact_s3_sse not in ("AES256", "aws:kms"):
+            problems.append(f"artifact storage must request server-side encryption in {env}")
+        if not self.quotas_enabled:
+            problems.append(f"quotas must be enabled in {env}")
+        if not self.rate_limit_shared:
+            problems.append(f"the rate limit must be shared across instances in {env}")
+        if not self.trusted_proxies:
+            problems.append(
+                f"trusted_proxies must name the load balancer in {env}, or every client is "
+                "rate-limited under its address"
+            )
+        if env == "production":
+            if self.demo_user_password is not None and self.demo_user_password.get_secret_value():
+                problems.append("demo user credentials must not be configured in production")
+            problems.append(
+                "purchasing data would come from the simulator: no production purchasing-source "
+                "adapter is implemented yet (use env=staging with synthetic data)"
+            )
         if problems:
             raise ConfigurationError("; ".join(problems))
         return self
 
     @property
+    def deployed(self) -> bool:
+        return self.env in ("staging", "production")
+
+    @property
     def secure_cookies(self) -> bool:
-        return self.env == "production" or urlparse(self.public_url).scheme == "https"
+        return self.deployed or urlparse(self.public_url).scheme == "https"
 
     def database_url(self, role: DbRole, database: str | None = None) -> str:
         user = f"opsbridge_{role}"

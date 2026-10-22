@@ -56,6 +56,14 @@ rejected outputs, invalid citations, or fallbacks. Real models (`anthropic`, `ol
   matched by case, repeat, step, occurrence and request digest; an unmatched call fails the
   run (it never falls back to a live call); Python-level network egress to anything other
   than loopback is blocked during the run.
+- Agent tool calls (the read-only evidence search) are recorded in a tool cassette beside
+  the model cassette (`tool-cassette.json`, `opsbridge-tool-cassette/1`): keyed by case,
+  mode, repeat and call occurrence, checked against tool name, version and argument digest.
+  Replay serves the recorded response and does not run the tool; a recorded denial or error
+  replays as that outcome. Recorded hits name database rows of the recording run, so replay
+  re-binds each hit to this run's document version with the same content digest; a hit
+  with no single match fails the run. Replayed tool calls are labelled `recorded` in the
+  trial log and in EvalSeal's `tool_acl`/`tool_responses`.
 - Frozen external state: the simulator is seeded from the split's corpus file only.
 
 ## Metrics
@@ -95,7 +103,7 @@ Each benchmark run is executed through EvalSeal 2.2.0 (`run_eval` with OpsBridge
 `LocalCallableTarget`, `ExactMatchScorer` on the next-action label), sealed into
 `evals/ledger/opsbridge-bench.jsonl`, and signed with a locally generated Ed25519 key whose
 public half is committed. Bound artifacts: the corpus split, this manifest, the acceptance
-policy, policy and pack files, the prompt registry, the per-trial log, the model cassette,
-an EvalSeal tool manifest (`tool_acl`) and frozen tool responses (`tool_responses`). A
+policy, policy and pack files, the prompt registry, the per-trial log, the model and tool
+cassettes, an EvalSeal tool manifest (`tool_acl`) and frozen tool responses (`tool_responses`). A
 signature proves integrity relative to that key only — not when the run happened, that
 inputs were true, or that no other runs occurred. External timestamping is not used.

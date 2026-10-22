@@ -13,7 +13,8 @@ from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Forbidden, Principal, require
 from opsbridge.domain.records import SourceRef
 from opsbridge.evidence.citations import resolve_all
-from opsbridge.evidence.storage import ArtifactStore
+from opsbridge.evidence.records import CORRECTABLE_FIELDS
+from opsbridge.evidence.storage import ArtifactIntegrityError, ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Artifact,
@@ -70,8 +71,14 @@ def _check_run_quota(s: Session, p: Principal) -> None:
     """Organization-wide run quota per rolling hour (tier entitlement; not an authority).
 
     The window is computed with the database clock, the same clock that wrote `created_at`;
-    mixing it with the application host's clock breaks the window when they drift.
+    mixing it with the application host's clock breaks the window when they drift. Starts in
+    the organization are serialized (a transaction lock held until the new run commits), so
+    concurrent starts on different cases cannot all see room.
     """
+    s.execute(
+        text("SELECT pg_advisory_xact_lock(hashtextextended(:k, 0))"),
+        {"k": f"investigation-quota:{p.tenant_id}"},
+    )
     limit = p.tier.max_investigations_per_hour
     row = s.execute(
         text(
@@ -362,6 +369,7 @@ def version_detail(
                     "locator": f.locator,
                     "method": f.method,
                     "status": f.status,
+                    "correctable": f.method != "ocr" and f.field_path in CORRECTABLE_FIELDS,
                     "note": f.note,
                     "corrections": by_field.get(f.id, []),
                 }
@@ -408,6 +416,12 @@ def correct_field(
                 "ocr_candidate",
                 "Values read by OCR are review candidates and are not used by the matching "
                 "rules. Record the confirmed value in the source system and re-run.",
+            )
+        if fld.field_path not in CORRECTABLE_FIELDS:
+            raise Conflict(
+                "not_correctable",
+                f"Matching does not use corrections to {fld.field_path}. Record the right value "
+                "in the source system and re-run.",
             )
         last = s.execute(
             select(FieldCorrection)
@@ -460,6 +474,10 @@ def correct_field(
         }
 
 
+class EvidenceIntegrityError(Exception):
+    """A stored original no longer matches its recorded digest."""
+
+
 def raw_document(
     db: Database, store: ArtifactStore, p: Principal, case_id: uuid.UUID, version_id: uuid.UUID
 ) -> tuple[bytes, str, str]:
@@ -470,7 +488,10 @@ def raw_document(
         art = s.get(Artifact, version.raw_artifact_id) if version.raw_artifact_id else None
         if art is None or art.storage_key is None or art.deleted_at is not None:
             raise NotFound("original (withheld or deleted by retention policy)")
-        data = store.get(p.tenant_id, art.storage_key)
+        try:
+            data = store.get(p.tenant_id, art.storage_key)
+        except ArtifactIntegrityError as exc:  # never serve altered evidence as the original
+            raise EvidenceIntegrityError(str(version.id)) from exc
         name = version.safe_filename or f"{doc.kind}-v{version.version_no}"
         audit.record(
             s,
@@ -505,6 +526,14 @@ def resolve_case(
             )
         if case.status not in ("awaiting_review", "follow_up_pending", "investigating"):
             raise Conflict("invalid_transition", f"Cannot resolve a case in status {case.status}.")
+        from .freshness import stale_reason
+        from .proposals import evidence_state
+
+        changed = stale_reason(s, case.id, latest)
+        if changed is None and evidence_state(s, case)[1] != latest.policy_version_id:
+            changed = "the effective policy changed since the investigation; re-run it"
+        if changed is not None:
+            raise Conflict("stale_investigation", changed[0].upper() + changed[1:] + ".")
         transition(case, "resolved")
         s.flush()
         s.refresh(case)  # load server-generated updated_at before the session closes

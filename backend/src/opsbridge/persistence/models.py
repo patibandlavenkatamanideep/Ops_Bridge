@@ -300,6 +300,31 @@ class Artifact(Base):
     )
 
 
+class BlobDeletion(Base):
+    """Bytes queued for deletion after retention marked their artifact rows deleted (same
+    transaction). The purge deletes them only if no live row still references the key, and
+    leaves the entry pending if storage fails (evidence/blobs.py, workflow/retention.py)."""
+
+    __tablename__ = "blob_deletions"
+    id: Mapped[uuid.UUID] = pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    storage_key: Mapped[str] = mapped_column(String(300))
+    reason: Mapped[str] = mapped_column(Text)
+    requested_at: Mapped[datetime] = created()
+    done_at: Mapped[datetime | None]
+    outcome: Mapped[str | None] = mapped_column(String(16))  # deleted | kept_referenced
+    __table_args__ = (
+        _tenant_unique("blob_deletions"),
+        Index(
+            "uq_blob_deletions_pending",
+            "tenant_id",
+            "storage_key",
+            unique=True,
+            postgresql_where=text("done_at IS NULL"),
+        ),
+    )
+
+
 class SourceDocument(Base):
     __tablename__ = "source_documents"
     id: Mapped[uuid.UUID] = pk()
@@ -497,9 +522,12 @@ class InvoiceRecord(_RecordMixin, Base):
     __table_args__ = (
         _tenant_unique("invoices"),
         _fk(["source_version_id"], "document_versions", "fk_invoices_version"),
+        # One current record per supplier and invoice number: two suppliers may use the same
+        # number, and neither supersedes the other (migration 0013).
         Index(
             "uq_invoices_current",
             "tenant_id",
+            text("coalesce(supplier_key, '')"),
             "invoice_number",
             unique=True,
             postgresql_where=text("superseded_at IS NULL"),
@@ -613,6 +641,13 @@ class Case(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     invoice_number: Mapped[str | None] = mapped_column(String(100))
     po_number: Mapped[str | None] = mapped_column(String(100))
+    # The supplier that issued the invoice, when the requester named it; without it an
+    # invoice number that two suppliers use cannot be matched (migration 0013).
+    supplier_id: Mapped[str | None] = mapped_column(String(100))
+    # The requester's Idempotency-Key and a digest of the request that created the case: a
+    # replay must repeat both (migration 0014).
+    intake_key: Mapped[str | None] = mapped_column(String(100))
+    intake_digest: Mapped[str | None] = mapped_column(String(71))
     # Stable key that prevents duplicate intake of the same blocked invoice.
     source_key: Mapped[str] = mapped_column(String(200))
     discrepancy_types: Mapped[list[str]] = mapped_column(ARRAY(String(32)), default=list)
@@ -628,6 +663,14 @@ class Case(Base):
         _tenant_unique("cases"),
         UniqueConstraint("tenant_id", "case_number", name="uq_cases_number"),
         UniqueConstraint("tenant_id", "source_key", name="uq_cases_source_key"),
+        Index(
+            "uq_cases_intake_key",
+            "tenant_id",
+            "requester_id",
+            "intake_key",
+            unique=True,
+            postgresql_where=text("intake_key IS NOT NULL"),
+        ),
         CheckConstraint(
             "status in ('new','collecting_evidence','investigating','needs_information',"
             "'awaiting_review','follow_up_pending','resolved','closed_without_resolution')",
@@ -744,6 +787,9 @@ class InvestigationVersion(Base):
     rules_version: Mapped[str] = mapped_column(String(48))
     source_manifest: Mapped[list[Any]] = mapped_column(JSONB)
     source_manifest_digest: Mapped[str] = mapped_column(String(71))
+    # {invoice_number, po_number, digest} of the evidence before matching read it
+    # (services/freshness.py); NULL on investigations recorded before migration 0012.
+    evidence_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = created()
     __table_args__ = (
         _tenant_unique("investigation_versions"),
@@ -833,6 +879,10 @@ class Proposal(Base):
     investigation_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     policy_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     policy_ref: Mapped[str] = mapped_column(String(100))
+    # Where the action goes (no credentials) and, for external actions, the text that leaves
+    # OpsBridge; both are part of the approved payload. NULL on proposals made before 0011.
+    destination: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     required_permission: Mapped[str] = mapped_column(String(64))
     payload_digest: Mapped[str] = mapped_column(String(71))
     canonicalization: Mapped[str] = mapped_column(String(32))
@@ -967,6 +1017,18 @@ class Attempt(Base):
         CheckConstraint(
             "status in ('started','succeeded','definite_failure','ambiguous_failure')",
             name="ck_attempts_status",
+        ),
+        # A local action is applied in the same transaction as its succeeded attempt, so this
+        # allows it to take effect once per operation.
+        Index(
+            "uq_attempts_one_local_effect",
+            "tenant_id",
+            "operation_id",
+            unique=True,
+            postgresql_where=text(
+                "kind = 'dispatch' AND status = 'succeeded' "
+                "AND connector_version = 'opsbridge-local/1'"
+            ),
         ),
     )
 

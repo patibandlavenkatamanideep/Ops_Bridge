@@ -4,6 +4,7 @@ instances allowed twice the configured rate."""
 
 from __future__ import annotations
 
+import secrets
 import time
 from typing import Any
 
@@ -13,6 +14,7 @@ from sqlalchemy import create_engine, text
 
 from opsbridge.api.app import create_app
 from opsbridge.api.ratelimit import SharedWindowLimiter
+from opsbridge.auth.sessions import COOKIE_NAME
 from opsbridge.persistence.db import Database
 
 pytestmark = pytest.mark.integration
@@ -29,7 +31,9 @@ def _codes(settings: Any, db: Database, requests: int) -> list[int]:
 
 
 def test_two_api_instances_share_one_limit(app_db: Database, settings: Any) -> None:
-    limited = {"rate_limit_per_minute": 3, "rate_limit_window_seconds": HOUR}
+    # Unauthenticated requests count against their address (the per-user limit needs a
+    # verified session); both limits use the same shared counter.
+    limited = {"rate_limit_per_address_per_minute": 3, "rate_limit_window_seconds": HOUR}
     shared = _codes(settings.model_copy(update=limited), app_db, 6)
     assert [c == 429 for c in shared] == [False, False, False, True, True, True]
     per_process = _codes(
@@ -39,7 +43,9 @@ def test_two_api_instances_share_one_limit(app_db: Database, settings: Any) -> N
 
 
 def test_the_window_rolls_over_and_retry_after_is_truthful(app_db: Database, settings: Any) -> None:
-    s = settings.model_copy(update={"rate_limit_per_minute": 2, "rate_limit_window_seconds": 2})
+    s = settings.model_copy(
+        update={"rate_limit_per_address_per_minute": 2, "rate_limit_window_seconds": 2}
+    )
     with TestClient(create_app(settings=s, db=app_db), base_url="http://localhost:5173") as c:
         codes = [c.get("/api/v1/me") for _ in range(3)]
         if codes[2].status_code != 429:  # the first requests straddled a 2 s boundary
@@ -75,3 +81,21 @@ def test_expired_windows_are_pruned(app_db: Database) -> None:
     with app_db.engine.begin() as conn:
         keys = conn.execute(text("SELECT key FROM rate_limit_windows ORDER BY key")).scalars().all()
     assert keys == ["ip:192.0.2.2"]
+
+
+def test_made_up_cookies_do_not_escape_the_address_limit(app_db: Database, settings: Any) -> None:
+    """Review finding F09: the key came from any cookie the client sent, so a fresh random
+    cookie per request got a fresh budget (and a new database row) every time."""
+    s = settings.model_copy(
+        update={"rate_limit_per_address_per_minute": 3, "rate_limit_window_seconds": HOUR}
+    )
+    with TestClient(create_app(settings=s, db=app_db), base_url="http://localhost:5173") as c:
+        codes = []
+        for _ in range(5):
+            c.cookies.clear()
+            c.cookies.set(COOKIE_NAME, secrets.token_urlsafe(32))
+            codes.append(c.get("/api/v1/me").status_code)
+    assert codes == [401, 401, 401, 429, 429]
+    with app_db.engine.begin() as conn:
+        rows = conn.execute(text("SELECT key FROM rate_limit_windows")).scalars().all()
+    assert rows and all(k.startswith("ip:") for k in rows)  # nothing keyed by unverified cookies
