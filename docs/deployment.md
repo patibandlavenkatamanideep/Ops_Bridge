@@ -76,9 +76,15 @@ never written to disk — production refuses to start the signer or verifier wit
 existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
 
-**Production settings checks** (`OPSBRIDGE_ENV=production` refuses to start otherwise): HTTPS
-public URL and issuer, no localhost issuer, no demo user credentials, simulator fault
-controls off, session secret length. Cookies are `Secure` behind HTTPS.
+**Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
+simulator is allowed) and `OPSBRIDGE_ENV=production` refuse to start unless: HTTPS public URL
+and issuer, no localhost issuer, simulator fault controls off, session secret of at least 32
+characters, an S3 artifact bucket with server-side encryption requested (`AES256` or
+`aws:kms`), quotas on, the rate limit shared across instances, and `trusted_proxies` naming the
+load balancer. `production` also refuses demo user credentials and, because no production
+purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
+`staging`. These are settings checks: they do not show that the bucket actually encrypts or
+that the CIDRs are really the load balancer's. Cookies are `Secure` in both.
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
