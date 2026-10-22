@@ -497,9 +497,12 @@ class InvoiceRecord(_RecordMixin, Base):
     __table_args__ = (
         _tenant_unique("invoices"),
         _fk(["source_version_id"], "document_versions", "fk_invoices_version"),
+        # One current record per supplier and invoice number: two suppliers may use the same
+        # number, and neither supersedes the other (migration 0013).
         Index(
             "uq_invoices_current",
             "tenant_id",
+            text("coalesce(supplier_key, '')"),
             "invoice_number",
             unique=True,
             postgresql_where=text("superseded_at IS NULL"),
@@ -613,6 +616,9 @@ class Case(Base):
     description: Mapped[str] = mapped_column(Text, default="")
     invoice_number: Mapped[str | None] = mapped_column(String(100))
     po_number: Mapped[str | None] = mapped_column(String(100))
+    # The supplier that issued the invoice, when the requester named it; without it an
+    # invoice number that two suppliers use cannot be matched (migration 0013).
+    supplier_id: Mapped[str | None] = mapped_column(String(100))
     # Stable key that prevents duplicate intake of the same blocked invoice.
     source_key: Mapped[str] = mapped_column(String(200))
     discrepancy_types: Mapped[list[str]] = mapped_column(ARRAY(String(32)), default=list)
