@@ -21,6 +21,7 @@ const RETENTION_LABELS: Record<string, string> = {
   conversation_days: "Case conversation message text",
   model_artifacts_days: "Model requests and responses",
   tool_artifacts_days: "Tool requests and responses",
+  invitations_days: "Email addresses on used, withdrawn or expired invitations",
 };
 
 export function TenantSettings() {
