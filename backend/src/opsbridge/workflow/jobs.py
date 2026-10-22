@@ -2,16 +2,23 @@
 
 - `enqueue` runs inside the caller's business transaction (transactional outbox).
 - `claim` uses FOR UPDATE SKIP LOCKED, sets a lease and increments `fencing_token`.
-  A job whose lease expired is claimable again.
+  A job whose lease expired is claimable again while it has attempts left; one that has
+  used them all (its worker kept dying) is given up by `reap_exhausted` instead.
 - `complete`/`fail` succeed only if the caller still holds the current fencing token,
   so a stale worker (lease lost) cannot overwrite the new holder's outcome.
+- `Lease` lets a handler doing long work fence its own durable writes and renew the lease
+  while a step makes progress, for a bounded time.
 Delivery is at-least-once: handlers must be idempotent with respect to durable state.
 """
 
 from __future__ import annotations
 
 import random
+import threading
+import time
 import uuid
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
@@ -22,6 +29,10 @@ from sqlalchemy.orm import Session
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Job
 from opsbridge.telemetry import tracing
+
+
+class LeaseLost(Exception):
+    """This worker no longer holds the job; it must stop without writing results."""
 
 
 @dataclass(frozen=True)
@@ -79,7 +90,8 @@ def claim(
         WHERE id = (
           SELECT id FROM jobs
           WHERE ((status = 'queued' AND run_after <= now())
-                 OR (status = 'leased' AND lease_expires_at < now()))
+                 OR (status = 'leased' AND lease_expires_at < now()
+                     AND attempts < max_attempts))
                 {kind_filter}
           ORDER BY priority, run_after
           FOR UPDATE SKIP LOCKED
@@ -100,6 +112,41 @@ def claim(
             row.fencing_token,
             row.lease_owner,
         )
+
+
+def reap_exhausted(db: Database, kinds: list[str] | None = None) -> list[ClaimedJob]:
+    """Give up jobs whose lease expired on their last attempt: the worker died every time
+    (a crash, an out-of-memory kill), so no failure was recorded and `claim` would otherwise
+    hand them out forever. Returns them for the caller's exhaustion handling."""
+    kind_filter = "AND kind = ANY(:kinds)" if kinds else ""
+    sql = text(f"""
+        UPDATE jobs SET status = 'dead', lease_owner = NULL, lease_expires_at = NULL,
+               last_error = 'lease expired on the last attempt; the worker stopped each time',
+               updated_at = now()
+        WHERE id IN (
+          SELECT id FROM jobs
+          WHERE status = 'leased' AND lease_expires_at < now() AND attempts >= max_attempts
+                {kind_filter}
+          FOR UPDATE SKIP LOCKED
+          LIMIT 20)
+        RETURNING id, tenant_id, kind, payload, attempts, max_attempts, fencing_token,
+                  'reaper' AS lease_owner
+    """)  # noqa: S608 - kind_filter is a fixed fragment
+    with db.session(DbContext()) as s:
+        rows = s.execute(sql, {"kinds": kinds}).all()
+    return [
+        ClaimedJob(
+            r.id,
+            r.tenant_id,
+            r.kind,
+            dict(r.payload),
+            r.attempts,
+            r.max_attempts,
+            r.fencing_token,
+            r.lease_owner,
+        )
+        for r in rows
+    ]
 
 
 def heartbeat(db: Database, job: ClaimedJob, lease_seconds: int) -> bool:
@@ -125,6 +172,45 @@ def holds_lease(session: Session, job: ClaimedJob) -> bool:
         {"id": job.id, "tok": job.fencing_token},
     ).first()
     return row is not None
+
+
+@dataclass
+class Lease:
+    """The lease on a claimed job, for handlers doing long work. `check` (inside a business
+    transaction) fences durable writes; `keep_alive` renews the lease while a step runs,
+    for at most `max_seconds`: a step stuck longer lets the lease expire, so another worker
+    can take the job and this one's late writes are refused."""
+
+    db: Database
+    job: ClaimedJob
+    lease_seconds: int
+    on_renew: Callable[[], None] | None = None  # e.g. the worker's liveness clock
+
+    def check(self, session: Session) -> None:
+        if not holds_lease(session, self.job):
+            raise LeaseLost(f"job {self.job.id} lease lost (token {self.job.fencing_token})")
+
+    @contextmanager
+    def keep_alive(self, max_seconds: float) -> Iterator[None]:
+        stop = threading.Event()
+
+        def renew() -> None:
+            deadline = time.monotonic() + max_seconds
+            while not stop.wait(self.lease_seconds / 3):
+                if time.monotonic() > deadline:
+                    return  # stuck: stop renewing and stop looking alive
+                if not heartbeat(self.db, self.job, self.lease_seconds):
+                    return  # lost already
+                if self.on_renew is not None:
+                    self.on_renew()
+
+        thread = threading.Thread(target=renew, name=f"lease-{self.job.id}", daemon=True)
+        thread.start()
+        try:
+            yield
+        finally:
+            stop.set()
+            thread.join()
 
 
 def complete(db: Database, job: ClaimedJob) -> bool:
