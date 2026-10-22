@@ -32,7 +32,7 @@ def delegation_key(settings: Settings) -> Ed25519PrivateKey:
         if not isinstance(key, Ed25519PrivateKey):
             raise DelegationError("the configured delegation key is not Ed25519")
         return key
-    if settings.env == "production" and not settings.delegation_key_path.exists():
+    if settings.deployed and not settings.delegation_key_path.exists():
         raise DelegationError(
             "no delegation key: provide OPSBRIDGE_DELEGATION_PRIVATE_KEY from the secret store"
         )
