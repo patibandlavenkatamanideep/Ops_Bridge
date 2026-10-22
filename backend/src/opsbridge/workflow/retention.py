@@ -1,7 +1,8 @@
 """Retention sweep: delete protected content past the tenant's retention periods.
 
 Deletes bytes and free text, not the fact that something existed: artifact manifests keep
-their digests and a deletion reason, audit events keep opaque references. After deletion,
+their digests and a deletion reason, audit events keep opaque references, and a closed or
+expired invitation keeps its roles and dates without the invited address. After deletion,
 semantic review or replay of the affected material is no longer possible, and the UI and
 API say so instead of failing silently. A digest is not anonymization of low-entropy data.
 """
@@ -13,7 +14,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, delete, func, select, text
+from sqlalchemy import CursorResult, delete, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from opsbridge.audit import events as audit
@@ -25,6 +26,7 @@ from opsbridge.persistence.models import (
     DocumentVersion,
     EvidenceChunk,
     Job,
+    MembershipInvitation,
     TenantSettings,
 )
 
@@ -40,12 +42,14 @@ class SweepReport:
     artifacts_deleted: int = 0
     chunks_deleted: int = 0
     messages_cleared: int = 0
+    invitation_addresses_cleared: int = 0
 
     def to_dict(self) -> dict[str, int]:
         return {
             "artifacts_deleted": self.artifacts_deleted,
             "chunks_deleted": self.chunks_deleted,
             "messages_cleared": self.messages_cleared,
+            "invitation_addresses_cleared": self.invitation_addresses_cleared,
         }
 
 
@@ -100,6 +104,28 @@ def sweep(
                 msg.deleted_at = now
                 msg.deletion_reason = f"retention:conversation_days={policy['conversation_days']}"
                 report.messages_cleared += 1
+        if "invitations_days" in policy:
+            # Counted from acceptance or withdrawal, or from expiry for one never used. A
+            # pending invitation that has not expired keeps its address: accepting needs it.
+            inv = MembershipInvitation
+            cutoff = now - timedelta(days=int(policy["invitations_days"]))
+            report.invitation_addresses_cleared = _rowcount(
+                s.execute(
+                    update(inv)
+                    .where(
+                        inv.email.is_not(None),
+                        func.coalesce(inv.closed_at, inv.expires_at) <= cutoff,
+                    )
+                    .values(
+                        email=None,
+                        email_cleared_at=now,
+                        deletion_reason=(
+                            f"retention:invitations_days={policy['invitations_days']}"
+                        ),
+                    )
+                    .execution_options(synchronize_session=False)
+                )
+            )
         audit.record(
             s,
             tenant_id=tenant_id,
