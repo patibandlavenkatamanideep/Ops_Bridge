@@ -131,3 +131,18 @@ def test_a_reused_idempotency_key_must_carry_the_same_request(stack) -> None:  #
     assert again.json()["id"] == first.json()["id"]
     other = new_case(st, {**body, "title": "A different problem"}, key="intake-7")
     assert other.status_code == 409 and other.json()["error"]["code"] == "idempotency_key_reused"
+
+    # A replay is recognised by its key and request even after the case learned its PO from
+    # the invoice; another key for the same invoice is a duplicate, not a replay.
+    inv = {"title": "Invoice INV-9001 blocked", "invoice_number": "INV-9001"}
+    created = new_case(st, inv, key="form-1")
+    assert created.status_code == 201
+    investigate(st, "furn-investigator", ORG, created.json()["id"])
+    case = get(st, "furn-investigator", f"{T}/cases/{created.json()['id']}").json()
+    assert case["po_number"] == "PO-1001"
+    replay = new_case(st, inv, key="form-1")
+    assert replay.status_code == 200 and replay.json()["id"] == created.json()["id"]
+    second_form = new_case(st, inv, key="form-2")
+    assert (
+        second_form.status_code == 409 and second_form.json()["error"]["code"] == "duplicate_case"
+    )
