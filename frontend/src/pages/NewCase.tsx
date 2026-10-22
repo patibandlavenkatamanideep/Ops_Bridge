@@ -10,7 +10,7 @@ export function NewCase() {
   const qc = useQueryClient();
   // One key per form instance so a double submit returns the same case.
   const idempotencyKey = useRef(crypto.randomUUID());
-  const [form, setForm] = useState({ title: "", description: "", invoice_number: "", po_number: "" });
+  const [form, setForm] = useState({ title: "", description: "", invoice_number: "", po_number: "", supplier_id: "" });
   const mutation = useMutation<CaseOut, ApiError, CaseCreate>({
     mutationFn: (body) =>
       api<CaseOut>(tenantPath(tenant, "/cases"), {
@@ -24,18 +24,25 @@ export function NewCase() {
     },
   });
 
-  function submit(e: FormEvent) {
-    e.preventDefault();
+  function send(confirmDistinct: boolean) {
     mutation.mutate({
       schema_version: 1,
       title: form.title,
       description: form.description,
       invoice_number: form.invoice_number || null,
       po_number: form.po_number || null,
+      supplier_id: form.supplier_id || null,
+      confirm_distinct: confirmDistinct,
     });
   }
 
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    send(false);
+  }
+
   const duplicateId = mutation.error?.code === "duplicate_case" ? mutation.error.details.existing_case_id : null;
+  const similar = mutation.error?.code === "possible_duplicate" ? mutation.error.details : null;
 
   return (
     <section aria-labelledby="new-case-title">
@@ -57,6 +64,11 @@ export function NewCase() {
                  onChange={(e) => setForm({ ...form, po_number: e.target.value })} />
         </label>
         <label>
+          Supplier ID (optional; needed when two suppliers use the same invoice number)
+          <input maxLength={100} value={form.supplier_id}
+                 onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} />
+        </label>
+        <label>
           What is blocked and why do you think so?
           <textarea rows={4} maxLength={5000} value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -66,6 +78,18 @@ export function NewCase() {
             <div className="state state-error" role="alert">
               A case already exists for this invoice.{" "}
               {duplicateId ? <Link to={`/t/${tenant}/cases/${String(duplicateId)}`}>Open the existing case</Link> : null}
+            </div>
+          ) : mutation.error.code === "possible_duplicate" ? (
+            <div className="state state-error" role="alert">
+              <p>
+                {similar?.existing_invoice_number
+                  ? <>A case exists for invoice <code>{String(similar.existing_invoice_number)}</code>, which differs only in punctuation, spacing or leading zeros.{" "}
+                      <Link to={`/t/${tenant}/cases/${String(similar.existing_case_id)}`}>Open it</Link></>
+                  : "A case exists for an invoice number that differs only in punctuation, spacing or leading zeros."}
+              </p>
+              <button type="button" className="button secondary" disabled={mutation.isPending} onClick={() => send(true)}>
+                It is a different invoice: create the case
+              </button>
             </div>
           ) : (
             <ErrorState error={mutation.error} />
