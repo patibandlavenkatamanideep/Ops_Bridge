@@ -14,7 +14,7 @@ from opsbridge.auth.permissions import Forbidden, Principal, require
 from opsbridge.domain.records import SourceRef
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.records import CORRECTABLE_FIELDS
-from opsbridge.evidence.storage import ArtifactStore
+from opsbridge.evidence.storage import ArtifactIntegrityError, ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Artifact,
@@ -468,6 +468,10 @@ def correct_field(
         }
 
 
+class EvidenceIntegrityError(Exception):
+    """A stored original no longer matches its recorded digest."""
+
+
 def raw_document(
     db: Database, store: ArtifactStore, p: Principal, case_id: uuid.UUID, version_id: uuid.UUID
 ) -> tuple[bytes, str, str]:
@@ -478,7 +482,10 @@ def raw_document(
         art = s.get(Artifact, version.raw_artifact_id) if version.raw_artifact_id else None
         if art is None or art.storage_key is None or art.deleted_at is not None:
             raise NotFound("original (withheld or deleted by retention policy)")
-        data = store.get(p.tenant_id, art.storage_key)
+        try:
+            data = store.get(p.tenant_id, art.storage_key)
+        except ArtifactIntegrityError as exc:  # never serve altered evidence as the original
+            raise EvidenceIntegrityError(str(version.id)) from exc
         name = version.safe_filename or f"{doc.kind}-v{version.version_no}"
         audit.record(
             s,
