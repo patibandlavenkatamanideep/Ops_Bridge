@@ -249,6 +249,30 @@ def test_self_approval_is_rejected_by_separation_of_duties(stack) -> None:  # ty
     assert approve(st, case_id, prop).status_code == 200
 
 
+def test_the_server_says_who_may_decide_a_proposal_and_why_not(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    """Review finding F18: the client hid approval from any author and judged expiry by the
+    time the page was rendered; the server now states each viewer's reason."""
+    st = stack
+    case_id, prop = prepared(st, "INV-9001", author="multi-member")  # investigator + approver
+
+    def blocked(who: str) -> Any:
+        items = get(st, who, f"{T}/cases/{case_id}/proposals").json()["items"]
+        return next(i for i in items if i["id"] == prop["id"])["decision_blocked"]
+
+    assert blocked("furn-approver") is None
+    assert blocked("multi-member") == "separation_of_duties"  # the author, under this policy
+    assert blocked("furn-investigator") == "no_permission"
+    assert blocked("furn-approver2") == "out_of_scope"
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, ORG))) as s:
+        s.execute(
+            text("UPDATE proposals SET expires_at = now() - interval '1 second' WHERE id = :p"),
+            {"p": prop["id"]},
+        )
+    assert blocked("furn-approver") == "expired"
+
+
 def test_approver_scope_and_role_are_enforced(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(st, "INV-9005")
