@@ -31,7 +31,7 @@ from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest
 from opsbridge.evidence.parsers import OcrSettings
-from opsbridge.evidence.records import load_match_input, source_manifest
+from opsbridge.evidence.records import current_invoices, load_match_input, source_manifest
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
@@ -160,6 +160,7 @@ def run_investigation(
             "case_id": str(case.id),
             "invoice_number": case.invoice_number,
             "po_number": case.po_number,
+            "supplier_id": case.supplier_id,
             "case_number": case.case_number,
         }
         tenant_slug, pack_id = tenant.slug, tenant.pack_id
@@ -328,13 +329,10 @@ def _collect(
             unavailable.append(f"invoice {invoice_no}")
         if invoice_no:
             with deps.db.session(_ctx(tenant_id)) as s:
-                found = s.execute(
-                    select(InvoiceRecord.po_number).where(
-                        InvoiceRecord.invoice_number == invoice_no,
-                        InvoiceRecord.superseded_at.is_(None),
-                    )
-                ).scalar()
-            po_no = found or po_no
+                found = current_invoices(s, invoice_no, case.get("supplier_id"))
+                # Learn the PO from the invoice only when exactly one invoice is meant.
+                if len(found) == 1 and found[0].po_number:
+                    po_no = found[0].po_number
         if po_no:
             if not _ingest_record(
                 deps,
@@ -453,7 +451,11 @@ def _reconcile(
     with deps.db.session(_ctx(tenant_id)) as s:
         # Taken before matching reads anything, so any later change makes this result stale.
         state = capture(
-            s, uuid.UUID(case["case_id"]), case["invoice_number"], collected.get("po_number")
+            s,
+            uuid.UUID(case["case_id"]),
+            case["invoice_number"],
+            collected.get("po_number"),
+            case.get("supplier_id"),
         )
         return {**_match(s, case, policy_out, collected), "evidence_state": state}
 
@@ -515,8 +517,28 @@ def _match(
             "corrections": [],
             "policy_ref": policy.ref,
         }
-    loaded = load_match_input(s, case["invoice_number"], collected.get("po_number"))
+    loaded = load_match_input(
+        s, case["invoice_number"], collected.get("po_number"), case.get("supplier_id")
+    )
     version_ids = sorted(str(v) for v in loaded.version_ids)
+    if loaded.ambiguous_suppliers:
+        findings.append(
+            _manual_finding(
+                "invoice_identity_ambiguous",
+                f"Invoice {case['invoice_number']} exists for more than one supplier ("
+                + ", ".join(loaded.ambiguous_suppliers)
+                + "). Name the supplier on the case; no invoice was matched.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": version_ids,
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
     if loaded.match_input is None:
         reasons = collected.get("unavailable") or loaded.missing
         needs_review_docs = [
