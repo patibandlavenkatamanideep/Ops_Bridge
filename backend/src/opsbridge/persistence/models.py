@@ -744,6 +744,9 @@ class InvestigationVersion(Base):
     rules_version: Mapped[str] = mapped_column(String(48))
     source_manifest: Mapped[list[Any]] = mapped_column(JSONB)
     source_manifest_digest: Mapped[str] = mapped_column(String(71))
+    # {invoice_number, po_number, digest} of the evidence before matching read it
+    # (services/freshness.py); NULL on investigations recorded before migration 0012.
+    evidence_state: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = created()
     __table_args__ = (
         _tenant_unique("investigation_versions"),
