@@ -29,7 +29,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    env: Literal["development", "test", "production"] = "development"
+    # staging: deployed, with synthetic data (the purchasing simulator is allowed);
+    # production: deployed, real data. Both refuse development defaults (_deployment_guards).
+    env: Literal["development", "test", "staging", "production"] = "development"
 
     db_host: str = "localhost"
     db_port: int = 5433
@@ -159,29 +161,55 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _production_guards(self) -> Settings:
-        if self.env != "production":
+    def _deployment_guards(self) -> Settings:
+        """A deployed environment refuses to start with development defaults. These are
+        settings checks only: they do not show that the bucket encrypts, the proxy is the load
+        balancer or the secrets are rotated (docs/deployment.md)."""
+        if not self.deployed:
             return self
+        env = self.env
         problems: list[str] = []
         if urlparse(self.public_url).scheme != "https":
-            problems.append("public_url must use https in production")
+            problems.append(f"public_url must use https in {env}")
         if urlparse(self.oidc_issuer).scheme != "https":
-            problems.append("oidc_issuer must use https in production")
+            problems.append(f"oidc_issuer must use https in {env}")
         if "localhost" in self.oidc_issuer or "127.0.0.1" in self.oidc_issuer:
-            problems.append("the local development identity provider is not allowed in production")
-        if self.demo_user_password is not None and self.demo_user_password.get_secret_value():
-            problems.append("demo user credentials must not be configured in production")
+            problems.append(f"the local development identity provider is not allowed in {env}")
         if self.simulator_fault_controls:
-            problems.append("simulator fault-injection controls must be disabled in production")
+            problems.append(f"simulator fault-injection controls must be disabled in {env}")
         if len(self.session_secret.get_secret_value()) < 32:
-            problems.append("session_secret must be at least 32 characters in production")
+            problems.append(f"session_secret must be at least 32 characters in {env}")
+        if not self.artifact_s3_bucket:
+            problems.append(f"the local artifact store is not allowed in {env}; set a bucket")
+        elif self.artifact_s3_sse not in ("AES256", "aws:kms"):
+            problems.append(f"artifact storage must request server-side encryption in {env}")
+        if not self.quotas_enabled:
+            problems.append(f"quotas must be enabled in {env}")
+        if not self.rate_limit_shared:
+            problems.append(f"the rate limit must be shared across instances in {env}")
+        if not self.trusted_proxies:
+            problems.append(
+                f"trusted_proxies must name the load balancer in {env}, or every client is "
+                "rate-limited under its address"
+            )
+        if env == "production":
+            if self.demo_user_password is not None and self.demo_user_password.get_secret_value():
+                problems.append("demo user credentials must not be configured in production")
+            problems.append(
+                "purchasing data would come from the simulator: no production purchasing-source "
+                "adapter is implemented yet (use env=staging with synthetic data)"
+            )
         if problems:
             raise ConfigurationError("; ".join(problems))
         return self
 
     @property
+    def deployed(self) -> bool:
+        return self.env in ("staging", "production")
+
+    @property
     def secure_cookies(self) -> bool:
-        return self.env == "production" or urlparse(self.public_url).scheme == "https"
+        return self.deployed or urlparse(self.public_url).scheme == "https"
 
     def database_url(self, role: DbRole, database: str | None = None) -> str:
         user = f"opsbridge_{role}"
