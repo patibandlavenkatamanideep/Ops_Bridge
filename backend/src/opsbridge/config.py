@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -136,6 +137,25 @@ class Settings(BaseSettings):
             value: Path = getattr(self, name)
             if not value.is_absolute():
                 object.__setattr__(self, name, (REPO_ROOT / value).resolve())
+        return self
+
+    @model_validator(mode="after")
+    def _amounts_are_finite(self) -> Settings:
+        """The spend ceiling and prices reserve real money: refuse what cannot be compared."""
+        for name in (
+            "live_spend_ceiling_usd",
+            "anthropic_price_input_per_mtok_usd",
+            "anthropic_price_output_per_mtok_usd",
+        ):
+            raw = getattr(self, name)
+            if raw is None:
+                continue
+            try:
+                value = Decimal(raw)
+            except InvalidOperation as exc:
+                raise ValueError(f"{name} is not a decimal amount: {raw!r}") from exc
+            if not value.is_finite() or value < 0:
+                raise ValueError(f"{name} must be a finite, non-negative amount, got {raw!r}")
         return self
 
     @model_validator(mode="after")
