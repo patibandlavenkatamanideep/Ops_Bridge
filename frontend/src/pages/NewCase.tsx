@@ -64,10 +64,11 @@ export function NewCase() {
                  onChange={(e) => setForm({ ...form, po_number: e.target.value })} />
         </label>
         <label>
-          Supplier ID (optional; needed when two suppliers use the same invoice number)
-          <input maxLength={100} value={form.supplier_id}
+          Supplier ID (optional)
+          <input maxLength={100} value={form.supplier_id} aria-describedby="supplier-hint"
                  onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} />
         </label>
+        <p id="supplier-hint" className="muted small">Needed when two suppliers use the same number.</p>
         <label>
           What is blocked and why do you think so?
           <textarea rows={4} maxLength={5000} value={form.description}
