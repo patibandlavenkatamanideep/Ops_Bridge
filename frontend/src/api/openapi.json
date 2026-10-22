@@ -2042,6 +2042,24 @@
             "title": "Canonicalization",
             "type": "string"
           },
+          "decision_blocked": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_awaiting_approval",
+                  "expired",
+                  "no_permission",
+                  "out_of_scope",
+                  "separation_of_duties"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Blocked"
+          },
           "destination": {
             "anyOf": [
               {

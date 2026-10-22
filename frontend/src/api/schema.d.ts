@@ -1183,6 +1183,8 @@ export interface components {
             author_kind: string;
             /** Canonicalization */
             canonicalization: string;
+            /** Decision Blocked */
+            decision_blocked?: ("not_awaiting_approval" | "expired" | "no_permission" | "out_of_scope" | "separation_of_duties") | null;
             /** Destination */
             destination: {
                 [key: string]: string;
