@@ -231,6 +231,11 @@
       },
       "CaseCreateIn": {
         "properties": {
+          "confirm_distinct": {
+            "default": false,
+            "title": "Confirm Distinct",
+            "type": "boolean"
+          },
           "description": {
             "default": "",
             "maxLength": 5000,
@@ -266,6 +271,18 @@
             "default": 1,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           },
           "title": {
             "maxLength": 300,
@@ -371,6 +388,17 @@
             "title": "Status",
             "type": "string"
           },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -387,6 +415,7 @@
           "description",
           "invoice_number",
           "po_number",
+          "supplier_id",
           "status",
           "discrepancy_types",
           "evidence_readiness",

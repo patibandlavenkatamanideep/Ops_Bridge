@@ -625,6 +625,11 @@ export interface components {
         /** CaseCreateIn */
         CaseCreateIn: {
             /**
+             * Confirm Distinct
+             * @default false
+             */
+            confirm_distinct: boolean;
+            /**
              * Description
              * @default
              */
@@ -639,6 +644,8 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /** Supplier Id */
+            supplier_id?: string | null;
             /** Title */
             title: string;
         };
@@ -676,6 +683,8 @@ export interface components {
             schema_version: 1;
             /** Status */
             status: string;
+            /** Supplier Id */
+            supplier_id: string | null;
             /** Title */
             title: string;
             /** Updated At */
