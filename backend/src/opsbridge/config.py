@@ -123,6 +123,9 @@ class Settings(BaseSettings):
     github_live_writes_authorized: bool = False
 
     worker_lease_seconds: int = 30
+    # A step that runs longer stops renewing its job's lease: another worker may take the
+    # run over, and the stuck worker's late writes are refused (fencing).
+    investigation_step_limit_seconds: int = 300
     worker_poll_seconds: float = 1.0
     connector_timeout_seconds: float = 5.0
 
