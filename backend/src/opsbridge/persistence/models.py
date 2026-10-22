@@ -833,6 +833,10 @@ class Proposal(Base):
     investigation_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     policy_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     policy_ref: Mapped[str] = mapped_column(String(100))
+    # Where the action goes (no credentials) and, for external actions, the text that leaves
+    # OpsBridge; both are part of the approved payload. NULL on proposals made before 0011.
+    destination: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    outbound: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     required_permission: Mapped[str] = mapped_column(String(64))
     payload_digest: Mapped[str] = mapped_column(String(71))
     canonicalization: Mapped[str] = mapped_column(String(32))
