@@ -49,6 +49,7 @@ from opsbridge.connectors.tasks import (
     TaskConnector,
     TaskRequest,
 )
+from opsbridge.evidence.blobs import store_bytes
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
@@ -322,7 +323,7 @@ def _keep(
     if deps.store is None:
         return None
     data = canonical_json(payload).encode("utf-8")
-    key, sha = deps.store.put(tid, data)
+    key, sha = store_bytes(s, deps.store, tid, data)
     art = Artifact(
         tenant_id=tid,
         kind=kind,
