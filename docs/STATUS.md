@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-20 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-21 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -369,7 +369,8 @@ Phase 1 exit gate evidence:
   field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
 - Uploads are not malware-scanned. People join by an invitation link the administrator
   delivers (OpsBridge sends no email); acceptance trusts the identity provider's email
-  verification. Invitation addresses are not covered by retention.
+  verification. Invitation addresses are cleared by retention only if the tenant sets
+  `invitations_days`; users' own profile emails are not covered.
 - Browser tests add conversation notes and upload versions to the local demo case INV-9001.
 - A run of a different model mode is refused (409) while another run is active, instead of
   silently returning the active run (found by a browser test; fixed in Phase 3).
@@ -688,3 +689,25 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   refused); the accessibility scan covers the invitation form and page. `make verify` 15/15
   (unit 280 + 3 skipped, integration 153, browser 27); restore drill ok at revision 0008
   (row counts equal, every table with forced RLS).
+
+### Retention for invitation addresses (2026-10-21)
+- The invitations batch left a privacy gap: the invited address stayed on accepted, withdrawn
+  and expired invitations indefinitely. A new retention key `invitations_days` clears it,
+  counted from acceptance, withdrawal or (for an invitation never used) expiry. The row keeps
+  roles, status, dates and token hash, plus `email_cleared_at` and the reason
+  (`retention:invitations_days=N`); a cleared invitation leaves the tenant settings list. A
+  pending invitation that has not expired keeps its address, since accepting needs it.
+- The sweep runs as the worker role, which had no access to invitations. Migration 0009 gives
+  it a tenant-scoped RLS policy, SELECT, and UPDATE on the three address columns only; a check
+  constraint ties `email IS NULL` to `email_cleared_at`. (First draft of that constraint was
+  inverted and was rejected by PostgreSQL against existing rows; fixed before anything ran.)
+- Evidence: `test_invitations.py::test_retention_clears_the_address_only_after_an_invitation_is_closed_or_expired`
+  (real PostgreSQL, sweep through the API and worker): with 30 days, addresses closed or
+  expired 31 days ago are cleared, one withdrawn 29 days ago and an open one are kept; the
+  open one can still be accepted; a second sweep clears nothing; the worker sees no
+  invitations outside a tenant and cannot change their status. Breaking the sweep (ignoring
+  expiry; dropping the cutoff) or the settings-list filter makes it fail. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 154, browser 27); backup and restore drill ok at
+  revision 0009 (6305 rows, counts equal, every table with forced RLS).
+- Not covered: users' own profile emails (`users.email`, refreshed at sign-in) and backups
+  taken before a sweep.
