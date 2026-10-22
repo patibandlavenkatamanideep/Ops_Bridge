@@ -13,6 +13,7 @@ from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Forbidden, Principal, require
 from opsbridge.domain.records import SourceRef
 from opsbridge.evidence.citations import resolve_all
+from opsbridge.evidence.records import CORRECTABLE_FIELDS
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
@@ -362,6 +363,7 @@ def version_detail(
                     "locator": f.locator,
                     "method": f.method,
                     "status": f.status,
+                    "correctable": f.method != "ocr" and f.field_path in CORRECTABLE_FIELDS,
                     "note": f.note,
                     "corrections": by_field.get(f.id, []),
                 }
@@ -408,6 +410,12 @@ def correct_field(
                 "ocr_candidate",
                 "Values read by OCR are review candidates and are not used by the matching "
                 "rules. Record the confirmed value in the source system and re-run.",
+            )
+        if fld.field_path not in CORRECTABLE_FIELDS:
+            raise Conflict(
+                "not_correctable",
+                f"Matching does not use corrections to {fld.field_path}. Record the right value "
+                "in the source system and re-run.",
             )
         last = s.execute(
             select(FieldCorrection)
