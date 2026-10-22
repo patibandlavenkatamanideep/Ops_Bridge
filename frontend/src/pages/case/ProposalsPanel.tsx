@@ -112,6 +112,8 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
   const [renderedAt] = useState(() => Date.now());
   const expired = new Date(p.expires_at).getTime() < renderedAt;
   const params = p.parameters as Record<string, string>;
+  const out = p.outbound as Record<string, string> | null;
+  const dest = p.destination;
   return (
     <li className={`finding finding-${p.status === "awaiting_approval" ? "needs_review" : "informational"}`}>
       <div className="finding-head">
@@ -123,6 +125,9 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
       <dl className="facts">
         {params.title && (<><dt>Title</dt><dd>{params.title}</dd></>)}
         {params.assignee_group && (<><dt>Assignee group</dt><dd>{params.assignee_group}</dd></>)}
+        {dest && dest.connector !== "opsbridge_local" && (
+          <><dt>Sends to</dt><dd>{dest.connector} · {dest.organization ?? dest.repository}</dd></>
+        )}
         <dt>Affects</dt>
         <dd>{p.affected_resources.join(", ")}</dd>
         <dt>Evidence</dt>
@@ -136,7 +141,14 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
         <dt>Expires</dt>
         <dd>{new Date(p.expires_at).toLocaleString()} {expired && p.status === "awaiting_approval" ? "(expired)" : ""}</dd>
       </dl>
-      {params.body && <pre className="explanation draft-body">{params.body}</pre>}
+      {out ? (
+        <section aria-label="Text exactly as it will be sent">
+          <p className="muted small">Exactly as it will leave OpsBridge (after redaction); approval covers this text.</p>
+          <pre className="explanation draft-body">{`${out.title}\n\n${out.body}`}</pre>
+        </section>
+      ) : (
+        params.body && <pre className="explanation draft-body">{params.body}</pre>
+      )}
       {p.status === "awaiting_approval" && can(tenant, "proposal.decide") && (
         own ? (
           <p className="muted small">You authored this proposal; separation of duties requires another approver.</p>
