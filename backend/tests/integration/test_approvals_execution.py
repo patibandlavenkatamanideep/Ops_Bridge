@@ -17,9 +17,18 @@ import pytest
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.exc import IntegrityError
 
+from opsbridge.canonical import digest
 from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector, TaskRequest
 from opsbridge.persistence.db import Database, DbContext, make_engine
-from opsbridge.persistence.models import ApprovalDecision, Attempt, Operation, PolicyVersion
+from opsbridge.persistence.models import (
+    ApprovalDecision,
+    Attempt,
+    Operation,
+    PolicyVersion,
+    Proposal,
+)
+from opsbridge.privacy.redaction import RedactionResult
+from opsbridge.services import proposals as proposals_svc
 from opsbridge.workflow import execution, jobs
 from opsbridge.workflow.execution import LeaseLost, dispatch
 from opsbridge.workflow.worker import Worker
@@ -742,6 +751,109 @@ def test_a_create_that_landed_is_confirmed_even_after_the_approval_expires(
     assert len(remote_tasks(st, op)) == 1
 
 
+# --- the approved destination and outgoing text --------------------------------------------
+
+IT = "/api/v1/tenants/demo-it"
+
+
+def _it_proposal(st: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """An IT-tenant follow-up proposal; that tier may use the simulator or GitHub."""
+    who = st["actors"]["it-investigator"]
+    case_id = open_case(st, "it-investigator", "demo-it", "INV-7002")
+    run = f"{IT}/cases/{case_id}/investigations"
+    assert call(st["client"], who, "POST", run, json={"model_mode": "rules_only"}).status_code in (
+        200,
+        202,
+    )
+    drain(st)
+    r = call(st["client"], who, "POST", f"{IT}/cases/{case_id}/proposals", json={})
+    assert r.status_code == 201, r.text
+    return case_id, r.json()
+
+
+def _approve_it(st: dict[str, Any], case_id: str, prop: dict[str, Any]) -> httpx.Response:
+    return call(
+        st["client"],
+        st["actors"]["it-approver"],
+        "POST",
+        f"{IT}/cases/{case_id}/proposals/{prop['id']}/decision",
+        json={
+            "decision": "approve",
+            "version": prop["version"],
+            "payload_digest": prop["payload_digest"],
+        },
+    )
+
+
+def _set_it_connector(app_db: Database, migrator_engine: Engine, name: str) -> None:
+    """What a tenant administrator's settings change does."""
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, "demo-it"))) as s:
+        assert (
+            s.execute(text("UPDATE tenant_settings SET task_connector = :n"), {"n": name}).rowcount
+            == 1
+        )  # type: ignore[attr-defined]
+
+
+def test_a_settings_change_after_drafting_cannot_redirect_the_approval(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = _it_proposal(st)
+    _set_it_connector(app_db, migrator_engine, "github_issues")
+    r = _approve_it(st, case_id, prop)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "stale_inputs", r.text
+    assert "the destination changed" in " ".join(r.json()["error"]["details"]["reasons"])
+    assert prop["destination"] == {"connector": "sim_tasks", "organization": "demo-it"}
+    assert prop["outbound"]["title"] and "sim_tasks (demo-it)" in prop["effect_summary"]
+
+
+@pytest.mark.parametrize("change", ["connector", "redaction"])
+def test_dispatch_refuses_when_destination_or_outgoing_text_changed_after_approval(
+    stack, app_db: Database, migrator_engine: Engine, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = _it_proposal(st)
+    assert _approve_it(st, case_id, prop).status_code == 200
+    if change == "connector":
+        _set_it_connector(app_db, migrator_engine, "github_issues")
+    else:  # redaction rules changed: the approved text is no longer what would be sent
+        monkeypatch.setattr(
+            proposals_svc, "redact", lambda t, keep=(): RedactionResult(t + " [rule 3]", {})
+        )
+    drain(st)
+    r = get(st, "it-approver", f"{IT}/cases/{case_id}/operations")
+    [op] = r.json()["items"]
+    assert (op["status"], op["failure_category"]) == (
+        "cancelled_before_dispatch",
+        "precondition_failed",
+    )
+    assert op["attempts"] == []
+    assert list(st["store"].find_tasks("demo-it", f"opsbridge-op:{op['operation_key']}")) == []
+
+
+def test_a_proposal_from_before_destination_binding_must_be_proposed_again(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = prepared(st, "INV-9001")
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, ORG))) as s:
+        pr = s.get(Proposal, uuid.UUID(prop["id"]))
+        assert pr is not None
+        pr.destination = pr.outbound = None  # as stored before migration 0011
+        pr.payload_digest = old_digest = digest(proposals_svc.payload_of(pr))
+    r = approve(st, case_id, {**prop, "payload_digest": old_digest})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "stale_inputs", r.text
+    assert "before destinations were bound" in " ".join(r.json()["error"]["details"]["reasons"])
+
+
+def _tenant_of(migrator_engine: Engine, slug: str) -> uuid.UUID:
+    with migrator_engine.begin() as conn:
+        tid: uuid.UUID = conn.execute(
+            text("SELECT id FROM tenants WHERE slug = :s"), {"s": slug}
+        ).scalar_one()
+    return tid
+
+
 def test_local_review_note_runs_through_the_same_ledger(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(
@@ -875,3 +987,11 @@ def test_attempt_requests_and_responses_are_kept_and_match_their_digests(
                 resp is not None and resp.kind == "tool_response" and resp.sha256 == a.output_digest
             )
             assert json.loads(store.get(tid, resp.storage_key))["remote_ref"] == op["remote_ref"]
+        # The dispatch request is the complete request as sent, body and destination included.
+        [create] = [a for a in attempts if a.kind == "dispatch"]
+        req = s.get(Artifact, create.input_artifact_id)
+        assert req is not None
+        sent = json.loads(store.get(tid, req.storage_key))
+    [task] = remote_tasks(st, op)
+    assert sent["body"] == task["body"] and sent["title"] == task["title"]
+    assert sent["destination"] == {"connector": "sim_tasks", "organization": ORG}
