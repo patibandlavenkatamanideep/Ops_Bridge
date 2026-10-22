@@ -251,6 +251,7 @@ def _ingest_record(
     case_id: str,
     linked: list[dict[str, Any]],
     problems: list[str],
+    refused: list[str],
 ) -> bool:
     spec = pack.sources.get(record_type)
     if spec is None or spec.collection is None:
@@ -276,6 +277,7 @@ def _ingest_record(
             )
         except IngestRejected as exc:
             problems.append(f"{record_type} {key}: rejected ({exc.reason})")
+            refused.append(f"{record_type} {key}: {exc.reason}")
             return False
         s.execute(
             text(
@@ -307,11 +309,21 @@ def _collect(
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
     unavailable: list[str] = []
+    refused: list[str] = []  # current source documents OpsBridge cannot read at all
     try:
         invoice_no = case["invoice_number"]
         po_no = case["po_number"]
         if invoice_no and not _ingest_record(
-            deps, tenant_id, pack, client, "invoice", invoice_no, case["case_id"], linked, problems
+            deps,
+            tenant_id,
+            pack,
+            client,
+            "invoice",
+            invoice_no,
+            case["case_id"],
+            linked,
+            problems,
+            refused,
         ):
             unavailable.append(f"invoice {invoice_no}")
         if invoice_no:
@@ -334,6 +346,7 @@ def _collect(
                 case["case_id"],
                 linked,
                 problems,
+                refused,
             ):
                 unavailable.append(f"purchase order {po_no}")
             follow_ups: tuple[RecordType, ...] = (
@@ -356,12 +369,14 @@ def _collect(
                         case["case_id"],
                         linked,
                         problems,
+                        refused,
                     )
     finally:
         client.close()
     return {
         "documents": linked,
         "unavailable": unavailable,
+        "refused": refused,
         "problems": problems,
         "po_number": po_no,
     }
@@ -475,6 +490,26 @@ def _match(
             "outcome": "needs_information",
             "findings": findings,
             "recommendation": None,
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    if collected.get("refused"):
+        # The source's current document could not be read; earlier extractions of it are
+        # history, not current facts, so nothing is matched until a readable version arrives.
+        findings.append(
+            _manual_finding(
+                "source_document_unreadable",
+                "The source system's current document could not be read ("
+                + "; ".join(collected["refused"])[:400]
+                + "). Earlier extractions were not used; a person must review it.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
             "uncertainty": uncertainty,
             "version_ids": [],
             "corrections": [],
