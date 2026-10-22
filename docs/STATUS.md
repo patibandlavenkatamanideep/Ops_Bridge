@@ -711,3 +711,34 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   revision 0009 (6305 rows, counts equal, every table with forced RLS).
 - Not covered: users' own profile emails (`users.email`, refreshed at sign-in) and backups
   taken before a sweep.
+
+### Agent tool calls replay from recordings (2026-10-21)
+- Gap against brief §14: offline replay served model responses from the cassette but re-ran
+  the agent's evidence search against the frozen corpus (OB-13 limit). Each replay produced
+  a new response digest for the same call, and a replay failure inside the tool would have
+  been recorded as an ordinary tool error.
+- Now tool calls are recorded in `tool-cassette.json` beside the model cassette (keyed by
+  case, mode, repeat and occurrence; checked against tool, version and argument digest;
+  responses checked against their digests on load). Replay serves the recorded response
+  without running the tool and labels it `recorded` (trial log, EvalSeal `tool_acl` and
+  `tool_responses`); recorded denials and errors replay as such. Recorded hits are re-bound
+  to the replay database's ids by document-version content digest. A missing, diverged or
+  unbindable call fails the run: `ReplayFailure` now lives in `agents/contracts.py` and the
+  agent step re-raises it. The tool cassette is bound in the sealed record.
+- The held-out recording is never re-recorded, so its tool cassette (and the latest
+  validation recording's) was written by `opsbridge.cli eval-backfill-tools` from the tool
+  artifacts those runs kept under `var/eval/`; every entry matches the argument and response
+  digests in the run's sealed trial log, and the command refuses otherwise. Without it,
+  `make eval-replay-check` failed closed on `fur-heldout-222` (checked before the backfill).
+- Evidence: `test_evaluation.py` (2 new): replay with the search patched to raise still
+  reproduces the verdict and the recorded response digest, labelled `recorded`; a missing
+  entry, other arguments, another tool version, and a hit for a document the case lacks each
+  fail with `ReplayFailure`, produce no explanation and record no tool call; an edited
+  response is refused on load; a recorded tool error replays as that error.
+  `tests/evaluation/test_tool_cassette_backfill.py` (2). Removing the re-raise, executing
+  the tool in replay, or skipping the re-binding each makes a test fail.
+  `make eval-offline`: `heldout-replay-20261022T012711Z` and
+  `security-replay-20261022T012742Z` reproduce case by case (held-out rules_only 36/40,
+  mock 36/40; security 7/7, 7/7); `fur-heldout-222` shows `recorded` with the sealed
+  digest `sha256:e4a49698…`; 26 records verify. `make verify` 15/15 (unit 282 + 3 skipped,
+  integration 156, browser 27).
