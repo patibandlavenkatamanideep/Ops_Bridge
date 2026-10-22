@@ -1,5 +1,5 @@
 import { useInfiniteQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { ApiError, api, tenantPath, type QueuePage } from "../api/client";
 import { EmptyState, ErrorState, Loading } from "../components/States";
@@ -22,13 +22,14 @@ export function CaseQueue() {
   const { can } = useSession();
   const [status, setStatus] = useState("");
   const [search, setSearch] = useState("");
+  const term = useDebounced(search.trim(), 300); // one request per pause in typing, not per key
   const query = useInfiniteQuery<QueuePage, ApiError>({
-    queryKey: ["cases", tenant, status, search],
+    queryKey: ["cases", tenant, status, term],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => {
       const params = new URLSearchParams({ limit: "25" });
       if (status) params.set("status", status);
-      if (search.trim()) params.set("q", search.trim());
+      if (term) params.set("q", term);
       if (pageParam) params.set("cursor", pageParam as string);
       return api<QueuePage>(tenantPath(tenant, `/cases?${params}`), { signal });
     },
@@ -120,4 +121,13 @@ export function CaseQueue() {
       )}
     </section>
   );
+}
+
+function useDebounced<T>(value: T, delayMs: number): T {
+  const [settled, setSettled] = useState(value);
+  useEffect(() => {
+    const timer = setTimeout(() => setSettled(value), delayMs);
+    return () => clearTimeout(timer);
+  }, [value, delayMs]);
+  return settled;
 }
