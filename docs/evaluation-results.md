@@ -83,6 +83,17 @@ explanations are labelled `model:replay`, responses `mocked`. A missing or diver
 recording fails the run before anything is sealed
 (`tests/integration/test_evaluation.py`).
 
+Until 2026-10-21 replay re-ran the agent's evidence search against the frozen corpus
+instead of serving the recorded response. Tool calls now replay from a tool cassette. The
+held-out and validation recordings predate it; their tool cassettes were written afterwards
+(`opsbridge.cli eval-backfill-tools`) from the tool artifacts those runs kept, and each
+entry matches the argument and response digests in the run's sealed trial log.
+`heldout-replay-20261022T012711Z` (and `security-replay-20261022T012742Z`) reproduce their
+recordings case by case; the held-out case with a search (`fur-heldout-222`, 3 repeats)
+now shows the call as `recorded` with the same response digest as the recording
+(`sha256:e4a49698…`), where earlier replays produced a new digest each time. 26 sealed
+records verify.
+
 Since 2026-10-19 a replay also fails when any per-case verdict differs from the recorded run
 (exit 5), and `make eval-replay-check` runs the same comparison without sealing anything; it
 is a `make verify` gate and runs in hosted CI. It was added after a replay on 2026-10-19 no
