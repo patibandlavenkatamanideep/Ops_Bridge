@@ -44,7 +44,7 @@ from opsbridge.canonical import digest
 from opsbridge.simulator.scenarios import Scenario
 
 from .bench import BenchEnvironment
-from .cassette import RecordingAdapter, ReplayFailure
+from .cassette import TOOL_CASSETTE, RecordingAdapter, ReplayFailure
 
 TOOL_DEFINITIONS = [
     {
@@ -58,18 +58,21 @@ TOOL_DEFINITIONS = [
 DENIED_TOOLS = ["create_follow_up_task", "get_follow_up_task", "reconcile_operation"]
 
 
-def tool_acl() -> dict[str, Any]:
+def tool_acl(response_mode: str = "live") -> dict[str, Any]:
     return {
         "schema": "evalseal.agent-tools/1",
-        "response_mode": "live",
+        "response_mode": response_mode,
         "tools": TOOL_DEFINITIONS,
         "allowed": [{"name": t["name"], "definition_sha256": digest(t)} for t in TOOL_DEFINITIONS],
         "denied": DENIED_TOOLS,
-        "note": "live = executed during the run against the local, frozen synthetic evidence store",
+        "note": "live = executed during the run against the local, frozen synthetic evidence "
+        "store; recorded = served from the recording's tool cassette, the tool was not executed",
     }
 
 
-def tool_responses(trials: list[dict[str, Any]], acl_sha: str) -> dict[str, Any]:
+def tool_responses(
+    trials: list[dict[str, Any]], acl_sha: str, response_mode: str = "live"
+) -> dict[str, Any]:
     calls = [
         {
             "case_id": t["case_id"],
@@ -87,7 +90,7 @@ def tool_responses(trials: list[dict[str, Any]], acl_sha: str) -> dict[str, Any]
     ]
     return {
         "schema": "evalseal.agent-tool-responses/1",
-        "response_mode": "live",
+        "response_mode": response_mode,
         "manifest_sha256": acl_sha,
         "calls": calls,
     }
@@ -124,9 +127,11 @@ def run_mode(
     run_dir.mkdir(parents=True, exist_ok=True)
     trial_log = run_dir / f"trials-{mode}.jsonl"
     trial_log.write_text("", encoding="utf-8")
+    tool_mode = getattr(adapter, "tool_response_mode", "live")
     acl_path = run_dir / "tool-acl.json"
-    acl_path.write_text(json.dumps(tool_acl(), indent=1, sort_keys=True) + "\n", encoding="utf-8")
-    acl_sha = digest(tool_acl())
+    acl = tool_acl(tool_mode)
+    acl_path.write_text(json.dumps(acl, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+    acl_sha = digest(acl)
     responses_path = run_dir / f"tool-responses-{mode}.json"
     prompts = {
         s.id: json.dumps(
@@ -151,7 +156,7 @@ def run_mode(
         with trial_log.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(result, sort_keys=True) + "\n")
         responses_path.write_text(
-            json.dumps(tool_responses(trials, acl_sha), indent=1, sort_keys=True) + "\n",
+            json.dumps(tool_responses(trials, acl_sha, tool_mode), indent=1, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         if isinstance(adapter, RecordingAdapter) and cassette_rel:
@@ -174,6 +179,9 @@ def run_mode(
     }
     if mode != "rules_only" and cassette_rel:
         artifacts["opsbridge_model_cassette"] = cassette_rel
+        tools = Path(cassette_rel).parent / TOOL_CASSETTE
+        if isinstance(adapter, RecordingAdapter) or tools.exists():  # recording writes one
+            artifacts["opsbridge_tool_cassette"] = str(tools)
     if isinstance(adapter, RecordingAdapter) and cassette_rel and mode != "rules_only":
         Path(cassette_rel).parent.mkdir(parents=True, exist_ok=True)
     record = run_eval(
