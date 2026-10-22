@@ -150,6 +150,8 @@ class BenchEnvironment:
         deps = build_investigation_deps(self.settings, self.worker_db)
         if self.model_adapter is not None:
             deps.adapter_overrides = {"mock": self.model_adapter}
+        if hasattr(self.model_adapter, "call_tool"):  # a cassette also records/replays tools
+            deps.tool_cassette = self.model_adapter
         self.worker = Worker(db=self.worker_db, settings=self.settings)
 
         def investigate(job: ClaimedJob) -> None:
@@ -244,6 +246,7 @@ class BenchEnvironment:
                     "input_sha256": ti.input_digest,
                     "response_sha256": ti.response_digest,
                     "outcome": ti.outcome,
+                    "origin": ti.origin,  # live, or recorded when replay served it
                 }
                 for ti in sess.execute(
                     select(ToolInvocation)
