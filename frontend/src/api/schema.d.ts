@@ -1310,7 +1310,8 @@ export interface components {
              *       "raw_documents_days",
              *       "conversation_days",
              *       "model_artifacts_days",
-             *       "tool_artifacts_days"
+             *       "tool_artifacts_days",
+             *       "invitations_days"
              *     ]
              */
             retention_keys: string[];
