@@ -3,12 +3,15 @@
 Algorithm for one `dispatch_operation` job (delivery is at-least-once):
 
 1. Terminal operations are left alone (duplicate delivery is a no-op).
-2. A pending operation with cancellation requested → cancelled_before_dispatch.
-3. Pending → re-validate: proposal still approved and current, approval unexpired,
-   approver still authorized, evidence and policy unchanged. Failure → cancelled.
-4. Inspect prior attempts. An attempt still `started` within the lease window is
+2. Inspect prior attempts. An attempt still `started` within the lease window is
    in flight elsewhere → back off. An abandoned `started` attempt or an
    `ambiguous_failure` → RECONCILE before anything else.
+3. Every NEW write needs current eligibility: on the first dispatch, on a retry after a
+   definite failure, and after reconciliation proved an earlier write absent. Cancellation
+   requested → cancelled_before_dispatch; otherwise re-validate (proposal still approved and
+   current, approval unexpired, approver still authorized, evidence and policy unchanged),
+   failure → cancelled_before_dispatch. Recovering a write that may have landed (read-back,
+   reconciliation) is not a new write and is not refused: it was authorized when made.
 5. Reconciliation by connector capability:
    - strong lookup: exactly one marker match → confirmed; none → safe to create;
      more than one → outcome_unknown (duplicates exist; human review);
@@ -66,6 +69,7 @@ from . import jobs
 from .investigation import StepFailed
 
 EXECUTOR = "service:opsbridge-worker"
+LOCAL_CONNECTOR = "opsbridge-local/1"
 TERMINAL = frozenset({"confirmed", "failed", "outcome_unknown", "cancelled_before_dispatch"})
 
 
@@ -112,26 +116,6 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         ).scalar_one()
         if op.status in TERMINAL:
             return
-        if op.status == "pending_dispatch":
-            if op.cancellation == "requested":
-                _finish(
-                    s,
-                    op,
-                    "cancelled_before_dispatch",
-                    category="cancelled_by_user",
-                    cancellation="confirmed",
-                )
-                return
-            problems = _revalidate(s, op)
-            if problems:
-                _finish(
-                    s,
-                    op,
-                    "cancelled_before_dispatch",
-                    category="precondition_failed",
-                    detail="; ".join(problems),
-                )
-                return
         attempts = list(
             s.execute(
                 select(Attempt).where(Attempt.operation_id == op.id).order_by(Attempt.started_at)
@@ -150,6 +134,8 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         succeeded = [
             a for a in attempts if a.status == "succeeded" and a.kind == "dispatch" and a.remote_ref
         ]
+        if not succeeded and not needs_reconcile and _refused(s, op):
+            return  # nothing can have landed, so what follows would be a new write
         op.status = "executing"
         op.executed_by = EXECUTOR
         op.row_version += 1
@@ -167,7 +153,43 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         outcome = _reconcile(deps, job, snapshot, connector)
         if outcome in ("confirmed", "unknown"):
             return
+        if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
+            return
     _create(deps, job, snapshot, connector)
+
+
+def _refused(s: Session, op: Operation) -> bool:
+    """Finish the operation instead of a new write if it was cancelled or is no longer
+    eligible; True when finished."""
+    if op.cancellation == "requested":
+        _finish(
+            s,
+            op,
+            "cancelled_before_dispatch",
+            category="cancelled_by_user",
+            cancellation="confirmed",
+        )
+        return True
+    problems = _revalidate(s, op)
+    if problems:
+        _finish(
+            s,
+            op,
+            "cancelled_before_dispatch",
+            category="precondition_failed",
+            detail="; ".join(problems),
+        )
+        return True
+    return False
+
+
+def _refused_now(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> bool:
+    with deps.db.session(_ctx(snap["tenant_id"])) as s:
+        _guard(s, job)
+        op = s.execute(
+            select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
+        ).scalar_one()
+        return _refused(s, op)
 
 
 def _snapshot(op: Operation, attempts: list[Attempt], keep: list[str]) -> dict[str, Any]:
@@ -646,17 +668,23 @@ def _reconcile(
 
 
 def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> None:
-    """OpsBridge-internal actions: same ledger, no external side effect."""
+    """OpsBridge-internal actions: same ledger, no external side effect. The effect, its
+    attempt, the outbox event and the operation's confirmation commit in ONE transaction:
+    nothing remote can be uncertain, so a worker that dies part-way leaves nothing behind
+    and the retry applies the action once (one succeeded local attempt per operation is
+    also enforced by a unique index, migration 0010)."""
     params = snap["payload"]["parameters"]
-    attempt_id = _new_attempt(
-        deps, job, snap, "dispatch", snap["action_type"], params, "opsbridge-local/1"
-    )
-    with deps.db.session(_ctx(snap["tenant_id"])) as s:
+    tid = snap["tenant_id"]
+    with deps.db.session(_ctx(tid)) as s:
         _guard(s, job)
+        op = s.execute(
+            select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
+        ).scalar_one()
+        if op.status in TERMINAL or _refused(s, op):
+            return
         case = s.execute(
             select(Case).where(Case.id == snap["case_id"]).with_for_update()
         ).scalar_one()
-        ref = None
         if snap["action_type"] == "assign_case":
             case.assignee_group = params["assignee_group"]
             ref = f"case:{case.id}:assignee_group"
@@ -676,7 +704,7 @@ def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, An
             )
             body = f"{kind}: {params['title']}\n\n{params.get('body', '')}"
             msg = ConversationMessage(
-                tenant_id=snap["tenant_id"],
+                tenant_id=tid,
                 case_id=case.id,
                 seq=seq,
                 author_kind="system",
@@ -687,26 +715,56 @@ def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, An
             s.add(msg)
             s.flush()
             ref = f"message:{msg.id}"
+        earlier = list(
+            s.execute(
+                select(Attempt.id).where(Attempt.operation_id == op.id).order_by(Attempt.started_at)
+            ).scalars()
+        )
+        output = {"ref": ref}
         s.add(
-            OutboxEvent(
-                tenant_id=snap["tenant_id"],
-                event_type="operation.local_applied",
-                aggregate_type="operation",
-                aggregate_id=snap["operation_id"],
-                payload={"ref": ref},
+            Attempt(
+                tenant_id=tid,
+                case_id=case.id,
+                run_id=None,
+                step_id="dispatch_operation",
+                operation_id=op.id,
+                parent_attempt_id=earlier[-1] if earlier else None,
+                retry_index=len(earlier),
+                kind="dispatch",
+                tool_name=snap["action_type"],
+                connector_version=LOCAL_CONNECTOR,
+                operation_key=snap["operation_key"],
+                status="succeeded",
+                input_digest=digest(params),
+                input_artifact_id=_keep(deps, s, tid, "tool_request", params),
+                output_digest=digest(output),
+                output_artifact_id=_keep(deps, s, tid, "tool_response", output),
+                response_mode="live",
+                remote_ref=ref,
+                worker_id=job.lease_owner,
+                fencing_token=job.fencing_token,
+                finished_at=_now(),
             )
         )
-    _close_attempt(
-        deps, snap["tenant_id"], attempt_id, "succeeded", output={"ref": ref}, remote_ref=ref
-    )
-    _complete(
-        deps,
-        job,
-        snap,
-        "confirmed",
-        remote_ref=ref,
-        confirmation={"method": "local_transaction", "ref": ref, "at": _now().isoformat()},
-    )
+        s.add(
+            OutboxEvent(
+                tenant_id=tid,
+                event_type="operation.local_applied",
+                aggregate_type="operation",
+                aggregate_id=op.id,
+                payload=output,
+            )
+        )
+        _finish(
+            s,
+            op,
+            "confirmed",
+            remote_ref=ref,
+            confirmation={"method": "local_transaction", "ref": ref, "at": _now().isoformat()},
+        )
+        metrics.after_commit(
+            s, lambda: metrics.CONNECTOR_ATTEMPTS.labels("dispatch", "succeeded").inc()
+        )
 
 
 def mark_unknown_after_exhaustion(db: Database, job: jobs.ClaimedJob, error: str) -> None:
