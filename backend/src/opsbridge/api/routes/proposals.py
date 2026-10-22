@@ -30,6 +30,8 @@ class ProposalOut(BaseModel):
     source_manifest_digest: str
     investigation_version_id: str
     policy_ref: str
+    destination: dict[str, str] | None  # connector and organization/repository; no credentials
+    outbound: dict[str, Any] | None  # what leaves OpsBridge for an external action
     required_permission: str
     payload_digest: str
     canonicalization: str
@@ -132,6 +134,8 @@ def proposal_out(p: Proposal) -> ProposalOut:
         source_manifest_digest=p.source_manifest_digest,
         investigation_version_id=str(p.investigation_version_id),
         policy_ref=p.policy_ref,
+        destination=p.destination,
+        outbound=p.outbound,
         required_permission=p.required_permission,
         payload_digest=p.payload_digest,
         canonicalization=p.canonicalization,
@@ -222,7 +226,12 @@ def create_proposal(
     try:
         return proposal_out(
             svc.create_from_investigation(
-                state.db, principal, case_id, overrides, request.state.correlation_id
+                state.db,
+                principal,
+                case_id,
+                overrides,
+                request.state.correlation_id,
+                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -253,6 +262,7 @@ def edit_proposal(
                 body.expected_payload_digest,
                 changes,
                 request.state.correlation_id,
+                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -279,6 +289,7 @@ def decide(
             payload_digest=body.payload_digest,
             reason=body.reason,
             correlation_id=request.state.correlation_id,
+            github_repo=state.settings.github_sandbox_repo,
         )
     except ERRORS as exc:
         raise _map(exc) from exc
