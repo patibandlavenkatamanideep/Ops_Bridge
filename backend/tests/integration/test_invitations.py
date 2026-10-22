@@ -2,7 +2,8 @@
 
 The risks: someone other than the invited person joins (forwarded link, unverified address),
 a link works twice, after it expired or was withdrawn, or after its inviter lost authority;
-the token is stored or audited; invitations leak across tenants or outside a tenant context.
+the token is stored or audited; invitations leak across tenants or outside a tenant context;
+retention keeps addresses forever, or clears one that an open invitation still needs.
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ from typing import Any
 
 import pytest
 from sqlalchemy import Engine, text
+from sqlalchemy.exc import DBAPIError
 
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.services.invitations import token_hash
@@ -20,6 +22,7 @@ from opsbridge.services.invitations import token_hash
 from .conftest import add_member, make_user
 from .stack import get
 from .test_api_cases import Actor, call, login
+from .test_approvals_execution import drain
 from .test_member_management import audit_rows, member, member_ids, patch, tenant_id
 
 pytestmark = pytest.mark.integration
@@ -222,3 +225,79 @@ def test_outside_a_tenant_only_the_matching_token_finds_an_invitation(
         assert s.execute(q).scalar_one() == 1
         # Read-only there: the token context cannot change or create invitations.
         assert s.execute(text("UPDATE membership_invitations SET status = 'revoked'")).rowcount == 0  # type: ignore[attr-defined]
+
+
+def test_retention_clears_the_address_only_after_an_invitation_is_closed_or_expired(
+    stack: dict[str, Any], migrator_engine: Engine, app_db: Database, worker_db: Database
+) -> None:
+    st = stack
+    adm = st["actors"]["furn-admin"]
+    ids: dict[str, str] = {}
+
+    def new(name: str) -> str:
+        r = invite(st, f"{name}@example.test", ["requester"])
+        assert r.status_code == 201, r.text
+        ids[name] = r.json()["invitation_id"]
+        return str(r.json()["token"])
+
+    joined = person(st, migrator_engine, app_db, "sam-joined")
+    assert accept(st, joined, new("sam-joined")).status_code == 200
+    for name in ("old-withdrawn", "new-withdrawn"):
+        new(name)
+        revoke = f"{T}/invitations/{ids[name]}/revoke"
+        assert call(st["client"], adm, "POST", revoke).status_code == 200
+    new("lapsed")
+    open_token = new("still-open")
+    tid = tenant_id(migrator_engine)
+    with app_db.session(DbContext(tenant_id=tid)) as s:  # backdate around a 30-day period
+        for name, column, days in (
+            ("sam-joined", "closed_at", 31),
+            ("old-withdrawn", "closed_at", 31),
+            ("new-withdrawn", "closed_at", 29),
+            ("lapsed", "expires_at", 31),
+        ):
+            s.execute(
+                text(
+                    f"UPDATE membership_invitations SET {column} = now() - make_interval(days => :d)"
+                    " WHERE id = :i"
+                ),
+                {"d": days, "i": ids[name]},
+            )
+    shown = [i["email"] for i in get(st, "furn-admin", f"{T}/settings").json()["invitations"]]
+    assert shown == ["lapsed@example.test", "still-open@example.test"]  # expired, still listed
+
+    put = {"retention": {"invitations_days": 30}}
+    assert call(st["client"], adm, "PUT", f"{T}/settings", json=put).status_code == 200
+    for _ in range(2):  # a second sweep finds nothing more to clear
+        assert call(st["client"], adm, "POST", f"{T}/retention/run").status_code == 202
+        drain(st)
+
+    q = text(
+        "SELECT id::text, email, status, roles, email_cleared_at IS NOT NULL, deletion_reason"
+        " FROM membership_invitations"
+    )
+    with app_db.session(DbContext(tenant_id=tid)) as s:
+        rows = {r[0]: tuple(r[1:]) for r in s.execute(q).all()}
+    why = "retention:invitations_days=30"
+    assert rows == {
+        ids["sam-joined"]: (None, "accepted", ["requester"], True, why),
+        ids["old-withdrawn"]: (None, "revoked", ["requester"], True, why),
+        ids["lapsed"]: (None, "pending", ["requester"], True, why),
+        ids["new-withdrawn"]: ("new-withdrawn@example.test", "revoked", ["requester"], False, None),
+        ids["still-open"]: ("still-open@example.test", "pending", ["requester"], False, None),
+    }
+    sweeps = audit_rows(worker_db, migrator_engine, "retention.sweep")
+    assert sorted(d["invitation_addresses_cleared"] for _, _, d in sweeps) == [0, 3]
+    shown = [i["email"] for i in get(st, "furn-admin", f"{T}/settings").json()["invitations"]]
+    assert shown == ["still-open@example.test"]  # a cleared invitation leaves the list
+    assert call(st["client"], joined, "GET", f"{T}/cases").status_code == 200  # still a member
+    still_open = person(st, migrator_engine, app_db, "still-open")
+    assert accept(st, still_open, open_token).status_code == 200
+
+    # The worker sees invitations only in a tenant's context and may change only the address.
+    count = text("SELECT count(*) FROM membership_invitations")
+    with worker_db.session(DbContext()) as s:
+        assert s.execute(count).scalar_one() == 0
+    with pytest.raises(DBAPIError, match="permission denied"):
+        with worker_db.session(DbContext(tenant_id=tid)) as s:
+            s.execute(text("UPDATE membership_invitations SET status = 'accepted'"))
