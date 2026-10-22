@@ -100,6 +100,7 @@ class FieldOut(BaseModel):
     locator: str
     method: str
     status: str
+    correctable: bool  # matching applies a correction to this field
     note: str | None
     corrections: list[CorrectionOut]
 
