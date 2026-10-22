@@ -835,3 +835,21 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Next: Package 11's local part (a source-contract harness), F15 (claim meaning in model
   validation) and F18 (operator UX); integration with a real purchasing system and the pilot
   need the owner (docs/review-findings.md).
+
+### External review: F15 and F18 (2026-10-22)
+- F15: model explanations and drafts could state real numbers in the wrong roles ("bills 18
+  while 20 were received") or units and still pass. A number next to a role word must now
+  equal a finding value of that role, and a number followed by a unit must use the findings'
+  unit. The check accepts every finding summary in the dev and validation corpora (a first
+  version flagged two; fixed), and none of the 120 recorded held-out mock explanations is
+  newly rejected. Comparisons, dates and prose without numbers are still unchecked;
+  structured claims would need a new prompt and benchmark version.
+- F18: the server now states why each viewer cannot decide a proposal (expired, no
+  permission, out of scope, separation of duties under this policy); the card notices expiry
+  while open; queue search is debounced; the README screenshots no longer show a loading
+  page. Saved views, due dates, a split settings page and operator sessions are not done.
+- Evidence: integration 200, browser 27 (+1 OCR skip here), agents 93, unit 329; benchmark
+  replay reproduces held-out and security.
+- What remains needs the owner: a real purchasing system and task destination (Package 11),
+  independently labelled data and a real-model comparison (Package 12), the pilot, branch
+  protection and release publishing (docs/review-findings.md).
