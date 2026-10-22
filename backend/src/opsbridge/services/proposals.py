@@ -31,14 +31,13 @@ from opsbridge.auth.permissions import Principal, permissions_for, require
 from opsbridge.canonical import CANONICALIZATION, digest
 from opsbridge.connectors.tasks import task_destination
 from opsbridge.domain.policy import ReconciliationPolicy
-from opsbridge.evidence.records import case_identifiers
+from opsbridge.evidence.records import case_identifiers, current_invoices
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     ApprovalDecision,
     Attempt,
     Case,
     InvestigationVersion,
-    InvoiceRecord,
     Membership,
     Operation,
     OutboxEvent,
@@ -226,12 +225,8 @@ def evidence_state(s: Session, case: Case) -> tuple[InvestigationVersion | None,
         return latest, None
     decision_date = None
     if case.invoice_number:
-        decision_date = s.execute(
-            select(InvoiceRecord.invoice_date).where(
-                InvoiceRecord.invoice_number == case.invoice_number,
-                InvoiceRecord.superseded_at.is_(None),
-            )
-        ).scalar()
+        found = current_invoices(s, case.invoice_number, case.supplier_id)
+        decision_date = found[0].invoice_date if len(found) == 1 else None
     q = select(PolicyVersion).where(PolicyVersion.policy_id == current_policy.policy_id)
     if decision_date is not None:
         q = q.where(PolicyVersion.effective_from <= decision_date)
