@@ -11,7 +11,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; all three jobs on ubuntu-24.04 |
+| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; four jobs on ubuntu-24.04 since 2026-10-22 (the fourth builds, smoke-tests, inventories and scans the runtime image); runs on pushes to `main` too |
 | Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
@@ -807,3 +807,31 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   replay reproduces held-out and security; canary 64/64; backup and restore drill ok at 0015
   (7465 rows, counts equal, every table with forced RLS).
 - Next: Phase C (F13 production profile, F14 release qualification in CI, F17 strict verify).
+
+### External review, Phase C: deployable artifact (2026-10-22)
+- F13: `staging` (synthetic data; the purchasing simulator is allowed) and `production` now
+  refuse the local artifact store, unencrypted S3, disabled quotas, a per-process rate limit
+  and missing trusted proxies; `production` also refuses demo users and, since no production
+  purchasing adapter exists, refuses to start at all. Settings checks only.
+- F14 (the part inside the repository): CI runs on every push to `main` as well as PRs (main
+  runs are never cancelled), fails when the regenerated API types differ from the committed
+  ones, and builds the runtime image from the locks with base images pinned by digest,
+  smoke-tests it (uid 10001, CLI, /healthz), uploads an SPDX SBOM and fails on fixable
+  critical vulnerabilities. A Trivy scan of the image found fixable advisories only in Pillow
+  12.3.0 and certifi 2026.7.22; both were updated (13.0.0, 2026.10.19; days-old fix
+  releases). Dependabot proposes weekly updates. Not done (owner's): protecting `main`,
+  publishing, signing and provenance of images.
+- F17: `make verify` lists every gate every time (skipped ones with the missing prerequisite,
+  and tests skipped inside a gate); `make verify-strict` is the release gate and fails on any
+  skip. Here it fails as intended (tesseract not installed: one unit and one browser OCR
+  test skip). A scenario test that skipped not-applicable cases now leaves them out of its
+  parameters; live tests are excluded from the unit gate by marker.
+- Hosted CI run 39848032134 at e6f8702: all four jobs passed (unit 328 passed, 0 skipped
+  with tesseract; the image scan covered 83 targets with no fixable critical finding).
+- Found on the way: the host disk was 99% full (127 MB free) during a local image rebuild,
+  which failed with corrupted blobs. The images, scan files and replay-check work
+  directories this work created were removed (2.3 GB free afterwards); other projects'
+  images were left alone. The rebuilt image was therefore scanned only in CI.
+- Next: Package 11's local part (a source-contract harness), F15 (claim meaning in model
+  validation) and F18 (operator UX); integration with a real purchasing system and the pilot
+  need the owner (docs/review-findings.md).
