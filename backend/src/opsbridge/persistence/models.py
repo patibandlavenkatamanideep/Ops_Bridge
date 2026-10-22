@@ -139,12 +139,13 @@ class Membership(Base):
 class MembershipInvitation(Base):
     """A single-use invitation to join a tenant with given roles. Only the SHA-256 of the
     token is stored. It can be accepted once, before `expires_at` (database clock), by a
-    signed-in user whose identity provider verified the invited email address."""
+    signed-in user whose identity provider verified the invited email address. Retention
+    clears the address once the invitation is closed or expired; the row stays."""
 
     __tablename__ = "membership_invitations"
     id: Mapped[uuid.UUID] = pk()
     tenant_id: Mapped[uuid.UUID] = tenant_fk()
-    email: Mapped[str] = mapped_column(String(320))  # trimmed, lower case
+    email: Mapped[str | None] = mapped_column(String(320))  # trimmed, lower case
     roles: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
     approval_scope: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
     token_hash: Mapped[str] = mapped_column(String(64))
@@ -154,11 +155,17 @@ class MembershipInvitation(Base):
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     accepted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_reason: Mapped[str | None] = mapped_column(Text)
     __table_args__ = (
         _tenant_unique("membership_invitations"),
         UniqueConstraint("token_hash", name="uq_membership_invitations_token_hash"),
         CheckConstraint(
             "status in ('pending','accepted','revoked')", name="ck_membership_invitations_status"
+        ),
+        CheckConstraint(
+            "(email IS NULL) = (email_cleared_at IS NOT NULL)",
+            name="ck_membership_invitations_email_cleared",
         ),
     )
 
