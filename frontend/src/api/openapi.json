@@ -2008,6 +2008,20 @@
             "title": "Canonicalization",
             "type": "string"
           },
+          "destination": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
           "effect_summary": {
             "title": "Effect Summary",
             "type": "string"
@@ -2035,6 +2049,18 @@
           "investigation_version_id": {
             "title": "Investigation Version Id",
             "type": "string"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound"
           },
           "parameters": {
             "additionalProperties": true,
@@ -2088,6 +2114,8 @@
           "source_manifest_digest",
           "investigation_version_id",
           "policy_ref",
+          "destination",
+          "outbound",
           "required_permission",
           "payload_digest",
           "canonicalization",

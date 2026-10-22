@@ -1172,6 +1172,10 @@ export interface components {
             author_kind: string;
             /** Canonicalization */
             canonicalization: string;
+            /** Destination */
+            destination: {
+                [key: string]: string;
+            } | null;
             /** Effect Summary */
             effect_summary: string;
             /** Evidence Refs */
@@ -1186,6 +1190,10 @@ export interface components {
             id: string;
             /** Investigation Version Id */
             investigation_version_id: string;
+            /** Outbound */
+            outbound: {
+                [key: string]: unknown;
+            } | null;
             /** Parameters */
             parameters: {
                 [key: string]: unknown;
