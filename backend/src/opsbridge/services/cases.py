@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Forbidden, Principal, require
+from opsbridge.canonical import digest
 from opsbridge.domain import identifiers
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Case, User
@@ -137,11 +138,21 @@ def create_case(
     correlation_id: str | None = None,
 ) -> tuple[Case, bool]:
     """Create a case. Returns (case, created). Repeating an idempotency key with the same
-    request returns the original; with a different request it is refused."""
+    request returns the case it created; with a different request it is refused. Another
+    key for an invoice that already has a case is a duplicate, not a replay."""
     require(principal, "case.create")
     invoice = identifiers.normalize(data.invoice_number)
     po = identifiers.normalize(data.po_number)
     supplier = identifiers.normalize(data.supplier_id)
+    request_digest = digest(
+        {
+            "title": data.title.strip(),
+            "description": data.description.strip(),
+            "invoice_number": invoice,
+            "po_number": po,
+            "supplier_id": supplier,
+        }
+    )
     if invoice:
         # Without a supplier the key is the one used before suppliers were recorded.
         source_key = f"invoice@{supplier}:{invoice}" if supplier else f"invoice:{invoice}"
@@ -151,20 +162,19 @@ def create_case(
         source_key = f"manual:{uuid.uuid4()}"
     ctx = DbContext(tenant_id=principal.tenant_id, user_id=principal.user_id)
     with db.session(ctx) as s:
+        if idempotency_key:
+            replayed = s.execute(
+                select(Case).where(
+                    Case.requester_id == principal.user_id, Case.intake_key == idempotency_key
+                )
+            ).scalar_one_or_none()
+            if replayed is not None:
+                if replayed.intake_digest != request_digest:
+                    raise IdempotencyKeyReused()
+                return replayed, False
         existing = s.execute(select(Case).where(Case.source_key == source_key)).scalar_one_or_none()
         if existing is not None:
             same_requester = existing.requester_id == principal.user_id
-            if idempotency_key and same_requester:
-                asked = (data.title.strip(), data.description.strip(), invoice, po, supplier)
-                if asked != (
-                    existing.title,
-                    existing.description,
-                    existing.invoice_number,
-                    existing.po_number,
-                    existing.supplier_id,
-                ):
-                    raise IdempotencyKeyReused()
-                return existing, False
             visible = principal.has("case.read_all") or same_requester
             raise DuplicateCase(existing.id if visible else None)
         if invoice and not data.confirm_distinct:
@@ -196,6 +206,8 @@ def create_case(
             po_number=po,
             supplier_id=supplier,
             source_key=source_key,
+            intake_key=idempotency_key,
+            intake_digest=request_digest,
             discrepancy_types=[],
             evidence_readiness="not_collected",
             status="new",
