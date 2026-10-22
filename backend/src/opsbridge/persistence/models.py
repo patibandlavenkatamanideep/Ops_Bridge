@@ -300,6 +300,31 @@ class Artifact(Base):
     )
 
 
+class BlobDeletion(Base):
+    """Bytes queued for deletion after retention marked their artifact rows deleted (same
+    transaction). The purge deletes them only if no live row still references the key, and
+    leaves the entry pending if storage fails (evidence/blobs.py, workflow/retention.py)."""
+
+    __tablename__ = "blob_deletions"
+    id: Mapped[uuid.UUID] = pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    storage_key: Mapped[str] = mapped_column(String(300))
+    reason: Mapped[str] = mapped_column(Text)
+    requested_at: Mapped[datetime] = created()
+    done_at: Mapped[datetime | None]
+    outcome: Mapped[str | None] = mapped_column(String(16))  # deleted | kept_referenced
+    __table_args__ = (
+        _tenant_unique("blob_deletions"),
+        Index(
+            "uq_blob_deletions_pending",
+            "tenant_id",
+            "storage_key",
+            unique=True,
+            postgresql_where=text("done_at IS NULL"),
+        ),
+    )
+
+
 class SourceDocument(Base):
     __tablename__ = "source_documents"
     id: Mapped[uuid.UUID] = pk()
