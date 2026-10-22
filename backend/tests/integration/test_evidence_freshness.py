@@ -100,9 +100,7 @@ def test_a_correction_after_approval_stops_the_dispatch_without_a_rerun(stack) -
 
 
 @pytest.mark.parametrize("change", ["correction", "upload", "shared_source"])
-def test_changed_evidence_blocks_approval_and_new_proposals_until_rerun(
-    stack, change: str
-) -> None:  # type: ignore[no-untyped-def]
+def test_changed_evidence_blocks_approval_and_new_proposals_until_rerun(stack, change: str) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(st, "INV-9001")
     if change == "correction":
