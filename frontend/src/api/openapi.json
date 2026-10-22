@@ -916,6 +916,10 @@
       },
       "FieldOut": {
         "properties": {
+          "correctable": {
+            "title": "Correctable",
+            "type": "boolean"
+          },
           "corrections": {
             "items": {
               "$ref": "#/components/schemas/CorrectionOut"
@@ -1000,6 +1004,7 @@
           "locator",
           "method",
           "status",
+          "correctable",
           "note",
           "corrections"
         ],

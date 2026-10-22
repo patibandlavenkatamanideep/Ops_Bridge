@@ -840,6 +840,8 @@ export interface components {
         };
         /** FieldOut */
         FieldOut: {
+            /** Correctable */
+            correctable: boolean;
             /** Corrections */
             corrections: components["schemas"]["CorrectionOut"][];
             /** Current Value */
