@@ -183,6 +183,11 @@ def ingest(
     result = IngestResult(doc.id, version.id, version.version_no, raw_sha, True, status, detail)
     if parsed.flags:
         result.problems.extend(f"flag:{f}" for f in parsed.flags)
+    if pack is not None and record_type is not None and status != "parsed":
+        # The newest version of this source yields no records, so the facts extracted from an
+        # earlier version must stop being current: matching would otherwise use what the
+        # source no longer shows. They stay in the history, superseded.
+        _supersede_all(session, doc.id, version.id)
     if pack is not None and record_type is not None and status == "parsed":
         mapping = map_document(
             pack, record_type, parsed, DocRef(str(doc.id), str(version.id), raw_sha, classification)
@@ -289,13 +294,7 @@ def _supersede(
     )
 
 
-def _store_records(
-    session: Session,
-    tenant_id: uuid.UUID,
-    document_id: uuid.UUID,
-    version_id: uuid.UUID,
-    m: MappingResult,
-) -> dict[str, int]:
+def _supersede_all(session: Session, document_id: uuid.UUID, keep_version: uuid.UUID) -> None:
     for model in (
         PurchaseOrderRecord,
         InvoiceRecord,
@@ -303,8 +302,18 @@ def _store_records(
         InvoiceAllocationRecord,
         SupplierAssertionRecord,
     ):
-        _supersede(session, model, document_id, version_id)
+        _supersede(session, model, document_id, keep_version)
     session.flush()
+
+
+def _store_records(
+    session: Session,
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    m: MappingResult,
+) -> dict[str, int]:
+    _supersede_all(session, document_id, version_id)
     for po in m.purchase_orders:
         # A PO number can only have one current record per tenant; a newer document wins.
         session.execute(
