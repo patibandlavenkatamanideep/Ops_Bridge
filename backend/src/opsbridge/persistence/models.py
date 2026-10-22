@@ -619,6 +619,10 @@ class Case(Base):
     # The supplier that issued the invoice, when the requester named it; without it an
     # invoice number that two suppliers use cannot be matched (migration 0013).
     supplier_id: Mapped[str | None] = mapped_column(String(100))
+    # The requester's Idempotency-Key and a digest of the request that created the case: a
+    # replay must repeat both (migration 0014).
+    intake_key: Mapped[str | None] = mapped_column(String(100))
+    intake_digest: Mapped[str | None] = mapped_column(String(71))
     # Stable key that prevents duplicate intake of the same blocked invoice.
     source_key: Mapped[str] = mapped_column(String(200))
     discrepancy_types: Mapped[list[str]] = mapped_column(ARRAY(String(32)), default=list)
@@ -634,6 +638,14 @@ class Case(Base):
         _tenant_unique("cases"),
         UniqueConstraint("tenant_id", "case_number", name="uq_cases_number"),
         UniqueConstraint("tenant_id", "source_key", name="uq_cases_source_key"),
+        Index(
+            "uq_cases_intake_key",
+            "tenant_id",
+            "requester_id",
+            "intake_key",
+            unique=True,
+            postgresql_where=text("intake_key IS NOT NULL"),
+        ),
         CheckConstraint(
             "status in ('new','collecting_evidence','investigating','needs_information',"
             "'awaiting_review','follow_up_pending','resolved','closed_without_resolution')",
