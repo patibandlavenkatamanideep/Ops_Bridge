@@ -52,6 +52,7 @@ RETENTION_KEYS = (
     "conversation_days",
     "model_artifacts_days",
     "tool_artifacts_days",
+    "invitations_days",
 )
 
 
@@ -290,7 +291,10 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
     invitations = s.execute(
         select(MembershipInvitation, User.username, MembershipInvitation.expires_at <= func.now())
         .outerjoin(User, User.id == MembershipInvitation.invited_by)
-        .where(MembershipInvitation.status == "pending")
+        .where(
+            MembershipInvitation.status == "pending",
+            MembershipInvitation.email.is_not(None),  # retention cleared expired ones
+        )
         .order_by(MembershipInvitation.created_at)
     ).all()
     versions = list(
