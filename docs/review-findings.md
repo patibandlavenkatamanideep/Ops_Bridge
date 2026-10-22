@@ -25,10 +25,10 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | F12 | P1 | Unreadable replacement leaves old records current | Fixed, verified locally | `test_an_unreadable_replacement_invoice_is_not_matched_on_the_old_extraction[*]` (3) |
 | F13 | P1 | Production configuration may keep development defaults | Fixed (settings checks), verified locally | `tests/test_deployment_settings.py` (16) |
 | F14 | P1 | `main` unprotected; CI does not qualify the runtime image | In-repository part done; branch protection and publishing remain the owner's | CI runs on pushes to `main`; API-type drift step; image job (build, smoke, SBOM, scan) — first run on PR #4; base images pinned by digest; Dependabot config |
-| F15 | P2 | Validators check numbers and citations, not claim meaning | Open | — |
+| F15 | P2 | Validators check numbers and citations, not claim meaning | Partly fixed, verified locally | role and unit checks: `test_compromised_explanations_are_rejected[…stated as invoiced / uses unit SET]`; no false alarms on any corpus finding summary (`test_finding_numbers.py`); 0 of 120 recorded held-out mock explanations newly rejected |
 | F16 | P2 | Local artifact reads do not verify digests | Fixed, verified locally | `tests/evidence/test_local_store.py`, `test_an_altered_original_is_refused_not_served` |
 | F17 | P2 | `verify` can pass with required gates skipped | Fixed, verified locally | `make verify-strict` fails here on the skipped OCR tests (tesseract not installed), as intended |
-| F18 | P2 | UX needs operator testing | Partly: destination and exact outgoing text shown before approval; Correct offered only for correctable fields; supplier and look-alike confirmation at intake | browser suite and accessibility scan pass |
+| F18 | P2 | UX needs operator testing | Partly: destination and exact outgoing text shown before approval; Correct offered only for correctable fields; supplier and look-alike confirmation at intake; the server states each viewer's decision reason; expiry noticed while the page is open; queue search debounced; README screenshots fixed | `test_the_server_says_who_may_decide_a_proposal_and_why_not`; browser suite and accessibility scan pass |
 
 ## What changed, and what it does not cover
 
@@ -82,6 +82,18 @@ and, where relevant, real Keycloak and browser tests on this machine.
   provenance and branch protection are not done.
 - F17: `verify --strict` is the release gate; the default `verify` stays a convenience
   report that now names every skipped gate and test.
+- F15: a number next to a role word (invoiced, ordered, received, returned, allocated,
+  claimed) must equal a finding value of that role, and a number followed by a unit must use
+  the findings' unit. Not checked: comparisons ("above"/"below"), dates, subjects beyond
+  these roles, prose without numbers. Structured claim-to-finding output would need a new
+  prompt version and therefore a new benchmark (the frozen recordings would no longer
+  replay); not done.
+- F18 not done: saved queue views, owner/due-date filters (no due dates are modelled),
+  splitting the tenant settings page, runtime validation of successful API responses, and
+  usability sessions with operators.
+- Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
+  having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
+  always does so. Recorded as a harness property, not changed.
 
 ## Migrations and rollback
 
