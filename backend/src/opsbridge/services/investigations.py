@@ -505,6 +505,14 @@ def resolve_case(
             )
         if case.status not in ("awaiting_review", "follow_up_pending", "investigating"):
             raise Conflict("invalid_transition", f"Cannot resolve a case in status {case.status}.")
+        from .freshness import stale_reason
+        from .proposals import evidence_state
+
+        changed = stale_reason(s, case.id, latest)
+        if changed is None and evidence_state(s, case)[1] != latest.policy_version_id:
+            changed = "the effective policy changed since the investigation; re-run it"
+        if changed is not None:
+            raise Conflict("stale_investigation", changed[0].upper() + changed[1:] + ".")
         transition(case, "resolved")
         s.flush()
         s.refresh(case)  # load server-generated updated_at before the session closes
