@@ -86,6 +86,7 @@ Outbox events are written in the approval transaction and marked delivered on co
 | Frozen benchmark manifest | `opsbridge-eval-manifest/1` | `evaluation/manifest.py` |
 | Acceptance policy | `opsbridge-acceptance/1` | `evals/acceptance-policy.json` |
 | Model cassette | `opsbridge-model-cassette/1` | `evaluation/cassette.py` |
+| Tool cassette | `opsbridge-tool-cassette/1` | `evaluation/cassette.py` |
 | Results | `opsbridge-eval-results/1` | CLI `eval-bench` |
 | Canary baseline | `opsbridge-canary/1` | `evaluation/canary.py` |
 | Tool manifest / responses | `evalseal.agent-tools/1`, `evalseal.agent-tool-responses/1` | EvalSeal 2.2.0 (documented schemas) |
