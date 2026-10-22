@@ -164,15 +164,36 @@ class LoadedEvidence:
     version_ids: set[uuid.UUID]
     corrections_applied: list[dict[str, str]]
     missing: list[str]
+    # Suppliers with a current invoice of this number when the case names none of them.
+    ambiguous_suppliers: list[str] = field(default_factory=list)
 
 
-def load_match_input(session: Session, invoice_number: str, po_hint: str | None) -> LoadedEvidence:
+def current_invoices(
+    session: Session, invoice_number: str, supplier_id: str | None
+) -> list[InvoiceRecord]:
+    """Current invoice records with this number: the named supplier's, or every supplier's."""
+    q = select(InvoiceRecord).where(
+        InvoiceRecord.invoice_number == invoice_number, InvoiceRecord.superseded_at.is_(None)
+    )
+    if supplier_id is not None:
+        q = q.where(InvoiceRecord.supplier_key == supplier_id)
+    return list(session.execute(q.order_by(InvoiceRecord.supplier_key)).scalars())
+
+
+def load_match_input(
+    session: Session, invoice_number: str, po_hint: str | None, supplier_id: str | None = None
+) -> LoadedEvidence:
     missing: list[str] = []
-    inv_row = session.execute(
-        select(InvoiceRecord).where(
-            InvoiceRecord.invoice_number == invoice_number, InvoiceRecord.superseded_at.is_(None)
+    found = current_invoices(session, invoice_number, supplier_id)
+    if len(found) > 1:  # never pick one: matching another supplier's invoice is worse
+        return LoadedEvidence(
+            None,
+            {r.source_version_id for r in found},
+            [],
+            [],
+            [r.supplier_key or "(no supplier id)" for r in found],
         )
-    ).scalar_one_or_none()
+    inv_row = found[0] if found else None
     if inv_row is None:
         return LoadedEvidence(None, set(), [], [f"invoice {invoice_number}"])
     versions: set[uuid.UUID] = {inv_row.source_version_id}
