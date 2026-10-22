@@ -9,7 +9,7 @@ been applied anywhere. Production readiness is not claimed.
 | Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (15 gates) on macOS + Podman 5.7.1 |
 | Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000; own database `opsbridge_demo`) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
 | Local observability | `make observability-up` (Prometheus :9090, Alertmanager :9093, alert sink :9099, Grafana :3000) | yes — alert drills with injected failures, delivered through Alertmanager to the local sink; all 23 dashboard queries ran in Grafana without error |
-| Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | yes — PR #1, run 39000811947 at 1f29197 (2026-10-17): all three jobs passed on ubuntu-24.04 with Docker |
+| Hosted CI | `.github/workflows/ci.yml` (pull requests to main, every push to main, manual dispatch): lint, types, unit, canary, receipts, build, API-type drift; integration; browser; runtime image (build, smoke test, SBOM, fail on fixable critical vulnerabilities) | yes for the first three jobs since PR #1 (run 39000811947 at 1f29197, 2026-10-17); the image job was added 2026-10-22 (see the PR's checks) |
 | Staging (AWS, below) | not provisioned | **no** |
 
 ## Local containers
@@ -75,6 +75,16 @@ user, kept out of the application); OIDC client secret; worker client secret; se
 never written to disk — production refuses to start the signer or verifier without it or an
 existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
+
+**Release qualification (in the repository) and what stays with the owner.** CI qualifies
+every PR head and every commit on `main` with the same jobs, including the runtime image
+built from the locks with base images pinned by digest, its SBOM (SPDX, a workflow artifact)
+and a vulnerability scan that fails on fixable critical findings. Nothing is published:
+pushing an image to a registry, signing it and recording provenance belong to a release
+workflow that the owner authorizes, and the image promoted to staging must be the one whose
+digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
+require the four CI jobs and one review before merging, disallow force-pushes. Dependabot
+(`.github/dependabot.yml`) proposes weekly updates as pull requests; each must pass CI.
 
 **Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
 simulator is allowed) and `OPSBRIDGE_ENV=production` refuse to start unless: HTTPS public URL
