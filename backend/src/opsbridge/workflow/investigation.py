@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -39,13 +40,17 @@ from opsbridge.persistence.models import (
     Case,
     InvestigationVersion,
     InvoiceRecord,
+    ModelCall,
     PolicyVersion,
     Tenant,
+    ToolInvocation,
     WorkflowRun,
     WorkflowStep,
 )
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
+
+from . import jobs
 
 WORKFLOW_VERSION = "investigation/1.1.0"
 SERVICE_IDENTITY = "service:opsbridge-worker"
@@ -77,13 +82,18 @@ def _ctx(tenant_id: uuid.UUID) -> DbContext:
 def _run_step(
     deps: InvestigationDeps,
     run: WorkflowRun,
+    lease: jobs.Lease | None,
     seq: int,
     name: str,
     inputs: Any,
     fn: Callable[[], dict[str, Any]],
 ) -> dict[str, Any]:
+    """Run one durable step. With a lease, every write is fenced (a worker that lost the job
+    writes nothing) and the lease is renewed while the step runs, up to the step limit."""
     ctx = _ctx(run.tenant_id)
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)
         step = s.execute(
             select(WorkflowStep).where(
                 WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -100,13 +110,23 @@ def _run_step(
         step.input_digest = digest(inputs)
         step.started_at = datetime.now(UTC)
         step.error = None
+    limit = float(getattr(deps.settings, "investigation_step_limit_seconds", 300))
     try:
-        with tracing.span(
-            f"step {name}", tenant_id=run.tenant_id, case_id=run.case_id, run_id=run.id, step=name
+        with (
+            tracing.span(
+                f"step {name}",
+                tenant_id=run.tenant_id,
+                case_id=run.case_id,
+                run_id=run.id,
+                step=name,
+            ),
+            lease.keep_alive(limit) if lease is not None else nullcontext(),
         ):
             output = fn()
     except Exception as exc:
         with deps.db.session(ctx) as s:
+            if lease is not None:
+                lease.check(s)
             step = s.execute(
                 select(WorkflowStep).where(
                     WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -117,6 +137,8 @@ def _run_step(
             step.finished_at = datetime.now(UTC)
         raise
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)  # a worker whose lease lapsed during the step records nothing
         step = s.execute(
             select(WorkflowStep).where(
                 WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -130,13 +152,21 @@ def _run_step(
 
 
 def run_investigation(
-    deps: InvestigationDeps, tenant_id: uuid.UUID, run_id: uuid.UUID
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    run_id: uuid.UUID,
+    lease: jobs.Lease | None = None,
 ) -> uuid.UUID:
-    """Execute (or resume) an investigation run. Returns the investigation version id."""
+    """Execute (or resume) an investigation run. Returns the investigation version id.
+
+    `lease` is the worker's claim on the job: without it (tests, the benchmark harness)
+    writes are not fenced."""
     from opsbridge.connectors.purchasing import SourceRecordInvalid, SourceUnavailable
 
     ctx = _ctx(tenant_id)
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)
         run = s.get(WorkflowRun, run_id)
         if run is None:
             raise StepFailed("run not found in tenant", retryable=False)
@@ -176,10 +206,11 @@ def run_investigation(
                 f"purchasing system returned an unusable record: {exc}", retryable=False
             ) from exc
 
-    collected = _run_step(deps, run, 1, "collect_context", case_snapshot, collect)
+    collected = _run_step(deps, run, lease, 1, "collect_context", case_snapshot, collect)
     policy_out = _run_step(
         deps,
         run,
+        lease,
         2,
         "retrieve_policy",
         {"pack": pack.policy_id, **collected},
@@ -188,6 +219,7 @@ def run_investigation(
     recon = _run_step(
         deps,
         run,
+        lease,
         3,
         "reconcile_records",
         {"policy": policy_out, "collected": collected},
@@ -197,6 +229,7 @@ def run_investigation(
     explained = _run_step(
         deps,
         run,
+        lease,
         4,
         "explain_findings",
         {"recon": recon, "mode": agent["mode"]},
@@ -205,6 +238,7 @@ def run_investigation(
     proposed = _run_step(
         deps,
         run,
+        lease,
         5,
         "propose_follow_up",
         {"recon": recon, "mode": agent["mode"]},
@@ -213,6 +247,7 @@ def run_investigation(
     validated = _run_step(
         deps,
         run,
+        lease,
         6,
         "validate_proposal",
         proposed,
@@ -235,7 +270,7 @@ def run_investigation(
             f"model explanation rejected: {problem}",
         ]
     return _finalize(
-        deps, tenant_id, run_id, case_snapshot, collected, policy_out, recon, explained
+        deps, tenant_id, run_id, case_snapshot, collected, policy_out, recon, explained, lease
     )
 
 
@@ -646,6 +681,13 @@ def _agent_runtime(
     with deps.db.session(_ctx(tenant_id)) as s:
         run = s.get(WorkflowRun, run_id)
         assert run is not None
+        # A resumed run continues its budget: calls an earlier attempt made still count.
+        budget.model_calls = s.execute(
+            select(func.count()).select_from(ModelCall).where(ModelCall.run_id == run_id)
+        ).scalar_one()
+        budget.tool_calls = s.execute(
+            select(func.count()).select_from(ToolInvocation).where(ToolInvocation.run_id == run_id)
+        ).scalar_one()
         run.budget = {
             "max_model_calls": budget.max_model_calls,
             "max_tool_calls": budget.max_tool_calls,
@@ -940,21 +982,23 @@ def _finalize(
     policy_out: dict[str, Any],
     recon: dict[str, Any],
     explained: dict[str, Any],
+    lease: jobs.Lease | None = None,
 ) -> uuid.UUID:
     from opsbridge.domain.records import SourceRef
 
     with deps.db.session(_ctx(tenant_id)) as s:
-        existing = s.execute(
-            select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
-        ).scalar_one_or_none()
-        if (
-            existing is not None
-        ):  # idempotent finalize after a crash between commit and job completion
-            return existing
-        run = s.get(WorkflowRun, run_id)
+        # Serialize on the case first, then decide: two holders cannot both pass the check.
         case = s.execute(
             select(Case).where(Case.id == uuid.UUID(case_snapshot["case_id"])).with_for_update()
         ).scalar_one()
+        existing = s.execute(
+            select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
+        ).scalar_one_or_none()
+        if existing is not None:  # idempotent after a crash between commit and job completion
+            return existing
+        if lease is not None:
+            lease.check(s)
+        run = s.get(WorkflowRun, run_id)
         assert run is not None
         refs = [SourceRef(**e) for f in recon["findings"] for e in f.get("evidence", [])]
         citations = [c.to_dict(include_excerpt=False) for c in resolve_all(s, refs)]
