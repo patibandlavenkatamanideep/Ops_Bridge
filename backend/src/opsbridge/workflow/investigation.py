@@ -60,6 +60,7 @@ class InvestigationDeps:
     adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
     records_mcp: Any = None  # McpToolClient when tool_transport == "mcp"
     signer: Any = None  # DelegationSigner for MCP calls
+    tool_cassette: Any = None  # benchmark only: records agent tool calls, or replays them
 
 
 class StepFailed(Exception):
@@ -672,8 +673,9 @@ def _explain(
     policy_out: dict[str, Any],
     collected: dict[str, Any],
 ) -> dict[str, Any]:
-    from opsbridge.agents.steps import explain
+    from opsbridge.agents.steps import SEARCH_TOOL, TOOL_VERSION, SearchResult, explain
     from opsbridge.evidence.retrieval import search
+    from opsbridge.persistence.models import DocumentVersion
 
     def fallback() -> dict[str, Any]:
         return template_explanation(recon=recon, policy=policy_out, case=case)
@@ -683,7 +685,7 @@ def _explain(
     ctx = _agent_context(deps, tenant_id, case, recon, policy_out)
     allowed_versions = _case_versions(deps, tenant_id, case["case_id"])
 
-    def search_fn(query: str) -> list[dict[str, Any]]:
+    def search_live(query: str) -> list[dict[str, Any]]:
         if deps.records_mcp is not None:
             with deps.db.session(_ctx(tenant_id)) as s:
                 run = s.execute(
@@ -705,6 +707,32 @@ def _explain(
             return list(out.get("hits", []))
         with deps.db.session(_ctx(tenant_id)) as s:
             return [h.__dict__ for h in search(s, allowed_versions, query, limit=3)]
+
+    def rebind(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Recorded hits name rows of the recording's database; this one holds the same
+        document versions under new ids. Map each hit by content digest within this case."""
+        with deps.db.session(_ctx(tenant_id)) as s:
+            rows = s.execute(
+                select(
+                    DocumentVersion.raw_sha256, DocumentVersion.document_id, DocumentVersion.id
+                ).where(DocumentVersion.id.in_(allowed_versions))
+            ).all()
+        out = []
+        for hit in hits:
+            same = [(doc, ver) for sha, doc, ver in rows if sha == hit["sha256"]]
+            if len(same) != 1:
+                raise LookupError(f"{len(same)} versions in this case have content {hit['sha256']}")
+            out.append({**hit, "document_id": str(same[0][0]), "version_id": str(same[0][1])})
+        return out
+
+    def search_fn(query: str) -> SearchResult:
+        if deps.tool_cassette is None:
+            hits = search_live(query)
+            return SearchResult(hits, hits)
+        response, hits, origin = deps.tool_cassette.call_tool(
+            SEARCH_TOOL, TOOL_VERSION, {"query": query}, lambda: search_live(query), rebind
+        )
+        return SearchResult(response, hits, origin)
 
     return explain(
         agent["adapter"],
