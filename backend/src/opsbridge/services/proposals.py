@@ -5,6 +5,9 @@ Invariants enforced here and re-checked at dispatch:
 - An approval binds approver, tenant, proposal version, canonical payload digest, policy
   version, evidence/source manifest digest and an expiry. The approver must present the
   digest they reviewed.
+- The payload includes the destination (connector and organization or repository, never
+  credentials) and the exact text that will leave OpsBridge. Both are recomputed when
+  approving and before every dispatch; any difference makes the proposal stale.
 - Separation of duties: the proposal author cannot approve when the policy requires it.
 - Approver authority = permission + action-type scope from server-side membership.
 - Approval consumption, the logical operation, the outbox event and the dispatch job are
@@ -26,7 +29,9 @@ from sqlalchemy.orm import Session
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Principal, permissions_for, require
 from opsbridge.canonical import CANONICALIZATION, digest
+from opsbridge.connectors.tasks import task_destination
 from opsbridge.domain.policy import ReconciliationPolicy
+from opsbridge.evidence.records import case_identifiers
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     ApprovalDecision,
@@ -39,8 +44,10 @@ from opsbridge.persistence.models import (
     OutboxEvent,
     PolicyVersion,
     Proposal,
+    Tenant,
     TenantSettings,
 )
+from opsbridge.privacy.redaction import REDACTION_VERSION, redact
 from opsbridge.telemetry import metrics
 from opsbridge.workflow import jobs
 
@@ -49,6 +56,10 @@ from .investigations import Conflict, NotFound
 
 PROPOSAL_SCHEMA = "opsbridge.proposal/1"
 EXTERNAL_ACTIONS = frozenset({"create_follow_up_task"})
+LOCAL_DESTINATION = {"connector": "opsbridge_local"}
+# Title and body redacted (keeping the case's own identifiers); dispatch appends one line with
+# the operation marker. A change here or in redaction makes approved proposals stale.
+OUTBOUND_TRANSFORM = f"opsbridge-outbound/1+{REDACTION_VERSION}"
 
 
 class _Params(BaseModel):
@@ -119,7 +130,43 @@ def payload_of(pr: Proposal) -> dict[str, Any]:
         "investigation_version_id": str(pr.investigation_version_id),
         "source_manifest_digest": pr.source_manifest_digest,
         "expires_at": pr.expires_at.isoformat(),
+        # Absent on proposals made before destinations were bound, so their digests hold;
+        # an external one of those can no longer be approved or dispatched.
+        **(
+            {"destination": pr.destination, "outbound": pr.outbound}
+            if pr.destination is not None
+            else {}
+        ),
     }
+
+
+def outbound_of(action: str, params: dict[str, Any], keep: list[str]) -> dict[str, Any] | None:
+    """The task content that leaves OpsBridge for an external action (None for local ones)."""
+    if action not in EXTERNAL_ACTIONS:
+        return None
+    return {
+        "title": redact(params["title"], keep).text,
+        "body": redact(params.get("body") or "", keep).text,
+        "assignee_group": params.get("assignee_group"),
+        "transform": OUTBOUND_TRANSFORM,
+    }
+
+
+def destination_now(
+    s: Session, tenant_id: uuid.UUID, action: str, github_repo: str | None
+) -> dict[str, str]:
+    """Where this action would go under the tenant's settings today (Conflict if the tier no
+    longer enables the connector)."""
+    if action not in EXTERNAL_ACTIONS:
+        return dict(LOCAL_DESTINATION)
+    tenant = s.get(Tenant, tenant_id)
+    assert tenant is not None
+    return task_destination(_connector(s, tenant_id), tenant.slug, github_repo)
+
+
+def describe(destination: dict[str, str]) -> str:
+    where = destination.get("organization") or destination.get("repository")
+    return f"{destination['connector']} ({where})" if where else destination["connector"]
 
 
 def operation_key(pr: Proposal) -> str:
@@ -134,12 +181,15 @@ def _policy(s: Session, policy_version_id: uuid.UUID) -> ReconciliationPolicy:
     return ReconciliationPolicy.model_validate(pv.document)
 
 
-def _effect(action: str, params: dict[str, Any], connector: str) -> tuple[str, list[str]]:
+def _effect(
+    action: str, params: dict[str, Any], destination: dict[str, str]
+) -> tuple[str, list[str]]:
     if action == "create_follow_up_task":
         return (
-            f"Create a follow-up task in {connector} for group '{params['assignee_group']}': "
-            f'"{params["title"]}". Does not change the invoice, purchase order or payment status.',
-            [f"task_system:{connector}"],
+            f"Create a follow-up task in {describe(destination)} for group "
+            f"'{params['assignee_group']}': \"{params['title']}\". Does not change the invoice, "
+            "purchase order or payment status.",
+            [f"task_system:{destination['connector']}"],
         )
     if action == "create_supplier_message_draft":
         return (
@@ -190,8 +240,20 @@ def evidence_state(s: Session, case: Case) -> tuple[InvestigationVersion | None,
     return latest, (effective.id if effective else None)
 
 
-def check_current(s: Session, case: Case, pr: Proposal) -> StaleCheck:
+def check_current(s: Session, case: Case, pr: Proposal, github_repo: str | None) -> StaleCheck:
     reasons = []
+    if pr.destination is None:
+        if pr.action_type in EXTERNAL_ACTIONS:
+            reasons.append("the proposal was made before destinations were bound to approvals")
+    else:
+        try:
+            if destination_now(s, pr.tenant_id, pr.action_type, github_repo) != pr.destination:
+                reasons.append("the destination changed since the proposal was made")
+        except Conflict as exc:
+            reasons.append(str(exc))
+        keep = case_identifiers(s, case.id)
+        if outbound_of(pr.action_type, pr.parameters, keep) != pr.outbound:
+            reasons.append("the text that would be sent changed since the proposal was made")
     latest, effective_policy = evidence_state(s, case)
     if latest is None or latest.source_manifest_digest != pr.source_manifest_digest:
         reasons.append("source evidence changed since the proposal was made")
@@ -217,6 +279,8 @@ def create_from_investigation(
     case_id: uuid.UUID,
     overrides: dict[str, Any],
     correlation_id: str | None,
+    *,
+    github_repo: str | None = None,
 ) -> Proposal:
     require(p, "proposal.create")
     with db.session(_ctx(p)) as s:
@@ -248,8 +312,8 @@ def create_from_investigation(
         ).scalars():
             old.status = "superseded"
             old.status_changed_at = _now()
-        connector = _connector(s, p.tenant_id)
-        effect, affected = _effect(action, params, connector)
+        destination = destination_now(s, p.tenant_id, action, github_repo)
+        effect, affected = _effect(action, params, destination)
         refs = [e for f in latest.findings for e in f.get("evidence", [])][:20]
         pr = Proposal(
             tenant_id=p.tenant_id,
@@ -266,6 +330,8 @@ def create_from_investigation(
             investigation_version_id=latest.id,
             policy_version_id=latest.policy_version_id,
             policy_ref=latest.policy_ref,
+            destination=destination,
+            outbound=outbound_of(action, params, case_identifiers(s, case.id)),
             required_permission=f"proposal.decide:{action}",
             payload_digest="pending",
             canonicalization=CANONICALIZATION,
@@ -306,6 +372,8 @@ def edit(
     expected_digest: str,
     changes: dict[str, Any],
     correlation_id: str | None,
+    *,
+    github_repo: str | None = None,
 ) -> Proposal:
     """Create version n+1 with edited parameters; version n is superseded (never mutated)."""
     require(p, "proposal.create")
@@ -331,7 +399,8 @@ def edit(
         _check_params_policy(old.action_type, params, policy)
         old.status = "superseded"
         old.status_changed_at = _now()
-        effect, affected = _effect(old.action_type, params, _connector(s, p.tenant_id))
+        destination = destination_now(s, p.tenant_id, old.action_type, github_repo)
+        effect, affected = _effect(old.action_type, params, destination)
         new = Proposal(
             tenant_id=old.tenant_id,
             case_id=old.case_id,
@@ -347,6 +416,8 @@ def edit(
             investigation_version_id=old.investigation_version_id,
             policy_version_id=old.policy_version_id,
             policy_ref=old.policy_ref,
+            destination=destination,
+            outbound=outbound_of(old.action_type, params, case_identifiers(s, case.id)),
             required_permission=old.required_permission,
             payload_digest="pending",
             canonicalization=CANONICALIZATION,
@@ -442,6 +513,7 @@ def decide(
     payload_digest: str,
     reason: str | None,
     correlation_id: str | None,
+    github_repo: str | None = None,
 ) -> tuple[Proposal, ApprovalDecision, Operation | None]:
     require(p, "proposal.decide")
     with db.session(_ctx(p)) as s:
@@ -475,7 +547,7 @@ def decide(
                     "separation_of_duties", "You cannot approve a proposal you authored."
                 )
             sod = "passed"
-        stale = check_current(s, case, pr)
+        stale = check_current(s, case, pr, github_repo)
         if decision == "approve" and not stale.ok:
             pr.status = "superseded"
             pr.status_changed_at = _now()
@@ -533,9 +605,8 @@ def decide(
                 approval_id=ad.id,
                 operation_key=operation_key(pr),
                 action_type=pr.action_type,
-                connector=_connector(s, p.tenant_id)
-                if pr.action_type in EXTERNAL_ACTIONS
-                else "opsbridge_local",
+                # The destination the approver saw (check_current: still what settings give).
+                connector=(pr.destination or LOCAL_DESTINATION)["connector"],
                 payload=payload_of(pr),
                 payload_digest=pr.payload_digest,
                 status="pending_dispatch",
