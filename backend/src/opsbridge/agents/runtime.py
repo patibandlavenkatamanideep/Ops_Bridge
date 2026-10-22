@@ -23,6 +23,7 @@ from sqlalchemy import func, select
 from opsbridge.auth.permissions import TierEntitlements
 from opsbridge.canonical import digest
 from opsbridge.config import Settings
+from opsbridge.evidence.blobs import store_bytes
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Artifact, ModelCall, ToolInvocation
@@ -160,7 +161,7 @@ class Recorder:
             if isinstance(payload, str)
             else __import__("json").dumps(payload, sort_keys=True)
         ).encode()
-        key, sha = self.store.put(self.tenant_id, data)
+        key, sha = store_bytes(s, self.store, self.tenant_id, data)
         art = Artifact(
             tenant_id=self.tenant_id,
             kind=kind,
