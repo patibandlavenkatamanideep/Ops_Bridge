@@ -214,7 +214,11 @@ def _revalidate(s: Session, op: Operation, github_repo: str | None) -> list[str]
     problems = []
     pr = s.get(Proposal, op.proposal_id)
     ad = s.get(ApprovalDecision, op.approval_id)
-    case = s.get(Case, op.case_id)
+    # Corrections and uploads hold this lock: a change committed first is seen here, and one
+    # waiting here lands after the dispatch decision.
+    case = s.execute(
+        select(Case).where(Case.id == op.case_id).with_for_update()
+    ).scalar_one_or_none()
     if pr is None or ad is None or case is None:
         return ["proposal, approval or case missing"]
     if pr.status != "approved":
