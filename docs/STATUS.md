@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-21 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-22 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -742,3 +742,39 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   mock 36/40; security 7/7, 7/7); `fur-heldout-222` shows `recorded` with the sealed
   digest `sha256:e4a49698…`; 26 records verify. `make verify` 15/15 (unit 282 + 3 skipped,
   integration 156, browser 27).
+
+### External review, Phase A: core decisions (2026-10-22)
+- An external review of `main` at `f0dbb1a` listed 18 findings; `docs/review-findings.md`
+  tracks each one (status, regression tests, migrations, rollback, what is not covered).
+  Phase A is done: F01–F04, F07, F11, F12. Each fix started with a test that failed on the
+  previous source.
+- F01: a retry after a definite failure, or after reconciliation proved an earlier write
+  absent, created the task without rechecking cancellation, expiry, authority, edits or
+  policy (10/10 combinations reproduced). Every new write now passes the full check;
+  recovering a write that may have landed does not need it.
+- F02: a local note or draft committed before the operation's confirmation; a crash in
+  between duplicated it. Effect, attempt, outbox and confirmation now commit together, and a
+  unique index allows one applied local action per operation (0010).
+- F03: approvals did not cover where a task goes or the text that leaves OpsBridge; a
+  settings change after drafting redirected the action. Destination and outgoing text are now
+  in the approved payload, shown before approval, and rechecked at approval and before every
+  write (0011).
+- F04: a correction, upload or another case's new source version did not make the latest
+  investigation stale, so its proposal could be approved, dispatched or the case resolved.
+  Investigations now record their evidence state (0012); proposing, approving, dispatch (under
+  the case lock) and resolving refuse a stale result. Resolution also checks the policy.
+- F07: another supplier's invoice with the same number superseded this one and the case was
+  matched against it; intake merged INV/123, INV.123 and INV123; a reused idempotency key
+  returned the first case for any request. Invoices are now current per supplier (0013), a
+  case may name its supplier, an unnamed one stops for review when the number is ambiguous,
+  look-alike numbers need confirmation, and replays are recognised by key and request (0014).
+- F11: corrections to fields matching ignores (currency, dates, units…) were accepted; now
+  refused, and the UI offers Correct only for the seven fields matching applies.
+- F12: an unreadable replacement (truncated PDF, image-only PDF, unsupported type) left the
+  previous extraction current. Earlier records are now superseded, and a refused current
+  document sends the run to manual review.
+- Evidence: `make verify` 15/15 (unit 282 + 3 skipped, integration 186, browser 27); benchmark
+  replay reproduces held-out and security; canary 64/64; backup and restore drill ok at 0014
+  (7083 rows, counts equal, every table with forced RLS). The browser suite caught one fault
+  in a first F07 version (see review-findings.md); fixed before this entry.
+- Next: Phase B (F05, F06, F08, F09, F10, F16).
