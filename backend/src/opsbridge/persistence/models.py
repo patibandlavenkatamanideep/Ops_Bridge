@@ -32,6 +32,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    false,
     func,
     text,
 )
@@ -106,6 +107,9 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(200))
     display_name: Mapped[str] = mapped_column(String(200))
     email: Mapped[str | None] = mapped_column(String(320))
+    # Whether the identity provider vouched for `email` at the latest sign-in (OIDC
+    # `email_verified`). Invitations are accepted only against a verified address.
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     created_at: Mapped[datetime] = created()
     last_login_at: Mapped[datetime | None]
     __table_args__ = (UniqueConstraint("issuer", "subject", name="uq_users_issuer_subject"),)
@@ -120,6 +124,9 @@ class Membership(Base):
     # Action types this member may approve when they hold the approver role.
     approval_scope: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
     status: Mapped[str] = mapped_column(String(16), default="active")
+    # Who last changed this membership in the app, and why (seeded rows have neither).
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    change_reason: Mapped[str | None] = mapped_column(String(500))
     created_at: Mapped[datetime] = created()
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
     __table_args__ = (
@@ -127,6 +134,50 @@ class Membership(Base):
         UniqueConstraint("tenant_id", "user_id", name="uq_memberships_tenant_user"),
         CheckConstraint("status in ('active','revoked')", name="ck_memberships_status"),
     )
+
+
+class MembershipInvitation(Base):
+    """A single-use invitation to join a tenant with given roles. Only the SHA-256 of the
+    token is stored. It can be accepted once, before `expires_at` (database clock), by a
+    signed-in user whose identity provider verified the invited email address. Retention
+    clears the address once the invitation is closed or expired; the row stays."""
+
+    __tablename__ = "membership_invitations"
+    id: Mapped[uuid.UUID] = pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    email: Mapped[str | None] = mapped_column(String(320))  # trimmed, lower case
+    roles: Mapped[list[str]] = mapped_column(ARRAY(String(32)))
+    approval_scope: Mapped[list[str]] = mapped_column(ARRAY(String(64)), default=list)
+    token_hash: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16), default="pending")
+    invited_by: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = created()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    accepted_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    email_cleared_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deletion_reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        _tenant_unique("membership_invitations"),
+        UniqueConstraint("token_hash", name="uq_membership_invitations_token_hash"),
+        CheckConstraint(
+            "status in ('pending','accepted','revoked')", name="ck_membership_invitations_status"
+        ),
+        CheckConstraint(
+            "(email IS NULL) = (email_cleared_at IS NOT NULL)",
+            name="ck_membership_invitations_email_cleared",
+        ),
+    )
+
+
+class RateLimitWindow(Base):
+    """Shared API rate-limit counters (perimeter state, not tenant data): one row per key and
+    fixed window. Keys are a session-cookie hash or a client address, never raw tokens."""
+
+    __tablename__ = "rate_limit_windows"
+    key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer)
 
 
 class UserSession(Base):

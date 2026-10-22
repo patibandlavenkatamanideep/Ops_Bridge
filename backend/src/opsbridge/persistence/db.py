@@ -29,6 +29,7 @@ class DbContext:
     session_hash: str | None = None
     oidc_issuer: str | None = None
     oidc_subject: str | None = None
+    invite_token_hash: str | None = None  # finds one invitation before its tenant is known
 
     def settings(self) -> dict[str, str]:
         return {
@@ -37,6 +38,7 @@ class DbContext:
             "app.session_hash": self.session_hash or "",
             "app.oidc_issuer": self.oidc_issuer or "",
             "app.oidc_subject": self.oidc_subject or "",
+            "app.invite_token_hash": self.invite_token_hash or "",
         }
 
 
@@ -44,7 +46,8 @@ _CONTEXT_KEY = "opsbridge_db_context"
 _SET_CONTEXT = text(
     "SELECT set_config('app.tenant_id', :tenant, true), set_config('app.user_id', :user, true),"
     " set_config('app.session_hash', :session_hash, true),"
-    " set_config('app.oidc_issuer', :issuer, true), set_config('app.oidc_subject', :subject, true)"
+    " set_config('app.oidc_issuer', :issuer, true), set_config('app.oidc_subject', :subject, true),"
+    " set_config('app.invite_token_hash', :invite, true)"
 )
 
 
@@ -60,6 +63,7 @@ def _apply_context(session: Session, _transaction: Any, connection: Any) -> None
             "session_hash": s["app.session_hash"],
             "issuer": s["app.oidc_issuer"],
             "subject": s["app.oidc_subject"],
+            "invite": s["app.invite_token_hash"],
         },
     )
 

@@ -208,7 +208,7 @@ def _revalidate(s: Session, op: Operation) -> list[str]:
         problems.append("operation payload does not match the approved digest")
     if ad.expires_at <= _now():
         problems.append("approval expired before dispatch")
-    if not approver_still_authorized(s, ad.approver_id, op.action_type):
+    if not approver_still_authorized(s, op.tenant_id, ad.approver_id, op.action_type):
         problems.append("approver no longer holds approval authority for this action")
     stale = check_current(s, case, pr)
     problems += stale.reasons

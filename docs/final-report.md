@@ -90,9 +90,13 @@ Details and reproduction: docs/case-study.md.
   (off by default) reads scanned pages for review only and is untested on a real paper scan;
   retrieval is lexical; the S3 artifact store is tested against SeaweedFS, not AWS
   (encryption and IAM unverified); quota values are starting points.
-- Rate limits are per process; no WAF; processes need synchronized clocks (NTP).
+- No WAF (application rate limits, shared across API instances, are not a DDoS defence);
+  processes need synchronized clocks (NTP).
 - Alerts are routed by severity through Alertmanager, but only to a local sink; no pager,
   queue or email receiver is connected.
+- Administrators manage members in the app and add people with a single-use invitation link
+  that they deliver themselves (OpsBridge sends no email); acceptance relies on the identity
+  provider's email verification.
 - The development `.env` was uploaded to iCloud before the move out of `~/Desktop`
   (ADR 0009); it holds local-only development secrets — regenerate them if that matters.
 
@@ -102,7 +106,7 @@ Details and reproduction: docs/case-study.md.
 |---|---|
 | Anthropic API key + explicit live opt-in + spend ceiling, or install Ollama with a pinned model | Real-model evaluation (OB-07 live, real-model quality gate) |
 | A GitHub sandbox repository, a fine-grained token (Issues read/write on that repo) and written authorization for writes | Live connector validation (OB-22) |
-| Reviewing PR #1 and deciding whether to merge it | `main` containing the build (CI already passes on the PR) |
+| Reviewing the open pull request (#3 at the time of writing) and deciding whether to merge it | `main` containing the latest work (PRs #1 and #2 are merged) |
 | A cloud account and authorization | Staging deployment |
 | A pilot owner, participants and approved data | Operator pilot (OB-25 outcomes) |
 

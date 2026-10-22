@@ -304,6 +304,10 @@ textarea {
   border-radius: 8px;
   padding: 1rem 1.25rem;
 }
+/* A div grouping a dt/dd pair keeps the two-column grid. */
+.facts > .contents {
+  display: contents;
+}
 .facts dt {
   color: var(--muted);
 }
@@ -570,4 +574,13 @@ fieldset {
 }
 .form textarea {
   width: 100%;
+}
+.form.member-editor {
+  margin-top: 1.25rem;
+}
+.form label.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 400;
 }

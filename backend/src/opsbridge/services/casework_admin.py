@@ -11,14 +11,15 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, get_args
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
-from opsbridge.auth.permissions import TIERS, Principal, require
+from opsbridge.auth.permissions import ROLES, TIERS, Principal, permissions_for, require
 from opsbridge.canonical import digest
+from opsbridge.domain.policy import ActionType
 from opsbridge.evidence.ingest import IngestRejected, ingest
 from opsbridge.evidence.parsers import OcrSettings
 from opsbridge.evidence.storage import ArtifactStore
@@ -28,6 +29,9 @@ from opsbridge.persistence.models import (
     Case,
     ConversationMessage,
     Membership,
+    MembershipInvitation,
+    Operation,
+    PolicyVersion,
     Tenant,
     TenantSettings,
     User,
@@ -48,6 +52,7 @@ RETENTION_KEYS = (
     "conversation_days",
     "model_artifacts_days",
     "tool_artifacts_days",
+    "invitations_days",
 )
 
 
@@ -282,6 +287,27 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
     members = s.execute(
         select(Membership, User).join(User, User.id == Membership.user_id).order_by(User.username)
     ).all()
+    today = s.execute(text("SELECT current_date")).scalar_one()  # the database clock
+    invitations = s.execute(
+        select(MembershipInvitation, User.username, MembershipInvitation.expires_at <= func.now())
+        .outerjoin(User, User.id == MembershipInvitation.invited_by)
+        .where(
+            MembershipInvitation.status == "pending",
+            MembershipInvitation.email.is_not(None),  # retention cleared expired ones
+        )
+        .order_by(MembershipInvitation.created_at)
+    ).all()
+    versions = list(
+        s.execute(
+            select(PolicyVersion).order_by(
+                PolicyVersion.policy_id, PolicyVersion.effective_from, PolicyVersion.version
+            )
+        ).scalars()
+    )
+    active = {}
+    for v in versions:  # same ordering as investigations: latest (effective_from, version)
+        if v.effective_from <= today:
+            active[v.policy_id] = v.id
     return {
         "tenant": {
             "slug": tenant.slug,
@@ -301,16 +327,131 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
             "task_connector": ts.task_connector if ts else "sim_tasks",
             "retention": (ts.retention if ts else {}) or {},
         },
+        "policies": [
+            {
+                "policy_id": v.policy_id,
+                "version": v.version,
+                "effective_from": v.effective_from.isoformat(),
+                "sha256": v.sha256,
+                "state": "active"
+                if active.get(v.policy_id) == v.id
+                else ("scheduled" if v.effective_from > today else "superseded"),
+            }
+            for v in versions
+        ],
         "members": [
             {
+                "id": str(m.id),
                 "username": u.username,
                 "display_name": u.display_name,
                 "roles": list(m.roles),
                 "approval_scope": list(m.approval_scope or []),
                 "status": m.status,
+                "change_reason": m.change_reason,
+                "changed_at": m.updated_at.isoformat() if m.change_reason else None,
             }
             for m, u in members
         ],
+        "invitations": [
+            {
+                "id": str(i.id),
+                "email": i.email,
+                "roles": list(i.roles),
+                "approval_scope": list(i.approval_scope or []),
+                "invited_by": inviter,
+                "created_at": i.created_at.isoformat(),
+                "expires_at": i.expires_at.isoformat(),
+                "expired": bool(expired),
+            }
+            for i, inviter, expired in invitations
+        ],
+    }
+
+
+def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any]:
+    """The tenant's follow-up task connector: what it currently promises (advertised live by
+    the simulator; declared for GitHub, which is not contacted without authorization) and how
+    its attempts went in the last 24 hours. Capabilities decide whether an ambiguous create can
+    be retried safely, so an operator should see when they change."""
+    require(p, "tenant.read_settings")
+    with db.session(_ctx(p)) as s:
+        ts = s.get(TenantSettings, p.tenant_id)
+        tenant = s.get(Tenant, p.tenant_id)
+        assert tenant is not None
+        name = ts.task_connector if ts else "sim_tasks"
+        rows = s.execute(
+            text(
+                "SELECT a.kind, a.status, count(*), max(a.started_at) FROM attempts a "
+                "JOIN operations o ON o.id = a.operation_id "
+                "WHERE o.connector = :c AND a.started_at > now() - interval '24 hours' "
+                "GROUP BY a.kind, a.status ORDER BY a.kind, a.status"
+            ),
+            {"c": name},
+        ).all()
+        awaiting_review = s.execute(
+            select(func.count())
+            .select_from(Operation)
+            .where(Operation.connector == name, Operation.status == "outcome_unknown")
+        ).scalar_one()
+        checked_at = s.execute(text("SELECT now()")).scalar_one()
+    configuration: dict[str, Any] = {}
+    if name == "sim_tasks":
+        from opsbridge.connectors.tasks import SimTaskConnector
+
+        conn = SimTaskConnector(
+            settings.simulator_url, settings.sim_master_secret.get_secret_value(), tenant.slug
+        )
+        try:
+            found = conn.discover()
+        finally:
+            conn.close()
+        reachable: bool | None = found is not None
+        idem, lookup = found or (False, "none")
+        source = (
+            "advertised by the task tracker just now"
+            if found
+            else "assumed weakest: the task tracker did not answer"
+        )
+    elif name == "github_issues":
+        from opsbridge.connectors.github import GitHubIssuesConnector
+
+        reachable = None
+        idem = GitHubIssuesConnector.capabilities.idempotency_keys
+        lookup = GitHubIssuesConnector.capabilities.lookup
+        source = "declared from GitHub's documentation; GitHub is not contacted from here"
+        configuration = {
+            "repository_configured": bool(settings.github_sandbox_repo),
+            "token_configured": bool(
+                settings.github_token and settings.github_token.get_secret_value()
+            ),
+            "live_writes_authorized": bool(settings.github_live_writes_authorized),
+        }
+    else:
+        raise Conflict("unknown_connector", f"Unknown task connector {name!r}.")
+    if idem:
+        meaning = "An ambiguous create can be resent with the same idempotency key."
+    elif lookup in ("strong", "eventual"):
+        meaning = "An ambiguous create is reconciled by lookup before any resend."
+    else:
+        meaning = "An ambiguous create cannot be checked: it goes to human review, never resent."
+    return {
+        "connector": name,
+        "checked_at": checked_at.isoformat(),
+        "reachable": reachable,
+        "capabilities": {"idempotency_keys": idem, "lookup": lookup},
+        "capability_source": source,
+        "meaning": meaning,
+        "configuration": configuration,
+        "attempts_24h": [
+            {
+                "kind": k,
+                "status": st,
+                "count": int(n),
+                "last_at": last.isoformat() if last else None,
+            }
+            for k, st, n, last in rows
+        ],
+        "awaiting_review": int(awaiting_review),
     }
 
 
@@ -377,6 +518,129 @@ def update_settings(
             resource_id=str(p.tenant_id),
             correlation_id=correlation_id,
             details={"changes": changes},
+        )
+        s.flush()
+        return _settings_view(s, p.tenant_id)
+
+
+MEMBER_STATUSES = ("active", "revoked")
+ACTION_TYPES: tuple[str, ...] = get_args(ActionType)
+
+
+def can_manage_members(m: Membership | None) -> bool:
+    return (
+        m is not None
+        and m.status == "active"
+        and "tenant.manage_members" in permissions_for(list(m.roles))
+    )
+
+
+def lock_members(s: Session, tenant_id: uuid.UUID) -> list[Membership]:
+    """Lock every membership of the tenant: membership changes in a tenant run one at a time."""
+    return list(
+        s.execute(
+            select(Membership)
+            .where(Membership.tenant_id == tenant_id)
+            .order_by(Membership.id)
+            .with_for_update()
+        ).scalars()
+    )
+
+
+def lock_members_as_admin(s: Session, p: Principal) -> tuple[Membership, list[Membership]]:
+    """Lock the tenant's memberships and re-check, under the lock, that the actor may still
+    manage members: the principal was resolved before the lock and may be stale."""
+    rows = lock_members(s, p.tenant_id)
+    actor = next((m for m in rows if m.user_id == p.user_id), None)
+    if actor is None or not can_manage_members(actor):
+        raise Conflict(
+            "authority_changed", "Your membership changed; you can no longer manage members."
+        )
+    return actor, rows
+
+
+def check_grant(roles: list[str], approval_scope: list[str]) -> None:
+    """Roles and approval scope a membership or invitation may carry."""
+    if not roles or any(r not in ROLES for r in roles):
+        raise Conflict(
+            "invalid_roles",
+            "A member needs at least one known role; to remove access, revoke the membership.",
+            {"allowed": list(ROLES)},
+        )
+    if any(a not in ACTION_TYPES for a in approval_scope):
+        raise Conflict(
+            "invalid_approval_scope", "Unknown action type.", {"allowed": list(ACTION_TYPES)}
+        )
+    if approval_scope and "approver" not in roles:
+        raise Conflict("invalid_approval_scope", "Only approvers have an approval scope.")
+
+
+def update_membership(
+    db: Database,
+    p: Principal,
+    membership_id: uuid.UUID,
+    *,
+    roles: list[str] | None,
+    approval_scope: list[str] | None,
+    status: str | None,
+    reason: str,
+    correlation_id: str | None,
+) -> dict[str, Any]:
+    """Change another member's roles, approval scope or status (revoke/reinstate).
+
+    Changes in one tenant are serialized by locking its membership rows, and the actor's own
+    authority is checked again under that lock: two administrators demoting each other at the
+    same moment must not both succeed. Administrators cannot change their own membership, so
+    the actor, verified under the lock, always remains an active administrator: no change can
+    leave the tenant without one. A revoked or narrowed approver's earlier approvals are
+    refused at dispatch (workflow/execution.py).
+    """
+    require(p, "tenant.manage_members")
+    with db.session(_ctx(p)) as s:
+        actor, rows = lock_members_as_admin(s, p)
+        target = next((m for m in rows if m.id == membership_id), None)
+        if target is None:
+            raise NotFound("member")
+        if target.id == actor.id:
+            raise Conflict(
+                "self_change",
+                "Administrators cannot change their own membership; another administrator must.",
+            )
+        old_roles, old_scope = sorted(target.roles), sorted(target.approval_scope or [])
+        before: dict[str, Any] = {
+            "roles": old_roles,
+            "approval_scope": old_scope,
+            "status": target.status,
+        }
+        new_roles = sorted(set(roles)) if roles is not None else old_roles
+        if approval_scope is not None:
+            new_scope = sorted(set(approval_scope))
+        else:  # losing the approver role clears a scope that would no longer mean anything
+            new_scope = old_scope if "approver" in new_roles else []
+        check_grant(new_roles, new_scope)
+        new_status = status if status is not None else target.status
+        if new_status not in MEMBER_STATUSES:
+            raise Conflict("invalid_status", "Status must be active or revoked.")
+        after: dict[str, Any] = {
+            "roles": new_roles,
+            "approval_scope": new_scope,
+            "status": new_status,
+        }
+        if after == before:
+            raise Conflict("no_change", "Nothing would change.")
+        target.roles, target.approval_scope, target.status = new_roles, new_scope, new_status
+        # The free-text reason stays on the membership, not in the append-only audit trail.
+        target.updated_by, target.change_reason = p.user_id, reason[:500]
+        audit.record(
+            s,
+            tenant_id=p.tenant_id,
+            actor_kind="user",
+            actor_id=str(p.user_id),
+            action="tenant.member_updated",
+            resource_type="membership",
+            resource_id=str(target.id),
+            correlation_id=correlation_id,
+            details={"user_id": str(target.user_id), "before": before, "after": after},
         )
         s.flush()
         return _settings_view(s, p.tenant_id)

@@ -18,6 +18,7 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `infra-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml up -d --build --wait postgres keycloak seaweedfs`, then `docker compose … exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh` (idempotent; creates missing databases) | macOS + Podman 5.7.1 |
 | `migrate` | `uv --directory backend run --frozen alembic upgrade head` (and `-x db=opsbridge_test`, `-x db=opsbridge_eval`) | macOS |
 | `seed-demo` | `uv --directory backend run --frozen python -m opsbridge.cli seed-demo` | macOS |
+| `identity-sync` | `python3 scripts/identity_sync.py` (adds realm users missing from a running local Keycloak; existing users untouched) | macOS + Podman 5.7.1 |
 | `dev` | `infra-up`, `migrate`, then `uv --directory backend run --frozen python scripts/devstack.py` (upserts `fixtures/scenarios/dev.yaml` into the simulator before starting it; `--seed-records`, used by `make demo`, loads every corpus) | macOS; Linux in hosted CI |
 | `lint` | `ruff check src tests && ruff format --check src tests` (in backend via uv run) and `npm run lint` (frontend) | macOS |
 | `typecheck` | `mypy src` (backend) and `npm run typecheck` (frontend) | macOS |
@@ -30,7 +31,7 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `dashboard-check` | `python3 scripts/dashboard_check.py` (after `observability-up`) | macOS + Podman |
 | `backup` / `restore-drill` | `python3 scripts/backup_restore.py backup` / `… restore-drill [DIR] [--keep]` | macOS + Podman |
 | `image` | `docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:local .` | macOS + Podman |
-| `demo-containers` | `image`, then `docker compose … --profile app up -d --wait` (stop `make dev` first) | macOS + Podman |
+| `demo-containers` | `image`, `infra-up`, then `docker compose … --profile app up -d --wait` (stop `make dev` first; uses its own database `opsbridge_demo`) | macOS + Podman |
 | `eval-offline` | `uv --directory backend run --frozen python -m opsbridge.cli eval-bench --split heldout --replay`, same for `--split security`, then `… eval-verify`; appends sealed replay receipts to the ledger and fails if any verdict differs from the recording | macOS |
 | `eval-replay-check` | `uv --directory backend run --frozen python -m opsbridge.cli eval-replay-check` (held-out and security; `--split` to choose); compares verdicts with the recordings, seals and writes nothing tracked | macOS; Linux in hosted CI |
 | `verify` | `python3 scripts/verify.py` | macOS |

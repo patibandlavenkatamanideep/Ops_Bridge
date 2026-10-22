@@ -141,7 +141,8 @@ class SimTaskConnector:
             )
         return self._capabilities
 
-    def _discover(self) -> tuple[bool, Consistency]:
+    def discover(self) -> tuple[bool, Consistency] | None:
+        """The tracker's advertised (idempotency keys, lookup), or None if it could not say."""
         try:
             r = self._client.get(f"/orgs/{self.org}/capabilities", timeout=3.0)
             if r.status_code == 200:
@@ -155,7 +156,13 @@ class SimTaskConnector:
                     return d["idempotency_keys"], lookup
         except (httpx.HTTPError, ValueError):
             pass
-        return False, "none"
+        return None
+
+    def _discover(self) -> tuple[bool, Consistency]:
+        return self.discover() or (False, "none")
+
+    def close(self) -> None:
+        self._client.close()
 
     def _task(self, d: dict[str, Any]) -> RemoteTask:
         return RemoteTask(

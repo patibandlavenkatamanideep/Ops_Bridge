@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test";
-import { openCase, signIn } from "./helpers";
+import { createOrOpenCase, signIn } from "./helpers";
 
 test("case notes can be added, corrected and have their text deleted with a reason", async ({ page }) => {
   const stamp = Date.now().toString(36);
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Conversation" }).click();
 
   await page.getByLabel("Add a note").fill(`Receiving counted 18 chairs (${stamp})`);
@@ -29,7 +29,7 @@ test("case notes can be added, corrected and have their text deleted with a reas
 
 test("an uploaded supplier message is parsed and shown as evidence", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Evidence" }).click();
   await page.getByRole("button", { name: "Upload a document" }).click();
   await page.getByLabel("Document type").selectOption("supplier_message");
@@ -46,7 +46,7 @@ test("an uploaded supplier message is parsed and shown as evidence", async ({ pa
 
 test("a disguised upload is rejected with an explanation", async ({ page }) => {
   await signIn(page, "furn-investigator");
-  await openCase(page, "INV-9001");
+  await createOrOpenCase(page, "INV-9001");
   await page.getByRole("tab", { name: "Evidence" }).click();
   await page.getByRole("button", { name: "Upload a document" }).click();
   await page.getByLabel(/^File/).setInputFiles({
@@ -57,6 +57,23 @@ test("a disguised upload is rejected with an explanation", async ({ page }) => {
   await page.getByRole("button", { name: "Upload", exact: true }).click();
   await expect(page.getByRole("alert")).toContainText("declared application/pdf but content looks like text/html");
   await expect(page.getByRole("status").filter({ hasText: "Stored as version" })).toHaveCount(0);
+});
+
+test("tenant settings show the policy in force and the connector's current promises", async ({ page }) => {
+  await signIn(page, "furn-admin");
+  await page.goto("/t/demo-furniture/settings");
+  const health = page.getByRole("region", { name: "Connector health" });
+  await expect(health.locator("dd").filter({ hasText: /^sim_tasks$/ })).toBeVisible();
+  await expect(health).toContainText("Reachable");
+  await expect(health).toContainText(/idempotency keys|no idempotency keys/);
+  await expect(health).toContainText("After an ambiguous create");
+  await health.getByRole("button", { name: "Check again" }).click();
+  await expect(health.getByRole("button", { name: "Check again" })).toBeEnabled();
+  const policies = page.getByRole("region", { name: "Policies" });
+  await expect(policies.getByRole("row").filter({ hasText: "furniture-ap" }).filter({ hasText: "v2" }))
+    .toContainText(/active/i);
+  await expect(policies.getByRole("row").filter({ hasText: "furniture-ap" }).filter({ hasText: "v1" }))
+    .toContainText(/superseded/i);
 });
 
 test("tenant settings: admins see tier-limited options; investigators are denied", async ({ page }) => {
@@ -76,4 +93,33 @@ test("tenant settings: admins see tier-limited options; investigators are denied
   await expect(page.getByRole("link", { name: "Tenant settings" })).toHaveCount(0);
   await page.goto("/t/demo-furniture/settings");
   await expect(page.getByRole("heading", { name: "You don't have access to this" })).toBeVisible();
+});
+
+test("an administrator revokes and reinstates a member, giving a reason each time", async ({ page }) => {
+  await signIn(page, "furn-admin");
+  await page.goto("/t/demo-furniture/settings");
+  const members = page.getByRole("table", { name: "Members of this organization" });
+  await expect(members.getByRole("row", { name: /Ada Admin/ })).toContainText("You");
+  await expect(members.getByRole("button", { name: "Change Ada Admin" })).toHaveCount(0); // not their own
+
+  const row = members.getByRole("row", { name: /Ana Notes-Approver/ });
+  // Reinstate first if an interrupted earlier run left the member revoked.
+  const steps: [string, string, RegExp][] = [
+    ["Revoked: no access to this organization", "E2E: access paused", /revoked/i],
+    ["Active", "E2E: access restored", /active/i],
+  ];
+  if (/revoked/i.test(await row.getByRole("cell").nth(2).innerText())) steps.reverse();
+  for (const [access, reason, shown] of steps) {
+    await members.getByRole("button", { name: "Change Ana Notes-Approver" }).click();
+    const form = page.getByRole("form", { name: "Change membership of Ana Notes-Approver" });
+    await expect(form.getByRole("heading")).toBeFocused();
+    await form.getByLabel(access).check();
+    await form.getByLabel("Reason for the change").fill(reason);
+    await form.getByRole("button", { name: "Save change" }).click();
+    await expect(page.getByText("Membership of Ana Notes-Approver updated.")).toBeVisible();
+    await expect(form).toHaveCount(0);
+    await expect(row.getByRole("cell").nth(2)).toHaveText(shown);
+    await expect(row).toContainText(reason);
+  }
+  await expect(row.getByRole("cell").nth(2)).toHaveText(/active/i);
 });

@@ -257,6 +257,38 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "id": "44444444-0000-4000-8000-000000000001",
+      "username": "new-hire",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Nia",
+      "lastName": "Newhire",
+      "email": "new-hire@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "44444444-0000-4000-8000-000000000002",
+      "username": "unverified-hire",
+      "enabled": true,
+      "emailVerified": false,
+      "firstName": "Uma",
+      "lastName": "Unverified",
+      "email": "unverified-hire@example.test",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "${OPSBRIDGE_DEMO_USER_PASSWORD}",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

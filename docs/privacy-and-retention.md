@@ -16,13 +16,15 @@ nothing here has been reviewed by counsel or validated against a regulation.
 | Tool requests/responses | artifact store, `tool_invocations` | yes — `tool_artifacts_days` |
 | Case conversation message text | `conversation_messages.body` | yes — `conversation_days` (text cleared; row kept) |
 | Audit events, approvals, operations, attempts | their tables (insert-only for the app role where applicable) | no |
+| Invited email address on membership invitations (roles, token **hash**; never the token) | `membership_invitations.email`; not copied into audit events | yes — `invitations_days`, counted from acceptance, withdrawal or expiry (address cleared; row kept). An open invitation keeps its address |
 | Application logs | process stdout/stderr | not managed by OpsBridge (see Logs) |
 
 Deletion removes stored bytes and free text. It keeps the fact that something existed: the
 artifact row keeps its digest, `deleted_at` and a `deletion_reason` such as
 `retention:raw_documents_days=30`; a cleared message keeps author, time, reason and the
-content digest. **A digest is not anonymization**: short or guessable text can be confirmed
-by hashing candidates.
+content digest; an invitation keeps its roles, status, dates and token hash, with
+`email_cleared_at` and the reason, and leaves the tenant settings list. **A digest is not
+anonymization**: short or guessable text can be confirmed by hashing candidates.
 
 After deletion the API says so instead of failing silently: an original download returns 404
 "original (withheld or deleted by retention policy)", the evidence view shows no source
@@ -36,8 +38,10 @@ deleted material is no longer possible.
   (`{"retention": {"raw_documents_days": 30, ...}}`; 0–3650; a missing key means "keep").
   The PUT replaces the whole retention map. Every change is audited (`tenant.settings_updated`).
 - `POST /api/v1/tenants/{tenant}/retention/run` (or "Run retention sweep") enqueues a
-  `retention_sweep` job; the worker deletes artifact bytes, chunks and message text past
-  the cutoff and writes `retention.sweep` with counts.
+  `retention_sweep` job; the worker deletes artifact bytes, chunks, message text and
+  invitation addresses past the cutoff and writes `retention.sweep` with counts. The worker
+  role may update only the address columns of invitations, in the tenant's context
+  (migration 0009).
 - The worker also schedules a sweep once per database day for every tenant that configured
   retention (`OPSBRIDGE_RETENTION_SCHEDULE_SECONDS`, default hourly checks; 0 disables). It
   learns which tenants are due only through the aggregate `ops.tenants_with_retention()`
@@ -48,7 +52,11 @@ deleted material is no longer possible.
 Evidence: `tests/integration/test_hardening.py::test_retention_deletes_protected_content_and_says_so`
 (original 200 → sweep → 404 with the retention message; chunks gone; digest and findings
 kept), `test_tenant_settings_respect_roles_and_tiers` (invalid keys/values refused,
-non-admins denied).
+non-admins denied),
+`test_invitations.py::test_retention_clears_the_address_only_after_an_invitation_is_closed_or_expired`
+(cleared 31 days after acceptance, withdrawal or expiry with a 30-day setting; kept at 29 days
+and while open; the open one can still be accepted; a second sweep clears nothing; the worker
+cannot change other columns or see invitations outside a tenant).
 
 ## Conversations
 

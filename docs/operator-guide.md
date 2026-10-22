@@ -79,6 +79,14 @@ The tier enables features; it never grants anyone authority or access to other
 organizations. *Run retention sweep* deletes content past its period immediately; deleted
 originals cannot be restored, and the evidence view says so.
 
+*Connector health* (administrators and auditors) shows what the follow-up task connector
+promises right now — idempotency keys and lookup, asked live from the simulator; for GitHub
+only its configuration, because GitHub is not contacted without authorization — what that
+means after an ambiguous create (resend, reconcile by lookup, or human review), attempts in the
+last 24 hours by phase and result, and operations waiting for review. *Check again* repeats
+the live check. *Policies* lists every policy version: *active* is the one in force today;
+an investigation uses the version in force on the invoice's decision date.
+
 ## Evaluation (investigators and auditors)
 
 Shows benchmark runs on synthetic data: how often the next action was right, with an

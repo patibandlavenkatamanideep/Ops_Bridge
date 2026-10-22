@@ -103,7 +103,11 @@ the right scope exist (Tenant settings → Members).
 `OpsBridgeConnectorFailures`. Definite failures (4xx) mean the request was rejected —
 check the attempt `error_category`; ambiguous failures (timeouts, 5xx) trigger
 reconciliation. GitHub rate limits are definite and retryable. For the simulator, check
-`/_control/stats/<org>` and that no fault injection is active.
+`/_control/stats/<org>` and that no fault injection is active. Tenant settings → *Connector
+health* (`GET /api/v1/tenants/{tenant}/connectors/health`) shows whether the tracker answers,
+the capabilities it advertises now and the attempt results of the last 24 hours; if it stops
+advertising idempotency keys or lookup, ambiguous creates go to human review instead of being
+resent.
 
 ## Model errors
 

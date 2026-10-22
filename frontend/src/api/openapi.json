@@ -1,6 +1,47 @@
 {
   "components": {
     "schemas": {
+      "AcceptIn": {
+        "properties": {
+          "token": {
+            "maxLength": 100,
+            "minLength": 20,
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "title": "AcceptIn",
+        "type": "object"
+      },
+      "AcceptOut": {
+        "properties": {
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          },
+          "tenant_name": {
+            "title": "Tenant Name",
+            "type": "string"
+          },
+          "tenant_slug": {
+            "title": "Tenant Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_slug",
+          "tenant_name",
+          "roles"
+        ],
+        "title": "AcceptOut",
+        "type": "object"
+      },
       "AttemptOut": {
         "properties": {
           "connector_version": {
@@ -131,6 +172,41 @@
           "finished_at"
         ],
         "title": "AttemptOut",
+        "type": "object"
+      },
+      "AttemptStat": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "count",
+          "last_at"
+        ],
+        "title": "AttemptStat",
         "type": "object"
       },
       "Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post": {
@@ -376,6 +452,73 @@
           "text"
         ],
         "title": "ChunkOut",
+        "type": "object"
+      },
+      "ConnectorHealthOut": {
+        "properties": {
+          "attempts_24h": {
+            "items": {
+              "$ref": "#/components/schemas/AttemptStat"
+            },
+            "title": "Attempts 24H",
+            "type": "array"
+          },
+          "awaiting_review": {
+            "title": "Awaiting Review",
+            "type": "integer"
+          },
+          "capabilities": {
+            "additionalProperties": true,
+            "title": "Capabilities",
+            "type": "object"
+          },
+          "capability_source": {
+            "title": "Capability Source",
+            "type": "string"
+          },
+          "checked_at": {
+            "title": "Checked At",
+            "type": "string"
+          },
+          "configuration": {
+            "additionalProperties": {
+              "type": "boolean"
+            },
+            "title": "Configuration",
+            "type": "object"
+          },
+          "connector": {
+            "title": "Connector",
+            "type": "string"
+          },
+          "meaning": {
+            "title": "Meaning",
+            "type": "string"
+          },
+          "reachable": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reachable"
+          }
+        },
+        "required": [
+          "connector",
+          "checked_at",
+          "reachable",
+          "capabilities",
+          "capability_source",
+          "meaning",
+          "configuration",
+          "attempts_24h",
+          "awaiting_review"
+        ],
+        "title": "ConnectorHealthOut",
         "type": "object"
       },
       "CorrectionCreated": {
@@ -1007,6 +1150,140 @@
         "title": "InvestigationOut",
         "type": "object"
       },
+      "InvitationCreatedOut": {
+        "properties": {
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "invitation_id": {
+            "title": "Invitation Id",
+            "type": "string"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/SettingsOut"
+          },
+          "token": {
+            "title": "Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "invitation_id",
+          "token",
+          "expires_at",
+          "settings"
+        ],
+        "title": "InvitationCreatedOut",
+        "type": "object"
+      },
+      "InvitationIn": {
+        "properties": {
+          "approval_scope": {
+            "items": {
+              "enum": [
+                "create_follow_up_task",
+                "assign_case",
+                "create_supplier_message_draft",
+                "record_review_note"
+              ],
+              "type": "string"
+            },
+            "maxItems": 10,
+            "title": "Approval Scope",
+            "type": "array"
+          },
+          "email": {
+            "maxLength": 320,
+            "minLength": 3,
+            "title": "Email",
+            "type": "string"
+          },
+          "roles": {
+            "items": {
+              "enum": [
+                "requester",
+                "investigator",
+                "approver",
+                "tenant_admin",
+                "auditor"
+              ],
+              "type": "string"
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "email",
+          "roles"
+        ],
+        "title": "InvitationIn",
+        "type": "object"
+      },
+      "InvitationOut": {
+        "properties": {
+          "approval_scope": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Approval Scope",
+            "type": "array"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "email": {
+            "title": "Email",
+            "type": "string"
+          },
+          "expired": {
+            "title": "Expired",
+            "type": "boolean"
+          },
+          "expires_at": {
+            "title": "Expires At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "invited_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invited By"
+          },
+          "roles": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Roles",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "email",
+          "roles",
+          "approval_scope",
+          "invited_by",
+          "created_at",
+          "expires_at",
+          "expired"
+        ],
+        "title": "InvitationOut",
+        "type": "object"
+      },
       "LogoutResponse": {
         "properties": {
           "logout_url": {
@@ -1082,6 +1359,28 @@
             "title": "Approval Scope",
             "type": "array"
           },
+          "change_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change Reason"
+          },
+          "changed_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changed At"
+          },
           "display_name": {
             "anyOf": [
               {
@@ -1092,6 +1391,10 @@
               }
             ],
             "title": "Display Name"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
           },
           "roles": {
             "items": {
@@ -1110,13 +1413,90 @@
           }
         },
         "required": [
+          "id",
           "username",
           "display_name",
           "roles",
           "approval_scope",
-          "status"
+          "status",
+          "change_reason",
+          "changed_at"
         ],
         "title": "MemberOut",
+        "type": "object"
+      },
+      "MemberUpdateIn": {
+        "description": "Fields left out stay as they are; dropping the approver role clears the scope.",
+        "properties": {
+          "approval_scope": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "create_follow_up_task",
+                    "assign_case",
+                    "create_supplier_message_draft",
+                    "record_review_note"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval Scope"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 5,
+            "title": "Reason",
+            "type": "string"
+          },
+          "roles": {
+            "anyOf": [
+              {
+                "items": {
+                  "enum": [
+                    "requester",
+                    "investigator",
+                    "approver",
+                    "tenant_admin",
+                    "auditor"
+                  ],
+                  "type": "string"
+                },
+                "maxItems": 5,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roles"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "enum": [
+                  "active",
+                  "revoked"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "MemberUpdateIn",
         "type": "object"
       },
       "MembershipOut": {
@@ -1481,6 +1861,39 @@
           "attempts"
         ],
         "title": "OperationOut",
+        "type": "object"
+      },
+      "PolicyOut": {
+        "properties": {
+          "effective_from": {
+            "title": "Effective From",
+            "type": "string"
+          },
+          "policy_id": {
+            "title": "Policy Id",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "policy_id",
+          "version",
+          "effective_from",
+          "sha256",
+          "state"
+        ],
+        "title": "PolicyOut",
         "type": "object"
       },
       "ProposalCreateIn": {
@@ -1964,6 +2377,13 @@
           "entitlements": {
             "$ref": "#/components/schemas/Entitlements"
           },
+          "invitations": {
+            "items": {
+              "$ref": "#/components/schemas/InvitationOut"
+            },
+            "title": "Invitations",
+            "type": "array"
+          },
           "members": {
             "items": {
               "$ref": "#/components/schemas/MemberOut"
@@ -1971,12 +2391,20 @@
             "title": "Members",
             "type": "array"
           },
+          "policies": {
+            "items": {
+              "$ref": "#/components/schemas/PolicyOut"
+            },
+            "title": "Policies",
+            "type": "array"
+          },
           "retention_keys": {
             "default": [
               "raw_documents_days",
               "conversation_days",
               "model_artifacts_days",
-              "tool_artifacts_days"
+              "tool_artifacts_days",
+              "invitations_days"
             ],
             "items": {
               "type": "string"
@@ -1995,7 +2423,9 @@
           "tenant",
           "entitlements",
           "settings",
-          "members"
+          "policies",
+          "members",
+          "invitations"
         ],
         "title": "SettingsOut",
         "type": "object"
@@ -2230,6 +2660,47 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/v1/invitations/accept": {
+      "post": {
+        "operationId": "accept_invitation_api_v1_invitations_accept_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AcceptOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Accept Invitation",
+        "tags": [
+          "invitations"
+        ]
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "me_api_v1_me_get",
@@ -3735,6 +4206,51 @@
         ]
       }
     },
+    "/api/v1/tenants/{tenant}/connectors/health": {
+      "get": {
+        "operationId": "connector_health_api_v1_tenants__tenant__connectors_health_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectorHealthOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Connector Health",
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
     "/api/v1/tenants/{tenant}/evaluations": {
       "get": {
         "operationId": "list_runs_api_v1_tenants__tenant__evaluations_get",
@@ -3905,6 +4421,181 @@
         "summary": "Receipt",
         "tags": [
           "evaluations"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/invitations": {
+      "post": {
+        "operationId": "create_invitation_api_v1_tenants__tenant__invitations_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InvitationIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitationCreatedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Invitation",
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/invitations/{invitation_id}/revoke": {
+      "post": {
+        "operationId": "revoke_invitation_api_v1_tenants__tenant__invitations__invitation_id__revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "invitation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Invitation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Invitation",
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/members/{membership_id}": {
+      "patch": {
+        "operationId": "update_member_api_v1_tenants__tenant__members__membership_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "membership_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Membership Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberUpdateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Member",
+        "tags": [
+          "tenant"
         ]
       }
     },

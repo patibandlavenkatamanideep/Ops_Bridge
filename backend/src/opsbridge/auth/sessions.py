@@ -111,7 +111,14 @@ def revoke_session(db: Database, session_hash: str) -> None:
 
 
 def upsert_login_user(
-    db: Database, *, issuer: str, subject: str, username: str, display_name: str, email: str | None
+    db: Database,
+    *,
+    issuer: str,
+    subject: str,
+    username: str,
+    display_name: str,
+    email: str | None,
+    email_verified: bool = False,
 ) -> uuid.UUID:
     """Find or create the user for a verified OIDC identity. Grants no tenant access."""
     ctx = DbContext(oidc_issuer=issuer, oidc_subject=subject)
@@ -127,6 +134,7 @@ def upsert_login_user(
                 username=username,
                 display_name=display_name,
                 email=email,
+                email_verified=bool(email and email_verified),
                 last_login_at=now,
             )
             s.add(user)
@@ -135,5 +143,6 @@ def upsert_login_user(
             user.username = username
             user.display_name = display_name
             user.email = email
+            user.email_verified = bool(email and email_verified)
             user.last_login_at = now
         return user.id

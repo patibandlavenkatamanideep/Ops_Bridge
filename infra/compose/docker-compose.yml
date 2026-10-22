@@ -94,7 +94,9 @@ services:
       OPSBRIDGE_OCR_ENABLED: ${OPSBRIDGE_OCR_ENABLED:-false}
       OPSBRIDGE_DB_HOST: postgres
       OPSBRIDGE_DB_PORT: "5432"
-      OPSBRIDGE_DB_NAME: opsbridge
+      # Its own database: the containers keep artifacts in their volume, so sharing `make dev`'s
+      # database would leave rows whose files are in another store (found by the restore drill).
+      OPSBRIDGE_DB_NAME: opsbridge_demo
       OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
       OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
       OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}

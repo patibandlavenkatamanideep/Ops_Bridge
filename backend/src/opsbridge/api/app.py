@@ -65,10 +65,20 @@ def create_app(
         same_site="lax",
         https_only=settings.secure_cookies,
     )
+    limiter = None
+    if settings.rate_limit_shared:
+        from .ratelimit import SharedWindowLimiter
+
+        limiter = SharedWindowLimiter(
+            app.state.opsbridge.db.engine,
+            settings.rate_limit_per_minute,
+            settings.rate_limit_window_seconds,
+        )
     app.add_middleware(
         PerimeterMiddleware,
         max_body_bytes=settings.max_request_bytes,
         rate_limit_per_minute=settings.rate_limit_per_minute,
+        limiter=limiter,
     )
 
     app.include_router(health.router)
@@ -78,6 +88,7 @@ def create_app(
     app.include_router(proposals.router)
     app.include_router(admin.tenant_router)
     app.include_router(admin.case_router)
+    app.include_router(admin.invitation_router)
     app.include_router(evaluations.router)
 
     if static_dir is not None and static_dir.is_dir():

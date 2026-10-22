@@ -585,9 +585,15 @@ def decide(
         return pr, ad, op
 
 
-def approver_still_authorized(s: Session, approver_id: uuid.UUID, action_type: str) -> bool:
+def approver_still_authorized(
+    s: Session, tenant_id: uuid.UUID, approver_id: uuid.UUID, action_type: str
+) -> bool:
     m = s.execute(
-        select(Membership).where(Membership.user_id == approver_id, Membership.status == "active")
+        select(Membership).where(
+            Membership.tenant_id == tenant_id,  # explicit, not only through row-level security
+            Membership.user_id == approver_id,
+            Membership.status == "active",
+        )
     ).scalar_one_or_none()
     if m is None:
         return False

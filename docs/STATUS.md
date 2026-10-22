@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-19 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-21 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -11,7 +11,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | passing — PR #1 to `main` (opened with the owner's authorization, not merged), run 39000811947 at 1f29197: all three jobs green on ubuntu-24.04 |
+| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; all three jobs on ubuntu-24.04 |
 | Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
@@ -52,7 +52,8 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   and per-session/IP rate limits; liveness/readiness.
 - UI: React 19/Vite 8 shell with sign-in, tenant switcher, case queue (loading/empty/
   denied/error states), new case form, case detail; types generated from OpenAPI.
-- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants.
+- Seed: `make seed-demo` idempotently creates only the two designated synthetic tenants
+  (since 2026-10-20 it creates missing memberships and leaves existing ones as administrators set them).
 - Commands: Makefile (`doctor setup infra-up migrate seed-demo dev demo lint typecheck test
   test-integration test-e2e verify build down reset-demo openapi`); direct equivalents in
   docs/developer-commands.md. `eval-offline` and `demo --seed-records` targets exist but
@@ -353,7 +354,7 @@ Phase 1 exit gate evidence:
 
 ## Known defects and limitations
 
-- Rate limiting is per process and in memory; not a DDoS control.
+- Rate limiting is shared across API instances (PostgreSQL) but is not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
   queue now has search (case/invoice/PO/title, wildcard-escaped) and tests use it.
@@ -366,7 +367,10 @@ Phase 1 exit gate evidence:
 - Retrieval is PostgreSQL lexical full-text search only; semantic retrieval not implemented.
 - Retention runs daily per configured tenant and on request; backups are outside its reach. Extracted
   field values and canonical records are kept as decision inputs (docs/privacy-and-retention.md).
-- Uploads are not malware-scanned; there is no in-app member editor (memberships are seeded).
+- Uploads are not malware-scanned. People join by an invitation link the administrator
+  delivers (OpsBridge sends no email); acceptance trusts the identity provider's email
+  verification. Invitation addresses are cleared by retention only if the tenant sets
+  `invitations_days`; users' own profile emails are not covered.
 - Browser tests add conversation notes and upload versions to the local demo case INV-9001.
 - A run of a different model mode is refused (409) while another run is active, instead of
   silently returning the active run (found by a browser test; fixed in Phase 3).
@@ -388,7 +392,7 @@ Phase 1 exit gate evidence:
 ## Next executable task
 
 The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
-review and, if you choose, merge PR #1 (hosted CI passes; merging is yours); with authorization, the live
+review and, if you choose, merge the open PR (#3 at the time of writing; merging is yours); with authorization, the live
 GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
 pilot owner. Local improvement that needs no authorization: the next supplier invoice
 layout for the furniture pack (from approved real samples, not the held-out layout).
@@ -580,3 +584,130 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   no tokens from the mock model, process memory not exported on macOS); rendered in a
   headless browser (docs/images/08-grafana-overview.png, synthetic local metrics).
 - `make verify` 15/15 (unit 280 + 3 skipped, integration 129, browser 23, replay check).
+
+### Tenant settings: policy versions and connector health (2026-10-19)
+- Brief §15 lists policies, members, connector health, retention and model mode on the tenant
+  settings screen; policies and connector health were missing.
+- Policies: every policy version with its state (active = in force today by the database
+  clock, using the same ordering as investigations; superseded; scheduled) and digest.
+- Connector health (`GET /api/v1/tenants/{tenant}/connectors/health`, administrators and
+  auditors): reachability and the capabilities the simulator advertises now (live discovery,
+  3 s timeout; discovery failure is reported as "assumed weakest", not hidden), what they mean
+  after an ambiguous create, attempts of the last 24 hours by phase and result, operations with
+  an unknown outcome. For GitHub: configuration flags only; GitHub is not contacted.
+- Evidence: `tests/integration/test_connector_health.py` (4: policy states; live capabilities,
+  attempt counts after a confirmed operation, and the change when the tracker stops promising
+  idempotency and lookup; unreachable tracker reported; investigators and other tenants
+  refused); browser test in `e2e/phase6.spec.ts`; the accessibility scan covers the new sections.
+
+### Shared API rate limit (2026-10-20)
+- The limit was counted per process in memory, so two API instances (the staging plan runs
+  two) allowed twice the configured rate and a restart reset it. Now one fixed window per
+  session hash or client address is counted in PostgreSQL (`rate_limit_windows`, migration
+  0006, RLS forced, API role only), aligned by the database clock, off the event loop; expired
+  windows are pruned. If the database is unavailable, each process falls back to its own
+  window, so a limit still applies. `rate_limit_shared` (on) and `rate_limit_window_seconds`.
+- Evidence: `tests/integration/test_rate_limit_shared.py` (4): two app instances allow 3 of 6
+  requests together (the old per-process mode, kept as a control, allowed all 6); the window
+  rolls over after the stated `Retry-After`; a database outage still limits per process;
+  expired windows are pruned. Cost measured locally: median 1.32 ms vs 0.55 ms per API request.
+
+### Container demo database and restore-drill finding (2026-10-20)
+- The restore drill failed: 4 attempt artifacts referenced by the dev database were missing
+  from `var/artifacts`. Cause: `make demo-containers` used the same database as `make dev`,
+  but the containers write artifacts to their own volume, so the container worker recorded
+  rows pointing at files the dev store does not have. Repaired by copying the 4 files from
+  the volume (sha256 checked); the drill then passed.
+- Prevention: the containers now use their own database `opsbridge_demo` (created by the
+  Postgres init script; `demo-containers` now runs `infra-up`, which rebuilds that image and
+  reruns the script). Evidence: after the container stack ran browser specs on :8000, the dev
+  database was unchanged (97 cases, 1022 audit events, 439 artifacts), `opsbridge_demo` had 3
+  cases, 19 audit events and 12 artifacts, and all 12 artifact files were in the volume.
+- Found on the way: phase3, phase4 and phase6 opened `INV-9001` and so passed only after
+  phase2 had created it. On the fresh demo database phase4 failed. They now create-or-open
+  the case; each spec passes alone against the containers (phase4 2, phase3 2, phase6 5).
+- Operational note: when `infra-up` recreates the Postgres container (its image changed),
+  Keycloak keeps dead pooled connections and the first sign-ins fail with an identity-provider
+  error until the pool replaces them (about a minute here). Seen once; not fixed.
+- Evidence: `make verify` 15/15 (unit 280 + 3 skipped, integration 137, browser 24); new
+  backup at revision 0006 and `make restore-drill` ok (5598 rows, 0 tables without forced
+  RLS, no artifact problems).
+
+### Member management (2026-10-20)
+- The brief gives tenant administrators membership management; memberships could only be
+  seeded. Now `PATCH /api/v1/tenants/{tenant}/members/{id}` (and the Members section of
+  tenant settings) changes another member's roles, approval scope or access (revoke,
+  reinstate) with a required reason. Changes apply on the person's next request.
+- Controls: `tenant.manage_members`; the tenant's membership rows are locked and the actor's
+  own authority is re-read under the lock; nobody changes their own membership, so an active
+  administrator always remains; unknown roles/action types refused; dropping the approver
+  role clears the scope. The audit event holds before/after only; the free-text reason is on
+  the membership row (`change_reason`, `updated_by`, migration 0007). The dispatch recheck of
+  the approver now filters by tenant explicitly instead of relying only on RLS.
+- Finding: `seed-demo` reset every existing demo membership to the fixture (roles, scope and
+  status `active`), and the container bootstrap runs it on every start, so a revoked member
+  would have regained access. Seeding now only creates missing memberships.
+- Evidence: `tests/integration/test_member_management.py` (8, real PostgreSQL): a role change
+  takes effect and is audited without the reason text; revoke and reinstate; a revoked
+  approver's earlier approval is cancelled before dispatch and nothing reaches the tracker;
+  validation and non-admin refusals; no cross-tenant change; an administrator demoted while
+  their request is in flight is refused; two administrators demoting each other while both
+  wait on the lock leave exactly one (with the re-check disabled both succeed and no
+  administrator remains, and the in-flight request goes through, so both tests fail);
+  re-seeding keeps in-app changes. Browser: `e2e/phase6.spec.ts` revokes and reinstates a
+  member with reasons; the accessibility scan covers the open editor. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 145, browser 25); restore drill ok at revision 0007.
+- Not built: protection against two colluding administrators, who can still grant each
+  other any role. (Inviting new people followed; see "Membership invitations".)
+
+### Membership invitations (2026-10-20)
+- Administrators can now add people: `POST /api/v1/tenants/{tenant}/invitations` (email,
+  roles, approval scope) returns a single-use link `/invite#<token>` once; open invitations
+  are listed in tenant settings and can be withdrawn. The person signs in and accepts
+  (`POST /api/v1/invitations/accept`). OpsBridge sends no email.
+- Binding (chosen because a link can be forwarded): a 256-bit token, stored only as SHA-256,
+  single use, 7-day expiry on the database clock, accepted only by a signed-in user whose
+  identity provider verified the invited address (`email_verified`, now recorded at every
+  sign-in), and only while the inviting administrator may still manage members. An active
+  member cannot accept; a revoked member is reinstated with the invited roles. The tenant is
+  found by token hash under its own RLS policy (read-only, only that row) and the change is
+  made in the tenant's context with its memberships locked (migration 0008).
+- The token travels in the URL fragment (not sent to servers, logs or Referer), is moved to
+  sessionStorage before the first render so it survives sign-in, and is removed from the
+  address bar. Pages outside an organization now have a header with Sign out.
+- Keycloak imports the realm file only once, so `make identity-sync` adds users that were
+  added to it later (`new-hire` verified, `unverified-hire` not; no memberships).
+- Evidence: `tests/integration/test_invitations.py` (7): join with the invited roles
+  (address normalized; single use; only the hash stored; token and address not audited); a
+  forwarded link and an unverified address are refused; expired and withdrawn links fail;
+  rules and non-admin refusals; an invitation lapses when its inviter is demoted; a revoked
+  member rejoins with new roles; RLS outside a tenant shows only the matching row,
+  read-only. Disabling the verified-address check or the inviter check makes a test fail.
+  `test_oidc_login.py` drives real Keycloak: the unverified account is refused, the
+  verified one joins. Browser: `e2e/invitations.spec.ts` (2, repeatable on the same
+  database: invite, sign in from the link, accept, land in the queue; a forwarded link is
+  refused); the accessibility scan covers the invitation form and page. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 153, browser 27); restore drill ok at revision 0008
+  (row counts equal, every table with forced RLS).
+
+### Retention for invitation addresses (2026-10-21)
+- The invitations batch left a privacy gap: the invited address stayed on accepted, withdrawn
+  and expired invitations indefinitely. A new retention key `invitations_days` clears it,
+  counted from acceptance, withdrawal or (for an invitation never used) expiry. The row keeps
+  roles, status, dates and token hash, plus `email_cleared_at` and the reason
+  (`retention:invitations_days=N`); a cleared invitation leaves the tenant settings list. A
+  pending invitation that has not expired keeps its address, since accepting needs it.
+- The sweep runs as the worker role, which had no access to invitations. Migration 0009 gives
+  it a tenant-scoped RLS policy, SELECT, and UPDATE on the three address columns only; a check
+  constraint ties `email IS NULL` to `email_cleared_at`. (First draft of that constraint was
+  inverted and was rejected by PostgreSQL against existing rows; fixed before anything ran.)
+- Evidence: `test_invitations.py::test_retention_clears_the_address_only_after_an_invitation_is_closed_or_expired`
+  (real PostgreSQL, sweep through the API and worker): with 30 days, addresses closed or
+  expired 31 days ago are cleared, one withdrawn 29 days ago and an open one are kept; the
+  open one can still be accepted; a second sweep clears nothing; the worker sees no
+  invitations outside a tenant and cannot change their status. Breaking the sweep (ignoring
+  expiry; dropping the cutoff) or the settings-list filter makes it fail. `make verify` 15/15
+  (unit 280 + 3 skipped, integration 154, browser 27); backup and restore drill ok at
+  revision 0009 (6305 rows, counts equal, every table with forced RLS).
+- Not covered: users' own profile emails (`users.email`, refreshed at sign-in) and backups
+  taken before a sweep.
