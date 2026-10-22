@@ -524,3 +524,21 @@ def test_retention_uses_the_database_clock_not_a_drifting_app_clock(
         ).status_code
         == 200
     )
+
+
+def test_an_altered_original_is_refused_not_served(stack) -> None:  # type: ignore[no-untyped-def]
+    """Review finding F16: local reads did not check the digest, so altered evidence was
+    served as the original."""
+    st = stack
+    case_id = investigated(st, "INV-9001")
+    docs = get(st, "furn-investigator", f"{T}/cases/{case_id}/documents").json()["items"]
+    version = docs[0]["versions"][0]
+    url = f"{T}/cases/{case_id}/documents/versions/{version['version_id']}/original"
+    original = get(st, "furn-investigator", url)
+    assert original.status_code == 200
+    digest_hex = version["raw_sha256"].removeprefix("sha256:")
+    [path] = list(st["settings"].artifact_dir.rglob(digest_hex))
+    path.write_bytes(original.content + b"\n% altered")
+    r = get(st, "furn-investigator", url)
+    assert r.status_code == 500 and r.json()["error"]["code"] == "evidence_integrity_failed"
+    assert b"altered" not in r.content
