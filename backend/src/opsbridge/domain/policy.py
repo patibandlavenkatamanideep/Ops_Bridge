@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
+from fractions import Fraction
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -88,6 +89,13 @@ class ConversionSpec(_Strict):
     to_unit: str
     factor: Decimal
 
+    @field_validator("factor")
+    @classmethod
+    def _positive_finite(cls, v: Decimal) -> Decimal:
+        if not v.is_finite() or v <= 0:
+            raise ValueError(f"conversion factor must be finite and positive, got {v}")
+        return v
+
     def to_domain(self) -> UnitConversion:
         return UnitConversion(self.from_unit, self.to_unit, self.factor)
 
@@ -132,6 +140,29 @@ class ReconciliationPolicy(_Strict):
         if unknown:
             raise ValueError(f"currencies without minor-unit definitions: {unknown}")
         return v
+
+    @model_validator(mode="after")
+    def _units_consistent(self) -> ReconciliationPolicy:
+        owner: dict[str, str] = {}
+        for canonical, labels in self.unit_aliases.items():
+            for label in {canonical.lower(), *(x.strip().lower() for x in labels)}:
+                if owner.setdefault(label, canonical) != canonical:
+                    raise ValueError(
+                        f"unit alias {label!r} names both {owner[label]} and {canonical}"
+                    )
+        factors: dict[tuple[str, str], Decimal] = {}
+        for c in self.unit_conversions:
+            pair = (c.from_unit, c.to_unit)
+            if pair in factors:
+                raise ValueError(f"conversion {pair[0]}->{pair[1]} is declared more than once")
+            factors[pair] = c.factor
+            back = factors.get((c.to_unit, c.from_unit))
+            if back is not None and Fraction(back) * Fraction(c.factor) != 1:
+                raise ValueError(
+                    f"conversions {c.from_unit}->{c.to_unit} ({c.factor}) and back ({back}) "
+                    "contradict each other"
+                )
+        return self
 
     @model_validator(mode="after")
     def _routes_allowed(self) -> ReconciliationPolicy:
