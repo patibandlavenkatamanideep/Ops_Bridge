@@ -46,6 +46,7 @@ from ..persistence.models import (
     SupplierAssertionRecord,
     SupplierRecord,
 )
+from .blobs import store_bytes
 from .normalize import NORMALIZATION_VERSION, normalized_digest
 from .parsers import MAX_BYTES, OcrSettings, ParsedDocument, parse, safe_filename
 from .storage import ArtifactStore
@@ -125,7 +126,7 @@ def ingest(
         session.add(doc)
         session.flush()
 
-    storage_key, raw_sha = store.put(tenant_id, data)
+    storage_key, raw_sha = store_bytes(session, store, tenant_id, data)
     latest = session.execute(
         select(DocumentVersion)
         .where(DocumentVersion.document_id == doc.id)
