@@ -40,6 +40,17 @@ class ProposalOut(BaseModel):
     status: str
     generated_at: str
     expires_at: str
+    # Why the viewer cannot decide this proposal now (null: they can). Listed proposals only.
+    decision_blocked: (
+        Literal[
+            "not_awaiting_approval",
+            "expired",
+            "no_permission",
+            "out_of_scope",
+            "separation_of_duties",
+        ]
+        | None
+    ) = None
 
 
 class ProposalList(BaseModel):
@@ -121,8 +132,9 @@ class ReviewIn(BaseModel):
     note: str = Field(min_length=5, max_length=500)
 
 
-def proposal_out(p: Proposal) -> ProposalOut:
+def proposal_out(p: Proposal, decision_blocked: str | None = None) -> ProposalOut:
     return ProposalOut(
+        decision_blocked=decision_blocked,
         id=str(p.id),
         proposal_key=str(p.proposal_key),
         version=p.version,
@@ -208,7 +220,10 @@ ERRORS = (svc.NotFound, svc.Conflict, svc.Forbidden)
 def list_proposals(case_id: uuid.UUID, principal: CurrentPrincipal, state: State) -> ProposalList:
     try:
         return ProposalList(
-            items=[proposal_out(p) for p in svc.list_proposals(state.db, principal, case_id)]
+            items=[
+                proposal_out(p, blocked)
+                for p, blocked in svc.list_proposals(state.db, principal, case_id)
+            ]
         )
     except ERRORS as exc:
         raise _map(exc) from exc
