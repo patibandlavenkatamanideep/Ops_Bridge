@@ -39,7 +39,14 @@ deleted material is no longer possible.
   The PUT replaces the whole retention map. Every change is audited (`tenant.settings_updated`).
 - `POST /api/v1/tenants/{tenant}/retention/run` (or "Run retention sweep") enqueues a
   `retention_sweep` job; the worker deletes artifact bytes, chunks, message text and
-  invitation addresses past the cutoff and writes `retention.sweep` with counts. The worker
+  invitation addresses past the cutoff and writes `retention.sweep` with counts.
+- Artifacts of a tenant share the bytes of identical content. The sweep marks expired rows
+  deleted and queues their storage keys (`blob_deletions`) in one transaction; after it
+  commits, the bytes are deleted only if no live artifact still references the key, under a
+  per-content lock that every writer also takes. A storage failure or a crash leaves the key
+  queued for the next sweep. (Until 2026-10-22 the sweep deleted shared bytes as soon as one
+  row expired, so a newer copy of the same file lost its content, and it did so before the
+  database committed; review finding F08, `tests/integration/test_retention_blobs.py`.) The worker
   role may update only the address columns of invitations, in the tenant's context
   (migration 0009).
 - The worker also schedules a sweep once per database day for every tenant that configured
