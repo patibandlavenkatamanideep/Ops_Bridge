@@ -1,11 +1,14 @@
-# OpsBridge CI. Runs on pull requests to main and on manual dispatch only (pushing the
-# feature branch does not start hosted runs). No secrets are used: setup generates a
-# throwaway .env; no paid model, GitHub-sandbox or customer calls are possible (live tests
-# never run without OPSBRIDGE_RUN_LIVE, which is not set). Actions are pinned to commits.
+# OpsBridge CI. Runs on pull requests to main, on every push to main (so the exact merge
+# commit is qualified, not only the PR head) and on manual dispatch. No secrets are used:
+# setup generates a throwaway .env; no paid model, GitHub-sandbox or customer calls are
+# possible (live tests never run without OPSBRIDGE_RUN_LIVE, which is not set). Actions are
+# pinned to commits. Nothing is published: the image is built, tested and scanned only.
 name: ci
 
 on:
   pull_request:
+    branches: [main]
+  push:
     branches: [main]
   workflow_dispatch:
 
@@ -14,7 +17,8 @@ permissions:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Superseded PR runs are cancelled; every commit on main is qualified.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   UV_VERSION: "0.10.2"
@@ -41,6 +45,8 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: make setup
+      - name: Generated API types match the backend
+        run: make openapi && git diff --exit-code -- frontend/src/api
       - run: make lint
       - run: make typecheck
       - name: Install tesseract for the OCR tests
@@ -131,3 +137,36 @@ jobs:
             devstack.log
           if-no-files-found: ignore
           retention-days: 7
+
+  image:
+    name: runtime image (build, smoke test, SBOM, vulnerability scan)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the runtime image from the locks
+        run: docker build -f infra/containers/opsbridge.Dockerfile -t opsbridge/app:ci .
+      - name: Smoke test the image (non-root, CLI, API health)
+        run: |
+          test "$(docker run --rm opsbridge/app:ci id -u)" = 10001
+          docker run --rm opsbridge/app:ci python -m opsbridge.cli --help > /dev/null
+          docker run -d --name api -p 127.0.0.1:8000:8000 \
+            -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" opsbridge/app:ci
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
+          docker logs api; exit 1
+      - name: Software bill of materials (SPDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          image: opsbridge/app:ci
+          format: spdx-json
+          artifact-name: opsbridge-image.spdx.json
+      - name: Fail on critical vulnerabilities that have a fix
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: opsbridge/app:ci
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
