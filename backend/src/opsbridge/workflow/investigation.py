@@ -20,6 +20,7 @@ from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
@@ -432,106 +433,116 @@ def _reconcile(
     policy_out: dict[str, Any],
     collected: dict[str, Any],
 ) -> dict[str, Any]:
+    from opsbridge.services.freshness import capture
+
+    with deps.db.session(_ctx(tenant_id)) as s:
+        # Taken before matching reads anything, so any later change makes this result stale.
+        state = capture(
+            s, uuid.UUID(case["case_id"]), case["invoice_number"], collected.get("po_number")
+        )
+        return {**_match(s, case, policy_out, collected), "evidence_state": state}
+
+
+def _match(
+    s: Session, case: dict[str, Any], policy_out: dict[str, Any], collected: dict[str, Any]
+) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     uncertainty: list[str] = list(collected.get("problems", []))
-    with deps.db.session(_ctx(tenant_id)) as s:
-        if policy_out.get("policy_version_id") is None:
+    if policy_out.get("policy_version_id") is None:
+        findings.append(
+            _manual_finding("policy_unavailable", policy_out.get("problem", "No effective policy."))
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": None,
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+        }
+    doc = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
+    assert doc is not None
+    policy = ReconciliationPolicy.model_validate(doc.document)
+    if not case["invoice_number"]:
+        findings.append(
+            _manual_finding(
+                "invoice_reference_missing",
+                "The case does not identify an invoice; add the invoice number.",
+                "needs_information",
+            )
+        )
+        return {
+            "outcome": "needs_information",
+            "findings": findings,
+            "recommendation": None,
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    loaded = load_match_input(s, case["invoice_number"], collected.get("po_number"))
+    version_ids = sorted(str(v) for v in loaded.version_ids)
+    if loaded.match_input is None:
+        reasons = collected.get("unavailable") or loaded.missing
+        needs_review_docs = [
+            d
+            for d in collected.get("documents", [])
+            if d["record_type"] == "invoice" and d["parse_status"] != "parsed"
+        ]
+        if needs_review_docs:
             findings.append(
                 _manual_finding(
-                    "policy_unavailable", policy_out.get("problem", "No effective policy.")
+                    "invoice_extraction_needs_review",
+                    "The invoice document could not be read reliably ("
+                    + "; ".join(
+                        p for p in collected.get("problems", []) if p.startswith("invoice")
+                    )[:400]
+                    + "). Its values were not used; a person must review or supply a structured copy.",
                 )
             )
-            return {
-                "outcome": "manual_review",
-                "findings": findings,
-                "recommendation": None,
-                "uncertainty": uncertainty,
-                "version_ids": [],
-                "corrections": [],
-            }
-        doc = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
-        assert doc is not None
-        policy = ReconciliationPolicy.model_validate(doc.document)
-        if not case["invoice_number"]:
+            outcome = "manual_review"
+        else:
             findings.append(
                 _manual_finding(
-                    "invoice_reference_missing",
-                    "The case does not identify an invoice; add the invoice number.",
+                    "invoice_record_unavailable",
+                    f"The invoice record is not available from the authorized sources ({', '.join(reasons)}).",
                     "needs_information",
                 )
             )
-            return {
-                "outcome": "needs_information",
-                "findings": findings,
-                "recommendation": None,
-                "uncertainty": uncertainty,
-                "version_ids": [],
-                "corrections": [],
-                "policy_ref": policy.ref,
-            }
-        loaded = load_match_input(s, case["invoice_number"], collected.get("po_number"))
-        version_ids = sorted(str(v) for v in loaded.version_ids)
-        if loaded.match_input is None:
-            reasons = collected.get("unavailable") or loaded.missing
-            needs_review_docs = [
-                d
-                for d in collected.get("documents", [])
-                if d["record_type"] == "invoice" and d["parse_status"] != "parsed"
-            ]
-            if needs_review_docs:
-                findings.append(
-                    _manual_finding(
-                        "invoice_extraction_needs_review",
-                        "The invoice document could not be read reliably ("
-                        + "; ".join(
-                            p for p in collected.get("problems", []) if p.startswith("invoice")
-                        )[:400]
-                        + "). Its values were not used; a person must review or supply a structured copy.",
-                    )
-                )
-                outcome = "manual_review"
-            else:
-                findings.append(
-                    _manual_finding(
-                        "invoice_record_unavailable",
-                        f"The invoice record is not available from the authorized sources ({', '.join(reasons)}).",
-                        "needs_information",
-                    )
-                )
-                outcome = "needs_information"
-            return {
-                "outcome": outcome,
-                "findings": findings,
-                "recommendation": _rec_for(outcome, policy, case),
-                "uncertainty": uncertainty,
-                "version_ids": version_ids,
-                "corrections": [],
-                "policy_ref": policy.ref,
-            }
-        result: MatchResult = reconcile(loaded.match_input, policy)
-        rec = recommend(result, policy, case["case_number"])
-        uncertainty += [
-            f"supplier claim unconfirmed: {f.summary}"
-            for f in result.findings
-            if f.reason_code == "supplier_claim_unverified"
-        ]
-        uncertainty += [
-            f"corrected value used for {c['field']} ({c['original']} → {c['corrected']})"
-            for c in loaded.corrections_applied
-        ]
+            outcome = "needs_information"
         return {
-            "outcome": result.outcome,
-            "findings": [f.to_dict() for f in result.findings],
-            "recommendation": rec.to_dict(),
+            "outcome": outcome,
+            "findings": findings,
+            "recommendation": _rec_for(outcome, policy, case),
             "uncertainty": uncertainty,
             "version_ids": version_ids,
-            "corrections": loaded.corrections_applied,
-            "policy_ref": result.policy_ref,
-            "rules_version": result.rules_version,
-            # identifiers the matcher resolved; outbound redaction keeps them intact
-            "resolved_po_number": result.resolved_po_number,
-            "resolved_supplier_id": result.resolved_supplier_id,
+            "corrections": [],
+            "policy_ref": policy.ref,
         }
+    result: MatchResult = reconcile(loaded.match_input, policy)
+    rec = recommend(result, policy, case["case_number"])
+    uncertainty += [
+        f"supplier claim unconfirmed: {f.summary}"
+        for f in result.findings
+        if f.reason_code == "supplier_claim_unverified"
+    ]
+    uncertainty += [
+        f"corrected value used for {c['field']} ({c['original']} → {c['corrected']})"
+        for c in loaded.corrections_applied
+    ]
+    return {
+        "outcome": result.outcome,
+        "findings": [f.to_dict() for f in result.findings],
+        "recommendation": rec.to_dict(),
+        "uncertainty": uncertainty,
+        "version_ids": version_ids,
+        "corrections": loaded.corrections_applied,
+        "policy_ref": result.policy_ref,
+        "rules_version": result.rules_version,
+        # identifiers the matcher resolved; outbound redaction keeps them intact
+        "resolved_po_number": result.resolved_po_number,
+        "resolved_supplier_id": result.resolved_supplier_id,
+    }
 
 
 def _rec_for(outcome: str, policy: ReconciliationPolicy, case: dict[str, Any]) -> dict[str, Any]:
@@ -933,6 +944,7 @@ def _finalize(
             rules_version=recon.get("rules_version", "n/a"),
             source_manifest=manifest,
             source_manifest_digest=digest(manifest),
+            evidence_state=recon.get("evidence_state"),
         )
         s.add(iv)
         s.flush()
