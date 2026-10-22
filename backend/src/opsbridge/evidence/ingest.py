@@ -363,10 +363,13 @@ def _store_records(
                 )
             )
     for inv in m.invoices:
+        # A newer document wins for the same supplier's invoice; another supplier's invoice
+        # with the same number is a different invoice and stays current.
         session.execute(
             update(InvoiceRecord)
             .where(
                 InvoiceRecord.invoice_number == inv.invoice_number,
+                InvoiceRecord.supplier_key.is_not_distinct_from(inv.supplier_id),
                 InvoiceRecord.superseded_at.is_(None),
             )
             .values(superseded_at=datetime.now(UTC))
