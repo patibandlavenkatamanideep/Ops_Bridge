@@ -778,3 +778,32 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   (7083 rows, counts equal, every table with forced RLS). The browser suite caught one fault
   in a first F07 version (see review-findings.md); fixed before this entry.
 - Next: Phase B (F05, F06, F08, F09, F10, F16).
+
+### External review, Phase B: concurrency and failure (2026-10-22)
+- F05: an investigation handler never saw its job, so a step outlasting the lease let a
+  second worker run the same investigation, a worker that had lost the job still wrote its
+  results, a job whose worker died on every attempt was re-claimed forever, and a resumed run
+  started a fresh model-call budget. Investigations now hold their job's lease: writes are
+  fenced, the lease is renewed during a step for at most the step limit (300 s), finalization
+  decides under the case lock, exhausted jobs are given up, and the budget counts recorded
+  calls.
+- F06: spend and the daily call quota were checked, then the model called; concurrent workers
+  overspent. A call is now reserved (pending row with its estimated cost) under the
+  organization's lock before it is sent and settled afterwards; crashes and timeouts keep the
+  estimate charged; investigation starts are serialized per organization for the hourly quota;
+  prices and the ceiling must be finite and non-negative.
+- F08: retention deleted bytes another artifact still used, before the database committed. It
+  now queues the keys with the row changes (migration 0015) and deletes bytes only when no
+  live artifact references them, under a per-content lock that writers also take.
+- F09: any session cookie, verified or not, chose its own rate-limit bucket. Every API request
+  now counts against its client address (X-Forwarded-For only from `trusted_proxies`); a
+  verified user also has their own budget; the fallback limiter is truly bounded.
+- F10: unit inverses are derived exactly (1/6 is refused, not rounded); policies refuse zero,
+  negative or non-finite factors, contradictory pairs and aliases naming two units.
+- F16: local artifact reads verify the digest; an altered original is refused, not served.
+- Each fix started with a test that failed on the previous source (F05's resumed-budget case
+  was found by reading: the test stack itself needs the new worker interface).
+- Evidence: `make verify` 15/15 (unit 310 + 3 skipped, integration 199, browser 27); benchmark
+  replay reproduces held-out and security; canary 64/64; backup and restore drill ok at 0015
+  (7465 rows, counts equal, every table with forced RLS).
+- Next: Phase C (F13 production profile, F14 release qualification in CI, F17 strict verify).
