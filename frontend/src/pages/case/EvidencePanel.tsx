@@ -57,6 +57,11 @@ export function EvidencePanel({ tenant, caseId, focus }: { tenant: string; caseI
                 <li key={d.document_id}>
                   <span className="doc-title">{d.title}</span>
                   <span className="muted small"> {statusLabel(d.kind)}</span>
+                  {d.withdrawn_at && (
+                    <span className="badge" title={`Since ${new Date(d.withdrawn_at).toLocaleString()}`}>
+                      No longer in the purchasing system
+                    </span>
+                  )}
                   <ul>
                     {d.versions.map((v) => (
                       <li key={v.version_id}>
@@ -107,6 +112,7 @@ function UploadForm({ tenant, caseId, onUploaded }: { tenant: string; caseId: st
     },
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ["documents", tenant, caseId] });
+      void qc.invalidateQueries({ queryKey: ["investigation", tenant, caseId] }); // now out of date
       setFile(null);
       if (inputRef.current) inputRef.current.value = "";
       onUploaded(r);
@@ -318,6 +324,7 @@ function CorrectionForm({ tenant, caseId, versionId, field, onDone }: { tenant: 
       }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["version", tenant, caseId, versionId] });
+      qc.invalidateQueries({ queryKey: ["investigation", tenant, caseId] }); // now out of date
       onDone();
     },
   });
