@@ -881,3 +881,16 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - Evidence: `make verify` 15/15 (unit 350 incl. the 21 contract checks, integration 208,
   browser 28); benchmark replay reproduces held-out and security; 0016 downgrade and upgrade
   on the test database.
+
+### Dependabot follow-ups and tenant task connections (2026-10-25)
+- Dependabot: #5 (Python 3.15 image) closed by Dependabot after the ignore rule; #11
+  (TypeScript 7) told to ignore that major. PR #16 unblocks #8 (axe-core 4.14 found citation
+  buttons whose accessible name did not contain their visible text; fixed) and replaces #14
+  (anthropic 2.1.0: the key goes as a bearer token; the SDK's own tracing is kept to metadata
+  and sends no trace context). Merging is the owner's: this session may not merge.
+- Task connections (Package 11): each tenant has a versioned connection (connector,
+  destination, credential reference, reason, who) instead of deployment-wide GitHub settings
+  (0017). Repositories must be allowlisted; rotate, move and revoke from tenant settings.
+  Approvals bind the destination; dispatch writes and recovers at the approved destination.
+  A probe on the previous code showed recovery looking in the newly configured repository and
+  leaving a created issue as `outcome_unknown`.
