@@ -9,12 +9,15 @@ the digest, and the result is stale until the investigation is re-run. A change 
 while matching runs also makes it stale (a false alarm at worst, never a missed change).
 
 This is local freshness only: it cannot show that the source system has not changed since
-the records were fetched.
+the records were fetched. For that, an investigation also records when it read the purchasing
+system and until when its result may be acted on (`source_max_age_hours`); after that, or
+when the time was not recorded, the result is stale too.
 """
 
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -83,4 +86,14 @@ def stale_reason(s: Session, case_id: uuid.UUID, iv: InvestigationVersion) -> st
         recorded["po_number"],
         recorded.get("supplier_id"),  # absent before suppliers were recorded
     )
-    return None if now["digest"] == recorded["digest"] else STALE
+    if now["digest"] != recorded["digest"]:
+        return STALE
+    if "source_valid_until" not in recorded:
+        return "the investigation does not record when it read the purchasing system; re-run it"
+    if datetime.now(UTC) > datetime.fromisoformat(recorded["source_valid_until"]):
+        read = datetime.fromisoformat(recorded["source_read_at"])
+        return (
+            f"purchasing data was read at {read:%Y-%m-%d %H:%M} UTC, longer ago than the "
+            "limit for acting on it; re-run the investigation"
+        )
+    return None
