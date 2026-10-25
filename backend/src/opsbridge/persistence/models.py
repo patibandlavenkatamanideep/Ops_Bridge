@@ -1051,6 +1051,9 @@ class Attempt(Base):
     fencing_token: Mapped[int | None] = mapped_column(BigInteger)
     started_at: Mapped[datetime] = created()
     finished_at: Mapped[datetime | None]
+    # A create's request deadline (migration 0018): the provider commits nothing after it, so
+    # only once it has passed can a lookup that finds nothing prove the create did not happen.
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         _tenant_unique("attempts"),
         _fk(["operation_id"], "operations", "fk_attempts_operation"),
