@@ -516,6 +516,16 @@
             "title": "Configuration",
             "type": "object"
           },
+          "connection": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskConnectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "connector": {
             "title": "Connector",
             "type": "string"
@@ -2364,6 +2374,21 @@
         "title": "ReviewIn",
         "type": "object"
       },
+      "RevokeConnectionIn": {
+        "properties": {
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "RevokeConnectionIn",
+        "type": "object"
+      },
       "RunOut": {
         "properties": {
           "created_at": {
@@ -2442,6 +2467,7 @@
         "type": "object"
       },
       "SettingsIn": {
+        "additionalProperties": false,
         "properties": {
           "model_mode": {
             "anyOf": [
@@ -2468,18 +2494,6 @@
               }
             ],
             "title": "Retention"
-          },
-          "task_connector": {
-            "anyOf": [
-              {
-                "maxLength": 32,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Task Connector"
           }
         },
         "title": "SettingsIn",
@@ -2590,6 +2604,218 @@
           }
         },
         "title": "StartIn",
+        "type": "object"
+      },
+      "TaskConnectionIn": {
+        "additionalProperties": false,
+        "properties": {
+          "connector": {
+            "enum": [
+              "sim_tasks",
+              "github_issues"
+            ],
+            "title": "Connector",
+            "type": "string"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "reason": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Reason",
+            "type": "string"
+          },
+          "repository": {
+            "anyOf": [
+              {
+                "maxLength": 201,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repository"
+          }
+        },
+        "required": [
+          "connector",
+          "reason"
+        ],
+        "title": "TaskConnectionIn",
+        "type": "object"
+      },
+      "TaskConnectionOut": {
+        "properties": {
+          "connector": {
+            "title": "Connector",
+            "type": "string"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "created_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created By"
+          },
+          "credential_configured": {
+            "title": "Credential Configured",
+            "type": "boolean"
+          },
+          "credential_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credential Ref"
+          },
+          "credential_source": {
+            "title": "Credential Source",
+            "type": "string"
+          },
+          "destination": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Destination",
+            "type": "object"
+          },
+          "end_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Reason"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "ended_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended By"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "enum": [
+              "active",
+              "superseded",
+              "revoked"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "version",
+          "connector",
+          "destination",
+          "credential_ref",
+          "credential_source",
+          "credential_configured",
+          "status",
+          "reason",
+          "created_at",
+          "created_by",
+          "ended_at",
+          "ended_by",
+          "end_reason"
+        ],
+        "title": "TaskConnectionOut",
+        "type": "object"
+      },
+      "TaskConnectionsOut": {
+        "properties": {
+          "active": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TaskConnectionOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "allowed_repositories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Repositories",
+            "type": "array"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/TaskConnectionOut"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "active",
+          "versions",
+          "allowed_repositories"
+        ],
+        "title": "TaskConnectionsOut",
         "type": "object"
       },
       "TenantInfo": {
@@ -4854,6 +5080,161 @@
           }
         },
         "summary": "Put Settings",
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/task-connection": {
+      "get": {
+        "operationId": "task_connection_api_v1_tenants__tenant__task_connection_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnectionsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Task Connection",
+        "tags": [
+          "tenant"
+        ]
+      },
+      "post": {
+        "description": "A new version of the tenant's task connection. Pending approvals for another\ndestination become stale; nothing already sent is redirected.",
+        "operationId": "change_task_connection_api_v1_tenants__tenant__task_connection_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskConnectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Task Connection",
+        "tags": [
+          "tenant"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/task-connection/revoke": {
+      "post": {
+        "description": "Stop sending follow-up tasks until a new connection is made.",
+        "operationId": "revoke_task_connection_api_v1_tenants__tenant__task_connection_revoke_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RevokeConnectionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskConnectionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Task Connection",
         "tags": [
           "tenant"
         ]
