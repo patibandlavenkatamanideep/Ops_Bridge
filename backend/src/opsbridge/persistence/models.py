@@ -300,6 +300,45 @@ class Artifact(Base):
     )
 
 
+class TaskConnection(Base):
+    """One version of a tenant's follow-up task connection (migration 0017): which connector,
+    the non-secret destination it writes to, and a reference to its credential, which lives in
+    the deployment's secret store, never here. A change makes a new version; one is active.
+    Approvals bind the destination, so pointing the connection elsewhere makes them stale;
+    revoking it stops new writes. Dispatch recovers a write at the approved destination."""
+
+    __tablename__ = "task_connections"
+    id: Mapped[uuid.UUID] = pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    version: Mapped[int] = mapped_column(Integer)
+    connector: Mapped[str] = mapped_column(String(32))
+    destination: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    credential_ref: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(16))  # active | superseded | revoked
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    created_at: Mapped[datetime] = created()
+    ended_at: Mapped[datetime | None]
+    ended_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
+    end_reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        _tenant_unique("task_connections"),
+        UniqueConstraint("tenant_id", "version", name="uq_task_connections_version"),
+        Index(
+            "uq_task_connections_active",
+            "tenant_id",
+            unique=True,
+            postgresql_where=text("status = 'active'"),
+        ),
+        CheckConstraint(
+            "status in ('active','superseded','revoked')", name="ck_task_connections_status"
+        ),
+        CheckConstraint(
+            "connector in ('sim_tasks','github_issues')", name="ck_task_connections_connector"
+        ),
+    )
+
+
 class BlobDeletion(Base):
     """Bytes queued for deletion after retention marked their artifact rows deleted (same
     transaction). The purge deletes them only if no live row still references the key, and
