@@ -100,6 +100,16 @@ records are tombstones. An investigation's `collect_context` output records `wit
 adds `source_read_at` and `source_valid_until`. `source_documents.withdrawn_at` (0016) marks
 documents the source no longer holds.
 
+## Task connections (`backend/src/opsbridge/services/connections.py`, migration 0017)
+
+`task_connections`: per tenant, versions `1..n` with `connector`, `destination` (exactly what
+proposals bind: `{"connector": "sim_tasks", "organization"}` or `{"connector":
+"github_issues", "repository"}`), `credential_ref` (a secret-store name, never the secret),
+`status` (`active` | `superseded` | `revoked`, one active at most), who made and ended each
+version and why. API: `GET/POST /tenants/{t}/task-connection`, `POST
+/tenants/{t}/task-connection/revoke`. `PUT /settings` no longer takes `task_connector` (an
+unknown field is refused with 422).
+
 ## API (`/api/v1`, OpenAPI at `/api/v1/openapi.json`)
 
 Generated into `frontend/src/api/openapi.json` and `schema.d.ts` (`make openapi`). Errors are
