@@ -6,6 +6,8 @@ Each connector states, explicitly:
   ("strong": an empty result proves absence; "eventual": an empty result is inconclusive;
   "none": no lookup);
 - whether conditional writes are supported;
+- whether the provider honours a request deadline (commits nothing after it), which is what
+  lets a lookup that finds nothing prove that an ambiguous create did not happen;
 - which failures are definite (nothing happened) versus ambiguous (it may have happened).
 The executor uses these declarations to decide between retry, reconcile and
 outcome_unknown. It never retries an ambiguous write blindly.
@@ -31,6 +33,10 @@ class ConnectorCapabilities:
     definite_failure_statuses: frozenset[int]
     retryable_definite_statuses: frozenset[int]
     notes: str = ""
+    # The provider refuses to commit a write after the deadline its request carries. Without
+    # it, a write whose response was lost may still land later, so finding nothing proves
+    # nothing (a strong lookup only sees what has been committed).
+    request_deadlines: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -39,6 +45,7 @@ class ConnectorCapabilities:
             "conditional_writes": self.conditional_writes,
             "definite_failure_statuses": sorted(self.definite_failure_statuses),
             "retryable_definite_statuses": sorted(self.retryable_definite_statuses),
+            "request_deadlines": self.request_deadlines,
             "notes": self.notes,
         }
 
@@ -49,6 +56,7 @@ class TaskRequest:
     body: str
     assignee_group: str | None
     marker: str  # opaque marker embedded in the remote task for reconciliation
+    deadline: float | None = None  # epoch seconds after which the provider must not commit it
 
 
 @dataclass(frozen=True)
@@ -110,10 +118,11 @@ class SimTaskConnector:
         *,
         idempotency_keys: bool | None = None,
         lookup: Consistency | None = None,
+        request_deadlines: bool | None = None,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.org = org
-        self._declared = (idempotency_keys, lookup)
+        self._declared = (idempotency_keys, lookup, request_deadlines)
         self._capabilities: ConnectorCapabilities | None = None
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
@@ -130,11 +139,12 @@ class SimTaskConnector:
         ambiguous result is sent to human review instead of being retried into a duplicate.
         """
         if self._capabilities is None:
-            idem, lookup = self._declared
-            if idem is None or lookup is None:
-                found_idem, found_lookup = self._discover()
+            idem, lookup, deadlines = self._declared
+            if idem is None or lookup is None or deadlines is None:
+                found_idem, found_lookup, found_deadlines = self._discover()
                 idem = found_idem if idem is None else idem
                 lookup = found_lookup if lookup is None else lookup
+                deadlines = found_deadlines if deadlines is None else deadlines
             self._capabilities = ConnectorCapabilities(
                 idempotency_keys=idem,
                 lookup=lookup,
@@ -143,11 +153,13 @@ class SimTaskConnector:
                 retryable_definite_statuses=frozenset({503}),
                 notes="503 is definite only with X-Sim-Not-Committed: true; other 5xx and timeouts are "
                 "ambiguous. Capabilities discovered from the tracker unless configured.",
+                request_deadlines=deadlines,
             )
         return self._capabilities
 
-    def discover(self) -> tuple[bool, Consistency] | None:
-        """The tracker's advertised (idempotency keys, lookup), or None if it could not say."""
+    def discover(self) -> tuple[bool, Consistency, bool] | None:
+        """The tracker's advertised (idempotency keys, lookup, request deadlines), or None if
+        it could not say. A tracker that does not mention deadlines does not honour them."""
         try:
             r = self._client.get(f"/orgs/{self.org}/capabilities", timeout=3.0)
             if r.status_code == 200:
@@ -158,13 +170,13 @@ class SimTaskConnector:
                     "eventual",
                     "none",
                 ):
-                    return d["idempotency_keys"], lookup
+                    return d["idempotency_keys"], lookup, d.get("request_deadlines") is True
         except (httpx.HTTPError, ValueError):
             pass
         return None
 
-    def _discover(self) -> tuple[bool, Consistency]:
-        return self.discover() or (False, "none")
+    def _discover(self) -> tuple[bool, Consistency, bool]:
+        return self.discover() or (False, "none", False)
 
     def close(self) -> None:
         self._client.close()
@@ -184,6 +196,8 @@ class SimTaskConnector:
             if (idempotency_key and self.capabilities.idempotency_keys)
             else {}
         )
+        if req.deadline is not None:
+            headers["X-Request-Deadline"] = f"{req.deadline:.3f}"
         body = {
             "title": req.title,
             "body": req.body,
@@ -206,9 +220,9 @@ class SimTaskConnector:
             raise DefiniteFailure(f"connection refused: {exc}", retryable=True) from exc
         if r.status_code in (200, 201):
             return self._task(r.json())
-        if r.status_code == 503 and r.headers.get("x-sim-not-committed") == "true":
+        if r.status_code in (503, 504) and r.headers.get("x-sim-not-committed") == "true":
             raise DefiniteFailure(
-                "provider unavailable (not committed)", retryable=True, status=503
+                "provider did not commit the task", retryable=True, status=r.status_code
             )
         if r.status_code in self.capabilities.definite_failure_statuses:
             raise DefiniteFailure(

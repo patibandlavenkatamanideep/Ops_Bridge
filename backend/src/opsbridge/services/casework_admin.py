@@ -401,7 +401,7 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
     configuration: dict[str, Any] = {}
     reachable: bool | None = None
     if conn is None:
-        idem, lookup = False, "none"
+        idem, lookup, deadlines = False, "none", False
         source = "no active task connection: follow-up tasks are not sent"
     elif name == "sim_tasks":
         from opsbridge.connectors.tasks import SimTaskConnector
@@ -414,7 +414,7 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         finally:
             sim.close()
         reachable = found is not None
-        idem, lookup = found or (False, "none")
+        idem, lookup, deadlines = found or (False, "none", False)
         source = (
             "advertised by the task tracker just now"
             if found
@@ -426,6 +426,7 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         reachable = None
         idem = GitHubIssuesConnector.capabilities.idempotency_keys
         lookup = GitHubIssuesConnector.capabilities.lookup
+        deadlines = GitHubIssuesConnector.capabilities.request_deadlines
         source = "declared from GitHub's documentation; GitHub is not contacted from here"
         repository = (connection or {}).get("destination", {}).get("repository") or ""
         configuration = {
@@ -440,8 +441,16 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         meaning = "Nothing is sent until an administrator sets up a task connection."
     elif idem:
         meaning = "An ambiguous create can be resent with the same idempotency key."
+    elif lookup == "strong" and deadlines:
+        meaning = (
+            "An ambiguous create is looked up once its deadline has passed; it is sent again "
+            "only if the tracker shows it never happened."
+        )
     elif lookup in ("strong", "eventual"):
-        meaning = "An ambiguous create is reconciled by lookup before any resend."
+        meaning = (
+            "An ambiguous create is looked up; if it is not found it goes to human review, "
+            "never resent (finding nothing cannot prove it will not still land)."
+        )
     else:
         meaning = "An ambiguous create cannot be checked: it goes to human review, never resent."
     return {
@@ -449,7 +458,11 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         "connection": connection,
         "checked_at": checked_at.isoformat(),
         "reachable": reachable,
-        "capabilities": {"idempotency_keys": idem, "lookup": lookup},
+        "capabilities": {
+            "idempotency_keys": idem,
+            "lookup": lookup,
+            "request_deadlines": deadlines,
+        },
         "capability_source": source,
         "meaning": meaning,
         "configuration": configuration,
