@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     investigation_step_limit_seconds: int = 300
     worker_poll_seconds: float = 1.0
     connector_timeout_seconds: float = 5.0
+    # An investigation's purchasing data may be acted on (proposals, approvals, dispatch,
+    # resolution) for this long after it was read; then the investigation must be re-run.
+    source_max_age_hours: float = Field(default=24.0, gt=0)
 
     @model_validator(mode="after")
     def _absolute_paths(self) -> Settings:
