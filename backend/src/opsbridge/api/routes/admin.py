@@ -6,7 +6,7 @@ import uuid
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
-from pydantic import BaseModel, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 from opsbridge.auth.permissions import Role, require
 from opsbridge.domain.policy import ActionType
@@ -15,6 +15,7 @@ from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import DbContext
 from opsbridge.services import casework_admin as svc
+from opsbridge.services import connections as conn_svc
 from opsbridge.services import invitations as inv_svc
 from opsbridge.services.investigations import Conflict, NotFound
 from opsbridge.workflow import jobs
@@ -37,9 +38,46 @@ def _map(exc: Exception) -> ApiError:
 
 
 class SettingsIn(BaseModel):
+    # Unknown fields are refused: the task connector moved to /task-connection, and a client
+    # still sending it must not be told its change was saved.
+    model_config = ConfigDict(extra="forbid")
     model_mode: str | None = Field(default=None, max_length=24)
-    task_connector: str | None = Field(default=None, max_length=32)
     retention: dict[str, int] | None = None
+
+
+class TaskConnectionOut(BaseModel):
+    id: str
+    version: int
+    connector: str
+    destination: dict[str, str]
+    credential_ref: str | None
+    credential_source: str
+    credential_configured: bool
+    status: Literal["active", "superseded", "revoked"]
+    reason: str | None
+    created_at: str
+    created_by: str | None
+    ended_at: str | None
+    ended_by: str | None
+    end_reason: str | None
+
+
+class TaskConnectionsOut(BaseModel):
+    active: TaskConnectionOut | None
+    versions: list[TaskConnectionOut]
+    allowed_repositories: list[str]  # GitHub repositories this deployment allows
+
+
+class TaskConnectionIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    connector: Literal["sim_tasks", "github_issues"]
+    repository: str | None = Field(default=None, max_length=201)
+    credential_ref: str | None = Field(default=None, max_length=64)
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class RevokeConnectionIn(BaseModel):
+    reason: str = Field(min_length=1, max_length=500)
 
 
 class TenantInfo(BaseModel):
@@ -126,7 +164,8 @@ class AttemptStat(BaseModel):
 
 
 class ConnectorHealthOut(BaseModel):
-    connector: str
+    connector: str  # "none" when the connection was revoked
+    connection: TaskConnectionOut | None = None
     checked_at: str
     reachable: bool | None  # None: not checked live (needs authorization)
     capabilities: dict[str, Any]
@@ -223,6 +262,53 @@ def connector_health(principal: CurrentPrincipal, state: State) -> ConnectorHeal
         raise _map(exc) from exc
 
 
+@tenant_router.get("/task-connection", response_model=TaskConnectionsOut)
+def task_connection(principal: CurrentPrincipal, state: State) -> TaskConnectionsOut:
+    return TaskConnectionsOut.model_validate(conn_svc.history(state.db, principal, state.settings))
+
+
+@tenant_router.post("/task-connection", response_model=TaskConnectionOut, status_code=201)
+def change_task_connection(
+    body: TaskConnectionIn, principal: CurrentPrincipal, state: State, request: Request
+) -> TaskConnectionOut:
+    """A new version of the tenant's task connection. Pending approvals for another
+    destination become stale; nothing already sent is redirected."""
+    try:
+        return TaskConnectionOut.model_validate(
+            conn_svc.change(
+                state.db,
+                principal,
+                state.settings,
+                connector=body.connector,
+                repository=body.repository,
+                credential_ref=body.credential_ref,
+                reason=body.reason,
+                correlation_id=request.state.correlation_id,
+            )
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+
+
+@tenant_router.post("/task-connection/revoke", response_model=TaskConnectionOut)
+def revoke_task_connection(
+    body: RevokeConnectionIn, principal: CurrentPrincipal, state: State, request: Request
+) -> TaskConnectionOut:
+    """Stop sending follow-up tasks until a new connection is made."""
+    try:
+        return TaskConnectionOut.model_validate(
+            conn_svc.revoke(
+                state.db,
+                principal,
+                state.settings,
+                reason=body.reason,
+                correlation_id=request.state.correlation_id,
+            )
+        )
+    except (NotFound, Conflict) as exc:
+        raise _map(exc) from exc
+
+
 @tenant_router.put("/settings", response_model=SettingsOut)
 def put_settings(
     body: SettingsIn, principal: CurrentPrincipal, state: State, request: Request
@@ -232,7 +318,6 @@ def put_settings(
             state.db,
             principal,
             model_mode=body.model_mode,
-            task_connector=body.task_connector,
             retention=body.retention,
             correlation_id=request.state.correlation_id,
         )

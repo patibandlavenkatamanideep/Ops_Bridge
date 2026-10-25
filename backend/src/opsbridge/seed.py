@@ -17,6 +17,7 @@ from opsbridge.persistence.models import (
     Membership,
     PolicyVersion,
     ServiceIdentity,
+    TaskConnection,
     Tenant,
     TenantSettings,
     User,
@@ -128,6 +129,17 @@ def seed_demo(
                         model_mode=t.get("model_mode", "mock"),
                         task_connector="sim_tasks",
                         retention={},
+                    )
+                )
+            if s.execute(select(TaskConnection.id).limit(1)).first() is None:
+                s.add(
+                    TaskConnection(
+                        tenant_id=tid,
+                        version=1,
+                        connector="sim_tasks",
+                        destination={"connector": "sim_tasks", "organization": t["slug"]},
+                        status="active",
+                        reason="demo seed",
                     )
                 )
             for rel in t["policies"]:

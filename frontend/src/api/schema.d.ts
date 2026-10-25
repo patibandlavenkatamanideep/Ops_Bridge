@@ -502,6 +502,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/task-connection": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Task Connection */
+        get: operations["task_connection_api_v1_tenants__tenant__task_connection_get"];
+        put?: never;
+        /**
+         * Change Task Connection
+         * @description A new version of the tenant's task connection. Pending approvals for another
+         *     destination become stale; nothing already sent is redirected.
+         */
+        post: operations["change_task_connection_api_v1_tenants__tenant__task_connection_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/task-connection/revoke": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revoke Task Connection
+         * @description Stop sending follow-up tasks until a new connection is made.
+         */
+        post: operations["revoke_task_connection_api_v1_tenants__tenant__task_connection_revoke_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -721,6 +763,7 @@ export interface components {
             configuration: {
                 [key: string]: boolean;
             };
+            connection?: components["schemas"]["TaskConnectionOut"] | null;
             /** Connector */
             connector: string;
             /** Meaning */
@@ -1288,6 +1331,11 @@ export interface components {
             /** Remote Ref */
             remote_ref?: string | null;
         };
+        /** RevokeConnectionIn */
+        RevokeConnectionIn: {
+            /** Reason */
+            reason: string;
+        };
         /** RunOut */
         RunOut: {
             /** Created At */
@@ -1319,8 +1367,6 @@ export interface components {
             retention?: {
                 [key: string]: number;
             } | null;
-            /** Task Connector */
-            task_connector?: string | null;
         };
         /** SettingsOut */
         SettingsOut: {
@@ -1360,6 +1406,64 @@ export interface components {
         StartIn: {
             /** Model Mode */
             model_mode?: ("rules_only" | "mock" | "anthropic" | "ollama") | null;
+        };
+        /** TaskConnectionIn */
+        TaskConnectionIn: {
+            /**
+             * Connector
+             * @enum {string}
+             */
+            connector: "sim_tasks" | "github_issues";
+            /** Credential Ref */
+            credential_ref?: string | null;
+            /** Reason */
+            reason: string;
+            /** Repository */
+            repository?: string | null;
+        };
+        /** TaskConnectionOut */
+        TaskConnectionOut: {
+            /** Connector */
+            connector: string;
+            /** Created At */
+            created_at: string;
+            /** Created By */
+            created_by: string | null;
+            /** Credential Configured */
+            credential_configured: boolean;
+            /** Credential Ref */
+            credential_ref: string | null;
+            /** Credential Source */
+            credential_source: string;
+            /** Destination */
+            destination: {
+                [key: string]: string;
+            };
+            /** End Reason */
+            end_reason: string | null;
+            /** Ended At */
+            ended_at: string | null;
+            /** Ended By */
+            ended_by: string | null;
+            /** Id */
+            id: string;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "active" | "superseded" | "revoked";
+            /** Version */
+            version: number;
+        };
+        /** TaskConnectionsOut */
+        TaskConnectionsOut: {
+            active: components["schemas"]["TaskConnectionOut"] | null;
+            /** Allowed Repositories */
+            allowed_repositories: string[];
+            /** Versions */
+            versions: components["schemas"]["TaskConnectionOut"][];
         };
         /** TenantInfo */
         TenantInfo: {
@@ -2570,6 +2674,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    task_connection_api_v1_tenants__tenant__task_connection_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskConnectionsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_task_connection_api_v1_tenants__tenant__task_connection_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TaskConnectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskConnectionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_task_connection_api_v1_tenants__tenant__task_connection_revoke_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevokeConnectionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskConnectionOut"];
                 };
             };
             /** @description Validation Error */

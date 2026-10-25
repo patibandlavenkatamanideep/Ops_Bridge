@@ -1,0 +1,10 @@
+# Findings Trivy reports that are not real, each scoped to where it was checked to be false.
+secrets:
+  - id: gcp-service-account
+    paths:
+      - "**/site-packages/anthropic/**"
+    statement: >-
+      The anthropic SDK's docstrings describe an execution identity as
+      `{"type": "service_account"}`, which the GCP service-account rule matches. There is no
+      key in these files (checked 2026-10-25 for anthropic 2.1.0); the rule still applies to
+      every other file in the image.

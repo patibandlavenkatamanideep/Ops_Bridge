@@ -17,6 +17,7 @@ import pytest
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.exc import IntegrityError
 
+from opsbridge.auth.permissions import TIERS, Principal, permissions_for
 from opsbridge.canonical import digest
 from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector, TaskRequest
 from opsbridge.persistence.db import Database, DbContext, make_engine
@@ -28,6 +29,7 @@ from opsbridge.persistence.models import (
     Proposal,
 )
 from opsbridge.privacy.redaction import RedactionResult
+from opsbridge.services import connections
 from opsbridge.services import proposals as proposals_svc
 from opsbridge.workflow import execution, jobs
 from opsbridge.workflow.execution import LeaseLost, dispatch
@@ -809,13 +811,28 @@ def _approve_it(st: dict[str, Any], case_id: str, prop: dict[str, Any]) -> httpx
     )
 
 
-def _set_it_connector(app_db: Database, migrator_engine: Engine, name: str) -> None:
-    """What a tenant administrator's settings change does."""
-    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, "demo-it"))) as s:
-        assert (
-            s.execute(text("UPDATE tenant_settings SET task_connector = :n"), {"n": name}).rowcount
-            == 1
-        )  # type: ignore[attr-defined]
+SANDBOX_REPO = "opsbridge-sandbox/followups"
+
+
+def it_admin(st: dict[str, Any], migrator_engine: Engine) -> Principal:
+    """An administrator of demo-it (the demo data has none; the IT approver's user stands in)."""
+    return Principal(
+        st["actors"]["it-approver"].user_id, "it-approver", "IT admin (test)",
+        _tenant_of(migrator_engine, "demo-it"), "demo-it", "it_hardware", ("tenant_admin",), (),
+        TIERS["enhanced"], permissions_for(["tenant_admin"]),
+    )  # fmt: skip
+
+
+def _set_it_connector(
+    st: dict[str, Any], app_db: Database, migrator_engine: Engine, name: str
+) -> None:
+    """What a tenant administrator's change of the task connection does."""
+    settings = st["settings"].model_copy(update={"github_repository_allowlist": [SANDBOX_REPO]})
+    connections.change(
+        app_db, it_admin(st, migrator_engine), settings, connector=name,
+        repository=SANDBOX_REPO if name == "github_issues" else None, credential_ref=None,
+        reason="moved to GitHub",
+    )  # fmt: skip
 
 
 def test_a_settings_change_after_drafting_cannot_redirect_the_approval(
@@ -823,7 +840,7 @@ def test_a_settings_change_after_drafting_cannot_redirect_the_approval(
 ) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = _it_proposal(st)
-    _set_it_connector(app_db, migrator_engine, "github_issues")
+    _set_it_connector(st, app_db, migrator_engine, "github_issues")
     r = _approve_it(st, case_id, prop)
     assert r.status_code == 409 and r.json()["error"]["code"] == "stale_inputs", r.text
     assert "the destination changed" in " ".join(r.json()["error"]["details"]["reasons"])
@@ -839,7 +856,7 @@ def test_dispatch_refuses_when_destination_or_outgoing_text_changed_after_approv
     case_id, prop = _it_proposal(st)
     assert _approve_it(st, case_id, prop).status_code == 200
     if change == "connector":
-        _set_it_connector(app_db, migrator_engine, "github_issues")
+        _set_it_connector(st, app_db, migrator_engine, "github_issues")
     else:  # redaction rules changed: the approved text is no longer what would be sent
         monkeypatch.setattr(
             proposals_svc, "redact", lambda t, keep=(): RedactionResult(t + " [rule 3]", {})

@@ -43,6 +43,7 @@ from opsbridge.audit import events as audit
 from opsbridge.canonical import canonical_json, digest
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
+    ConnectorUnavailable,
     DefiniteFailure,
     LookupUnavailable,
     RemoteTask,
@@ -84,7 +85,6 @@ class ExecutionDeps:
     # Where attempt requests/responses are kept (content-addressed, tenant-scoped); without
     # one only digests are recorded.
     store: ArtifactStore | None = None
-    github_repo: str | None = None  # the configured sandbox repository, part of a destination
 
 
 def _ctx(tenant_id: uuid.UUID) -> DbContext:
@@ -141,7 +141,19 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
     if snapshot["action_type"] != "create_follow_up_task":
         _execute_local(deps, job, snapshot)
         return
-    connector = deps.connector_for(tid, snapshot["connector"], snapshot)
+    try:
+        connector = deps.connector_for(tid, snapshot["connector"], snapshot)
+    except ConnectorUnavailable as exc:
+        if succeeded or needs_reconcile:  # a write may have landed: a person must check
+            _complete(
+                deps, job, snapshot, "outcome_unknown",
+                category="connector_unavailable", detail=str(exc), review=True,
+            )  # fmt: skip
+        else:  # nothing was sent
+            _complete(
+                deps, job, snapshot, "failed", category="connector_unavailable", detail=str(exc)
+            )
+        return
     if succeeded:  # created earlier; only read-back was missing
         _read_back(
             deps, job, snapshot, connector, succeeded[-1].remote_ref or "", parent=succeeded[-1].id
@@ -168,7 +180,7 @@ def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
             cancellation="confirmed",
         )
         return True
-    problems = _revalidate(s, op, deps.github_repo)
+    problems = _revalidate(s, op)
     if problems:
         _finish(
             s,
@@ -206,7 +218,7 @@ def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
     }
 
 
-def _revalidate(s: Session, op: Operation, github_repo: str | None) -> list[str]:
+def _revalidate(s: Session, op: Operation) -> list[str]:
     from opsbridge.services.proposals import approver_still_authorized, check_current, payload_of
 
     problems = []
@@ -233,7 +245,7 @@ def _revalidate(s: Session, op: Operation, github_repo: str | None) -> list[str]
         problems.append("approval expired before dispatch")
     if not approver_still_authorized(s, op.tenant_id, ad.approver_id, op.action_type):
         problems.append("approver no longer holds approval authority for this action")
-    stale = check_current(s, case, pr, github_repo)
+    stale = check_current(s, case, pr)
     problems += stale.reasons
     return problems
 

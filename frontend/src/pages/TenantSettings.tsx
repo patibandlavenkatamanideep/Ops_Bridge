@@ -11,6 +11,8 @@ import {
   type Member,
   type MemberUpdate,
   type SettingsView,
+  type TaskConnection,
+  type TaskConnections,
 } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
@@ -40,9 +42,7 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
   const { can } = useSession();
   const qc = useQueryClient();
   const canPolicy = can(tenant, "tenant.manage_policy");
-  const canConnectors = can(tenant, "tenant.manage_connectors");
   const [modelMode, setModelMode] = useState(view.settings.model_mode);
-  const [connector, setConnector] = useState(view.settings.task_connector);
   const [retention, setRetention] = useState<Record<string, string>>(() =>
     Object.fromEntries(view.retention_keys.map((k) => [k, view.settings.retention[k]?.toString() ?? ""])),
   );
@@ -58,7 +58,6 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
           Object.entries(retention).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)]),
         );
       }
-      if (canConnectors) body.task_connector = connector;
       return api<SettingsView>(tenantPath(tenant, "/settings"), { method: "PUT", body });
     },
     onSuccess: (data) => {
@@ -97,8 +96,8 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
       </p>
 
       <form className="form" onSubmit={submit} aria-label="Tenant settings">
-        <fieldset disabled={!canPolicy && !canConnectors}>
-          <legend>Investigation and follow-up</legend>
+        <fieldset disabled={!canPolicy}>
+          <legend>Investigation</legend>
           <label>
             Default investigation mode
             <select value={modelMode} onChange={(e) => setModelMode(e.target.value)} disabled={!canPolicy}>
@@ -113,16 +112,6 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
             Modes this tier allows: {modes.map(statusLabel).join(", ")}. Hosted models also need a configured key and
             explicit opt-in on each run.
           </p>
-          <label>
-            Follow-up task connector
-            <select value={connector} onChange={(e) => setConnector(e.target.value)} disabled={!canConnectors}>
-              {view.entitlements.external_connectors.map((c) => (
-                <option key={c} value={c}>
-                  {statusLabel(c)}
-                </option>
-              ))}
-            </select>
-          </label>
         </fieldset>
         <fieldset disabled={!canPolicy}>
           <legend>Retention (days; leave blank to keep)</legend>
@@ -144,7 +133,7 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
             Settings saved.
           </p>
         )}
-        {(canPolicy || canConnectors) && (
+        {canPolicy && (
           <div className="actions">
             <button type="submit" className="button primary" disabled={save.isPending}>
               Save settings
@@ -174,6 +163,7 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
         </section>
       )}
 
+      <TaskConnectionPanel tenant={tenant} connectors={view.entitlements.external_connectors} />
       <ConnectorHealthPanel tenant={tenant} />
 
       <section aria-labelledby="policies-title">
@@ -596,6 +586,184 @@ function MemberEditor({ tenant, member, onDone }: {
         </button>
       </div>
     </form>
+  );
+}
+
+function where(c: TaskConnection): string {
+  return c.destination.repository ?? c.destination.organization ?? "—";
+}
+
+/** Where follow-up tasks go, with which credential, and who changed it. */
+function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connectors: string[] }) {
+  const { can } = useSession();
+  const qc = useQueryClient();
+  const canManage = can(tenant, "tenant.manage_connectors");
+  const query = useQuery<TaskConnections, ApiError>({
+    queryKey: ["task-connection", tenant],
+    queryFn: ({ signal }) => api<TaskConnections>(tenantPath(tenant, "/task-connection"), { signal }),
+  });
+  const current = query.data?.active ?? null;
+  const [connector, setConnector] = useState("");
+  const [repository, setRepository] = useState("");
+  const [credentialRef, setCredentialRef] = useState("");
+  const [reason, setReason] = useState("");
+  const [revokeReason, setRevokeReason] = useState("");
+  const chosen = connector || current?.connector || connectors[0] || "sim_tasks";
+  const refresh = () => {
+    setReason("");
+    setRevokeReason("");
+    void qc.invalidateQueries({ queryKey: ["task-connection", tenant] });
+    void qc.invalidateQueries({ queryKey: ["connector-health", tenant] });
+    void qc.invalidateQueries({ queryKey: ["settings", tenant] });
+  };
+  const change = useMutation<TaskConnection, ApiError>({
+    mutationFn: () =>
+      api<TaskConnection>(tenantPath(tenant, "/task-connection"), {
+        method: "POST",
+        body: {
+          connector: chosen,
+          reason,
+          ...(chosen === "github_issues"
+            ? { repository, credential_ref: credentialRef.trim() || null }
+            : {}),
+        },
+      }),
+    onSuccess: refresh,
+  });
+  const revoke = useMutation<TaskConnection, ApiError>({
+    mutationFn: () =>
+      api<TaskConnection>(tenantPath(tenant, "/task-connection/revoke"), {
+        method: "POST",
+        body: { reason: revokeReason },
+      }),
+    onSuccess: refresh,
+  });
+  return (
+    <section aria-labelledby="connection-title">
+      <h2 id="connection-title">Task connection</h2>
+      {query.isPending ? (
+        <Loading label="Loading the task connection" />
+      ) : query.isError ? (
+        <ErrorState error={query.error} onRetry={() => query.refetch()} />
+      ) : (
+        <>
+          {current ? (
+            <dl className="facts">
+              <dt>Follow-up tasks go to</dt>
+              <dd>
+                <span className="mono">{current.connector}</span> ({where(current)})
+              </dd>
+              <dt>Credential</dt>
+              <dd>
+                {current.credential_source}
+                {current.credential_configured ? "" : " — not configured in this deployment"}
+              </dd>
+              <dt>Version</dt>
+              <dd>
+                v{current.version} since {new Date(current.created_at).toLocaleString()}
+                {current.created_by ? ` by ${current.created_by}` : ""}
+                {current.reason ? ` — ${current.reason}` : ""}
+              </dd>
+            </dl>
+          ) : (
+            <p className="state state-denied">No active task connection: follow-up tasks are not sent.</p>
+          )}
+          <p className="muted small">
+            Approvals are bound to where a task goes. Pointing the connection elsewhere makes pending approvals stale
+            instead of redirecting them; work already sent is still checked where it went. Secrets stay in the
+            deployment’s secret store; only their reference is kept here.
+          </p>
+          {canManage && (
+            <form className="form" aria-label="Change the task connection"
+                  onSubmit={(e) => { e.preventDefault(); change.mutate(); }}>
+              <label>
+                Connector
+                <select value={chosen} onChange={(e) => setConnector(e.target.value)}>
+                  {connectors.map((c) => (
+                    <option key={c} value={c}>{statusLabel(c)}</option>
+                  ))}
+                </select>
+              </label>
+              {chosen === "github_issues" && (
+                <>
+                  <label>
+                    Repository (owner/name)
+                    <input value={repository} onChange={(e) => setRepository(e.target.value)} required
+                           list="allowed-repositories" />
+                    <datalist id="allowed-repositories">
+                      {query.data.allowed_repositories.map((r) => <option key={r} value={r} />)}
+                    </datalist>
+                  </label>
+                  <label>
+                    Credential reference (optional)
+                    <input value={credentialRef} onChange={(e) => setCredentialRef(e.target.value)}
+                           aria-describedby="credential-hint" />
+                  </label>
+                  <p id="credential-hint" className="muted small">
+                    The name of a secret in the deployment’s secret store; leave empty for the deployment’s default
+                    token.
+                  </p>
+                </>
+              )}
+              <label>
+                Reason for the change
+                <input value={reason} onChange={(e) => setReason(e.target.value)} required maxLength={500} />
+              </label>
+              {change.isError && <ErrorState error={change.error} />}
+              {change.isSuccess && <p role="status" className="small">Task connection v{change.data.version} saved.</p>}
+              <div className="actions">
+                <button type="submit" className="button primary" disabled={change.isPending}>
+                  Save task connection
+                </button>
+              </div>
+            </form>
+          )}
+          {canManage && current && (
+            <form className="form" aria-label="Revoke the task connection"
+                  onSubmit={(e) => { e.preventDefault(); revoke.mutate(); }}>
+              <label>
+                Reason for revoking
+                <input value={revokeReason} onChange={(e) => setRevokeReason(e.target.value)} required
+                       maxLength={500} />
+              </label>
+              {revoke.isError && <ErrorState error={revoke.error} />}
+              <div className="actions">
+                <button type="submit" className="button danger" disabled={revoke.isPending}>
+                  Revoke task connection
+                </button>
+              </div>
+            </form>
+          )}
+          {revoke.isSuccess && <p role="status" className="small">Task connection revoked.</p>}
+          <table className="table compact">
+            <caption>Task connection history</caption>
+            <thead>
+              <tr>
+                <th scope="col">Version</th>
+                <th scope="col">Destination</th>
+                <th scope="col">Credential</th>
+                <th scope="col">State</th>
+                <th scope="col">Ended</th>
+              </tr>
+            </thead>
+            <tbody>
+              {query.data.versions.map((v) => (
+                <tr key={v.id}>
+                  <th scope="row">v{v.version}</th>
+                  <td><span className="mono">{v.connector}</span> ({where(v)})</td>
+                  <td className="mono small">{v.credential_ref ?? "—"}</td>
+                  <td>{statusLabel(v.status)}</td>
+                  <td>
+                    {v.ended_at ? new Date(v.ended_at).toLocaleString() : "—"}
+                    {v.end_reason ? ` — ${v.end_reason}` : ""}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </section>
   );
 }
 

@@ -246,7 +246,6 @@ def create_proposal(
                 case_id,
                 overrides,
                 request.state.correlation_id,
-                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -277,7 +276,6 @@ def edit_proposal(
                 body.expected_payload_digest,
                 changes,
                 request.state.correlation_id,
-                github_repo=state.settings.github_sandbox_repo,
             )
         )
     except ERRORS as exc:
@@ -304,7 +302,6 @@ def decide(
             payload_digest=body.payload_digest,
             reason=body.reason,
             correlation_id=request.state.correlation_id,
-            github_repo=state.settings.github_sandbox_repo,
         )
     except ERRORS as exc:
         raise _map(exc) from exc

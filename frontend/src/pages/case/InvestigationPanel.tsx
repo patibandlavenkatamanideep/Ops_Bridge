@@ -210,12 +210,14 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
                   const resolved = (inv.citations as unknown as Citation[]).find(
                     (x) => x.version_id === c.version_id && x.locator === c.locator && x.field === c.field,
                   );
+                  // The accessible name starts with the visible text (speech users say what
+                  // they see); the field it cites is added for screen readers.
                   return (
                     <button type="button" key={`${c.version_id}${c.locator}${c.field}`} className="cite"
-                            onClick={() => onCite(resolved ?? c)}
-                            aria-label={`Open evidence ${c.field} at ${c.locator}`}>
+                            onClick={() => onCite(resolved ?? c)}>
                       {resolved?.document_title ?? c.field} · {c.locator}
                       {resolved && resolved.status !== "valid" ? ` (${resolved.status})` : ""}
+                      <span className="visually-hidden">, open evidence for {c.field}</span>
                     </button>
                   );
                 })}

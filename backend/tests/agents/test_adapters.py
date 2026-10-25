@@ -30,7 +30,7 @@ def req(
 
 
 def anthropic_factory(handler: Any) -> Any:
-    """Real SDK client whose transport is a local handler (anthropic 1.13 uses httpx2)."""
+    """Real SDK client whose transport is a local handler (the anthropic SDK uses httpx2)."""
 
     def factory(**kwargs: Any) -> anthropic.Anthropic:
         return anthropic.Anthropic(
@@ -48,7 +48,7 @@ def test_anthropic_request_uses_structured_output_and_maps_usage() -> None:
     def handler(request: httpx2.Request) -> httpx2.Response:
         seen["url"] = str(request.url)
         seen["body"] = json.loads(request.content)
-        seen["has_key"] = bool(request.headers.get("x-api-key"))
+        seen["auth"] = request.headers.get("authorization")  # SDK 2.x: the key as a bearer token
         return httpx2.Response(
             200,
             json={
@@ -68,7 +68,9 @@ def test_anthropic_request_uses_structured_output_and_maps_usage() -> None:
     )
     resp = adapter.generate(req({"effort": "low"}))
     body = seen["body"]
-    assert seen["url"].endswith("/v1/messages") and seen["has_key"]
+    assert seen["url"].endswith("/v1/messages") and seen["auth"] == "Bearer test-key"
+    assert adapter._client.open_telemetry["propagation"] is False
+    assert adapter._client.open_telemetry["traces"]["content_mode"] == "metadata_only"
     assert body["model"] == "claude-configured-test" and body["max_tokens"] == 256
     assert body["output_config"] == {
         "format": {"type": "json_schema", "schema": SCHEMA},

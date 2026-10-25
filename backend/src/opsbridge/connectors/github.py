@@ -27,6 +27,7 @@ from opsbridge.config import Settings
 from .tasks import (
     AmbiguousFailure,
     ConnectorCapabilities,
+    ConnectorUnavailable,
     DefiniteFailure,
     LookupUnavailable,
     RemoteTask,
@@ -38,8 +39,8 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
 _MARKER_RE = re.compile(r"OpsBridge operation marker: (opsbridge-op:[A-Za-z0-9-]+)")
 
 
-class ConnectorNotAuthorized(Exception):
-    """Configuration does not authorize this connector to write."""
+class ConnectorNotAuthorized(ConnectorUnavailable):
+    """Configuration does not authorize this connector (repository or token)."""
 
 
 class GitHubIssuesConnector:
@@ -181,6 +182,8 @@ class GitHubIssuesConnector:
 
 
 def github_connector_from_settings(settings: Settings) -> GitHubIssuesConnector:
+    """The deployment's sandbox repository with its default token (the live test uses it;
+    dispatch builds connectors from the tenant's connection instead)."""
     repo = settings.github_sandbox_repo or ""
     token = settings.github_token.get_secret_value() if settings.github_token else ""
     return GitHubIssuesConnector(
@@ -188,4 +191,5 @@ def github_connector_from_settings(settings: Settings) -> GitHubIssuesConnector:
         token,
         allowlist=frozenset({repo}) if repo else frozenset(),
         writes_authorized=settings.github_live_writes_authorized,
+        base_url=settings.github_api_url,
     )

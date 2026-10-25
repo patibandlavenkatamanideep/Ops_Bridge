@@ -12,7 +12,7 @@ Status: accepted (2026-10-14). Versions verified against PyPI, npm and quay.io o
 | psycopg[binary] | 3.3.6 | PostgreSQL driver | LGPL-3.0 (dynamic use, unmodified) |
 | authlib | 1.9.1 | Maintained OIDC client (PKCE, nonce, ID-token validation) | BSD-3 |
 | mcp | 2.3.0 | Official MCP Python SDK (`MCPServer`, `Client`, streamable HTTP) | MIT |
-| anthropic | 1.13.0 | Official SDK for the hosted adapter | MIT |
+| anthropic | 2.1.0 (from 1.13.0 on 2026-10-25) | Official SDK for the hosted adapter; its OpenTelemetry spans are kept to metadata and send no trace context | MIT |
 | httpx | 0.28.1 | HTTP client for simulator, GitHub, Ollama | BSD-3 |
 | pypdf | 6.20.1 | Text-layer PDF extraction | BSD-3 |
 | evalseal | 2.2.0 | Evaluation receipts (owner's verified release, tag v2.2.0) | MIT |

@@ -296,7 +296,6 @@ def test_tenant_settings_respect_roles_and_tiers(stack) -> None:  # type: ignore
     assert any(m["username"] == "furn-approver" for m in view["members"])
     for body in (
         {"model_mode": "anthropic"},
-        {"task_connector": "github_issues"},
         {"retention": {"raw_documents_days": -1}},
         {"retention": {"everything_days": 3}},
     ):
@@ -308,6 +307,13 @@ def test_tenant_settings_respect_roles_and_tiers(stack) -> None:  # type: ignore
         ).status_code
         == 200
     )
+    # The connector moved to the task connection: a settings change naming it is refused,
+    # not silently ignored, and this tier still cannot connect GitHub.
+    r = call(st["client"], adm, "PUT", f"{T}/settings", json={"task_connector": "github_issues"})
+    assert r.status_code == 422, r.text
+    github = {"connector": "github_issues", "repository": "o/r", "reason": "try"}
+    r = call(st["client"], adm, "POST", f"{T}/task-connection", json=github)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "not_entitled", r.text
     assert get(st, "furn-investigator", f"{T}/settings").status_code == 403
     assert get(st, "furn-auditor", f"{T}/settings").status_code == 200
     r = call(

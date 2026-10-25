@@ -21,11 +21,12 @@ from sqlalchemy.exc import DBAPIError
 
 from opsbridge.config import Settings, get_settings
 from opsbridge.connectors.purchasing import PurchasingClient
-from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector
+from opsbridge.connectors.tasks import ConnectorUnavailable, SimTaskConnector, TaskConnector
 from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import Database, DbContext, get_database
 from opsbridge.persistence.models import Tenant, WorkflowRun
+from opsbridge.services import connections
 from opsbridge.telemetry import metrics, tracing
 from opsbridge.telemetry.logging import configure_logging
 
@@ -216,21 +217,36 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
     secret = settings.sim_master_secret.get_secret_value()
 
     def connector_for(tenant_id: uuid.UUID, name: str, operation: dict[str, Any]) -> TaskConnector:
+        """A connector for the destination the operation was APPROVED for, whatever the
+        tenant's connection says now: a new write is only made after re-validation confirmed
+        the connection still points there, and recovering an earlier write must look where
+        it went."""
+        destination = (operation.get("payload") or {}).get("destination") or {}
         with db.session(DbContext(tenant_id=tenant_id)) as s:
             tenant = s.get(Tenant, tenant_id)
             assert tenant is not None
             org = tenant.slug
-        if name == "sim_tasks" and settings.tool_transport == "mcp":
-            from opsbridge.mcp_services.factory import casework_connector
-
-            return casework_connector(settings, tenant_id, operation, org)
+            version = connections.for_destination(s, tenant_id, destination)
+            token = connections.credential(settings, version, name)
         if name == "sim_tasks":
+            if destination.get("organization", org) != org:
+                raise ConnectorUnavailable("the approved organization is not this tenant's")
+            if settings.tool_transport == "mcp":
+                from opsbridge.mcp_services.factory import casework_connector
+
+                return casework_connector(settings, tenant_id, operation, org)
             return SimTaskConnector(settings.simulator_url, secret, org)
         if name == "github_issues":
-            from opsbridge.connectors.github import github_connector_from_settings
+            from opsbridge.connectors.github import GitHubIssuesConnector
 
-            return github_connector_from_settings(settings)
-        raise ValueError(f"unknown task connector {name!r}")
+            return GitHubIssuesConnector(
+                destination.get("repository") or "",
+                token or "",
+                allowlist=connections.allowed_repositories(settings),
+                writes_authorized=settings.github_live_writes_authorized,
+                base_url=settings.github_api_url,
+            )
+        raise ConnectorUnavailable(f"unknown task connector {name!r}")
 
     return ExecutionDeps(
         db=db,
@@ -238,7 +254,6 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
         store=artifact_store(settings),
-        github_repo=settings.github_sandbox_repo,
     )
 
 

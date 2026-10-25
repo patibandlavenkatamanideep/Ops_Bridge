@@ -55,6 +55,21 @@ writing late results. A running investigation step renews its lease (and the wor
 alive) for up to `OPSBRIDGE_INVESTIGATION_STEP_LIMIT_SECONDS` (300 s); a step stuck longer
 lets the lease lapse and `/healthz` turn stale, so another worker takes the run over.
 
+## Task connections: change, rotate, revoke
+
+Tenant settings → Task connection (administrators). Each change is a new version with a
+reason, recorded in the audit log (`task_connection.changed` / `task_connection.revoked`).
+- Rotate a GitHub token: put the new secret in the store under a new name
+  (`OPSBRIDGE_CONNECTION_SECRET_<REF>`), make a new version with that reference (same
+  repository: pending approvals stay valid), then remove the old secret. Changing the value
+  behind the same reference also works and needs no new version.
+- Point tasks elsewhere: a new version with the new repository (it must be on
+  `OPSBRIDGE_GITHUB_REPOSITORY_ALLOWLIST`); pending approvals for the old destination become
+  stale and must be proposed again; writes already made are still checked where they went.
+- Suspected credential leak: revoke. No new write goes anywhere, and the revoked credential
+  is not used again; operations whose write may have landed go to review
+  (`connector_unavailable`). Make a new version when ready.
+
 ## Out-of-date investigations
 
 An investigation's result may be acted on (proposal, approval, dispatch, resolution) for

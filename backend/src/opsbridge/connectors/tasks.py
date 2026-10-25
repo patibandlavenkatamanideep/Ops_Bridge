@@ -77,6 +77,11 @@ class LookupUnavailable(Exception):
     """Reconciliation lookup is not supported or failed; absence is NOT established."""
 
 
+class ConnectorUnavailable(Exception):
+    """No connector can be built for the approved destination (no usable credential, a
+    repository off the allowlist, a destination the tenant does not own). Nothing is sent."""
+
+
 class TaskConnector(Protocol):
     name: str
     version: str
@@ -236,13 +241,3 @@ class SimTaskConnector:
         if r.status_code != 200:
             raise LookupUnavailable(f"lookup returned {r.status_code}")
         return [self._task(d) for d in r.json().get("items", [])]
-
-
-def task_destination(connector: str, org: str, github_repo: str | None) -> dict[str, str]:
-    """Where a follow-up task goes, without credentials. Approvals bind it; dispatch refuses
-    when the configuration now resolves somewhere else."""
-    if connector == "sim_tasks":
-        return {"connector": connector, "organization": org}
-    if connector == "github_issues":
-        return {"connector": connector, "repository": (github_repo or "").lower()}
-    raise ValueError(f"unknown task connector {connector!r}")

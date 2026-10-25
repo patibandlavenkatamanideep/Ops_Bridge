@@ -79,6 +79,16 @@ or absent from a complete listing for its PO) is marked withdrawn and its record
 superseded, so it stops counting; uploads are never withdrawn by a listing. A withdrawn
 record that returns becomes current again as a new version.
 
+Task connections (`services/connections.py`, 0017). Where an external action goes is the
+tenant's active connection version (connector, simulator organization or GitHub repository,
+credential reference); approvals bind that destination. Dispatch builds its connector from
+the destination the operation was **approved** for, never from what the connection says at
+that moment: a new write is made only after re-validation found the connection still points
+there, and recovering an earlier write (reconciliation, read-back) looks where it went, with
+the credential of the newest version for that destination. A revoked version's credential is
+not used again, not even to recover: such an operation goes to review
+(`connector_unavailable`), and one that sent nothing fails without an attempt.
+
 ## Dispatch (see `workflow/execution.py`)
 
 1. Terminal operation → no-op (duplicate delivery).

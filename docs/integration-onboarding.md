@@ -73,7 +73,10 @@ owner's authorization.
 
 ## 5. Task connector (follow-up work)
 
-Implement `TaskConnector` (`connectors/tasks.py`): `create`, `get` (read-back) and
+Each tenant's task connection (Tenant settings → Task connection) names the connector, its
+destination and a credential reference; add a new connector to `services/connections.py`
+(destination shape, validation) and to `workflow/worker.py::connector_for`, which builds it
+from the approved destination. Implement `TaskConnector` (`connectors/tasks.py`): `create`, `get` (read-back) and
 `find_by_marker`, and declare `capabilities` honestly — idempotency keys, lookup
 consistency (strong, eventual or none), which HTTP statuses are definite vs ambiguous. If
 the provider advertises capabilities, discover them per dispatch and assume the weakest

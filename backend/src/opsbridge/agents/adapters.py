@@ -1,9 +1,10 @@
 """Model adapters: deterministic mock, Anthropic (official SDK), Ollama (HTTP API).
 
-Verified interfaces (2026-10-14):
-- anthropic 1.13.0: `messages.create(model, max_tokens, system, messages, output_config=
-  {"format": {"type": "json_schema", "schema": ...}, "effort": ...}, stop_sequences, timeout)`.
-  The method has no temperature/top_p/seed parameters, so those are declared unsupported.
+Verified interfaces (2026-10-14; anthropic 2.1.0 on 2026-10-25):
+- anthropic 2.1.0 (API version 2026-10-21): `messages.create(model, max_tokens, system,
+  messages, output_config={"format": {"type": "json_schema", "schema": ...}, "effort": ...},
+  stop_sequences, timeout)`. The method has no temperature/top_p/seed parameters, so those
+  are declared unsupported. Since 2.0 the key is sent as `Authorization: Bearer`.
 - Ollama `/api/chat` (docs/api.md): `model`, `messages`, `format` (JSON schema), `options`
   (e.g. `temperature`, `seed`, `num_predict`), `stream: false`; response has `model`,
   `message.content`, `done_reason`, `prompt_eval_count`, `eval_count`. `/api/tags` lists
@@ -183,7 +184,15 @@ class AnthropicAdapter:
         self.model = model
         self._sdk_version = anthropic.__version__
         factory = client_factory or anthropic.Anthropic
-        self._client: Any = factory(api_key=api_key, max_retries=0)
+        # The SDK traces through the app's global tracer provider. Keep its spans to metadata
+        # (an ANTHROPIC_OPEN_TELEMETRY_* variable cannot switch them to prompt and evidence
+        # text: an explicit option ignores the environment) and send no trace context to the
+        # provider.
+        telemetry: anthropic.OpenTelemetryOptions = {
+            "propagation": False,
+            "traces": {"enabled": True, "content_mode": "metadata_only"},
+        }
+        self._client: Any = factory(api_key=api_key, max_retries=0, open_telemetry=telemetry)
         self.capabilities = Capabilities(
             provider="anthropic",
             structured_output="native_schema",

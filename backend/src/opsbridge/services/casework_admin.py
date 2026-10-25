@@ -37,6 +37,7 @@ from opsbridge.persistence.models import (
     User,
 )
 
+from . import connections
 from .cases import _visible_filter
 from .investigations import Conflict, NotFound
 
@@ -324,7 +325,9 @@ def _settings_view(s: Session, tenant_id: uuid.UUID) -> dict[str, Any]:
         },
         "settings": {
             "model_mode": ts.model_mode if ts else "rules_only",
-            "task_connector": ts.task_connector if ts else "sim_tasks",
+            "task_connector": conn.connector
+            if (conn := connections.active(s, tenant_id))
+            else "none",
             "retention": (ts.retention if ts else {}) or {},
         },
         "policies": [
@@ -375,10 +378,11 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
     be retried safely, so an operator should see when they change."""
     require(p, "tenant.read_settings")
     with db.session(_ctx(p)) as s:
-        ts = s.get(TenantSettings, p.tenant_id)
         tenant = s.get(Tenant, p.tenant_id)
         assert tenant is not None
-        name = ts.task_connector if ts else "sim_tasks"
+        conn = connections.active(s, p.tenant_id)
+        name = conn.connector if conn else "none"
+        connection = connections.view(s, conn, settings) if conn else None
         rows = s.execute(
             text(
                 "SELECT a.kind, a.status, count(*), max(a.started_at) FROM attempts a "
@@ -395,17 +399,21 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         ).scalar_one()
         checked_at = s.execute(text("SELECT now()")).scalar_one()
     configuration: dict[str, Any] = {}
-    if name == "sim_tasks":
+    reachable: bool | None = None
+    if conn is None:
+        idem, lookup = False, "none"
+        source = "no active task connection: follow-up tasks are not sent"
+    elif name == "sim_tasks":
         from opsbridge.connectors.tasks import SimTaskConnector
 
-        conn = SimTaskConnector(
+        sim = SimTaskConnector(
             settings.simulator_url, settings.sim_master_secret.get_secret_value(), tenant.slug
         )
         try:
-            found = conn.discover()
+            found = sim.discover()
         finally:
-            conn.close()
-        reachable: bool | None = found is not None
+            sim.close()
+        reachable = found is not None
         idem, lookup = found or (False, "none")
         source = (
             "advertised by the task tracker just now"
@@ -419,16 +427,18 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         idem = GitHubIssuesConnector.capabilities.idempotency_keys
         lookup = GitHubIssuesConnector.capabilities.lookup
         source = "declared from GitHub's documentation; GitHub is not contacted from here"
+        repository = (connection or {}).get("destination", {}).get("repository") or ""
         configuration = {
-            "repository_configured": bool(settings.github_sandbox_repo),
-            "token_configured": bool(
-                settings.github_token and settings.github_token.get_secret_value()
-            ),
+            "repository_configured": bool(repository),
+            "repository_allowed": repository in connections.allowed_repositories(settings),
+            "token_configured": bool((connection or {}).get("credential_configured")),
             "live_writes_authorized": bool(settings.github_live_writes_authorized),
         }
     else:
         raise Conflict("unknown_connector", f"Unknown task connector {name!r}.")
-    if idem:
+    if conn is None:
+        meaning = "Nothing is sent until an administrator sets up a task connection."
+    elif idem:
         meaning = "An ambiguous create can be resent with the same idempotency key."
     elif lookup in ("strong", "eventual"):
         meaning = "An ambiguous create is reconciled by lookup before any resend."
@@ -436,6 +446,7 @@ def connector_health(db: Database, p: Principal, settings: Any) -> dict[str, Any
         meaning = "An ambiguous create cannot be checked: it goes to human review, never resent."
     return {
         "connector": name,
+        "connection": connection,
         "checked_at": checked_at.isoformat(),
         "reachable": reachable,
         "capabilities": {"idempotency_keys": idem, "lookup": lookup},
@@ -460,14 +471,11 @@ def update_settings(
     p: Principal,
     *,
     model_mode: str | None,
-    task_connector: str | None,
     retention: dict[str, int] | None,
     correlation_id: str | None,
 ) -> dict[str, Any]:
-    if task_connector is not None:
-        require(p, "tenant.manage_connectors")
-    if task_connector is None or model_mode is not None or retention is not None:
-        require(p, "tenant.manage_policy")
+    # The task connector is part of the tenant's task connection (services/connections.py).
+    require(p, "tenant.manage_policy")
     with db.session(_ctx(p)) as s:
         tenant = s.get(Tenant, p.tenant_id)
         assert tenant is not None
@@ -490,13 +498,6 @@ def update_settings(
                 )
             ts.model_mode = model_mode
             changes["model_mode"] = model_mode
-        if task_connector is not None:
-            if task_connector not in tier.external_connectors:
-                raise Conflict(
-                    "not_entitled", f"Connector {task_connector!r} is not enabled for this tier."
-                )
-            ts.task_connector = task_connector
-            changes["task_connector"] = task_connector
         if retention is not None:
             bad = [k for k in retention if k not in RETENTION_KEYS]
             if bad or any(not isinstance(v, int) or v < 0 or v > 3650 for v in retention.values()):
