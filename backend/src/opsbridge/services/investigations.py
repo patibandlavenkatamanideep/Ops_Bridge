@@ -203,13 +203,26 @@ class InvestigationView:
     evidence_visible: bool
     versions: list[dict[str, Any]]
     model_routing: dict[str, Any] | None = None  # how the producing run routed model use
+    stale_reason: str | None = None  # why it may no longer be acted on (None: current)
+    source_read_at: str | None = None  # when it read the purchasing system
+
+
+def _stale(s: Session, case: Case, iv: InvestigationVersion) -> str | None:
+    """Why the investigation no longer describes the case (evidence, source age, policy)."""
+    from .freshness import stale_reason
+    from .proposals import evidence_state
+
+    changed = stale_reason(s, case.id, iv)
+    if changed is None and evidence_state(s, case)[1] != iv.policy_version_id:
+        changed = "the effective policy changed since the investigation; re-run it"
+    return changed
 
 
 def latest_investigation(
     db: Database, p: Principal, case_id: uuid.UUID, version: int | None = None
 ) -> InvestigationView | None:
     with db.session(_ctx(p)) as s:
-        _case(s, p, case_id)
+        case = _case(s, p, case_id)
         q = select(InvestigationVersion).where(InvestigationVersion.case_id == case_id)
         q = (
             q.where(InvestigationVersion.version == version)
@@ -239,7 +252,20 @@ def latest_investigation(
         ]
         run = s.get(WorkflowRun, iv.run_id) if iv.run_id else None
         routing = dict((run.usage or {}).get("routing") or {}) if run is not None else None
-        return InvestigationView(iv, citations, visible, history, routing or None)
+        stale = (
+            _stale(s, case, iv)
+            if iv.version == history[0]["version"]
+            else "a newer investigation version exists"
+        )
+        return InvestigationView(
+            iv,
+            citations,
+            visible,
+            history,
+            routing or None,
+            stale,
+            (iv.evidence_state or {}).get("source_read_at"),
+        )
 
 
 def _linked_version(
@@ -284,6 +310,7 @@ def case_documents(db: Database, p: Principal, case_id: uuid.UUID) -> list[dict[
                     "role": role,
                     "origin": doc.origin,
                     "classification": doc.classification,
+                    "withdrawn_at": doc.withdrawn_at.isoformat() if doc.withdrawn_at else None,
                     "versions": [
                         {
                             "version_id": str(v.id),
@@ -526,12 +553,7 @@ def resolve_case(
             )
         if case.status not in ("awaiting_review", "follow_up_pending", "investigating"):
             raise Conflict("invalid_transition", f"Cannot resolve a case in status {case.status}.")
-        from .freshness import stale_reason
-        from .proposals import evidence_state
-
-        changed = stale_reason(s, case.id, latest)
-        if changed is None and evidence_state(s, case)[1] != latest.policy_version_id:
-            changed = "the effective policy changed since the investigation; re-run it"
+        changed = _stale(s, case, latest)
         if changed is not None:
             raise Conflict("stale_investigation", changed[0].upper() + changed[1:] + ".")
         transition(case, "resolved")
