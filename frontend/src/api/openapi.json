@@ -809,6 +809,17 @@
             },
             "title": "Versions",
             "type": "array"
+          },
+          "withdrawn_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn At"
           }
         },
         "required": [
@@ -1149,6 +1160,28 @@
           "source_manifest_digest": {
             "title": "Source Manifest Digest",
             "type": "string"
+          },
+          "source_read_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Read At"
+          },
+          "stale_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Reason"
           },
           "uncertainty": {
             "items": {
