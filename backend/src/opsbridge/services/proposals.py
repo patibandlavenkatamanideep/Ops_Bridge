@@ -29,7 +29,6 @@ from sqlalchemy.orm import Session
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Principal, permissions_for, require
 from opsbridge.canonical import CANONICALIZATION, digest
-from opsbridge.connectors.tasks import task_destination
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.records import case_identifiers, decision_date
 from opsbridge.persistence.db import Database, DbContext
@@ -43,13 +42,12 @@ from opsbridge.persistence.models import (
     OutboxEvent,
     PolicyVersion,
     Proposal,
-    Tenant,
-    TenantSettings,
 )
 from opsbridge.privacy.redaction import REDACTION_VERSION, redact
 from opsbridge.telemetry import metrics
 from opsbridge.workflow import jobs
 
+from . import connections
 from .cases import _visible_filter, transition
 from .freshness import stale_reason
 from .investigations import Conflict, NotFound
@@ -152,16 +150,12 @@ def outbound_of(action: str, params: dict[str, Any], keep: list[str]) -> dict[st
     }
 
 
-def destination_now(
-    s: Session, tenant_id: uuid.UUID, action: str, github_repo: str | None
-) -> dict[str, str]:
-    """Where this action would go under the tenant's settings today (Conflict if the tier no
-    longer enables the connector)."""
+def destination_now(s: Session, tenant_id: uuid.UUID, action: str) -> dict[str, str]:
+    """Where this action would go under the tenant's task connection today (Conflict when it
+    was revoked, names no repository, or the tier no longer enables its connector)."""
     if action not in EXTERNAL_ACTIONS:
         return dict(LOCAL_DESTINATION)
-    tenant = s.get(Tenant, tenant_id)
-    assert tenant is not None
-    return task_destination(_connector(s, tenant_id), tenant.slug, github_repo)
+    return dict(connections.usable(s, tenant_id).destination)
 
 
 def describe(destination: dict[str, str]) -> str:
@@ -236,14 +230,14 @@ def evidence_state(s: Session, case: Case) -> tuple[InvestigationVersion | None,
     return latest, (effective.id if effective else None)
 
 
-def check_current(s: Session, case: Case, pr: Proposal, github_repo: str | None) -> StaleCheck:
+def check_current(s: Session, case: Case, pr: Proposal) -> StaleCheck:
     reasons = []
     if pr.destination is None:
         if pr.action_type in EXTERNAL_ACTIONS:
             reasons.append("the proposal was made before destinations were bound to approvals")
     else:
         try:
-            if destination_now(s, pr.tenant_id, pr.action_type, github_repo) != pr.destination:
+            if destination_now(s, pr.tenant_id, pr.action_type) != pr.destination:
                 reasons.append("the destination changed since the proposal was made")
         except Conflict as exc:
             reasons.append(str(exc))
@@ -277,8 +271,6 @@ def create_from_investigation(
     case_id: uuid.UUID,
     overrides: dict[str, Any],
     correlation_id: str | None,
-    *,
-    github_repo: str | None = None,
 ) -> Proposal:
     require(p, "proposal.create")
     with db.session(_ctx(p)) as s:
@@ -313,7 +305,7 @@ def create_from_investigation(
         ).scalars():
             old.status = "superseded"
             old.status_changed_at = _now()
-        destination = destination_now(s, p.tenant_id, action, github_repo)
+        destination = destination_now(s, p.tenant_id, action)
         effect, affected = _effect(action, params, destination)
         refs = [e for f in latest.findings for e in f.get("evidence", [])][:20]
         pr = Proposal(
@@ -373,8 +365,6 @@ def edit(
     expected_digest: str,
     changes: dict[str, Any],
     correlation_id: str | None,
-    *,
-    github_repo: str | None = None,
 ) -> Proposal:
     """Create version n+1 with edited parameters; version n is superseded (never mutated)."""
     require(p, "proposal.create")
@@ -400,7 +390,7 @@ def edit(
         _check_params_policy(old.action_type, params, policy)
         old.status = "superseded"
         old.status_changed_at = _now()
-        destination = destination_now(s, p.tenant_id, old.action_type, github_repo)
+        destination = destination_now(s, p.tenant_id, old.action_type)
         effect, affected = _effect(old.action_type, params, destination)
         new = Proposal(
             tenant_id=old.tenant_id,
@@ -484,22 +474,6 @@ def _check_params_policy(action: str, params: dict[str, Any], policy: Reconcilia
         )
 
 
-def _connector(s: Session, tenant_id: uuid.UUID) -> str:
-    """The tenant's task connector, if its service tier enables it (no silent fallback)."""
-    from opsbridge.auth.permissions import TIERS
-    from opsbridge.persistence.models import Tenant
-
-    ts = s.get(TenantSettings, tenant_id)
-    name = ts.task_connector if ts else "sim_tasks"
-    tenant = s.get(Tenant, tenant_id)
-    if tenant is None or name not in TIERS[tenant.tier].external_connectors:
-        raise Conflict(
-            "connector_not_entitled",
-            f"Task connector {name!r} is not enabled for this tenant's tier.",
-        )
-    return name
-
-
 # --- decide -----------------------------------------------------------------------------
 
 
@@ -514,7 +488,6 @@ def decide(
     payload_digest: str,
     reason: str | None,
     correlation_id: str | None,
-    github_repo: str | None = None,
 ) -> tuple[Proposal, ApprovalDecision, Operation | None]:
     require(p, "proposal.decide")
     with db.session(_ctx(p)) as s:
@@ -548,7 +521,7 @@ def decide(
                     "separation_of_duties", "You cannot approve a proposal you authored."
                 )
             sod = "passed"
-        stale = check_current(s, case, pr, github_repo)
+        stale = check_current(s, case, pr)
         if decision == "approve" and not stale.ok:
             pr.status = "superseded"
             pr.status_changed_at = _now()
