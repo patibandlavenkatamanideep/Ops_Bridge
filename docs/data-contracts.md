@@ -100,6 +100,13 @@ records are tombstones. An investigation's `collect_context` output records `wit
 adds `source_read_at` and `source_valid_until`. `source_documents.withdrawn_at` (0016) marks
 documents the source no longer holds.
 
+## Request deadlines (migration 0018)
+
+A create carries `X-Request-Deadline` (epoch seconds: now + the connector timeout; through
+Casework MCP the `deadline` tool argument). A provider that advertises `request_deadlines`
+commits nothing after it (the simulator answers 504 with `X-Sim-Not-Committed: true`).
+`attempts.deadline_at` records the deadline each create was sent with.
+
 ## Task connections (`backend/src/opsbridge/services/connections.py`, migration 0017)
 
 `task_connections`: per tenant, versions `1..n` with `connector`, `destination` (exactly what
