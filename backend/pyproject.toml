@@ -6,19 +6,19 @@ requires-python = ">=3.12,<3.13"
 license = "MIT"
 authors = [{ name = "Venkata Manideep Patibandla" }]
 dependencies = [
-    "fastapi==0.143.1",
+    "fastapi==0.159.1",
     "uvicorn[standard]==0.54.0",
     "pydantic==2.14.1",
-    "pydantic-settings==2.16.0",
-    "sqlalchemy==2.1.4",
-    "alembic==1.20.0",
+    "pydantic-settings==2.16.1",
+    "sqlalchemy==2.1.6",
+    "alembic==1.20.1",
     "psycopg[binary]==3.3.6",
     "authlib==1.9.1",
     "itsdangerous==2.2.0",
     "httpx==0.28.1",
     "python-multipart==0.0.32",
     "pyyaml>=6.0.2",
-    "pypdf==6.20.1",
+    "pypdf==6.21.2",
     "mcp==2.3.0",
     "anthropic==2.1.0",
     "pyjwt[crypto]==2.15.1",
@@ -30,15 +30,15 @@ dependencies = [
     "pillow==13.0.0",
     "jsonschema==4.26.0",
     "opentelemetry-exporter-otlp-proto-http==1.45.1",
-    "boto3==1.43.107",
+    "boto3==1.43.117",
 ]
 
 [dependency-groups]
 dev = [
     "pytest==9.1.1",
-    "ruff==0.17.0",
+    "ruff==0.17.1",
     "mypy==2.4.0",
-    "hypothesis==6.169.1",
+    "hypothesis==6.170.5",
     "types-PyYAML",
     "types-jsonschema",
 ]
