@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { createOrOpenCase, signIn } from "./helpers";
+import { createOrOpenCase, rerunInvestigation, signIn } from "./helpers";
 
 test("case notes can be added, corrected and have their text deleted with a reason", async ({ page }) => {
   const stamp = Date.now().toString(36);
@@ -42,6 +42,31 @@ test("an uploaded supplier message is parsed and shown as evidence", async ({ pa
   await expect(page.getByRole("status").filter({ hasText: "Stored as version" })).toContainText(/parsed/i);
   await expect(page.getByText("Uploaded supplier message").first()).toBeVisible();
   await expect(page.locator(".source")).toContainText("All 20 chairs for PO-1001 were delivered.");
+});
+
+test("evidence added after the investigation marks it out of date until it is re-run", async ({ page }) => {
+  await signIn(page, "furn-investigator");
+  await createOrOpenCase(page, "INV-9001");
+  await rerunInvestigation(page, "rules_only");
+  const outOfDate = page.getByRole("status").filter({ hasText: "Out of date" });
+  await expect(outOfDate).toHaveCount(0);
+  await expect(page.locator(".facts dt", { hasText: "Purchasing data read" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Evidence" }).click();
+  await page.getByRole("button", { name: "Upload a document" }).click();
+  await page.getByLabel("Document type").selectOption("supplier_message");
+  await page.getByLabel(/^File/).setInputFiles({
+    name: "later-reply.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(`Hello,\nA further note on PO-1001 (${Date.now()}).\nRegards (synthetic)\n`),
+  });
+  await page.getByRole("button", { name: "Upload", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Stored as version" })).toBeVisible();
+
+  await page.getByRole("tab", { name: "Investigation" }).click();
+  await expect(outOfDate).toContainText("Evidence changed since the investigation");
+  await rerunInvestigation(page, "rules_only");
+  await expect(outOfDate).toHaveCount(0);
 });
 
 test("a disguised upload is rejected with an explanation", async ({ page }) => {

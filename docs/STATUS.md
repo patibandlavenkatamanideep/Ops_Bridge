@@ -858,3 +858,26 @@ layout for the furniture pack (from approved real samples, not the held-out layo
 - What remains needs the owner: a real purchasing system and task destination (Package 11),
   independently labelled data and a real-model comparison (Package 12), the pilot, branch
   protection and release publishing (docs/review-findings.md).
+
+### Purchasing-source contract, Package 11 local part (2026-10-25)
+- No customer purchasing system or export has been chosen, so, as the review asked, this
+  builds the contract and its harness and records the blocker; nothing is live-validated.
+- Fixed, each with a regression test that failed before (docs/review-findings.md):
+  - a listing read only its first page, so later receipts were silently missing (6 of 10
+    received counted as a discrepancy);
+  - a receipt deleted, voided or moved to another PO in the source kept counting as received;
+    it is now marked "No longer in the purchasing system" and stops being current, and comes
+    back if the source holds it again (migration 0016);
+  - nothing recorded when the source was read: a result may now be acted on for 24 hours
+    (`source_max_age_hours`), the case shows the read time and an "Out of date" reason;
+  - a listing longer than the connector reads goes to manual review instead of concluding;
+  - the policy date came from any supplier's invoice with the number, and a case with no
+    single invoice date could never get a proposal once a future-dated policy existed.
+- `connectors/source_contract.py` (`purchasing-source/1`) states what an adapter must do;
+  `tests/contracts/test_purchasing_source_contract.py` (21) is the suite a real adapter must
+  pass against its sandbox. docs/integration-onboarding.md §4 describes both.
+- Not done: tenant-bound task connections; a background sync or change feed (reads stay per
+  case); saved views and due dates (F18).
+- Evidence: `make verify` 15/15 (unit 350 incl. the 21 contract checks, integration 208,
+  browser 28); benchmark replay reproduces held-out and security; 0016 downgrade and upgrade
+  on the test database.

@@ -30,6 +30,38 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | F17 | P2 | `verify` can pass with required gates skipped | Fixed, verified locally | `make verify-strict` fails here on the skipped OCR tests (tesseract not installed), as intended |
 | F18 | P2 | UX needs operator testing | Partly: destination and exact outgoing text shown before approval; Correct offered only for correctable fields; supplier and look-alike confirmation at intake; the server states each viewer's decision reason; expiry noticed while the page is open; queue search debounced; README screenshots fixed | `test_the_server_says_who_may_decide_a_proposal_and_why_not`; browser suite and accessibility scan pass |
 
+Found while building the source contract (not in the review):
+
+| ID | Finding | Status | Regression evidence |
+|---|---|---|---|
+| X1 | The policy date came from any current invoice with the number (another supplier's older invoice could put the case under a superseded policy), and proposal checks took the newest policy, even a future-dated one, when no single invoice date applied (such a case could never get a proposal) | Fixed, verified locally | `test_the_policy_is_chosen_by_this_suppliers_invoice_date`, `test_a_case_without_one_invoice_date_is_judged_under_todays_policy` |
+
+## Package 11, local part: the purchasing-source contract (2026-10-25)
+
+The review asked for one real read-only source adapter and, without access to one, for the
+contract harness with the blocker recorded. No customer purchasing system or export has been
+chosen, so no adapter for a real system exists and nothing here is live-validated.
+
+| Gap | Before | Now | Regression evidence |
+|---|---|---|---|
+| Pagination | One response per listing: a source that pages lost every receipt after page one | Every page is read; a failed page fails the step; a non-advancing cursor is refused | `test_every_page_of_a_listing_is_read` (failed before: 6 of 10 received) |
+| Completeness | No notion of a partial listing | Past the bound (50 pages of 100) the listing says it is incomplete and the case goes to manual review (`source_listing_incomplete`) | `test_a_listing_cut_off_at_the_page_bound_is_not_concluded` |
+| Withdrawals (tombstones) | A receipt deleted, voided or moved to another PO in the source stayed current and kept counting | Reported tombstones, 404s and absence from a complete listing mark the document withdrawn (0016) and supersede its records; uploads are never withdrawn; a returning record is current again | `test_a_receipt_withdrawn_in_the_source_no_longer_counts[deleted, moved_to_another_po]` (failed before: still matched), `test_an_uploaded_receipt_is_not_withdrawn_by_the_source` |
+| Source freshness | Nothing recorded when the source was read | Each investigation records the read time; its result may be acted on for `source_max_age_hours` (24); the case shows the read time and an "Out of date" reason | `test_purchasing_data_older_than_the_limit_cannot_be_acted_on` (failed before: approved) |
+| Contract harness | none | `connectors/source_contract.py` (`purchasing-source/1`) and `tests/contracts/test_purchasing_source_contract.py` (21: paging, tombstones, moved records, credentials errors are not "not found", outages, bound, mid-listing failure, non-advancing cursor, malformed, redirect, oversize, timeout, key validation) | runs in the unit suite |
+
+Not covered:
+
+- No real system. A real adapter must pass the contract suite against its sandbox, plus that
+  system's own pagination, rate-limit and change-timestamp behaviour. Blocker: the owner has
+  to choose a customer system or export and provide a sandbox and authorization.
+- Reads stay per case, on demand: there is no background sync, change feed or cursor kept
+  between investigations. Freshness is bounded by the age limit, not by change notification.
+- Withdrawal is inferred only for records filed against the PO being read; a record moved
+  between POs is current again once a case for its new PO reads it.
+- Tenant-bound, versioned task connections (the review's `services/connections.py`) are not
+  done; the GitHub connector still uses deployment-wide settings.
+
 ## What changed, and what it does not cover
 
 - F01: every new write (first dispatch, retry after a definite failure, create after
@@ -105,6 +137,7 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | 0013 | `cases.supplier_id`; current-invoice index per supplier | Restores the per-number index; fails if two suppliers' same-numbered invoices are current. |
 | 0014 | `cases.intake_key`, `cases.intake_digest` (+ unique per requester and key) | Drops them; replays are then recognised only for manual cases. |
 | 0015 | `blob_deletions` (forced RLS, worker only) | Drops the queue; pending deletions are then forgotten (bytes stay: safe). |
+| 0016 | `source_documents.withdrawn_at` | Drops it; withdrawn documents' records stay superseded, and an unchanged record that returns is not reinstated until its bytes change: re-ingest it, or re-upgrade. |
 
-All six ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
+All seven ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
 restore drill at 0015: 7465 rows, counts equal, every table with forced RLS.

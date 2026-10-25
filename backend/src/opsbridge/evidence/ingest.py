@@ -133,7 +133,11 @@ def ingest(
         .order_by(DocumentVersion.version_no.desc())
         .limit(1)
     ).scalar_one_or_none()
-    if latest is not None and latest.raw_sha256 == raw_sha:
+    returned = doc.withdrawn_at is not None
+    # A document the source withdrew and now holds again becomes a new version even with the
+    # same bytes: its records were superseded and must be current again.
+    doc.withdrawn_at = None
+    if latest is not None and latest.raw_sha256 == raw_sha and not returned:
         return IngestResult(
             doc.id,
             latest.id,
@@ -283,11 +287,11 @@ def _store_fields(
 
 
 def _supersede(
-    session: Session, model: Any, document_id: uuid.UUID, keep_version: uuid.UUID
+    session: Session, model: Any, document_id: uuid.UUID, keep_version: uuid.UUID | None
 ) -> None:
-    older = select(DocumentVersion.id).where(
-        DocumentVersion.document_id == document_id, DocumentVersion.id != keep_version
-    )
+    older = select(DocumentVersion.id).where(DocumentVersion.document_id == document_id)
+    if keep_version is not None:
+        older = older.where(DocumentVersion.id != keep_version)
     session.execute(
         update(model)
         .where(model.source_version_id.in_(older), model.superseded_at.is_(None))
@@ -295,16 +299,34 @@ def _supersede(
     )
 
 
-def _supersede_all(session: Session, document_id: uuid.UUID, keep_version: uuid.UUID) -> None:
-    for model in (
-        PurchaseOrderRecord,
-        InvoiceRecord,
-        GoodsReceiptRecord,
-        InvoiceAllocationRecord,
-        SupplierAssertionRecord,
-    ):
+SOURCE_RECORD_MODELS = (
+    PurchaseOrderRecord,
+    InvoiceRecord,
+    GoodsReceiptRecord,
+    InvoiceAllocationRecord,
+    SupplierAssertionRecord,
+)
+
+
+def _supersede_all(
+    session: Session, document_id: uuid.UUID, keep_version: uuid.UUID | None
+) -> None:
+    for model in SOURCE_RECORD_MODELS:
         _supersede(session, model, document_id, keep_version)
     session.flush()
+
+
+def withdraw(session: Session, source_key: str) -> uuid.UUID | None:
+    """Mark the document the source no longer holds as withdrawn and supersede its records.
+    Returns the document id, or None when there is no such document or it already was."""
+    doc = session.execute(
+        select(SourceDocument).where(SourceDocument.source_key == source_key)
+    ).scalar_one_or_none()
+    if doc is None or doc.withdrawn_at is not None:
+        return None
+    doc.withdrawn_at = datetime.now(UTC)
+    _supersede_all(session, doc.id, None)
+    return doc.id
 
 
 def _store_records(

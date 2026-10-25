@@ -17,7 +17,7 @@ import uuid
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -26,22 +26,32 @@ from sqlalchemy.orm import Session
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
 from opsbridge.connectors.purchasing import PurchasingClient
+from opsbridge.connectors.source_contract import CONTRACT, Listing
 from opsbridge.domain.decision import recommend
 from opsbridge.domain.matching import Finding, MatchResult, reconcile
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
-from opsbridge.evidence.ingest import IngestRejected, ingest
+from opsbridge.evidence.ingest import IngestRejected, ingest, withdraw
 from opsbridge.evidence.parsers import OcrSettings
-from opsbridge.evidence.records import current_invoices, load_match_input, source_manifest
+from opsbridge.evidence.records import (
+    current_invoices,
+    decision_date,
+    load_match_input,
+    source_manifest,
+)
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Case,
+    DocumentVersion,
+    GoodsReceiptRecord,
     InvestigationVersion,
-    InvoiceRecord,
+    InvoiceAllocationRecord,
     ModelCall,
     PolicyVersion,
+    SourceDocument,
+    SupplierAssertionRecord,
     Tenant,
     ToolInvocation,
     WorkflowRun,
@@ -288,12 +298,14 @@ def _ingest_record(
     linked: list[dict[str, Any]],
     problems: list[str],
     refused: list[str],
+    withdrawn: list[str],
 ) -> bool:
     spec = pack.sources.get(record_type)
     if spec is None or spec.collection is None:
         return False
     fetched = client.fetch(spec.collection, key)
-    if fetched is None:
+    if fetched is None:  # the source says it does not exist (now)
+        _withdraw(deps, tenant_id, record_type, f"purchasing:{spec.collection}:{key}", withdrawn)
         return False
     with deps.db.session(_ctx(tenant_id)) as s:
         try:
@@ -338,14 +350,65 @@ def _ingest_record(
     return True
 
 
+_RECORDS_BY_PO: dict[str, Any] = {
+    "goods_receipt": GoodsReceiptRecord,
+    "allocation_history": InvoiceAllocationRecord,
+    "supplier_message": SupplierAssertionRecord,
+}
+
+
+def _withdraw(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    record_type: str,
+    source_key: str,
+    withdrawn: list[str],
+) -> None:
+    with deps.db.session(_ctx(tenant_id)) as s:
+        if withdraw(s, source_key) is not None:
+            withdrawn.append(f"{record_type.replace('_', ' ')} {source_key.split(':', 2)[2]}")
+
+
+def _withdraw_absent(
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    record_type: str,
+    listing: Listing,
+    withdrawn: list[str],
+) -> None:
+    """After a complete listing: records ingested from this source for the PO that the
+    listing no longer holds, and those it reports deleted, stop being current."""
+    model = _RECORDS_BY_PO[record_type]
+    prefix = f"purchasing:{listing.collection}:"
+    with deps.db.session(_ctx(tenant_id)) as s:
+        current = s.execute(
+            select(SourceDocument.source_key)
+            .distinct()
+            .join(DocumentVersion, DocumentVersion.document_id == SourceDocument.id)
+            .join(model, model.source_version_id == DocumentVersion.id)
+            .where(
+                model.po_number == listing.po_number,
+                model.superseded_at.is_(None),
+                SourceDocument.source_key.startswith(prefix, autoescape=True),
+            )
+        ).scalars()
+        held = set(listing.keys)
+        gone = {k for k in current if k.removeprefix(prefix) not in held}
+    for source_key in sorted(gone | {prefix + k for k in listing.withdrawn}):
+        _withdraw(deps, tenant_id, record_type, source_key, withdrawn)
+
+
 def _collect(
     deps: InvestigationDeps, tenant_id: uuid.UUID, org: str, pack: PackSpec, case: dict[str, Any]
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
+    read_at = datetime.now(UTC)  # before the first request: the oldest data point read
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
     unavailable: list[str] = []
     refused: list[str] = []  # current source documents OpsBridge cannot read at all
+    withdrawn: list[str] = []  # records the source no longer holds
+    incomplete: list[str] = []  # listings longer than the connector reads
     try:
         invoice_no = case["invoice_number"]
         po_no = case["po_number"]
@@ -360,6 +423,7 @@ def _collect(
             linked,
             problems,
             refused,
+            withdrawn,
         ):
             unavailable.append(f"invoice {invoice_no}")
         if invoice_no:
@@ -380,6 +444,7 @@ def _collect(
                 linked,
                 problems,
                 refused,
+                withdrawn,
             ):
                 unavailable.append(f"purchase order {po_no}")
             follow_ups: tuple[RecordType, ...] = (
@@ -391,7 +456,8 @@ def _collect(
                 spec = pack.sources.get(record_type)
                 if spec is None or spec.collection is None:
                     continue
-                for key in client.list_keys(spec.collection, po_no):
+                listing = client.list_for_po(spec.collection, po_no)
+                for key in listing.keys:
                     _ingest_record(
                         deps,
                         tenant_id,
@@ -403,15 +469,31 @@ def _collect(
                         linked,
                         problems,
                         refused,
+                        withdrawn,
+                    )
+                if listing.complete:
+                    _withdraw_absent(deps, tenant_id, record_type, listing, withdrawn)
+                else:
+                    incomplete.append(
+                        f"{record_type.replace('_', ' ')}s for {po_no}: more than "
+                        f"{listing.pages} pages"
                     )
     finally:
         client.close()
+    problems.extend(f"{w}: no longer in the purchasing system; not used" for w in withdrawn)
     return {
         "documents": linked,
         "unavailable": unavailable,
         "refused": refused,
+        "withdrawn": withdrawn,
+        "incomplete": incomplete,
         "problems": problems,
         "po_number": po_no,
+        "source": {
+            "contract": CONTRACT,
+            "connector": client.connector_version,
+            "read_at": read_at.isoformat(),
+        },
     }
 
 
@@ -422,15 +504,7 @@ def _retrieve_policy(
     deps: InvestigationDeps, tenant_id: uuid.UUID, policy_id: str, case: dict[str, Any]
 ) -> dict[str, Any]:
     with deps.db.session(_ctx(tenant_id)) as s:
-        inv_date = None
-        if case["invoice_number"]:
-            inv_date = s.execute(
-                select(InvoiceRecord.invoice_date).where(
-                    InvoiceRecord.invoice_number == case["invoice_number"],
-                    InvoiceRecord.superseded_at.is_(None),
-                )
-            ).scalar()
-        decision_date: date = inv_date or datetime.now(UTC).date()
+        on, date_source = decision_date(s, case["invoice_number"], case.get("supplier_id"))
         versions = list(
             s.execute(
                 select(PolicyVersion)
@@ -438,31 +512,31 @@ def _retrieve_policy(
                 .order_by(PolicyVersion.effective_from, PolicyVersion.version)
             ).scalars()
         )
-        effective = [v for v in versions if v.effective_from <= decision_date]
+        effective = [v for v in versions if v.effective_from <= on]
         if not effective:
             return {
                 "policy_version_id": None,
                 "policy_ref": None,
-                "decision_date": decision_date.isoformat(),
+                "decision_date": on.isoformat(),
                 "superseded": [],
-                "problem": f"no {policy_id} policy effective on {decision_date}",
+                "problem": f"no {policy_id} policy effective on {on}",
             }
         chosen = effective[-1]
         return {
             "policy_version_id": str(chosen.id),
             "policy_ref": f"{chosen.policy_id}@v{chosen.version}",
             "policy_sha256": chosen.sha256,
-            "decision_date": decision_date.isoformat(),
-            "decision_date_source": "invoice_date" if inv_date else "today",
+            "decision_date": on.isoformat(),
+            "decision_date_source": date_source,
             "superseded": [
                 f"{v.policy_id}@v{v.version} (effective {v.effective_from})"
                 for v in versions
-                if v.id != chosen.id and v.effective_from <= decision_date
+                if v.id != chosen.id and v.effective_from <= on
             ],
             "later_versions": [
                 f"{v.policy_id}@v{v.version} (effective {v.effective_from})"
                 for v in versions
-                if v.effective_from > decision_date
+                if v.effective_from > on
             ],
         }
 
@@ -492,6 +566,11 @@ def _reconcile(
             collected.get("po_number"),
             case.get("supplier_id"),
         )
+        read_at = (collected.get("source") or {}).get("read_at")
+        if read_at is not None:
+            hours = float(getattr(deps.settings, "source_max_age_hours", 24))
+            until = datetime.fromisoformat(read_at) + timedelta(hours=hours)
+            state = {**state, "source_read_at": read_at, "source_valid_until": until.isoformat()}
         return {**_match(s, case, policy_out, collected), "evidence_state": state}
 
 
@@ -541,6 +620,25 @@ def _match(
                 "The source system's current document could not be read ("
                 + "; ".join(collected["refused"])[:400]
                 + "). Earlier extractions were not used; a person must review it.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    if collected.get("incomplete"):
+        findings.append(
+            _manual_finding(
+                "source_listing_incomplete",
+                "The purchasing system listed more records than OpsBridge reads ("
+                + "; ".join(collected["incomplete"])[:400]
+                + "), so receipts, allocations or messages may be missing. Nothing was "
+                "concluded; a person must review it.",
             )
         )
         return {
@@ -964,7 +1062,11 @@ def template_explanation(
 
 
 def _readiness(outcome: str, collected: dict[str, Any]) -> str:
-    if collected.get("unavailable") or outcome == "needs_information":
+    if (
+        collected.get("unavailable")
+        or collected.get("incomplete")
+        or outcome == "needs_information"
+    ):
         return "incomplete"
     if outcome == "manual_review" or any(
         d["parse_status"] != "parsed" for d in collected.get("documents", [])

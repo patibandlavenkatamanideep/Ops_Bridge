@@ -87,6 +87,19 @@ over the original bytes; normalized-text digests are separate (`opsbridge-norm/1
   recorded when the case is created (migration 0014), and another key for an invoice that
   already has a case is a duplicate (`duplicate_case`).
 
+## Purchasing source (`backend/src/opsbridge/connectors/source_contract.py`)
+
+`purchasing-source/1`: `fetch(collection, key)` returns the original bytes, content type and
+ETag, or None only when the source says the record does not exist; `list_for_po(collection,
+po_number)` returns `Listing(keys, withdrawn, complete, pages)` after following every page.
+Outages raise `SourceUnavailable`, unusable answers `SourceRecordInvalid`. The simulator's
+listing route serves `{"items": [{"key", "content_type", "sha256", "updated_at",
+"deleted"}], "next_cursor"}` in key order with `limit` and `cursor` parameters; deleted
+records are tombstones. An investigation's `collect_context` output records `withdrawn`,
+`incomplete` and `source` (contract, connector version, `read_at`); its `evidence_state`
+adds `source_read_at` and `source_valid_until`. `source_documents.withdrawn_at` (0016) marks
+documents the source no longer holds.
+
 ## API (`/api/v1`, OpenAPI at `/api/v1/openapi.json`)
 
 Generated into `frontend/src/api/openapi.json` and `schema.d.ts` (`make openapi`). Errors are

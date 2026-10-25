@@ -11,6 +11,11 @@ updates:
   - package-ecosystem: docker
     directory: /infra/containers
     schedule: { interval: weekly }
+    ignore:
+      # backend/pyproject.toml requires Python 3.12 (requires-python <3.13), so only 3.12
+      # patch images can work; moving to a newer Python is a deliberate change of its own.
+      - dependency-name: library/python
+        update-types: [version-update:semver-major, version-update:semver-minor]
     open-pull-requests-limit: 3
   - package-ecosystem: uv
     directory: /backend

@@ -10,16 +10,21 @@ the request differed.
 
 from __future__ import annotations
 
+from datetime import date
 from typing import Any
 
 import httpx
 import pytest
+from sqlalchemy import Engine, select
 
 from opsbridge.config import REPO_ROOT
+from opsbridge.persistence.db import Database, DbContext, make_engine
+from opsbridge.persistence.models import PolicyVersion
 from opsbridge.simulator.scenarios import _furniture_invoice_pdf, load_corpus
 
 from .stack import get, investigate, open_case
 from .test_api_cases import call
+from .test_approvals_execution import _tenant_of
 from .test_hardening import upload
 
 pytestmark = pytest.mark.integration
@@ -27,7 +32,7 @@ ORG = "demo-furniture"
 T = f"/api/v1/tenants/{ORG}"
 
 
-def other_supplier_invoice(number: str) -> tuple[bytes, str]:
+def other_supplier_invoice(number: str, **changes: Any) -> tuple[bytes, str]:
     """The same invoice number, issued by a different supplier against its own PO."""
     corpus = load_corpus(REPO_ROOT / "fixtures" / "scenarios" / "dev.yaml")
     s = next(x for x in corpus.scenarios if x.invoice.number == number)
@@ -36,6 +41,7 @@ def other_supplier_invoice(number: str) -> tuple[bytes, str]:
             "supplier_id": "SUP-OTHER",
             "supplier_name": "Other Office Supply",
             "po_number": "PO-7777",
+            **changes,
         }
     )
     return _furniture_invoice_pdf(s.model_copy(update={"invoice": inv})), str(s.invoice.supplier_id)
@@ -98,6 +104,91 @@ def test_another_suppliers_invoice_with_the_same_number_does_not_replace_this_on
     third = latest(st, c.json()["id"])
     assert third["outcome"] == "discrepancies_found", third["findings"]
     assert "PO-7777" not in str(third["findings"])
+
+
+def test_the_policy_is_chosen_by_this_suppliers_invoice_date(stack) -> None:  # type: ignore[no-untyped-def]
+    """The policy effective on the invoice date applies. The date used to be read from any
+    current invoice with that number, so another supplier's older invoice could put the case
+    under a superseded policy (and proposals then saw a policy change that never happened)."""
+    st = stack
+    pdf, own_supplier = other_supplier_invoice(
+        "INV-9001", date=date(2025, 6, 15), supplier_id="SUP-AARDVARK"
+    )
+    b = new_case(st, {"title": "Invoice from Other Office Supply"})
+    assert b.status_code == 201, b.text
+    up = upload(
+        st["client"],
+        st["actors"]["furn-investigator"],
+        b.json()["id"],
+        "invoice",
+        "inv.pdf",
+        pdf,
+        "application/pdf",
+    )
+    assert up.status_code == 201 and up.json()["parse_status"] == "parsed", up.text
+
+    c = new_case(
+        st,
+        {
+            "title": "Invoice INV-9001 (Acme)",
+            "invoice_number": "INV-9001",
+            "supplier_id": own_supplier,
+        },
+    )
+    assert c.status_code == 201, c.text
+    investigate(st, "furn-investigator", ORG, c.json()["id"])
+    found = latest(st, c.json()["id"])
+    assert found["outcome"] == "discrepancies_found", found["findings"]
+    assert found["policy_ref"].endswith("@v2"), found["policy_ref"]  # invoiced 2026-09-30
+
+
+def test_a_case_without_one_invoice_date_is_judged_under_todays_policy(
+    stack, worker_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    """With no single invoice date (here: two suppliers' invoices share the number), the
+    investigation used today's policy but proposals compared it with the newest policy even
+    when that takes effect in the future, so no proposal could ever be made for the case."""
+    st = stack
+    pdf, _ = other_supplier_invoice("INV-9001")
+    b = new_case(st, {"title": "Invoice from Other Office Supply"})
+    assert b.status_code == 201, b.text
+    up = upload(
+        st["client"],
+        st["actors"]["furn-investigator"],
+        b.json()["id"],
+        "invoice",
+        "inv.pdf",
+        pdf,
+        "application/pdf",
+    )
+    assert up.status_code == 201, up.text
+    future = date(2027, 1, 1)
+    mdb = Database(make_engine("migrator", database="opsbridge_test"))
+    try:
+        with mdb.session(DbContext(tenant_id=_tenant_of(migrator_engine, ORG))) as s:
+            v2 = s.execute(select(PolicyVersion).where(PolicyVersion.version == 2)).scalar_one()
+            s.add(
+                PolicyVersion(
+                    tenant_id=v2.tenant_id,
+                    policy_id=v2.policy_id,
+                    version=3,
+                    effective_from=future,
+                    document={**v2.document, "version": 3, "effective_from": future.isoformat()},
+                    sha256="sha256:" + "3" * 64,
+                )
+            )
+    finally:
+        mdb.engine.dispose()
+
+    a = open_case(st, "furn-investigator", ORG, "INV-9001")  # supplier not named
+    investigate(st, "furn-investigator", ORG, a)
+    found = latest(st, a)
+    assert "invoice_identity_ambiguous" in {f["reason_code"] for f in found["findings"]}
+    assert found["policy_ref"].endswith("@v2"), found["policy_ref"]
+    r = call(
+        st["client"], st["actors"]["furn-investigator"], "POST", f"{T}/cases/{a}/proposals", json={}
+    )
+    assert r.status_code == 201, r.text
 
 
 def test_identifiers_keep_their_punctuation_and_near_duplicates_need_confirmation(stack) -> None:  # type: ignore[no-untyped-def]

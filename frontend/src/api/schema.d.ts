@@ -812,6 +812,8 @@ export interface components {
             title: string;
             /** Versions */
             versions: components["schemas"]["DocumentVersionOut"][];
+            /** Withdrawn At */
+            withdrawn_at?: string | null;
         };
         /** DocumentVersionOut */
         DocumentVersionOut: {
@@ -933,6 +935,10 @@ export interface components {
             }[];
             /** Source Manifest Digest */
             source_manifest_digest: string;
+            /** Source Read At */
+            source_read_at?: string | null;
+            /** Stale Reason */
+            stale_reason?: string | null;
             /** Uncertainty */
             uncertainty: string[];
             /** Version */

@@ -31,7 +31,7 @@ from opsbridge.auth.permissions import Principal, permissions_for, require
 from opsbridge.canonical import CANONICALIZATION, digest
 from opsbridge.connectors.tasks import task_destination
 from opsbridge.domain.policy import ReconciliationPolicy
-from opsbridge.evidence.records import case_identifiers, current_invoices
+from opsbridge.evidence.records import case_identifiers, decision_date
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     ApprovalDecision,
@@ -223,15 +223,15 @@ def evidence_state(s: Session, case: Case) -> tuple[InvestigationVersion | None,
     current_policy = s.get(PolicyVersion, latest.policy_version_id)
     if current_policy is None:
         return latest, None
-    decision_date = None
-    if case.invoice_number:
-        found = current_invoices(s, case.invoice_number, case.supplier_id)
-        decision_date = found[0].invoice_date if len(found) == 1 else None
-    q = select(PolicyVersion).where(PolicyVersion.policy_id == current_policy.policy_id)
-    if decision_date is not None:
-        q = q.where(PolicyVersion.effective_from <= decision_date)
+    on, _ = decision_date(s, case.invoice_number, case.supplier_id)
     effective = s.execute(
-        q.order_by(PolicyVersion.effective_from.desc(), PolicyVersion.version.desc()).limit(1)
+        select(PolicyVersion)
+        .where(
+            PolicyVersion.policy_id == current_policy.policy_id,
+            PolicyVersion.effective_from <= on,
+        )
+        .order_by(PolicyVersion.effective_from.desc(), PolicyVersion.version.desc())
+        .limit(1)
     ).scalar_one_or_none()
     return latest, (effective.id if effective else None)
 

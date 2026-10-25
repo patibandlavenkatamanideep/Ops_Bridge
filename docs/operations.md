@@ -55,6 +55,17 @@ writing late results. A running investigation step renews its lease (and the wor
 alive) for up to `OPSBRIDGE_INVESTIGATION_STEP_LIMIT_SECONDS` (300 s); a step stuck longer
 lets the lease lapse and `/healthz` turn stale, so another worker takes the run over.
 
+## Out-of-date investigations
+
+An investigation's result may be acted on (proposal, approval, dispatch, resolution) for
+`OPSBRIDGE_SOURCE_MAX_AGE_HOURS` (24) after it read the purchasing system; the case then
+shows "Out of date" and the actions answer `stale_inputs` / `stale_investigation` until the
+investigation is re-run. Many such refusals after a quiet period are expected. If approvals
+routinely wait longer than the limit, raise it only with the AP lead's agreement: a longer
+limit means acting on older receipts and allocations. A run that reports
+`source_listing_incomplete` met a purchasing listing longer than the connector reads (50
+pages of 100); review the case by hand.
+
 ## Dependency unavailable
 
 `OpsBridgeDependencyDown`, `OpsBridgeStateUnknown`. `/readyz` names the failing check.

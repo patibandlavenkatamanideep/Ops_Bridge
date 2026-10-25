@@ -1,42 +1,32 @@
 """Read connector for the purchasing system (the local simulator in development).
 
-Credentials are scoped to one org; the base URL comes from configuration (allowlisted),
-never from documents or model output. Responses are size-limited and redirects are not
-followed.
+Implements the `purchasing-source/1` contract (`source_contract.py`). Credentials are scoped
+to one org; the base URL comes from configuration (allowlisted), never from documents or
+model output. Responses are size-limited and redirects are not followed.
 """
 
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass
 
 import httpx
 
 from opsbridge.simulator.app import org_key
 
-CONNECTOR_VERSION = "purchasing-sim/1"
+from .source_contract import FetchedRecord, Listing, SourceRecordInvalid, SourceUnavailable
+
+__all__ = ["FetchedRecord", "PurchasingClient", "SourceRecordInvalid", "SourceUnavailable"]
+
+CONNECTOR_VERSION = "purchasing-sim/2"
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
+PAGE_SIZE = 100
+MAX_PAGES = 50  # a listing longer than this is reported incomplete, not cut silently
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
 
-class SourceUnavailable(Exception):
-    """The source system could not be reached or answered with a server error."""
-
-
-class SourceRecordInvalid(Exception):
-    """The source returned something unusable (bad status, oversize, bad key)."""
-
-
-@dataclass(frozen=True)
-class FetchedRecord:
-    collection: str
-    key: str
-    body: bytes
-    content_type: str
-    etag: str | None
-
-
 class PurchasingClient:
+    connector_version = CONNECTOR_VERSION
+
     def __init__(
         self,
         base_url: str,
@@ -57,14 +47,38 @@ class PurchasingClient:
     def close(self) -> None:
         self._client.close()
 
-    def list_keys(self, collection: str, po_number: str | None = None) -> list[str]:
-        params = {"po_number": po_number} if po_number else None
-        r = self._get(f"/orgs/{self.org}/{collection}", params=params)
-        try:
-            items = r.json()["items"]
-            return [str(i["key"]) for i in items]
-        except (ValueError, KeyError, TypeError) as exc:
-            raise SourceRecordInvalid(f"malformed list response for {collection}") from exc
+    def list_for_po(self, collection: str, po_number: str) -> Listing:
+        keys: dict[str, None] = {}  # ordered, without the duplicates a shifting page can repeat
+        withdrawn: dict[str, None] = {}
+        cursor: str | None = None
+        seen: set[str] = set()
+        for page in range(1, MAX_PAGES + 1):
+            params = {"po_number": po_number, "limit": str(PAGE_SIZE)}
+            if cursor is not None:
+                params["cursor"] = cursor
+            try:
+                r = self._get(f"/orgs/{self.org}/{collection}", params=params)
+            except _NotFound as exc:  # a listing exists for every PO, if only empty
+                raise SourceRecordInvalid(f"no listing for {collection}") from exc
+            try:
+                body = r.json()
+                items, cursor = body["items"], body.get("next_cursor")
+                for item in items:
+                    key = str(item["key"])
+                    if item.get("deleted") is True:
+                        withdrawn[key] = None
+                        keys.pop(key, None)
+                    else:
+                        keys[key] = None
+                        withdrawn.pop(key, None)
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise SourceRecordInvalid(f"malformed list response for {collection}") from exc
+            if cursor is None:
+                return Listing(collection, po_number, tuple(keys), tuple(withdrawn), True, page)
+            if not isinstance(cursor, str) or not _KEY_RE.match(cursor) or cursor in seen:
+                raise SourceRecordInvalid(f"list cursor for {collection} did not advance")
+            seen.add(cursor)
+        return Listing(collection, po_number, tuple(keys), tuple(withdrawn), False, MAX_PAGES)
 
     def fetch(self, collection: str, key: str) -> FetchedRecord | None:
         if not _KEY_RE.match(key):
@@ -81,7 +95,7 @@ class PurchasingClient:
             r = self._client.get(path, params=params)
         except httpx.HTTPError as exc:
             raise SourceUnavailable(f"{type(exc).__name__} contacting purchasing system") from exc
-        if r.status_code == 404:
+        if r.status_code in (404, 410):
             raise _NotFound()
         if r.status_code >= 500:
             raise SourceUnavailable(f"purchasing system returned {r.status_code}")
