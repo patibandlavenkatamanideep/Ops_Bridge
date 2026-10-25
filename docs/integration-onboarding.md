@@ -39,15 +39,37 @@ samples in the customer's format, and `opsbridge eval-rules --corpus <their vali
 
 ## 4. Source system adapter
 
-The workflow fetches records through `PurchasingClient` (`connectors/purchasing.py`:
-`list_keys(collection, po_number)` and `fetch(collection, key)` returning bytes, content
-type and version). Today it talks to the simulator's HTTP API. For a real ERP, implement the
-same two operations against its API or export location with a read-only service account,
-map ERP collections to the pack's `collection` names, return the original bytes (digests are
-taken over them), and raise `SourceUnavailable` for outages (retried) versus "not found"
-(becomes needs-information). Wire it in `workflow/worker.py::build_investigation_deps`
-(`purchasing_for`). Add contract tests against a fake written from the ERP's documentation,
-plus a recorded sandbox run when authorized.
+The workflow reads purchasing records through an adapter that implements the
+`purchasing-source/1` contract (`connectors/source_contract.py`); `PurchasingClient`
+(`connectors/purchasing.py`) is the only implementation and talks to the simulator. For a
+real system, implement the same two operations against its API or export location with a
+read-only service account:
+
+- `fetch(collection, key)` returns the original bytes, content type and version (digests are
+  taken over the bytes). It returns None only when the source says the record does not exist;
+  outages, timeouts and server errors raise `SourceUnavailable` (the step is retried), and
+  refused credentials, bad statuses, oversize or malformed bodies and redirects raise
+  `SourceRecordInvalid`.
+- `list_for_po(collection, po_number)` follows the source's pagination to the end and
+  returns the keys it holds, the keys it reports deleted, voided or reversed (`withdrawn`),
+  and whether the listing is complete. A failed page fails the listing; a cursor that does
+  not advance is refused; reaching the adapter's page bound returns `complete=False`.
+
+OpsBridge acts on those answers: a record the source no longer holds (reported withdrawn, a
+404, or missing from a complete listing for its PO) stops being current and is marked "No
+longer in the purchasing system"; an incomplete listing sends the case to manual review; each
+investigation records when it read the source, and its result may be acted on for
+`OPSBRIDGE_SOURCE_MAX_AGE_HOURS` (24) after that. Map the system's collections to the pack's
+`collection` names, and the system's own deletion or reversal semantics (a reversal posted
+as a separate movement, a voided status) to `withdrawn`. Wire the adapter in
+`workflow/worker.py::build_investigation_deps` (`purchasing_for`).
+
+The suite an adapter must pass is `tests/contracts/test_purchasing_source_contract.py`: run
+it against the system's sandbox, replacing the simulator fixture with the adapter and the
+store calls with the sandbox's way of creating, deleting and paging records, and add the
+system's own cases (its pagination style, rate limits, change timestamps). No customer
+system has been connected or run through it; that needs a chosen system, a sandbox and the
+owner's authorization.
 
 ## 5. Task connector (follow-up work)
 
