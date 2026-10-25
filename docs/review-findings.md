@@ -34,6 +34,7 @@ Found while building the source contract (not in the review):
 
 | ID | Finding | Status | Regression evidence |
 |---|---|---|---|
+| X3 | After a create timed out, a strong lookup that found nothing was taken as proof of absence, so a create the tracker committed after the client gave up landed next to the resend (no idempotency keys: two tasks) | Fixed, verified locally | `test_a_create_still_in_flight_is_not_proved_absent_and_sent_again[True]` (failed before: 2 tasks) and `[False]` (a tracker without deadlines: review, one task) |
 | X2 | Dispatch built its connector from the configuration at the moment it ran, so recovering a write that had already landed (worker died after the create, or a retried read-back) looked wherever the configuration pointed by then | Fixed with tenant task connections, verified locally | Probe on the previous code: GitHub issue created, worker dies, repository setting changed → `outcome_unknown` (unreconcilable) though the issue existed; unchanged configuration → confirmed. Now `test_recovery_after_the_connection_moved_looks_where_the_write_went` |
 | X1 | The policy date came from any current invoice with the number (another supplier's older invoice could put the case under a superseded policy), and proposal checks took the newest policy, even a future-dated one, when no single invoice date applied (such a case could never get a proposal) | Fixed, verified locally | `test_the_policy_is_chosen_by_this_suppliers_invoice_date`, `test_a_case_without_one_invoice_date_is_judged_under_todays_policy` |
 
@@ -67,9 +68,10 @@ Not covered:
 - Observed once in three full integration runs (never in eight isolated runs):
   `test_timeout_after_commit_behind_the_mcp_hop_is_reconciled` logged "ambiguous failure
   reconciled as absent" and failed. Behind the MCP hop a timed-out create may still be in
-  flight when the strong lookup runs, so "absent" is not proof there; the simulator's
-  idempotency keys prevent a duplicate, a destination without them could get one. Not
-  investigated further yet.
+  flight when the lookup runs. Without idempotency keys that was a real duplicate risk (X3,
+  fixed with request deadlines, also through the hop). With keys, as in that test, the resend
+  is safe and the task is then confirmed by read-back instead of by marker, which is what the
+  test's method assertion rejects: a timing-dependent test, not a duplicate. Left as is.
 
 ## What changed, and what it does not cover
 
@@ -146,8 +148,9 @@ Not covered:
 | 0013 | `cases.supplier_id`; current-invoice index per supplier | Restores the per-number index; fails if two suppliers' same-numbered invoices are current. |
 | 0014 | `cases.intake_key`, `cases.intake_digest` (+ unique per requester and key) | Drops them; replays are then recognised only for manual cases. |
 | 0015 | `blob_deletions` (forced RLS, worker only) | Drops the queue; pending deletions are then forgotten (bytes stay: safe). |
+| 0018 | `attempts.deadline_at` | Drops it; absence after a timeout can then no longer be proved for a provider without idempotency keys (such operations go to review: safe). |
 | 0017 | `task_connections` (forced RLS; version 1 per tenant from its connector setting) | Drops it; the connector is read from `tenant_settings.task_connector` again (kept in step), the GitHub repository and token from deployment settings. A GitHub tenant starts 0017 with no repository and must set one. |
 | 0016 | `source_documents.withdrawn_at` | Drops it; withdrawn documents' records stay superseded, and an unchanged record that returns is not reinstated until its bytes change: re-ingest it, or re-upgrade. |
 
-All eight ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
+All nine ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
 restore drill at 0015: 7465 rows, counts equal, every table with forced RLS.
