@@ -122,6 +122,12 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
   const rec = inv.recommendation as Record<string, unknown>;
   return (
     <div className="investigation">
+      {inv.stale_reason && (
+        <div className="state state-denied" role="status">
+          <strong>Out of date.</strong> {inv.stale_reason.charAt(0).toUpperCase() + inv.stale_reason.slice(1)}. Proposals,
+          approvals and resolution wait for a current investigation.
+        </div>
+      )}
       <dl className="facts">
         <dt>Outcome</dt>
         <dd>
@@ -131,6 +137,8 @@ function InvestigationView({ inv, onCite }: { inv: Investigation; onCite: (c: Ci
         <dd>{statusLabel(inv.evidence_readiness)}</dd>
         <dt>Policy</dt>
         <dd className="mono">{inv.policy_ref}</dd>
+        <dt>Purchasing data read</dt>
+        <dd>{inv.source_read_at ? new Date(inv.source_read_at).toLocaleString() : "not recorded"}</dd>
         <dt>Version</dt>
         <dd>
           v{inv.version} · {new Date(inv.created_at).toLocaleString()} · explanation: {inv.explanation_origin}
