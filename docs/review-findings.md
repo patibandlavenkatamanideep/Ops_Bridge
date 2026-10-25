@@ -34,6 +34,7 @@ Found while building the source contract (not in the review):
 
 | ID | Finding | Status | Regression evidence |
 |---|---|---|---|
+| X2 | Dispatch built its connector from the configuration at the moment it ran, so recovering a write that had already landed (worker died after the create, or a retried read-back) looked wherever the configuration pointed by then | Fixed with tenant task connections, verified locally | Probe on the previous code: GitHub issue created, worker dies, repository setting changed → `outcome_unknown` (unreconcilable) though the issue existed; unchanged configuration → confirmed. Now `test_recovery_after_the_connection_moved_looks_where_the_write_went` |
 | X1 | The policy date came from any current invoice with the number (another supplier's older invoice could put the case under a superseded policy), and proposal checks took the newest policy, even a future-dated one, when no single invoice date applied (such a case could never get a proposal) | Fixed, verified locally | `test_the_policy_is_chosen_by_this_suppliers_invoice_date`, `test_a_case_without_one_invoice_date_is_judged_under_todays_policy` |
 
 ## Package 11, local part: the purchasing-source contract (2026-10-25)
@@ -48,6 +49,7 @@ chosen, so no adapter for a real system exists and nothing here is live-validate
 | Completeness | No notion of a partial listing | Past the bound (50 pages of 100) the listing says it is incomplete and the case goes to manual review (`source_listing_incomplete`) | `test_a_listing_cut_off_at_the_page_bound_is_not_concluded` |
 | Withdrawals (tombstones) | A receipt deleted, voided or moved to another PO in the source stayed current and kept counting | Reported tombstones, 404s and absence from a complete listing mark the document withdrawn (0016) and supersede its records; uploads are never withdrawn; a returning record is current again | `test_a_receipt_withdrawn_in_the_source_no_longer_counts[deleted, moved_to_another_po]` (failed before: still matched), `test_an_uploaded_receipt_is_not_withdrawn_by_the_source` |
 | Source freshness | Nothing recorded when the source was read | Each investigation records the read time; its result may be acted on for `source_max_age_hours` (24); the case shows the read time and an "Out of date" reason | `test_purchasing_data_older_than_the_limit_cannot_be_acted_on` (failed before: approved) |
+| Tenant task connections | GitHub repository and token were deployment-wide; the connector was a tenant setting with no history; no way to stop a tenant's external writes | Versioned per-tenant connection (0017): destination, credential reference to the secret store, reason, who and when; repositories on a deployment allowlist; rotate, move, revoke; dispatch writes and recovers at the approved destination; a revoked credential is never used again | `tests/integration/test_task_connections.py` (4), updated connector tests, browser test for revoke and restore |
 | Contract harness | none | `connectors/source_contract.py` (`purchasing-source/1`) and `tests/contracts/test_purchasing_source_contract.py` (21: paging, tombstones, moved records, credentials errors are not "not found", outages, bound, mid-listing failure, non-advancing cursor, malformed, redirect, oversize, timeout, key validation) | runs in the unit suite |
 
 Not covered:
@@ -59,8 +61,15 @@ Not covered:
   between investigations. Freshness is bounded by the age limit, not by change notification.
 - Withdrawal is inferred only for records filed against the PO being read; a record moved
   between POs is current again once a case for its new PO reads it.
-- Tenant-bound, versioned task connections (the review's `services/connections.py`) are not
-  done; the GitHub connector still uses deployment-wide settings.
+- Task connections: the secret store is environment variables
+  (`OPSBRIDGE_CONNECTION_SECRET_<REF>`); a deployment would map them from its secret manager.
+  One active connection per tenant. GitHub live writes are not live-validated.
+- Observed once in three full integration runs (never in eight isolated runs):
+  `test_timeout_after_commit_behind_the_mcp_hop_is_reconciled` logged "ambiguous failure
+  reconciled as absent" and failed. Behind the MCP hop a timed-out create may still be in
+  flight when the strong lookup runs, so "absent" is not proof there; the simulator's
+  idempotency keys prevent a duplicate, a destination without them could get one. Not
+  investigated further yet.
 
 ## What changed, and what it does not cover
 
@@ -72,8 +81,8 @@ Not covered:
   together; a partial unique index (0010) allows one applied local action per operation.
   An operation left mid-way by the old code before upgrading could still be applied twice.
 - F03: payload carries `destination` and `outbound`; both recomputed when approving and
-  before every new write. GitHub credentials and repository remain deployment-wide sandbox
-  settings, not versioned tenant connections (Package 11).
+  before every new write. Since 0017 the destination comes from the tenant's versioned task
+  connection, and dispatch builds its connector from the approved destination.
 - F04: local freshness only; a source-system change OpsBridge has not fetched is not seen.
   Investigations recorded before 0012 count as stale and must be re-run.
 - F07: one legal entity and one purchasing source per tenant are assumed; credit-note
@@ -137,7 +146,8 @@ Not covered:
 | 0013 | `cases.supplier_id`; current-invoice index per supplier | Restores the per-number index; fails if two suppliers' same-numbered invoices are current. |
 | 0014 | `cases.intake_key`, `cases.intake_digest` (+ unique per requester and key) | Drops them; replays are then recognised only for manual cases. |
 | 0015 | `blob_deletions` (forced RLS, worker only) | Drops the queue; pending deletions are then forgotten (bytes stay: safe). |
+| 0017 | `task_connections` (forced RLS; version 1 per tenant from its connector setting) | Drops it; the connector is read from `tenant_settings.task_connector` again (kept in step), the GitHub repository and token from deployment settings. A GitHub tenant starts 0017 with no repository and must set one. |
 | 0016 | `source_documents.withdrawn_at` | Drops it; withdrawn documents' records stay superseded, and an unchanged record that returns is not reinstated until its bytes change: re-ingest it, or re-upgrade. |
 
-All seven ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
+All eight ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
 restore drill at 0015: 7465 rows, counts equal, every table with forced RLS.
