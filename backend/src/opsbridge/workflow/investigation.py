@@ -17,7 +17,7 @@ import uuid
 from collections.abc import Callable
 from contextlib import nullcontext
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
@@ -32,14 +32,18 @@ from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest
 from opsbridge.evidence.parsers import OcrSettings
-from opsbridge.evidence.records import current_invoices, load_match_input, source_manifest
+from opsbridge.evidence.records import (
+    current_invoices,
+    decision_date,
+    load_match_input,
+    source_manifest,
+)
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Case,
     InvestigationVersion,
-    InvoiceRecord,
     ModelCall,
     PolicyVersion,
     Tenant,
@@ -422,15 +426,7 @@ def _retrieve_policy(
     deps: InvestigationDeps, tenant_id: uuid.UUID, policy_id: str, case: dict[str, Any]
 ) -> dict[str, Any]:
     with deps.db.session(_ctx(tenant_id)) as s:
-        inv_date = None
-        if case["invoice_number"]:
-            inv_date = s.execute(
-                select(InvoiceRecord.invoice_date).where(
-                    InvoiceRecord.invoice_number == case["invoice_number"],
-                    InvoiceRecord.superseded_at.is_(None),
-                )
-            ).scalar()
-        decision_date: date = inv_date or datetime.now(UTC).date()
+        on, date_source = decision_date(s, case["invoice_number"], case.get("supplier_id"))
         versions = list(
             s.execute(
                 select(PolicyVersion)
@@ -438,31 +434,31 @@ def _retrieve_policy(
                 .order_by(PolicyVersion.effective_from, PolicyVersion.version)
             ).scalars()
         )
-        effective = [v for v in versions if v.effective_from <= decision_date]
+        effective = [v for v in versions if v.effective_from <= on]
         if not effective:
             return {
                 "policy_version_id": None,
                 "policy_ref": None,
-                "decision_date": decision_date.isoformat(),
+                "decision_date": on.isoformat(),
                 "superseded": [],
-                "problem": f"no {policy_id} policy effective on {decision_date}",
+                "problem": f"no {policy_id} policy effective on {on}",
             }
         chosen = effective[-1]
         return {
             "policy_version_id": str(chosen.id),
             "policy_ref": f"{chosen.policy_id}@v{chosen.version}",
             "policy_sha256": chosen.sha256,
-            "decision_date": decision_date.isoformat(),
-            "decision_date_source": "invoice_date" if inv_date else "today",
+            "decision_date": on.isoformat(),
+            "decision_date_source": date_source,
             "superseded": [
                 f"{v.policy_id}@v{v.version} (effective {v.effective_from})"
                 for v in versions
-                if v.id != chosen.id and v.effective_from <= decision_date
+                if v.id != chosen.id and v.effective_from <= on
             ],
             "later_versions": [
                 f"{v.policy_id}@v{v.version} (effective {v.effective_from})"
                 for v in versions
-                if v.effective_from > decision_date
+                if v.effective_from > on
             ],
         }
 
