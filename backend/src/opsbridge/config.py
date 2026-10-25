@@ -122,8 +122,11 @@ class Settings(BaseSettings):
     ollama_model: str | None = None
 
     github_sandbox_repo: str | None = None
-    github_token: SecretStr | None = None
+    github_token: SecretStr | None = None  # used by GitHub connections without a credential ref
     github_live_writes_authorized: bool = False
+    # Repositories a tenant's GitHub task connection may name (the sandbox repo is included).
+    github_repository_allowlist: list[str] = Field(default_factory=list)
+    github_api_url: str = "https://api.github.com"
 
     worker_lease_seconds: int = 30
     # A step that runs longer stops renewing its job's lease: another worker may take the
