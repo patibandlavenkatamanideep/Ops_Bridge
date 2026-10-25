@@ -894,3 +894,14 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   Approvals bind the destination; dispatch writes and recovers at the approved destination.
   A probe on the previous code showed recovery looking in the newly configured repository and
   leaving a created issue as `outcome_unknown`.
+
+### No resend while a create may still land (2026-10-25)
+- After a create timed out, a reliable lookup that found nothing was taken as proof that it
+  had not happened, and the task was sent again. A tracker can still commit the first request
+  after the client gave up (or the Casework MCP hop can deliver it late), so a tracker without
+  idempotency keys got the task twice; reproduced with a create committed 6 s after the
+  request.
+- Creates now carry a request deadline (recorded on the attempt, migration 0018, passed
+  through the MCP hop). Finding nothing proves absence only once the deadline plus a clock
+  allowance has passed and the tracker honours deadlines (the simulator refuses late
+  creates); before that the job looks again later; a tracker without deadlines goes to review.
