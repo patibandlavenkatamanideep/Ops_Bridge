@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import uuid
 from typing import Any, Literal
 
@@ -14,6 +15,8 @@ from opsbridge.services import investigations as svc
 from ..deps import CurrentPrincipal, State
 from ..errors import ApiError, conflict, not_found
 from .cases import CaseOut, case_out
+
+log = logging.getLogger("opsbridge.api.evidence")
 
 router = APIRouter(prefix="/api/v1/tenants/{tenant}/cases/{case_id}", tags=["investigations"])
 
@@ -100,6 +103,7 @@ class FieldOut(BaseModel):
     locator: str
     method: str
     status: str
+    correctable: bool  # matching applies a correction to this field
     note: str | None
     corrections: list[CorrectionOut]
 
@@ -286,6 +290,14 @@ def original(
         )
     except svc.NotFound as exc:
         raise _map_errors(exc) from exc
+    except svc.EvidenceIntegrityError as exc:
+        log.error("stored original %s does not match its digest; not served", exc)
+        raise ApiError(
+            500,
+            "evidence_integrity_failed",
+            "The stored original no longer matches its recorded digest and is not served. "
+            "Restore it from a backup.",
+        ) from exc
     return Response(
         content=data,
         media_type=ctype,

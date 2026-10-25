@@ -2,16 +2,17 @@
 # services, simulator and the one-shot bootstrap; the command selects the role.
 # Build from the repository root: docker build -f infra/containers/opsbridge.Dockerfile .
 # The repository layout is kept under /app so paths resolve as in development.
+# Base images are pinned by index digest (tag kept for reading); Dependabot proposes updates.
 
-FROM docker.io/library/node:24.22.0-bookworm-slim AS ui
+FROM docker.io/library/node:24.22.0-bookworm-slim@sha256:91acba91b842bec0bf7ea6f5e09c644c7ccad72c4996ed9616d861d1c7cd60d4 AS ui
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-FROM docker.io/library/python:3.12.15-slim-bookworm AS python
-COPY --from=ghcr.io/astral-sh/uv:0.10.2 /uv /usr/local/bin/uv
+FROM docker.io/library/python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70 AS python
+COPY --from=ghcr.io/astral-sh/uv:0.10.2@sha256:94a23af2d50e97b87b522d3cea24aaf8a1faedec1344c952767434f69585cbf9 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/app/backend/.venv
 WORKDIR /app/backend
@@ -22,7 +23,7 @@ COPY backend/alembic.ini ./
 COPY backend/src ./src
 RUN uv sync --frozen --no-dev
 
-FROM docker.io/library/python:3.12.15-slim-bookworm
+FROM docker.io/library/python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
 # Optional local OCR for PDFs without a text layer (off unless OPSBRIDGE_OCR_ENABLED=true):
 # Debian's tesseract with English data, pinned. OCR text is never authoritative.
 RUN apt-get update \

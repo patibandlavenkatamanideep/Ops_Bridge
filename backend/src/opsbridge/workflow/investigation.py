@@ -15,11 +15,13 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Callable
+from contextlib import nullcontext
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
 from sqlalchemy import func, select, text
+from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
@@ -30,7 +32,7 @@ from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest
 from opsbridge.evidence.parsers import OcrSettings
-from opsbridge.evidence.records import load_match_input, source_manifest
+from opsbridge.evidence.records import current_invoices, load_match_input, source_manifest
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
@@ -38,13 +40,17 @@ from opsbridge.persistence.models import (
     Case,
     InvestigationVersion,
     InvoiceRecord,
+    ModelCall,
     PolicyVersion,
     Tenant,
+    ToolInvocation,
     WorkflowRun,
     WorkflowStep,
 )
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
+
+from . import jobs
 
 WORKFLOW_VERSION = "investigation/1.1.0"
 SERVICE_IDENTITY = "service:opsbridge-worker"
@@ -60,6 +66,7 @@ class InvestigationDeps:
     adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
     records_mcp: Any = None  # McpToolClient when tool_transport == "mcp"
     signer: Any = None  # DelegationSigner for MCP calls
+    tool_cassette: Any = None  # benchmark only: records agent tool calls, or replays them
 
 
 class StepFailed(Exception):
@@ -75,13 +82,18 @@ def _ctx(tenant_id: uuid.UUID) -> DbContext:
 def _run_step(
     deps: InvestigationDeps,
     run: WorkflowRun,
+    lease: jobs.Lease | None,
     seq: int,
     name: str,
     inputs: Any,
     fn: Callable[[], dict[str, Any]],
 ) -> dict[str, Any]:
+    """Run one durable step. With a lease, every write is fenced (a worker that lost the job
+    writes nothing) and the lease is renewed while the step runs, up to the step limit."""
     ctx = _ctx(run.tenant_id)
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)
         step = s.execute(
             select(WorkflowStep).where(
                 WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -98,13 +110,23 @@ def _run_step(
         step.input_digest = digest(inputs)
         step.started_at = datetime.now(UTC)
         step.error = None
+    limit = float(getattr(deps.settings, "investigation_step_limit_seconds", 300))
     try:
-        with tracing.span(
-            f"step {name}", tenant_id=run.tenant_id, case_id=run.case_id, run_id=run.id, step=name
+        with (
+            tracing.span(
+                f"step {name}",
+                tenant_id=run.tenant_id,
+                case_id=run.case_id,
+                run_id=run.id,
+                step=name,
+            ),
+            lease.keep_alive(limit) if lease is not None else nullcontext(),
         ):
             output = fn()
     except Exception as exc:
         with deps.db.session(ctx) as s:
+            if lease is not None:
+                lease.check(s)
             step = s.execute(
                 select(WorkflowStep).where(
                     WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -115,6 +137,8 @@ def _run_step(
             step.finished_at = datetime.now(UTC)
         raise
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)  # a worker whose lease lapsed during the step records nothing
         step = s.execute(
             select(WorkflowStep).where(
                 WorkflowStep.run_id == run.id, WorkflowStep.step_name == name
@@ -128,13 +152,21 @@ def _run_step(
 
 
 def run_investigation(
-    deps: InvestigationDeps, tenant_id: uuid.UUID, run_id: uuid.UUID
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    run_id: uuid.UUID,
+    lease: jobs.Lease | None = None,
 ) -> uuid.UUID:
-    """Execute (or resume) an investigation run. Returns the investigation version id."""
+    """Execute (or resume) an investigation run. Returns the investigation version id.
+
+    `lease` is the worker's claim on the job: without it (tests, the benchmark harness)
+    writes are not fenced."""
     from opsbridge.connectors.purchasing import SourceRecordInvalid, SourceUnavailable
 
     ctx = _ctx(tenant_id)
     with deps.db.session(ctx) as s:
+        if lease is not None:
+            lease.check(s)
         run = s.get(WorkflowRun, run_id)
         if run is None:
             raise StepFailed("run not found in tenant", retryable=False)
@@ -158,6 +190,7 @@ def run_investigation(
             "case_id": str(case.id),
             "invoice_number": case.invoice_number,
             "po_number": case.po_number,
+            "supplier_id": case.supplier_id,
             "case_number": case.case_number,
         }
         tenant_slug, pack_id = tenant.slug, tenant.pack_id
@@ -173,10 +206,11 @@ def run_investigation(
                 f"purchasing system returned an unusable record: {exc}", retryable=False
             ) from exc
 
-    collected = _run_step(deps, run, 1, "collect_context", case_snapshot, collect)
+    collected = _run_step(deps, run, lease, 1, "collect_context", case_snapshot, collect)
     policy_out = _run_step(
         deps,
         run,
+        lease,
         2,
         "retrieve_policy",
         {"pack": pack.policy_id, **collected},
@@ -185,6 +219,7 @@ def run_investigation(
     recon = _run_step(
         deps,
         run,
+        lease,
         3,
         "reconcile_records",
         {"policy": policy_out, "collected": collected},
@@ -194,6 +229,7 @@ def run_investigation(
     explained = _run_step(
         deps,
         run,
+        lease,
         4,
         "explain_findings",
         {"recon": recon, "mode": agent["mode"]},
@@ -202,6 +238,7 @@ def run_investigation(
     proposed = _run_step(
         deps,
         run,
+        lease,
         5,
         "propose_follow_up",
         {"recon": recon, "mode": agent["mode"]},
@@ -210,6 +247,7 @@ def run_investigation(
     validated = _run_step(
         deps,
         run,
+        lease,
         6,
         "validate_proposal",
         proposed,
@@ -232,7 +270,7 @@ def run_investigation(
             f"model explanation rejected: {problem}",
         ]
     return _finalize(
-        deps, tenant_id, run_id, case_snapshot, collected, policy_out, recon, explained
+        deps, tenant_id, run_id, case_snapshot, collected, policy_out, recon, explained, lease
     )
 
 
@@ -249,6 +287,7 @@ def _ingest_record(
     case_id: str,
     linked: list[dict[str, Any]],
     problems: list[str],
+    refused: list[str],
 ) -> bool:
     spec = pack.sources.get(record_type)
     if spec is None or spec.collection is None:
@@ -274,6 +313,7 @@ def _ingest_record(
             )
         except IngestRejected as exc:
             problems.append(f"{record_type} {key}: rejected ({exc.reason})")
+            refused.append(f"{record_type} {key}: {exc.reason}")
             return False
         s.execute(
             text(
@@ -305,22 +345,29 @@ def _collect(
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
     unavailable: list[str] = []
+    refused: list[str] = []  # current source documents OpsBridge cannot read at all
     try:
         invoice_no = case["invoice_number"]
         po_no = case["po_number"]
         if invoice_no and not _ingest_record(
-            deps, tenant_id, pack, client, "invoice", invoice_no, case["case_id"], linked, problems
+            deps,
+            tenant_id,
+            pack,
+            client,
+            "invoice",
+            invoice_no,
+            case["case_id"],
+            linked,
+            problems,
+            refused,
         ):
             unavailable.append(f"invoice {invoice_no}")
         if invoice_no:
             with deps.db.session(_ctx(tenant_id)) as s:
-                found = s.execute(
-                    select(InvoiceRecord.po_number).where(
-                        InvoiceRecord.invoice_number == invoice_no,
-                        InvoiceRecord.superseded_at.is_(None),
-                    )
-                ).scalar()
-            po_no = found or po_no
+                found = current_invoices(s, invoice_no, case.get("supplier_id"))
+                # Learn the PO from the invoice only when exactly one invoice is meant.
+                if len(found) == 1 and found[0].po_number:
+                    po_no = found[0].po_number
         if po_no:
             if not _ingest_record(
                 deps,
@@ -332,6 +379,7 @@ def _collect(
                 case["case_id"],
                 linked,
                 problems,
+                refused,
             ):
                 unavailable.append(f"purchase order {po_no}")
             follow_ups: tuple[RecordType, ...] = (
@@ -354,12 +402,14 @@ def _collect(
                         case["case_id"],
                         linked,
                         problems,
+                        refused,
                     )
     finally:
         client.close()
     return {
         "documents": linked,
         "unavailable": unavailable,
+        "refused": refused,
         "problems": problems,
         "po_number": po_no,
     }
@@ -431,106 +481,160 @@ def _reconcile(
     policy_out: dict[str, Any],
     collected: dict[str, Any],
 ) -> dict[str, Any]:
+    from opsbridge.services.freshness import capture
+
+    with deps.db.session(_ctx(tenant_id)) as s:
+        # Taken before matching reads anything, so any later change makes this result stale.
+        state = capture(
+            s,
+            uuid.UUID(case["case_id"]),
+            case["invoice_number"],
+            collected.get("po_number"),
+            case.get("supplier_id"),
+        )
+        return {**_match(s, case, policy_out, collected), "evidence_state": state}
+
+
+def _match(
+    s: Session, case: dict[str, Any], policy_out: dict[str, Any], collected: dict[str, Any]
+) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     uncertainty: list[str] = list(collected.get("problems", []))
-    with deps.db.session(_ctx(tenant_id)) as s:
-        if policy_out.get("policy_version_id") is None:
+    if policy_out.get("policy_version_id") is None:
+        findings.append(
+            _manual_finding("policy_unavailable", policy_out.get("problem", "No effective policy."))
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": None,
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+        }
+    doc = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
+    assert doc is not None
+    policy = ReconciliationPolicy.model_validate(doc.document)
+    if not case["invoice_number"]:
+        findings.append(
+            _manual_finding(
+                "invoice_reference_missing",
+                "The case does not identify an invoice; add the invoice number.",
+                "needs_information",
+            )
+        )
+        return {
+            "outcome": "needs_information",
+            "findings": findings,
+            "recommendation": None,
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    if collected.get("refused"):
+        # The source's current document could not be read; earlier extractions of it are
+        # history, not current facts, so nothing is matched until a readable version arrives.
+        findings.append(
+            _manual_finding(
+                "source_document_unreadable",
+                "The source system's current document could not be read ("
+                + "; ".join(collected["refused"])[:400]
+                + "). Earlier extractions were not used; a person must review it.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    loaded = load_match_input(
+        s, case["invoice_number"], collected.get("po_number"), case.get("supplier_id")
+    )
+    version_ids = sorted(str(v) for v in loaded.version_ids)
+    if loaded.ambiguous_suppliers:
+        findings.append(
+            _manual_finding(
+                "invoice_identity_ambiguous",
+                f"Invoice {case['invoice_number']} exists for more than one supplier ("
+                + ", ".join(loaded.ambiguous_suppliers)
+                + "). Name the supplier on the case; no invoice was matched.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": version_ids,
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    if loaded.match_input is None:
+        reasons = collected.get("unavailable") or loaded.missing
+        needs_review_docs = [
+            d
+            for d in collected.get("documents", [])
+            if d["record_type"] == "invoice" and d["parse_status"] != "parsed"
+        ]
+        if needs_review_docs:
             findings.append(
                 _manual_finding(
-                    "policy_unavailable", policy_out.get("problem", "No effective policy.")
+                    "invoice_extraction_needs_review",
+                    "The invoice document could not be read reliably ("
+                    + "; ".join(
+                        p for p in collected.get("problems", []) if p.startswith("invoice")
+                    )[:400]
+                    + "). Its values were not used; a person must review or supply a structured copy.",
                 )
             )
-            return {
-                "outcome": "manual_review",
-                "findings": findings,
-                "recommendation": None,
-                "uncertainty": uncertainty,
-                "version_ids": [],
-                "corrections": [],
-            }
-        doc = s.get(PolicyVersion, uuid.UUID(policy_out["policy_version_id"]))
-        assert doc is not None
-        policy = ReconciliationPolicy.model_validate(doc.document)
-        if not case["invoice_number"]:
+            outcome = "manual_review"
+        else:
             findings.append(
                 _manual_finding(
-                    "invoice_reference_missing",
-                    "The case does not identify an invoice; add the invoice number.",
+                    "invoice_record_unavailable",
+                    f"The invoice record is not available from the authorized sources ({', '.join(reasons)}).",
                     "needs_information",
                 )
             )
-            return {
-                "outcome": "needs_information",
-                "findings": findings,
-                "recommendation": None,
-                "uncertainty": uncertainty,
-                "version_ids": [],
-                "corrections": [],
-                "policy_ref": policy.ref,
-            }
-        loaded = load_match_input(s, case["invoice_number"], collected.get("po_number"))
-        version_ids = sorted(str(v) for v in loaded.version_ids)
-        if loaded.match_input is None:
-            reasons = collected.get("unavailable") or loaded.missing
-            needs_review_docs = [
-                d
-                for d in collected.get("documents", [])
-                if d["record_type"] == "invoice" and d["parse_status"] != "parsed"
-            ]
-            if needs_review_docs:
-                findings.append(
-                    _manual_finding(
-                        "invoice_extraction_needs_review",
-                        "The invoice document could not be read reliably ("
-                        + "; ".join(
-                            p for p in collected.get("problems", []) if p.startswith("invoice")
-                        )[:400]
-                        + "). Its values were not used; a person must review or supply a structured copy.",
-                    )
-                )
-                outcome = "manual_review"
-            else:
-                findings.append(
-                    _manual_finding(
-                        "invoice_record_unavailable",
-                        f"The invoice record is not available from the authorized sources ({', '.join(reasons)}).",
-                        "needs_information",
-                    )
-                )
-                outcome = "needs_information"
-            return {
-                "outcome": outcome,
-                "findings": findings,
-                "recommendation": _rec_for(outcome, policy, case),
-                "uncertainty": uncertainty,
-                "version_ids": version_ids,
-                "corrections": [],
-                "policy_ref": policy.ref,
-            }
-        result: MatchResult = reconcile(loaded.match_input, policy)
-        rec = recommend(result, policy, case["case_number"])
-        uncertainty += [
-            f"supplier claim unconfirmed: {f.summary}"
-            for f in result.findings
-            if f.reason_code == "supplier_claim_unverified"
-        ]
-        uncertainty += [
-            f"corrected value used for {c['field']} ({c['original']} → {c['corrected']})"
-            for c in loaded.corrections_applied
-        ]
+            outcome = "needs_information"
         return {
-            "outcome": result.outcome,
-            "findings": [f.to_dict() for f in result.findings],
-            "recommendation": rec.to_dict(),
+            "outcome": outcome,
+            "findings": findings,
+            "recommendation": _rec_for(outcome, policy, case),
             "uncertainty": uncertainty,
             "version_ids": version_ids,
-            "corrections": loaded.corrections_applied,
-            "policy_ref": result.policy_ref,
-            "rules_version": result.rules_version,
-            # identifiers the matcher resolved; outbound redaction keeps them intact
-            "resolved_po_number": result.resolved_po_number,
-            "resolved_supplier_id": result.resolved_supplier_id,
+            "corrections": [],
+            "policy_ref": policy.ref,
         }
+    result: MatchResult = reconcile(loaded.match_input, policy)
+    rec = recommend(result, policy, case["case_number"])
+    uncertainty += [
+        f"supplier claim unconfirmed: {f.summary}"
+        for f in result.findings
+        if f.reason_code == "supplier_claim_unverified"
+    ]
+    uncertainty += [
+        f"corrected value used for {c['field']} ({c['original']} → {c['corrected']})"
+        for c in loaded.corrections_applied
+    ]
+    return {
+        "outcome": result.outcome,
+        "findings": [f.to_dict() for f in result.findings],
+        "recommendation": rec.to_dict(),
+        "uncertainty": uncertainty,
+        "version_ids": version_ids,
+        "corrections": loaded.corrections_applied,
+        "policy_ref": result.policy_ref,
+        "rules_version": result.rules_version,
+        # identifiers the matcher resolved; outbound redaction keeps them intact
+        "resolved_po_number": result.resolved_po_number,
+        "resolved_supplier_id": result.resolved_supplier_id,
+    }
 
 
 def _rec_for(outcome: str, policy: ReconciliationPolicy, case: dict[str, Any]) -> dict[str, Any]:
@@ -577,6 +681,13 @@ def _agent_runtime(
     with deps.db.session(_ctx(tenant_id)) as s:
         run = s.get(WorkflowRun, run_id)
         assert run is not None
+        # A resumed run continues its budget: calls an earlier attempt made still count.
+        budget.model_calls = s.execute(
+            select(func.count()).select_from(ModelCall).where(ModelCall.run_id == run_id)
+        ).scalar_one()
+        budget.tool_calls = s.execute(
+            select(func.count()).select_from(ToolInvocation).where(ToolInvocation.run_id == run_id)
+        ).scalar_one()
         run.budget = {
             "max_model_calls": budget.max_model_calls,
             "max_tool_calls": budget.max_tool_calls,
@@ -672,8 +783,9 @@ def _explain(
     policy_out: dict[str, Any],
     collected: dict[str, Any],
 ) -> dict[str, Any]:
-    from opsbridge.agents.steps import explain
+    from opsbridge.agents.steps import SEARCH_TOOL, TOOL_VERSION, SearchResult, explain
     from opsbridge.evidence.retrieval import search
+    from opsbridge.persistence.models import DocumentVersion
 
     def fallback() -> dict[str, Any]:
         return template_explanation(recon=recon, policy=policy_out, case=case)
@@ -683,7 +795,7 @@ def _explain(
     ctx = _agent_context(deps, tenant_id, case, recon, policy_out)
     allowed_versions = _case_versions(deps, tenant_id, case["case_id"])
 
-    def search_fn(query: str) -> list[dict[str, Any]]:
+    def search_live(query: str) -> list[dict[str, Any]]:
         if deps.records_mcp is not None:
             with deps.db.session(_ctx(tenant_id)) as s:
                 run = s.execute(
@@ -705,6 +817,32 @@ def _explain(
             return list(out.get("hits", []))
         with deps.db.session(_ctx(tenant_id)) as s:
             return [h.__dict__ for h in search(s, allowed_versions, query, limit=3)]
+
+    def rebind(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        """Recorded hits name rows of the recording's database; this one holds the same
+        document versions under new ids. Map each hit by content digest within this case."""
+        with deps.db.session(_ctx(tenant_id)) as s:
+            rows = s.execute(
+                select(
+                    DocumentVersion.raw_sha256, DocumentVersion.document_id, DocumentVersion.id
+                ).where(DocumentVersion.id.in_(allowed_versions))
+            ).all()
+        out = []
+        for hit in hits:
+            same = [(doc, ver) for sha, doc, ver in rows if sha == hit["sha256"]]
+            if len(same) != 1:
+                raise LookupError(f"{len(same)} versions in this case have content {hit['sha256']}")
+            out.append({**hit, "document_id": str(same[0][0]), "version_id": str(same[0][1])})
+        return out
+
+    def search_fn(query: str) -> SearchResult:
+        if deps.tool_cassette is None:
+            hits = search_live(query)
+            return SearchResult(hits, hits)
+        response, hits, origin = deps.tool_cassette.call_tool(
+            SEARCH_TOOL, TOOL_VERSION, {"query": query}, lambda: search_live(query), rebind
+        )
+        return SearchResult(response, hits, origin)
 
     return explain(
         agent["adapter"],
@@ -844,21 +982,23 @@ def _finalize(
     policy_out: dict[str, Any],
     recon: dict[str, Any],
     explained: dict[str, Any],
+    lease: jobs.Lease | None = None,
 ) -> uuid.UUID:
     from opsbridge.domain.records import SourceRef
 
     with deps.db.session(_ctx(tenant_id)) as s:
-        existing = s.execute(
-            select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
-        ).scalar_one_or_none()
-        if (
-            existing is not None
-        ):  # idempotent finalize after a crash between commit and job completion
-            return existing
-        run = s.get(WorkflowRun, run_id)
+        # Serialize on the case first, then decide: two holders cannot both pass the check.
         case = s.execute(
             select(Case).where(Case.id == uuid.UUID(case_snapshot["case_id"])).with_for_update()
         ).scalar_one()
+        existing = s.execute(
+            select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
+        ).scalar_one_or_none()
+        if existing is not None:  # idempotent after a crash between commit and job completion
+            return existing
+        if lease is not None:
+            lease.check(s)
+        run = s.get(WorkflowRun, run_id)
         assert run is not None
         refs = [SourceRef(**e) for f in recon["findings"] for e in f.get("evidence", [])]
         citations = [c.to_dict(include_excerpt=False) for c in resolve_all(s, refs)]
@@ -905,6 +1045,7 @@ def _finalize(
             rules_version=recon.get("rules_version", "n/a"),
             source_manifest=manifest,
             source_manifest_digest=digest(manifest),
+            evidence_state=recon.get("evidence_state"),
         )
         s.add(iv)
         s.flush()

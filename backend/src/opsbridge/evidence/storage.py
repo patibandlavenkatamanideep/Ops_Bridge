@@ -45,11 +45,12 @@ class LocalArtifactStore:
         return path
 
     def put(self, tenant_id: uuid.UUID, data: bytes) -> tuple[str, str]:
-        """Store bytes; return (storage_key, 'sha256:<hex>'). Idempotent per content."""
+        """Store bytes; return (storage_key, 'sha256:<hex>'). Idempotent per content; a file
+        whose bytes no longer match its name is rewritten."""
         hexdigest = hashlib.sha256(data).hexdigest()
         key = f"{tenant_id}/{hexdigest[:2]}/{hexdigest}"
         path = self._path(tenant_id, key)
-        if not path.exists():
+        if not path.exists() or hashlib.sha256(path.read_bytes()).hexdigest() != hexdigest:
             path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
             tmp = path.with_suffix(f".tmp-{uuid.uuid4().hex}")
             with open(tmp, "wb") as fh:
@@ -61,7 +62,10 @@ class LocalArtifactStore:
         return key, f"sha256:{hexdigest}"
 
     def get(self, tenant_id: uuid.UUID, key: str) -> bytes:
-        return self._path(tenant_id, key).read_bytes()
+        data = self._path(tenant_id, key).read_bytes()
+        if hashlib.sha256(data).hexdigest() != key.rsplit("/", 1)[1]:
+            raise ArtifactIntegrityError(f"stored object {key} does not match its digest")
+        return data
 
     def exists(self, tenant_id: uuid.UUID, key: str) -> bool:
         return self._path(tenant_id, key).exists()

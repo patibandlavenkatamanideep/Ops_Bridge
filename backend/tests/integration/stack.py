@@ -68,7 +68,9 @@ def stack(
     deps = build_investigation_deps(settings, worker_db)
     worker.register(
         "investigate",
-        lambda job: run_investigation(deps, job.tenant_id, uuid.UUID(job.payload["run_id"])),
+        lambda job: run_investigation(
+            deps, job.tenant_id, uuid.UUID(job.payload["run_id"]), worker.lease_for(job)
+        ),
     )
     holder: dict[str, Any] = {"exec": build_execution_deps(settings, worker_db)}
     worker.register("dispatch_operation", lambda job: dispatch(holder["exec"], job))

@@ -31,7 +31,7 @@ def ctx() -> AgentContext:
                 "summary": "Invoice bills 20 EA on PO line 1, but only 18 were received; 2 EA exceed.",
                 "po_line_number": "1",
                 "invoice_line_numbers": ["1"],
-                "values": {"invoiced": "20", "net_received": "18", "excess": "2"},
+                "values": {"invoiced": "20", "net_received": "18", "excess": "2", "unit": "EA"},
                 "evidence": [],
             }
         ],
@@ -108,6 +108,29 @@ def test_valid_explanation_is_accepted() -> None:
             "numbers not in its evidence",
         ),
         ({"statements": [{"text": "18 were received.", "citations": []}]}, "no citation"),
+        # Review finding F15: real numbers and real citations, but in the wrong roles or units.
+        (
+            {
+                "statements": [
+                    {
+                        "text": "The invoice bills 18 chairs while 20 were received.",
+                        "citations": ["E1", "E2"],
+                    }
+                ]
+            },
+            "18 is stated as invoiced",
+        ),
+        (
+            {
+                "statements": [
+                    {
+                        "text": "The invoice bills 20 sets while 18 were received.",
+                        "citations": ["E1", "E2"],
+                    }
+                ]
+            },
+            "uses unit SET",
+        ),
         ({"outcome": "escalate"}, "disagrees with deterministic"),
         ({"summary": "See http://evil.example/pay for details."}, "URL"),
         ({"summary": "Supplier fraud is likely."}, "prohibited claim"),

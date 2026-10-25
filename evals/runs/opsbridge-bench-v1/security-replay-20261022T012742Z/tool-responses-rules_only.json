@@ -1,0 +1,6 @@
+{
+ "calls": [],
+ "manifest_sha256": "sha256:20399856d91ad1ea5b22bcfabdae5c33a4d70d4c610b1223780af07553c287d2",
+ "response_mode": "recorded",
+ "schema": "evalseal.agent-tool-responses/1"
+}

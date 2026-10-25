@@ -231,6 +231,11 @@
       },
       "CaseCreateIn": {
         "properties": {
+          "confirm_distinct": {
+            "default": false,
+            "title": "Confirm Distinct",
+            "type": "boolean"
+          },
           "description": {
             "default": "",
             "maxLength": 5000,
@@ -266,6 +271,18 @@
             "default": 1,
             "title": "Schema Version",
             "type": "integer"
+          },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
           },
           "title": {
             "maxLength": 300,
@@ -371,6 +388,17 @@
             "title": "Status",
             "type": "string"
           },
+          "supplier_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Supplier Id"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -387,6 +415,7 @@
           "description",
           "invoice_number",
           "po_number",
+          "supplier_id",
           "status",
           "discrepancy_types",
           "evidence_readiness",
@@ -916,6 +945,10 @@
       },
       "FieldOut": {
         "properties": {
+          "correctable": {
+            "title": "Correctable",
+            "type": "boolean"
+          },
           "corrections": {
             "items": {
               "$ref": "#/components/schemas/CorrectionOut"
@@ -1000,6 +1033,7 @@
           "locator",
           "method",
           "status",
+          "correctable",
           "note",
           "corrections"
         ],
@@ -2008,6 +2042,38 @@
             "title": "Canonicalization",
             "type": "string"
           },
+          "decision_blocked": {
+            "anyOf": [
+              {
+                "enum": [
+                  "not_awaiting_approval",
+                  "expired",
+                  "no_permission",
+                  "out_of_scope",
+                  "separation_of_duties"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision Blocked"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Destination"
+          },
           "effect_summary": {
             "title": "Effect Summary",
             "type": "string"
@@ -2035,6 +2101,18 @@
           "investigation_version_id": {
             "title": "Investigation Version Id",
             "type": "string"
+          },
+          "outbound": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound"
           },
           "parameters": {
             "additionalProperties": true,
@@ -2088,6 +2166,8 @@
           "source_manifest_digest",
           "investigation_version_id",
           "policy_ref",
+          "destination",
+          "outbound",
           "required_permission",
           "payload_digest",
           "canonicalization",

@@ -53,6 +53,12 @@ class RoutingBlocked(ModelError):
     category = "routing_blocked"
 
 
+class ReplayFailure(RuntimeError):
+    """Offline replay has no recorded response for a model or tool call, or the call diverged
+    from the recording. Deliberately not a `ModelError` and never handled as a tool error:
+    the run must stop, not fall back to a template or to executing anything."""
+
+
 @dataclass(frozen=True)
 class Capabilities:
     provider: str

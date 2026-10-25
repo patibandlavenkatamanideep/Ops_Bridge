@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import base64
 import json
-import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
@@ -16,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import Forbidden, Principal, require
+from opsbridge.canonical import digest
+from opsbridge.domain import identifiers
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Case, User
 
@@ -78,28 +79,35 @@ def transition(case: Case, new_status: str) -> None:
     case.row_version += 1
 
 
-_KEY_RE = re.compile(r"[^A-Z0-9-]")
-
-
-def normalize_ref(value: str | None) -> str | None:
-    if value is None:
-        return None
-    v = _KEY_RE.sub("", value.strip().upper())
-    return v or None
-
-
 @dataclass(frozen=True)
 class CaseCreate:
     title: str
     description: str
     invoice_number: str | None
     po_number: str | None
+    supplier_id: str | None = None
+    # The caller checked that a similar-looking invoice number names a different document.
+    confirm_distinct: bool = False
 
 
 class DuplicateCase(Exception):
     def __init__(self, existing_id: uuid.UUID | None) -> None:
         super().__init__("a case for this source already exists")
         self.existing_id = existing_id
+
+
+class PossibleDuplicate(Exception):
+    """An existing case's invoice number differs only in punctuation, spacing or leading
+    zeros. It may be the same invoice; a person must confirm before a second case opens."""
+
+    def __init__(self, existing_id: uuid.UUID | None, existing_invoice_number: str | None) -> None:
+        super().__init__("a case for a similar invoice number exists")
+        self.existing_id = existing_id
+        self.existing_invoice_number = existing_invoice_number
+
+
+class IdempotencyKeyReused(Exception):
+    """The idempotency key was already used for a different request."""
 
 
 def _visible_filter(principal: Principal) -> Any:
@@ -129,25 +137,66 @@ def create_case(
     idempotency_key: str | None,
     correlation_id: str | None = None,
 ) -> tuple[Case, bool]:
-    """Create a case. Returns (case, created). A repeated idempotency key returns the original."""
+    """Create a case. Returns (case, created). Repeating an idempotency key with the same
+    request returns the case it created; with a different request it is refused. Another
+    key for an invoice that already has a case is a duplicate, not a replay."""
     require(principal, "case.create")
-    invoice = normalize_ref(data.invoice_number)
-    po = normalize_ref(data.po_number)
+    invoice = identifiers.normalize(data.invoice_number)
+    po = identifiers.normalize(data.po_number)
+    supplier = identifiers.normalize(data.supplier_id)
+    request_digest = digest(
+        {
+            "title": data.title.strip(),
+            "description": data.description.strip(),
+            "invoice_number": invoice,
+            "po_number": po,
+            "supplier_id": supplier,
+        }
+    )
     if invoice:
-        source_key = f"invoice:{invoice}"
+        # Without a supplier the key is the one used before suppliers were recorded.
+        source_key = f"invoice@{supplier}:{invoice}" if supplier else f"invoice:{invoice}"
     elif idempotency_key:
         source_key = f"manual:{principal.user_id}:{idempotency_key}"
     else:
         source_key = f"manual:{uuid.uuid4()}"
     ctx = DbContext(tenant_id=principal.tenant_id, user_id=principal.user_id)
     with db.session(ctx) as s:
+        if idempotency_key:
+            replayed = s.execute(
+                select(Case).where(
+                    Case.requester_id == principal.user_id, Case.intake_key == idempotency_key
+                )
+            ).scalar_one_or_none()
+            if replayed is not None:
+                if replayed.intake_digest != request_digest:
+                    raise IdempotencyKeyReused()
+                return replayed, False
         existing = s.execute(select(Case).where(Case.source_key == source_key)).scalar_one_or_none()
         if existing is not None:
             same_requester = existing.requester_id == principal.user_id
-            if idempotency_key and same_requester:
-                return existing, False
             visible = principal.has("case.read_all") or same_requester
             raise DuplicateCase(existing.id if visible else None)
+        if invoice and not data.confirm_distinct:
+            looks_alike = text(
+                f"{identifiers.similarity_sql('cases.invoice_number')} = :key"
+            ).bindparams(key=identifiers.similarity_key(invoice))
+            # Different named suppliers make different invoices; otherwise it may be the same.
+            supplier_may_match = (
+                [or_(Case.supplier_id.is_(None), Case.supplier_id == supplier)] if supplier else []
+            )
+            similar = s.execute(
+                select(Case)
+                .where(Case.invoice_number != invoice, looks_alike, *supplier_may_match)
+                .limit(1)
+            ).scalar_one_or_none()
+            if similar is not None:
+                visible = (
+                    principal.has("case.read_all") or similar.requester_id == principal.user_id
+                )
+                raise PossibleDuplicate(
+                    similar.id if visible else None, similar.invoice_number if visible else None
+                )
         case = Case(
             tenant_id=principal.tenant_id,
             case_number=_next_number(s, principal.tenant_id),
@@ -155,7 +204,10 @@ def create_case(
             description=data.description.strip(),
             invoice_number=invoice,
             po_number=po,
+            supplier_id=supplier,
             source_key=source_key,
+            intake_key=idempotency_key,
+            intake_digest=request_digest,
             discrepancy_types=[],
             evidence_readiness="not_collected",
             status="new",

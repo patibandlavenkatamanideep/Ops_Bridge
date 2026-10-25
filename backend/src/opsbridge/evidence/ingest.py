@@ -46,6 +46,7 @@ from ..persistence.models import (
     SupplierAssertionRecord,
     SupplierRecord,
 )
+from .blobs import store_bytes
 from .normalize import NORMALIZATION_VERSION, normalized_digest
 from .parsers import MAX_BYTES, OcrSettings, ParsedDocument, parse, safe_filename
 from .storage import ArtifactStore
@@ -125,7 +126,7 @@ def ingest(
         session.add(doc)
         session.flush()
 
-    storage_key, raw_sha = store.put(tenant_id, data)
+    storage_key, raw_sha = store_bytes(session, store, tenant_id, data)
     latest = session.execute(
         select(DocumentVersion)
         .where(DocumentVersion.document_id == doc.id)
@@ -183,6 +184,11 @@ def ingest(
     result = IngestResult(doc.id, version.id, version.version_no, raw_sha, True, status, detail)
     if parsed.flags:
         result.problems.extend(f"flag:{f}" for f in parsed.flags)
+    if pack is not None and record_type is not None and status != "parsed":
+        # The newest version of this source yields no records, so the facts extracted from an
+        # earlier version must stop being current: matching would otherwise use what the
+        # source no longer shows. They stay in the history, superseded.
+        _supersede_all(session, doc.id, version.id)
     if pack is not None and record_type is not None and status == "parsed":
         mapping = map_document(
             pack, record_type, parsed, DocRef(str(doc.id), str(version.id), raw_sha, classification)
@@ -289,13 +295,7 @@ def _supersede(
     )
 
 
-def _store_records(
-    session: Session,
-    tenant_id: uuid.UUID,
-    document_id: uuid.UUID,
-    version_id: uuid.UUID,
-    m: MappingResult,
-) -> dict[str, int]:
+def _supersede_all(session: Session, document_id: uuid.UUID, keep_version: uuid.UUID) -> None:
     for model in (
         PurchaseOrderRecord,
         InvoiceRecord,
@@ -303,8 +303,18 @@ def _store_records(
         InvoiceAllocationRecord,
         SupplierAssertionRecord,
     ):
-        _supersede(session, model, document_id, version_id)
+        _supersede(session, model, document_id, keep_version)
     session.flush()
+
+
+def _store_records(
+    session: Session,
+    tenant_id: uuid.UUID,
+    document_id: uuid.UUID,
+    version_id: uuid.UUID,
+    m: MappingResult,
+) -> dict[str, int]:
+    _supersede_all(session, document_id, version_id)
     for po in m.purchase_orders:
         # A PO number can only have one current record per tenant; a newer document wins.
         session.execute(
@@ -354,10 +364,13 @@ def _store_records(
                 )
             )
     for inv in m.invoices:
+        # A newer document wins for the same supplier's invoice; another supplier's invoice
+        # with the same number is a different invoice and stays current.
         session.execute(
             update(InvoiceRecord)
             .where(
                 InvoiceRecord.invoice_number == inv.invoice_number,
+                InvoiceRecord.supplier_key.is_not_distinct_from(inv.supplier_id),
                 InvoiceRecord.superseded_at.is_(None),
             )
             .values(superseded_at=datetime.now(UTC))

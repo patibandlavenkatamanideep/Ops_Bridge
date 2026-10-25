@@ -97,7 +97,7 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
 
 function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId: string; p: ProposalItem;
   onChange: () => void }) {
-  const { me, membership, can } = useSession();
+  const { can } = useSession();
   const [reason, setReason] = useState("");
   const decide = useMutation<DecisionResult, ApiError, "approve" | "reject">({
     mutationFn: (decision) =>
@@ -107,11 +107,14 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
       }),
     onSuccess: onChange,
   });
-  const inScope = membership(tenant)?.approval_scope.includes(p.action_type) ?? false;
-  const own = p.author_id === me.user_id;
-  const [renderedAt] = useState(() => Date.now());
-  const expired = new Date(p.expires_at).getTime() < renderedAt;
+  // The server says why this viewer cannot decide (policy, scope, expiry); the clock also
+  // catches an expiry that passes while the page stays open.
+  const now = useNow(15_000);
+  const expired = p.decision_blocked === "expired" || new Date(p.expires_at).getTime() <= now;
+  const blocked = expired ? "expired" : p.decision_blocked;
   const params = p.parameters as Record<string, string>;
+  const out = p.outbound as Record<string, string> | null;
+  const dest = p.destination;
   return (
     <li className={`finding finding-${p.status === "awaiting_approval" ? "needs_review" : "informational"}`}>
       <div className="finding-head">
@@ -123,6 +126,9 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
       <dl className="facts">
         {params.title && (<><dt>Title</dt><dd>{params.title}</dd></>)}
         {params.assignee_group && (<><dt>Assignee group</dt><dd>{params.assignee_group}</dd></>)}
+        {dest && dest.connector !== "opsbridge_local" && (
+          <><dt>Sends to</dt><dd>{dest.connector} · {dest.organization ?? dest.repository}</dd></>
+        )}
         <dt>Affects</dt>
         <dd>{p.affected_resources.join(", ")}</dd>
         <dt>Evidence</dt>
@@ -136,13 +142,22 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
         <dt>Expires</dt>
         <dd>{new Date(p.expires_at).toLocaleString()} {expired && p.status === "awaiting_approval" ? "(expired)" : ""}</dd>
       </dl>
-      {params.body && <pre className="explanation draft-body">{params.body}</pre>}
+      {out ? (
+        <section aria-label="Text exactly as it will be sent">
+          <p className="muted small">Exactly as it will leave OpsBridge (after redaction); approval covers this text.</p>
+          <pre className="explanation draft-body">{`${out.title}\n\n${out.body}`}</pre>
+        </section>
+      ) : (
+        params.body && <pre className="explanation draft-body">{params.body}</pre>
+      )}
       {p.status === "awaiting_approval" && can(tenant, "proposal.decide") && (
-        own ? (
-          <p className="muted small">You authored this proposal; separation of duties requires another approver.</p>
-        ) : !inScope ? (
+        blocked === "separation_of_duties" ? (
+          <p className="muted small">You authored this proposal; this policy requires another approver.</p>
+        ) : blocked === "out_of_scope" ? (
           <p className="muted small">Your approval scope does not include {p.action_type}.</p>
-        ) : (
+        ) : blocked === "expired" ? (
+          <p className="muted small">This proposal has expired; create a new one from the current investigation.</p>
+        ) : blocked ? null : (
           <div className="decision">
             <label>
               Reason (optional)
@@ -259,4 +274,13 @@ function ReviewForm({ tenant, caseId, op, onDone }: { tenant: string; caseId: st
       <button type="submit" className="button primary" disabled={m.isPending}>Record review</button>
     </form>
   );
+}
+
+function useNow(intervalMs: number): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), intervalMs);
+    return () => clearInterval(timer);
+  }, [intervalMs]);
+  return now;
 }

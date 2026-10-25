@@ -9,7 +9,7 @@ been applied anywhere. Production readiness is not claimed.
 | Local, host processes | `make setup`, `make infra-up`, `make migrate`, `make seed-demo`, `make dev` (UI :5173, API :8000) | yes — `make verify` (15 gates) on macOS + Podman 5.7.1 |
 | Local, all containers | `make demo-containers` (stop `make dev` first; UI+API on :8000; own database `opsbridge_demo`) | yes — clean launch from empty volumes, 12 browser tests, recovery drills (docs/operations.md) |
 | Local observability | `make observability-up` (Prometheus :9090, Alertmanager :9093, alert sink :9099, Grafana :3000) | yes — alert drills with injected failures, delivered through Alertmanager to the local sink; all 23 dashboard queries ran in Grafana without error |
-| Hosted CI | `.github/workflows/ci.yml` (pull requests to main, manual dispatch) | yes — PR #1, run 39000811947 at 1f29197 (2026-10-17): all three jobs passed on ubuntu-24.04 with Docker |
+| Hosted CI | `.github/workflows/ci.yml` (pull requests to main, every push to main, manual dispatch): lint, types, unit, canary, receipts, build, API-type drift; integration; browser; runtime image (build, smoke test, SBOM, fail on fixable critical vulnerabilities) | yes for the first three jobs since PR #1 (run 39000811947 at 1f29197, 2026-10-17); the image job was added 2026-10-22 (see the PR's checks) |
 | Staging (AWS, below) | not provisioned | **no** |
 
 ## Local containers
@@ -76,9 +76,25 @@ never written to disk — production refuses to start the signer or verifier wit
 existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
 
-**Production settings checks** (`OPSBRIDGE_ENV=production` refuses to start otherwise): HTTPS
-public URL and issuer, no localhost issuer, no demo user credentials, simulator fault
-controls off, session secret length. Cookies are `Secure` behind HTTPS.
+**Release qualification (in the repository) and what stays with the owner.** CI qualifies
+every PR head and every commit on `main` with the same jobs, including the runtime image
+built from the locks with base images pinned by digest, its SBOM (SPDX, a workflow artifact)
+and a vulnerability scan that fails on fixable critical findings. Nothing is published:
+pushing an image to a registry, signing it and recording provenance belong to a release
+workflow that the owner authorizes, and the image promoted to staging must be the one whose
+digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
+require the four CI jobs and one review before merging, disallow force-pushes. Dependabot
+(`.github/dependabot.yml`) proposes weekly updates as pull requests; each must pass CI.
+
+**Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
+simulator is allowed) and `OPSBRIDGE_ENV=production` refuse to start unless: HTTPS public URL
+and issuer, no localhost issuer, simulator fault controls off, session secret of at least 32
+characters, an S3 artifact bucket with server-side encryption requested (`AES256` or
+`aws:kms`), quotas on, the rate limit shared across instances, and `trusted_proxies` naming the
+load balancer. `production` also refuses demo user credentials and, because no production
+purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
+`staging`. These are settings checks: they do not show that the bucket actually encrypts or
+that the CIDRs are really the load balancer's. Cookies are `Secure` in both.
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
@@ -126,5 +142,6 @@ store's encryption, IAM and lifecycle settings against the real bucket (tested l
 SeaweedFS only); connect the page and ticket receivers to real on-call and queue services and
 repeat the routing drill there (locally they reach only the alert sink);
 add the WAF/rate-limit edge (application rate limits are shared across API tasks through
-PostgreSQL but are not a DDoS defence); run the restore drill
+PostgreSQL but are not a DDoS defence); set `OPSBRIDGE_TRUSTED_PROXIES` to the ALB's subnet
+CIDRs, or every client is counted under the ALB's address; run the restore drill
 there with synthetic data.

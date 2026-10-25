@@ -34,7 +34,8 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `demo-containers` | `image`, `infra-up`, then `docker compose … --profile app up -d --wait` (stop `make dev` first; uses its own database `opsbridge_demo`) | macOS + Podman |
 | `eval-offline` | `uv --directory backend run --frozen python -m opsbridge.cli eval-bench --split heldout --replay`, same for `--split security`, then `… eval-verify`; appends sealed replay receipts to the ledger and fails if any verdict differs from the recording | macOS |
 | `eval-replay-check` | `uv --directory backend run --frozen python -m opsbridge.cli eval-replay-check` (held-out and security; `--split` to choose); compares verdicts with the recordings, seals and writes nothing tracked | macOS; Linux in hosted CI |
-| `verify` | `python3 scripts/verify.py` | macOS |
+| `verify` | `python3 scripts/verify.py`: every gate is listed every time (passed, failed, or skipped with the missing prerequisite); skipped tests are counted with reasons; fails only if a gate failed | macOS |
+| `verify-strict` | `python3 scripts/verify.py --strict`: the release gate; a skipped gate or a skipped test also fails (live tests, marker `live`, are outside both) | macOS (fails here as intended: tesseract is not installed) |
 | `build` | `uv --directory backend build --wheel --out-dir ../dist && (cd frontend && npm run build)` | macOS |
 | `down` | `docker compose --env-file .env -f infra/compose/docker-compose.yml stop` | macOS |
 | `reset-demo` | `docker compose ... down --volumes` — destructive; the make target requires `CONFIRM=delete-local-demo-data` | not exercised |

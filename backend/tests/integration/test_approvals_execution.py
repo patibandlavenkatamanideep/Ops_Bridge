@@ -9,16 +9,27 @@ from __future__ import annotations
 import threading
 import uuid
 from dataclasses import replace
+from datetime import date
 from typing import Any
 
 import httpx
 import pytest
 from sqlalchemy import Engine, func, select, text
+from sqlalchemy.exc import IntegrityError
 
+from opsbridge.canonical import digest
 from opsbridge.connectors.tasks import SimTaskConnector, TaskConnector, TaskRequest
-from opsbridge.persistence.db import Database, DbContext
-from opsbridge.persistence.models import ApprovalDecision, Attempt, Operation
-from opsbridge.workflow import jobs
+from opsbridge.persistence.db import Database, DbContext, make_engine
+from opsbridge.persistence.models import (
+    ApprovalDecision,
+    Attempt,
+    Operation,
+    PolicyVersion,
+    Proposal,
+)
+from opsbridge.privacy.redaction import RedactionResult
+from opsbridge.services import proposals as proposals_svc
+from opsbridge.workflow import execution, jobs
 from opsbridge.workflow.execution import LeaseLost, dispatch
 from opsbridge.workflow.worker import Worker
 
@@ -236,6 +247,30 @@ def test_self_approval_is_rejected_by_separation_of_duties(stack) -> None:  # ty
     r = approve(st, case_id, prop, who="multi-member")
     assert r.status_code == 403 and r.json()["error"]["code"] == "separation_of_duties"
     assert approve(st, case_id, prop).status_code == 200
+
+
+def test_the_server_says_who_may_decide_a_proposal_and_why_not(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    """Review finding F18: the client hid approval from any author and judged expiry by the
+    time the page was rendered; the server now states each viewer's reason."""
+    st = stack
+    case_id, prop = prepared(st, "INV-9001", author="multi-member")  # investigator + approver
+
+    def blocked(who: str) -> Any:
+        items = get(st, who, f"{T}/cases/{case_id}/proposals").json()["items"]
+        return next(i for i in items if i["id"] == prop["id"])["decision_blocked"]
+
+    assert blocked("furn-approver") is None
+    assert blocked("multi-member") == "separation_of_duties"  # the author, under this policy
+    assert blocked("furn-investigator") == "no_permission"
+    assert blocked("furn-approver2") == "out_of_scope"
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, ORG))) as s:
+        s.execute(
+            text("UPDATE proposals SET expires_at = now() - interval '1 second' WHERE id = :p"),
+            {"p": prop["id"]},
+        )
+    assert blocked("furn-approver") == "expired"
 
 
 def test_approver_scope_and_role_are_enforced(stack) -> None:  # type: ignore[no-untyped-def]
@@ -627,6 +662,222 @@ def test_cancellation_before_dispatch_and_too_late(stack) -> None:  # type: igno
     assert r.status_code == 409 and r.json()["error"]["code"] == "too_late"
 
 
+# --- a retry needs current eligibility for a new write; recovery of a landed one does not ----
+
+
+def _expire_approval(worker_db: Database, prop: dict[str, Any]) -> None:
+    with worker_db.session(DbContext(tenant_id=_tenant(worker_db))) as s:
+        s.execute(
+            text(
+                "UPDATE approval_decisions SET expires_at = now() - interval '1 second' "
+                "WHERE proposal_id = :p"
+            ),
+            {"p": prop["id"]},
+        )
+
+
+def _publish_policy_v3(worker_db: Database, tenant_id: uuid.UUID | None = None) -> None:
+    mdb = Database(make_engine("migrator", database="opsbridge_test"))
+    try:
+        with mdb.session(DbContext(tenant_id=tenant_id or _tenant(worker_db))) as s:
+            v2 = s.execute(select(PolicyVersion).where(PolicyVersion.version == 2)).scalar_one()
+            s.add(
+                PolicyVersion(
+                    tenant_id=v2.tenant_id,
+                    policy_id=v2.policy_id,
+                    version=3,
+                    effective_from=date(2026, 6, 1),
+                    document={**v2.document, "version": 3, "effective_from": "2026-06-01"},
+                    sha256="sha256:" + "3" * 64,
+                )
+            )
+    finally:
+        mdb.engine.dispose()
+
+
+SCOPE = (
+    "UPDATE memberships SET approval_scope = :scope FROM users "
+    "WHERE memberships.user_id = users.id AND users.username = 'furn-approver'"
+)
+FULL_SCOPE = "{create_follow_up_task,assign_case,create_supplier_message_draft,record_review_note}"
+
+
+@pytest.mark.parametrize("change", ["expired", "revoked", "cancelled", "edited", "policy"])
+@pytest.mark.parametrize("first", ["fail_503_not_committed", "fail_500"])
+def test_a_retry_rechecks_eligibility_before_any_new_create(
+    stack, migrator_engine: Engine, worker_db: Database, first: str, change: str
+) -> None:  # type: ignore[no-untyped-def]
+    """The first create is rejected, or fails ambiguously and is proved absent, so the
+    operation stays `executing` with no effect. A retry would be a new write: it must pass
+    the same checks as the first dispatch."""
+    st = stack
+    case_id, prop = prepared(st, "INV-9001")
+    op_id = approve(st, case_id, prop).json()["operation"]["id"]
+    fault(st, first)
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "executing" and remote_tasks(st, op) == []
+    try:
+        if change == "expired":
+            _expire_approval(worker_db, prop)
+        elif change == "revoked":
+            with migrator_engine.begin() as conn:
+                conn.execute(text(SCOPE), {"scope": "{record_review_note}"})
+        elif change == "cancelled":
+            r = call(
+                st["client"],
+                st["actors"]["furn-approver"],
+                "POST",
+                f"{T}/cases/{case_id}/operations/{op_id}/cancel",
+            )
+            assert r.status_code == 200, r.text
+        elif change == "edited":
+            r = call(
+                st["client"],
+                st["actors"]["furn-investigator"],
+                "PUT",
+                f"{T}/cases/{case_id}/proposals/{prop['id']}",
+                json={"expected_payload_digest": prop["payload_digest"], "title": "Edited later"},
+            )
+            assert r.status_code == 201, r.text
+        else:
+            _publish_policy_v3(worker_db)
+        expire_attempts_and_leases(worker_db)
+        drain(st)
+    finally:
+        with migrator_engine.begin() as conn:
+            conn.execute(text(SCOPE), {"scope": FULL_SCOPE})
+    [op] = operations(st, case_id)
+    assert remote_tasks(st, op) == []
+    assert [a["kind"] for a in op["attempts"]].count("dispatch") == 1  # no second create
+    assert op["status"] == "cancelled_before_dispatch"
+    if change == "cancelled":
+        assert op["cancellation"] == "confirmed"
+    else:
+        assert op["failure_category"] == "precondition_failed"
+
+
+def test_a_create_that_landed_is_confirmed_even_after_the_approval_expires(
+    stack, worker_db: Database
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = prepared(st, "INV-9003")
+    approve(st, case_id, prop)
+    use_connector(st, lambda: CrashingConnector(sim(st), "after"))
+    with pytest.raises(SimulatedCrash):
+        st["worker"].run_once()  # the task exists remotely; OpsBridge never heard back
+    _expire_approval(worker_db, prop)
+    use_connector(st, lambda: sim(st))
+    expire_attempts_and_leases(worker_db)
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed" and op["confirmation"]["method"] == "reconciled_by_marker"
+    assert len(remote_tasks(st, op)) == 1
+
+
+# --- the approved destination and outgoing text --------------------------------------------
+
+IT = "/api/v1/tenants/demo-it"
+
+
+def _it_proposal(st: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    """An IT-tenant follow-up proposal; that tier may use the simulator or GitHub."""
+    who = st["actors"]["it-investigator"]
+    case_id = open_case(st, "it-investigator", "demo-it", "INV-7002")
+    run = f"{IT}/cases/{case_id}/investigations"
+    assert call(st["client"], who, "POST", run, json={"model_mode": "rules_only"}).status_code in (
+        200,
+        202,
+    )
+    drain(st)
+    r = call(st["client"], who, "POST", f"{IT}/cases/{case_id}/proposals", json={})
+    assert r.status_code == 201, r.text
+    return case_id, r.json()
+
+
+def _approve_it(st: dict[str, Any], case_id: str, prop: dict[str, Any]) -> httpx.Response:
+    return call(
+        st["client"],
+        st["actors"]["it-approver"],
+        "POST",
+        f"{IT}/cases/{case_id}/proposals/{prop['id']}/decision",
+        json={
+            "decision": "approve",
+            "version": prop["version"],
+            "payload_digest": prop["payload_digest"],
+        },
+    )
+
+
+def _set_it_connector(app_db: Database, migrator_engine: Engine, name: str) -> None:
+    """What a tenant administrator's settings change does."""
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, "demo-it"))) as s:
+        assert (
+            s.execute(text("UPDATE tenant_settings SET task_connector = :n"), {"n": name}).rowcount
+            == 1
+        )  # type: ignore[attr-defined]
+
+
+def test_a_settings_change_after_drafting_cannot_redirect_the_approval(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = _it_proposal(st)
+    _set_it_connector(app_db, migrator_engine, "github_issues")
+    r = _approve_it(st, case_id, prop)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "stale_inputs", r.text
+    assert "the destination changed" in " ".join(r.json()["error"]["details"]["reasons"])
+    assert prop["destination"] == {"connector": "sim_tasks", "organization": "demo-it"}
+    assert prop["outbound"]["title"] and "sim_tasks (demo-it)" in prop["effect_summary"]
+
+
+@pytest.mark.parametrize("change", ["connector", "redaction"])
+def test_dispatch_refuses_when_destination_or_outgoing_text_changed_after_approval(
+    stack, app_db: Database, migrator_engine: Engine, monkeypatch: pytest.MonkeyPatch, change: str
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = _it_proposal(st)
+    assert _approve_it(st, case_id, prop).status_code == 200
+    if change == "connector":
+        _set_it_connector(app_db, migrator_engine, "github_issues")
+    else:  # redaction rules changed: the approved text is no longer what would be sent
+        monkeypatch.setattr(
+            proposals_svc, "redact", lambda t, keep=(): RedactionResult(t + " [rule 3]", {})
+        )
+    drain(st)
+    r = get(st, "it-approver", f"{IT}/cases/{case_id}/operations")
+    [op] = r.json()["items"]
+    assert (op["status"], op["failure_category"]) == (
+        "cancelled_before_dispatch",
+        "precondition_failed",
+    )
+    assert op["attempts"] == []
+    assert list(st["store"].find_tasks("demo-it", f"opsbridge-op:{op['operation_key']}")) == []
+
+
+def test_a_proposal_from_before_destination_binding_must_be_proposed_again(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    case_id, prop = prepared(st, "INV-9001")
+    with app_db.session(DbContext(tenant_id=_tenant_of(migrator_engine, ORG))) as s:
+        pr = s.get(Proposal, uuid.UUID(prop["id"]))
+        assert pr is not None
+        pr.destination = pr.outbound = None  # as stored before migration 0011
+        pr.payload_digest = old_digest = digest(proposals_svc.payload_of(pr))
+    r = approve(st, case_id, {**prop, "payload_digest": old_digest})
+    assert r.status_code == 409 and r.json()["error"]["code"] == "stale_inputs", r.text
+    assert "before destinations were bound" in " ".join(r.json()["error"]["details"]["reasons"])
+
+
+def _tenant_of(migrator_engine: Engine, slug: str) -> uuid.UUID:
+    with migrator_engine.begin() as conn:
+        tid: uuid.UUID = conn.execute(
+            text("SELECT id FROM tenants WHERE slug = :s"), {"s": slug}
+        ).scalar_one()
+    return tid
+
+
 def test_local_review_note_runs_through_the_same_ledger(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(
@@ -642,6 +893,44 @@ def test_local_review_note_runs_through_the_same_ledger(stack) -> None:  # type:
     assert op["confirmation"]["method"] == "local_transaction"
     case = get(st, "furn-investigator", f"{T}/cases/{case_id}").json()
     assert case["assignee_group"] == "ap-review"
+
+
+def test_a_local_action_takes_effect_once_even_if_the_worker_dies_while_completing(
+    stack, worker_db: Database, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    """The draft, its attempt and the operation's confirmation commit together: a worker that
+    dies before confirming leaves nothing behind, and the retry writes exactly one draft."""
+    st = stack
+    case_id, prop = prepared(st, "INV-9009")
+    assert prop["action_type"] == "create_supplier_message_draft"
+    assert approve(st, case_id, prop).status_code == 200
+    real = execution._finish
+
+    def dies_confirming(s: Any, op: Any, status: str, **kw: Any) -> None:
+        if status == "confirmed":
+            raise SimulatedCrash("worker died while confirming the operation")
+        real(s, op, status, **kw)
+
+    def drafts() -> list[dict[str, Any]]:
+        items = get(st, "furn-investigator", f"{T}/cases/{case_id}/messages").json()["items"]
+        return [m for m in items if (m["body"] or "").startswith("Supplier message DRAFT")]
+
+    monkeypatch.setattr(execution, "_finish", dies_confirming)
+    with pytest.raises(SimulatedCrash):
+        st["worker"].run_once()
+    monkeypatch.setattr(execution, "_finish", real)
+    assert drafts() == []  # nothing is applied without the operation's confirmation
+    expire_attempts_and_leases(worker_db)
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed" and len(drafts()) == 1
+    assert [(a["kind"], a["status"]) for a in op["attempts"]] == [("dispatch", "succeeded")]
+    # The database also refuses a second applied local action for the operation.
+    with pytest.raises(IntegrityError, match="uq_attempts_one_local_effect"):
+        with worker_db.session(DbContext(tenant_id=_tenant(worker_db))) as s:
+            done = s.execute(select(Attempt).where(Attempt.operation_id == op["id"])).scalar_one()
+            cols = [c.key for c in Attempt.__mapper__.column_attrs if c.key != "id"]
+            s.add(Attempt(**{c: getattr(done, c) for c in cols}))
 
 
 def test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate(stack) -> None:  # type: ignore[no-untyped-def]
@@ -722,3 +1011,11 @@ def test_attempt_requests_and_responses_are_kept_and_match_their_digests(
                 resp is not None and resp.kind == "tool_response" and resp.sha256 == a.output_digest
             )
             assert json.loads(store.get(tid, resp.storage_key))["remote_ref"] == op["remote_ref"]
+        # The dispatch request is the complete request as sent, body and destination included.
+        [create] = [a for a in attempts if a.kind == "dispatch"]
+        req = s.get(Artifact, create.input_artifact_id)
+        assert req is not None
+        sent = json.loads(store.get(tid, req.storage_key))
+    [task] = remote_tasks(st, op)
+    assert sent["body"] == task["body"] and sent["title"] == task["title"]
+    assert sent["destination"] == {"connector": "sim_tasks", "organization": ORG}

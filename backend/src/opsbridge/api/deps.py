@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import urlparse
 
 from fastapi import Depends, Path, Request
@@ -25,6 +25,7 @@ UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 class AppState:
     settings: Settings
     db: Database
+    user_limiter: Any = None  # per verified user; set by create_app
 
 
 def app_state(request: Request) -> AppState:
@@ -39,6 +40,16 @@ def current_session(request: Request, state: State) -> SessionInfo:
     info = load_session(state.db, state.settings, request.cookies.get(COOKIE_NAME))
     if info is None:
         raise unauthenticated()
+    if state.user_limiter is not None:  # only a verified session reaches its own budget
+        allowed, retry_after = state.user_limiter.hit(f"u:{info.user_id}")
+        if not allowed:
+            raise ApiError(
+                429,
+                "rate_limited",
+                "Too many requests; slow down.",
+                retryable=True,
+                headers={"Retry-After": str(retry_after)},
+            )
     if request.method in UNSAFE_METHODS:
         _check_csrf(request, info, state.settings)
     request.state.session = info

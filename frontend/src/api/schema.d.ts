@@ -625,6 +625,11 @@ export interface components {
         /** CaseCreateIn */
         CaseCreateIn: {
             /**
+             * Confirm Distinct
+             * @default false
+             */
+            confirm_distinct: boolean;
+            /**
              * Description
              * @default
              */
@@ -639,6 +644,8 @@ export interface components {
              * @constant
              */
             schema_version: 1;
+            /** Supplier Id */
+            supplier_id?: string | null;
             /** Title */
             title: string;
         };
@@ -676,6 +683,8 @@ export interface components {
             schema_version: 1;
             /** Status */
             status: string;
+            /** Supplier Id */
+            supplier_id: string | null;
             /** Title */
             title: string;
             /** Updated At */
@@ -840,6 +849,8 @@ export interface components {
         };
         /** FieldOut */
         FieldOut: {
+            /** Correctable */
+            correctable: boolean;
             /** Corrections */
             corrections: components["schemas"]["CorrectionOut"][];
             /** Current Value */
@@ -1172,6 +1183,12 @@ export interface components {
             author_kind: string;
             /** Canonicalization */
             canonicalization: string;
+            /** Decision Blocked */
+            decision_blocked?: ("not_awaiting_approval" | "expired" | "no_permission" | "out_of_scope" | "separation_of_duties") | null;
+            /** Destination */
+            destination: {
+                [key: string]: string;
+            } | null;
             /** Effect Summary */
             effect_summary: string;
             /** Evidence Refs */
@@ -1186,6 +1203,10 @@ export interface components {
             id: string;
             /** Investigation Version Id */
             investigation_version_id: string;
+            /** Outbound */
+            outbound: {
+                [key: string]: unknown;
+            } | null;
             /** Parameters */
             parameters: {
                 [key: string]: unknown;

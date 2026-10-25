@@ -455,6 +455,20 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     return 1 if failed else 0
 
 
+def _eval_backfill_tools(args: argparse.Namespace) -> int:
+    import os
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation.cassette import backfill_tool_cassette
+
+    os.chdir(REPO_ROOT)
+    run = Path(args.run)
+    out = backfill_tool_cassette(run, Path("var/eval") / run.name / "artifacts")
+    entries = json.loads(out.read_text(encoding="utf-8"))["entries"]
+    print(f"{out}: {len(entries)} tool call(s), each matching the run's recorded digests")
+    return 0
+
+
 def _eval_verify(_args: argparse.Namespace) -> int:
     import os
 
@@ -694,6 +708,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--benchmark", default="opsbridge-bench-v1")
     p.add_argument("--split", action="append", choices=["dev", "validation", "heldout", "security"])
     p.set_defaults(func=_eval_replay_check)
+
+    p = sub.add_parser(
+        "eval-backfill-tools",
+        help="write a pre-tool-cassette run's tool cassette from its kept, digest-checked artifacts",
+    )
+    p.add_argument("--run", required=True, help="evals/runs/<benchmark>/<split>-record-<time>")
+    p.set_defaults(func=_eval_backfill_tools)
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
     p.set_defaults(func=_eval_verify)

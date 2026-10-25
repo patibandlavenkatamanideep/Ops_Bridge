@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated: 2026-10-21 · Branch: `feat/opsbridge-foundation` (pushed to
+Last updated: 2026-10-22 · Branch: `feat/opsbridge-foundation` (pushed to
 github.com/patibandlavenkatamanideep/Ops_Bridge; never pushed to `main`) ·
 Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 
@@ -11,7 +11,7 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
 | Local application complete | yes — Phases 0–9 done and verified locally (see docs/final-report.md) |
 | Real model validated | not evaluated (no live opt-in, no credentials); benchmark used mocked responses only |
 | External connector (GitHub sandbox) validated | not evaluated — contract-tested against a documented-API fake only; live run needs repo, token and authorization |
-| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; all three jobs on ubuntu-24.04 |
+| Hosted CI | passing — PR #1 (first green run 39000811947 at 1f29197) and PR #2 were merged into `main` by the owner; later batches go to open PRs whose checks show the latest run; four jobs on ubuntu-24.04 since 2026-10-22 (the fourth builds, smoke-tests, inventories and scans the runtime image); runs on pushes to `main` too |
 | Staging deployed | no — AWS plan documented in docs/deployment.md, not provisioned |
 | Operator pilot measured | no |
 
@@ -711,3 +711,150 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   revision 0009 (6305 rows, counts equal, every table with forced RLS).
 - Not covered: users' own profile emails (`users.email`, refreshed at sign-in) and backups
   taken before a sweep.
+
+### Agent tool calls replay from recordings (2026-10-21)
+- Gap against brief §14: offline replay served model responses from the cassette but re-ran
+  the agent's evidence search against the frozen corpus (OB-13 limit). Each replay produced
+  a new response digest for the same call, and a replay failure inside the tool would have
+  been recorded as an ordinary tool error.
+- Now tool calls are recorded in `tool-cassette.json` beside the model cassette (keyed by
+  case, mode, repeat and occurrence; checked against tool, version and argument digest;
+  responses checked against their digests on load). Replay serves the recorded response
+  without running the tool and labels it `recorded` (trial log, EvalSeal `tool_acl` and
+  `tool_responses`); recorded denials and errors replay as such. Recorded hits are re-bound
+  to the replay database's ids by document-version content digest. A missing, diverged or
+  unbindable call fails the run: `ReplayFailure` now lives in `agents/contracts.py` and the
+  agent step re-raises it. The tool cassette is bound in the sealed record.
+- The held-out recording is never re-recorded, so its tool cassette (and the latest
+  validation recording's) was written by `opsbridge.cli eval-backfill-tools` from the tool
+  artifacts those runs kept under `var/eval/`; every entry matches the argument and response
+  digests in the run's sealed trial log, and the command refuses otherwise. Without it,
+  `make eval-replay-check` failed closed on `fur-heldout-222` (checked before the backfill).
+- Evidence: `test_evaluation.py` (2 new): replay with the search patched to raise still
+  reproduces the verdict and the recorded response digest, labelled `recorded`; a missing
+  entry, other arguments, another tool version, and a hit for a document the case lacks each
+  fail with `ReplayFailure`, produce no explanation and record no tool call; an edited
+  response is refused on load; a recorded tool error replays as that error.
+  `tests/evaluation/test_tool_cassette_backfill.py` (2). Removing the re-raise, executing
+  the tool in replay, or skipping the re-binding each makes a test fail.
+  `make eval-offline`: `heldout-replay-20261022T012711Z` and
+  `security-replay-20261022T012742Z` reproduce case by case (held-out rules_only 36/40,
+  mock 36/40; security 7/7, 7/7); `fur-heldout-222` shows `recorded` with the sealed
+  digest `sha256:e4a49698…`; 26 records verify. `make verify` 15/15 (unit 282 + 3 skipped,
+  integration 156, browser 27).
+
+### External review, Phase A: core decisions (2026-10-22)
+- An external review of `main` at `f0dbb1a` listed 18 findings; `docs/review-findings.md`
+  tracks each one (status, regression tests, migrations, rollback, what is not covered).
+  Phase A is done: F01–F04, F07, F11, F12. Each fix started with a test that failed on the
+  previous source.
+- F01: a retry after a definite failure, or after reconciliation proved an earlier write
+  absent, created the task without rechecking cancellation, expiry, authority, edits or
+  policy (10/10 combinations reproduced). Every new write now passes the full check;
+  recovering a write that may have landed does not need it.
+- F02: a local note or draft committed before the operation's confirmation; a crash in
+  between duplicated it. Effect, attempt, outbox and confirmation now commit together, and a
+  unique index allows one applied local action per operation (0010).
+- F03: approvals did not cover where a task goes or the text that leaves OpsBridge; a
+  settings change after drafting redirected the action. Destination and outgoing text are now
+  in the approved payload, shown before approval, and rechecked at approval and before every
+  write (0011).
+- F04: a correction, upload or another case's new source version did not make the latest
+  investigation stale, so its proposal could be approved, dispatched or the case resolved.
+  Investigations now record their evidence state (0012); proposing, approving, dispatch (under
+  the case lock) and resolving refuse a stale result. Resolution also checks the policy.
+- F07: another supplier's invoice with the same number superseded this one and the case was
+  matched against it; intake merged INV/123, INV.123 and INV123; a reused idempotency key
+  returned the first case for any request. Invoices are now current per supplier (0013), a
+  case may name its supplier, an unnamed one stops for review when the number is ambiguous,
+  look-alike numbers need confirmation, and replays are recognised by key and request (0014).
+- F11: corrections to fields matching ignores (currency, dates, units…) were accepted; now
+  refused, and the UI offers Correct only for the seven fields matching applies.
+- F12: an unreadable replacement (truncated PDF, image-only PDF, unsupported type) left the
+  previous extraction current. Earlier records are now superseded, and a refused current
+  document sends the run to manual review.
+- Evidence: `make verify` 15/15 (unit 282 + 3 skipped, integration 186, browser 27); benchmark
+  replay reproduces held-out and security; canary 64/64; backup and restore drill ok at 0014
+  (7083 rows, counts equal, every table with forced RLS). The browser suite caught one fault
+  in a first F07 version (see review-findings.md); fixed before this entry.
+- Next: Phase B (F05, F06, F08, F09, F10, F16).
+
+### External review, Phase B: concurrency and failure (2026-10-22)
+- F05: an investigation handler never saw its job, so a step outlasting the lease let a
+  second worker run the same investigation, a worker that had lost the job still wrote its
+  results, a job whose worker died on every attempt was re-claimed forever, and a resumed run
+  started a fresh model-call budget. Investigations now hold their job's lease: writes are
+  fenced, the lease is renewed during a step for at most the step limit (300 s), finalization
+  decides under the case lock, exhausted jobs are given up, and the budget counts recorded
+  calls.
+- F06: spend and the daily call quota were checked, then the model called; concurrent workers
+  overspent. A call is now reserved (pending row with its estimated cost) under the
+  organization's lock before it is sent and settled afterwards; crashes and timeouts keep the
+  estimate charged; investigation starts are serialized per organization for the hourly quota;
+  prices and the ceiling must be finite and non-negative.
+- F08: retention deleted bytes another artifact still used, before the database committed. It
+  now queues the keys with the row changes (migration 0015) and deletes bytes only when no
+  live artifact references them, under a per-content lock that writers also take.
+- F09: any session cookie, verified or not, chose its own rate-limit bucket. Every API request
+  now counts against its client address (X-Forwarded-For only from `trusted_proxies`); a
+  verified user also has their own budget; the fallback limiter is truly bounded.
+- F10: unit inverses are derived exactly (1/6 is refused, not rounded); policies refuse zero,
+  negative or non-finite factors, contradictory pairs and aliases naming two units.
+- F16: local artifact reads verify the digest; an altered original is refused, not served.
+- Each fix started with a test that failed on the previous source (F05's resumed-budget case
+  was found by reading: the test stack itself needs the new worker interface).
+- Evidence: `make verify` 15/15 (unit 310 + 3 skipped, integration 199, browser 27); benchmark
+  replay reproduces held-out and security; canary 64/64; backup and restore drill ok at 0015
+  (7465 rows, counts equal, every table with forced RLS).
+- Next: Phase C (F13 production profile, F14 release qualification in CI, F17 strict verify).
+
+### External review, Phase C: deployable artifact (2026-10-22)
+- F13: `staging` (synthetic data; the purchasing simulator is allowed) and `production` now
+  refuse the local artifact store, unencrypted S3, disabled quotas, a per-process rate limit
+  and missing trusted proxies; `production` also refuses demo users and, since no production
+  purchasing adapter exists, refuses to start at all. Settings checks only.
+- F14 (the part inside the repository): CI runs on every push to `main` as well as PRs (main
+  runs are never cancelled), fails when the regenerated API types differ from the committed
+  ones, and builds the runtime image from the locks with base images pinned by digest,
+  smoke-tests it (uid 10001, CLI, /healthz), uploads an SPDX SBOM and fails on fixable
+  critical vulnerabilities. A Trivy scan of the image found fixable advisories only in Pillow
+  12.3.0 and certifi 2026.7.22; both were updated (13.0.0, 2026.10.19; days-old fix
+  releases). Dependabot proposes weekly updates. Not done (owner's): protecting `main`,
+  publishing, signing and provenance of images.
+- F17: `make verify` lists every gate every time (skipped ones with the missing prerequisite,
+  and tests skipped inside a gate); `make verify-strict` is the release gate and fails on any
+  skip. Here it fails as intended (tesseract not installed: one unit and one browser OCR
+  test skip). A scenario test that skipped not-applicable cases now leaves them out of its
+  parameters; live tests are excluded from the unit gate by marker.
+- Hosted CI run 39848032134 at e6f8702: all four jobs passed (unit 328 passed, 0 skipped
+  with tesseract; the image scan covered 83 targets with no fixable critical finding).
+- Found on the way: the host disk was 99% full (127 MB free) during a local image rebuild,
+  which failed with corrupted blobs. The images, scan files and replay-check work
+  directories this work created were removed (2.3 GB free afterwards); other projects'
+  images were left alone. The rebuilt image was therefore scanned only in CI. Later the
+  shared Podman VM could not start any new container (writeback errors on its disk while the
+  host was full; overlayfs then refused mounts); running containers were unaffected. Cleared
+  without restarting the VM by `sync -f` on its container storage (the file that lost writes
+  was the failed build's deleted temp file); the alert-rule gate and `make verify` pass again.
+  Before building images locally, check that several GB are free.
+- Next: Package 11's local part (a source-contract harness), F15 (claim meaning in model
+  validation) and F18 (operator UX); integration with a real purchasing system and the pilot
+  need the owner (docs/review-findings.md).
+
+### External review: F15 and F18 (2026-10-22)
+- F15: model explanations and drafts could state real numbers in the wrong roles ("bills 18
+  while 20 were received") or units and still pass. A number next to a role word must now
+  equal a finding value of that role, and a number followed by a unit must use the findings'
+  unit. The check accepts every finding summary in the dev and validation corpora (a first
+  version flagged two; fixed), and none of the 120 recorded held-out mock explanations is
+  newly rejected. Comparisons, dates and prose without numbers are still unchecked;
+  structured claims would need a new prompt and benchmark version.
+- F18: the server now states why each viewer cannot decide a proposal (expired, no
+  permission, out of scope, separation of duties under this policy); the card notices expiry
+  while open; queue search is debounced; the README screenshots no longer show a loading
+  page. Saved views, due dates, a split settings page and operator sessions are not done.
+- Evidence: integration 200, browser 27 (+1 OCR skip here), agents 93, unit 329; benchmark
+  replay reproduces held-out and security.
+- What remains needs the owner: a real purchasing system and task destination (Package 11),
+  independently labelled data and a real-model comparison (Package 12), the pilot, branch
+  protection and release publishing (docs/review-findings.md).

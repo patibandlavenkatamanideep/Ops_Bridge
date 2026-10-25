@@ -247,6 +247,7 @@ def test_worker_restart_resumes_from_durable_steps(stack, worker_db: Database) -
     _run_step(
         deps,
         wr,
+        jobs.Lease(worker_db, job, 1),  # the dying worker still held its lease here
         1,
         "collect_context",
         snapshot,
