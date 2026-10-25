@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any, cast
 
@@ -178,6 +179,17 @@ def current_invoices(
     if supplier_id is not None:
         q = q.where(InvoiceRecord.supplier_key == supplier_id)
     return list(session.execute(q.order_by(InvoiceRecord.supplier_key)).scalars())
+
+
+def decision_date(
+    session: Session, invoice_number: str | None, supplier_id: str | None
+) -> tuple[date, str]:
+    """The date a policy is chosen for: the date of the one current invoice meant, or today
+    (UTC) when there is none or more than one. Returns the date and where it came from."""
+    found = current_invoices(session, invoice_number, supplier_id) if invoice_number else []
+    if len(found) == 1 and found[0].invoice_date is not None:
+        return found[0].invoice_date, "invoice_date"
+    return datetime.now(UTC).date(), "today"
 
 
 def load_match_input(
