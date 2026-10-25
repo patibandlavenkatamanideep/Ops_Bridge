@@ -78,7 +78,9 @@ destination and a credential reference; add a new connector to `services/connect
 (destination shape, validation) and to `workflow/worker.py::connector_for`, which builds it
 from the approved destination. Implement `TaskConnector` (`connectors/tasks.py`): `create`, `get` (read-back) and
 `find_by_marker`, and declare `capabilities` honestly — idempotency keys, lookup
-consistency (strong, eventual or none), which HTTP statuses are definite vs ambiguous. If
+consistency (strong, eventual or none), whether the provider honours a request deadline
+(commits nothing after it: only then can a strong lookup that finds nothing prove an
+ambiguous create absent), which HTTP statuses are definite vs ambiguous. If
 the provider advertises capabilities, discover them per dispatch and assume the weakest
 contract when discovery fails (as `SimTaskConnector` does); a capability the provider does
 not actually honour can produce duplicates. Include the operation marker in every created
