@@ -163,6 +163,8 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         outcome = _reconcile(deps, job, snapshot, connector)
         if outcome in ("confirmed", "unknown"):
             return
+        if outcome == "pending":  # no new write while an earlier one may still land
+            raise StepFailed(_PENDING, retryable=True)
         if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
             return
     _create(deps, job, snapshot, connector)
@@ -355,6 +357,7 @@ def _new_attempt(
     tool: str,
     args: dict[str, Any],
     connector_version: str,
+    deadline_at: datetime | None = None,
 ) -> uuid.UUID:
     with deps.db.session(_ctx(snap["tenant_id"])) as s:
         _guard(s, job)
@@ -385,6 +388,7 @@ def _new_attempt(
             response_mode="live",
             worker_id=job.lease_owner,
             fencing_token=job.fencing_token,
+            deadline_at=deadline_at,
         )
         s.add(a)
         s.flush()
@@ -456,7 +460,7 @@ def _complete(
         _finish(s, op, status, **kw)
 
 
-def _task_request(snap: dict[str, Any]) -> TaskRequest:
+def _task_request(snap: dict[str, Any], deadline: float | None = None) -> TaskRequest:
     # Exactly the approved outbound text (re-checked before this write); the marker line lets
     # reconciliation find the task.
     out = snap["payload"]["outbound"]
@@ -465,6 +469,7 @@ def _task_request(snap: dict[str, Any]) -> TaskRequest:
         body=f"{out['body']}\n\nOpsBridge operation marker: {snap['marker']}",
         assignee_group=out["assignee_group"],
         marker=snap["marker"],
+        deadline=deadline,
     )
 
 
@@ -475,7 +480,10 @@ def _remote_dict(t: RemoteTask) -> dict[str, Any]:
 def _create(
     deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any], connector: TaskConnector
 ) -> None:
-    req = _task_request(snap)
+    # The provider must not commit the task after this moment (when it honours deadlines):
+    # that is what lets a later lookup that finds nothing prove it did not happen.
+    deadline = datetime.now(UTC) + timedelta(seconds=deps.timeout_seconds)
+    req = _task_request(snap, deadline.timestamp())
     key = snap["operation_key"] if connector.capabilities.idempotency_keys else None
     args = {  # the complete request as sent, so the attempt's digest covers the body too
         "destination": snap["payload"]["destination"],
@@ -484,9 +492,10 @@ def _create(
         "assignee_group": req.assignee_group,
         "marker": req.marker,
         "idempotency_key": key,
+        "deadline": deadline.isoformat(),
     }
     attempt_id = _new_attempt(
-        deps, job, snap, "dispatch", "create_follow_up_task", args, connector.version
+        deps, job, snap, "dispatch", "create_follow_up_task", args, connector.version, deadline
     )
     try:
         task = connector.create(req, key, deps.timeout_seconds)
@@ -514,10 +523,12 @@ def _create(
         )
         outcome = _reconcile(deps, job, snap, connector)
         if outcome == "absent":
-            # Strong lookup proved the earlier write did not happen; retry later via backoff.
+            # The earlier write did not happen (proved) or a resend cannot duplicate it.
             raise StepFailed(
                 "ambiguous failure reconciled as absent; will retry", retryable=True
             ) from exc
+        if outcome == "pending":
+            raise StepFailed(_PENDING, retryable=True) from exc
         return
     _close_attempt(
         deps,
@@ -606,7 +617,12 @@ def _read_back(
 def _reconcile(
     deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any], connector: TaskConnector
 ) -> str:
-    """Returns 'confirmed', 'absent' (safe to create) or 'unknown' (review required)."""
+    """Returns 'confirmed', 'absent' (safe to create), 'pending' (look again later: an earlier
+    create may still land) or 'unknown' (review required).
+
+    Finding nothing proves absence only when no earlier create can still be committed: the
+    provider honours request deadlines and every earlier create's deadline (plus a clock
+    allowance) has passed. With idempotency keys a resend cannot duplicate, so it is safe."""
     caps = connector.capabilities
     if caps.lookup != "none":
         attempt_id = _new_attempt(
@@ -664,8 +680,10 @@ def _reconcile(
                     review=True,
                 )
                 return "unknown"
-            if caps.lookup == "strong":
-                return "absent"
+            if caps.lookup == "strong" and not caps.idempotency_keys and caps.request_deadlines:
+                settled = _creates_settled_at(deps, snap)
+                if settled is not None:
+                    return "absent" if _now() >= settled else "pending"
     if caps.idempotency_keys:
         return "absent"  # re-sending with the same idempotency key cannot create a duplicate
     _complete(
@@ -678,6 +696,31 @@ def _reconcile(
         review=True,
     )
     return "unknown"
+
+
+_PENDING = "an earlier create may still land until its deadline passes; checking again later"
+# Allowance for clock difference between the worker, which sets a deadline, and the provider,
+# which enforces it.
+DEADLINE_ALLOWANCE = timedelta(seconds=2)
+
+
+def _creates_settled_at(deps: ExecutionDeps, snap: dict[str, Any]) -> datetime | None:
+    """When no earlier create of this operation can still be committed: the latest create
+    deadline plus the clock allowance. None when a create went out without a deadline
+    (before 0018), so absence cannot be proved for it."""
+    with deps.db.session(_ctx(snap["tenant_id"])) as s:
+        deadlines = (
+            s.execute(
+                select(Attempt.deadline_at).where(
+                    Attempt.operation_id == snap["operation_id"], Attempt.kind == "dispatch"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    if not deadlines or any(d is None for d in deadlines):
+        return None
+    return max(d for d in deadlines if d is not None) + DEADLINE_ALLOWANCE
 
 
 def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> None:
