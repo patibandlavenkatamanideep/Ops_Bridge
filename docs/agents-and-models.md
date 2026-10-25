@@ -24,7 +24,7 @@ on resume. A run records routing, budget and usage in `workflow_runs`.
 | Adapter | Origin label | Structured output | Supported params | Verified how |
 |---|---|---|---|---|
 | `MockModelAdapter` | mocked | n/a (builds JSON from its own context) | none | unit + integration + browser |
-| `AnthropicAdapter` (anthropic 1.13.0) | live | `output_config.format` JSON schema | `effort`, `stop_sequences` | real SDK serialization against a local fake transport; **no live call** |
+| `AnthropicAdapter` (anthropic 2.1.0) | live | `output_config.format` JSON schema | `effort`, `stop_sequences` | real SDK serialization against a local fake transport; **no live call** |
 | `OllamaAdapter` (`/api/chat`) | live | `format` JSON schema | `temperature`, `seed`, `num_ctx` | HTTP contract against a local fake; **Ollama not installed** |
 
 Unsupported parameters raise `UnsupportedParameter` before any request (e.g.
