@@ -64,8 +64,20 @@ Evidence freshness. Each investigation records the evidence state before matchin
 linked documents, and the corrections on them. Creating a proposal, approving, every
 dispatch and resolving recompute it; a correction, an upload, or a new version ingested for
 another case makes the result stale until the investigation is re-run. Dispatch rechecks
-under the case lock that corrections and uploads take. This is local freshness only: it
-cannot show that the source system has not changed since the records were fetched.
+under the case lock that corrections and uploads take. This digest is local freshness only:
+it cannot show that the source system has not changed since the records were fetched. So
+each investigation also records when it read the purchasing system, and its result may be
+acted on for `source_max_age_hours` (24) after that; later, or when the read time was not
+recorded (investigations before this change), it is stale and must be re-run. The case's
+investigation view shows the read time and, when stale, why.
+
+Source reads (`connectors/source_contract.py`, contract `purchasing-source/1`). Listings
+follow the source's pages to the end; a failed page fails the step (retried), and a listing
+longer than the connector's bound (50 pages of 100) sends the case to manual review instead
+of concluding from part of it. A record the source no longer holds (reported deleted, a 404,
+or absent from a complete listing for its PO) is marked withdrawn and its records are
+superseded, so it stops counting; uploads are never withdrawn by a listing. A withdrawn
+record that returns becomes current again as a new version.
 
 ## Dispatch (see `workflow/execution.py`)
 
