@@ -336,6 +336,9 @@ class SourceDocument(Base):
     classification: Mapped[str] = mapped_column(String(32), default="internal")
     created_by: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = created()
+    # Set when the source system no longer holds the record (deleted, voided or moved to
+    # another PO); its records are then superseded. Cleared when it returns (migration 0016).
+    withdrawn_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         _tenant_unique("source_documents"),
         UniqueConstraint("tenant_id", "source_key", name="uq_source_documents_key"),
