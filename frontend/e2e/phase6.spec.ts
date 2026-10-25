@@ -101,6 +101,28 @@ test("tenant settings show the policy in force and the connector's current promi
     .toContainText(/superseded/i);
 });
 
+test("an administrator revokes the task connection and restores it, giving a reason each time", async ({ page }) => {
+  await signIn(page, "furn-admin");
+  await page.goto("/t/demo-furniture/settings");
+  const panel = page.getByRole("region", { name: "Task connection" });
+  await expect(panel.locator(".facts")).toContainText("sim_tasks (demo-furniture)");
+
+  const drill = `Credential rotation drill ${Date.now()}`; // unique: the demo database persists
+  const revoke = panel.getByRole("form", { name: "Revoke the task connection" });
+  await revoke.getByLabel("Reason for revoking").fill(drill);
+  await revoke.getByRole("button", { name: "Revoke task connection" }).click();
+  await expect(panel).toContainText("No active task connection: follow-up tasks are not sent.");
+  await expect(page.getByRole("region", { name: "Connector health" })).toContainText("none");
+
+  const change = panel.getByRole("form", { name: "Change the task connection" });
+  await change.getByLabel("Connector").selectOption("sim_tasks");
+  await change.getByLabel("Reason for the change").fill("Drill finished");
+  await change.getByRole("button", { name: "Save task connection" }).click();
+  await expect(panel.locator(".facts")).toContainText("sim_tasks (demo-furniture)");
+  const history = panel.getByRole("table", { name: "Task connection history" });
+  await expect(history.getByRole("row").filter({ hasText: drill })).toContainText(/revoked/i);
+});
+
 test("tenant settings: admins see tier-limited options; investigators are denied", async ({ page }) => {
   await signIn(page, "furn-admin");
   await page.getByRole("link", { name: "Tenant settings" }).click();
