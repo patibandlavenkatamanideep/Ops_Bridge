@@ -26,7 +26,7 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, Res
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
-from .store import SimStore
+from .store import MAX_PAGE_SIZE, SimStore
 
 ORG_RE = r"^[a-z0-9-]{1,64}$"
 KEY_RE = r"^[A-Za-z0-9._-]{1,120}$"
@@ -59,6 +59,10 @@ class FaultIn(BaseModel):
     mode: FaultMode
     count: int = Field(default=1, ge=1, le=100)
     delay_ms: int = Field(default=0, ge=0, le=120_000)
+
+
+class ListingIn(BaseModel):
+    max_page_size: int | None = Field(default=None, ge=1, le=MAX_PAGE_SIZE)
 
 
 class CapabilitiesIn(BaseModel):
@@ -180,15 +184,22 @@ def create_simulator(
     # never captured by /orgs/{org}/{collection}/{key}.
     @app.get("/orgs/{org}/{collection}")
     async def list_records(
-        org: Org, collection: str, po_number: Annotated[str | None, Query(max_length=100)] = None
+        org: Org,
+        collection: str,
+        po_number: Annotated[str | None, Query(max_length=100)] = None,
+        limit: Annotated[int | None, Query(ge=1, le=MAX_PAGE_SIZE)] = None,
+        cursor: Annotated[str | None, Query(pattern=KEY_RE)] = None,
     ) -> Any:
+        """One page in key order. Deleted records appear as `"deleted": true` tombstones;
+        `next_cursor` is null on the last page. The server may serve fewer than `limit`."""
         if collection not in COLLECTIONS:
             raise HTTPException(404, "unknown collection")
         mode = await apply_fault(org, "records.list")
         if mode == "fail_500":
             store.log(org, "records.list", "fault_500")
             return JSONResponse({"error": "internal"}, status_code=500)
-        return {"items": store.list_records(org, collection, po_number)}
+        items, next_cursor = store.list_records(org, collection, po_number, cursor, limit)
+        return {"items": items, "next_cursor": next_cursor}
 
     @app.get("/orgs/{org}/{collection}/{key}")
     async def get_record(org: Org, collection: str, key: str) -> Response:
@@ -238,6 +249,17 @@ def create_simulator(
             body = await request.body()
             ctype = request.headers.get("content-type", "application/octet-stream")
             return {"sha256": store.put_record(org, collection, key, body, ctype, po_number)}
+
+        @app.delete("/_control/records/{org}/{collection}/{key}")
+        def delete_record(org: str, collection: str, key: str) -> dict[str, bool]:
+            if collection not in COLLECTIONS or not _valid_key(key):
+                raise HTTPException(404, "unknown collection")
+            return {"deleted": store.delete_record(org, collection, key)}
+
+        @app.put("/_control/listing/{org}")
+        def set_listing(org: str, body: ListingIn) -> dict[str, str]:
+            store.set_page_limit(org, body.max_page_size)
+            return {"status": "ok"}
 
     return app
 
