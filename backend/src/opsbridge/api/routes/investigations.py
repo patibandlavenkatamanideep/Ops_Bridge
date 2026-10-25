@@ -54,6 +54,10 @@ class InvestigationOut(BaseModel):
     history: list[dict[str, Any]]
     # Mode requested, data routing from policy, and why a model was or was not used.
     model_routing: dict[str, Any] | None = None
+    # Why this result may no longer be acted on (changed evidence or policy, purchasing data
+    # past its age limit, a newer version); None while it is current.
+    stale_reason: str | None = None
+    source_read_at: str | None = None  # when it read the purchasing system
 
 
 class DocumentVersionOut(BaseModel):
@@ -76,6 +80,7 @@ class DocumentOut(BaseModel):
     role: str
     origin: str
     classification: str
+    withdrawn_at: str | None = None  # the source system no longer holds it
     versions: list[DocumentVersionOut]
 
 
@@ -255,6 +260,8 @@ def latest(
         created_at=iv.created_at.isoformat(),
         history=view.versions,
         model_routing=view.model_routing,
+        stale_reason=view.stale_reason,
+        source_read_at=view.source_read_at,
     )
 
 
