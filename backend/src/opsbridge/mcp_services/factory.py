@@ -77,6 +77,8 @@ def casework_connector(
         caps.definite_failure_statuses,
         caps.retryable_definite_statuses,
         notes="via Casework MCP; " + caps.notes,
+        # The casework service passes the worker's deadline on to the tracker.
+        request_deadlines=caps.request_deadlines,
     )
     return McpCaseworkConnector(
         client=McpToolClient(

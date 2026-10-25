@@ -111,7 +111,11 @@ def build_casework_server(
     @server.tool(
         description="Create the approved follow-up task for an operation (parameters from the record)."
     )
-    async def create_follow_up_task(operation_id: str, ctx: Context) -> dict[str, Any]:
+    async def create_follow_up_task(
+        operation_id: str, ctx: Context, deadline: float | None = None
+    ) -> dict[str, Any]:
+        """`deadline` (epoch seconds) is the caller's: the task must not be committed after it,
+        so the caller can later prove absence by lookup."""
         cc = guard.authorize(ctx, "create_follow_up_task", "proposal.decide")
 
         def go() -> dict[str, Any]:
@@ -122,7 +126,11 @@ def build_casework_server(
             marker = f"opsbridge-op:{op.operation_key}"
             body = f"{redact(params.get('body') or '', keep).text}\n\nOpsBridge operation marker: {marker}"
             req = TaskRequest(
-                redact(params["title"], keep).text, body, params.get("assignee_group"), marker
+                redact(params["title"], keep).text,
+                body,
+                params.get("assignee_group"),
+                marker,
+                deadline=deadline,
             )
             key = op.operation_key if conn.capabilities.idempotency_keys else None
             try:

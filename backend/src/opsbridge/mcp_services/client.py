@@ -159,7 +159,9 @@ class McpCaseworkConnector:
         try:
             out = self.client.call(
                 "create_follow_up_task",
-                {"operation_id": str(self.operation_id)},
+                # The deadline travels with the call: the casework service must not let the
+                # task be committed after it, however late the hop delivers the request.
+                {"operation_id": str(self.operation_id), "deadline": req.deadline},
                 self._delegation(),
             )
         except McpDenied as exc:
