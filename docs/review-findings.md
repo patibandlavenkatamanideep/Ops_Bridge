@@ -151,9 +151,15 @@ Not covered:
   outcomes) with counts, oldest-first order, and keeps view, filters and order in the URL.
   Before, nothing could set a case's owner. Tests: `tests/integration/test_case_ownership.py`
   (5), a queue unit test, `e2e/queue.spec.ts`.
+- F18, runtime validation of successful API responses (2026-10-26): every typed response is
+  checked in the browser against the OpenAPI schema it is documented with (a generated,
+  slimmed copy: +24 KB, under 5 KB gzipped); a mismatch, such as a proposal without its
+  destination after a version skew, is an error that asks for a reload instead of a page
+  that renders, or offers to approve, what it did not understand. Tests:
+  `frontend/src/api/validate.test.ts`; every browser test now runs with validation on.
 - F18 not done: due dates (invoices carry no payment terms in the packs; an SLA would be a
   policy decision), saved views per person beyond URLs, splitting the tenant settings page,
-  runtime validation of successful API responses, and usability sessions with operators.
+  and usability sessions with operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
   always does so. Recorded as a harness property, not changed.
