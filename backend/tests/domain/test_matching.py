@@ -472,3 +472,64 @@ def test_quantity_rule_matches_oracle(
             if f.reason_code != "invoiced_exceeds_ordered"
         ]
         assert Decimal(f.values["excess"]) == invoiced - (received - prior)
+
+
+# --- Negative quantities and prices ------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("data", "named"),
+    [
+        (
+            MatchInput(
+                invoice=invoice((inv_line("1", "1", "-20", "185.00"),)),
+                purchase_orders=(po(),),
+                receipts=(receipt((r_line("1", "18"),)),),
+            ),
+            "invoice line 1 quantity -20",
+        ),
+        (
+            MatchInput(
+                invoice=invoice((inv_line("1", "1", "20", "-185.00"),)),
+                purchase_orders=(po(),),
+                receipts=(receipt((r_line("1", "20"),)),),
+            ),
+            "invoice line 1 unit price -185.00",
+        ),
+        (
+            MatchInput(
+                invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
+                purchase_orders=(po(lines=(po_line("1", "-20", "185.00"),)),),
+                receipts=(receipt((r_line("1", "20"),)),),
+            ),
+            "PO-1001 line 1 quantity -20",
+        ),
+        (
+            MatchInput(
+                invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
+                purchase_orders=(po(),),
+                receipts=(receipt((r_line("1", "-18"),)),),
+            ),
+            "GR-5001 line 1 quantity -18",
+        ),
+        (
+            MatchInput(
+                invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
+                purchase_orders=(po(),),
+                receipts=(receipt((r_line("1", "20"),)),),
+                prior_allocations=(allocation("INV-8000", "1", "-5"),),
+            ),
+            "allocation of INV-8000 to PO line 1 quantity -5",
+        ),
+    ],
+    ids=["invoice quantity", "invoice price", "po quantity", "receipt quantity", "allocation"],
+)
+def test_a_negative_quantity_or_price_goes_to_review_not_to_a_match(
+    data: MatchInput, named: str
+) -> None:
+    """Credit notes and negative values are not modelled. An invoice quantity of -20 used to
+    count as fully covered by the 18 received, so the case matched and could be resolved."""
+    result = run(data)
+    assert result.outcome == "manual_review", [f.reason_code for f in result.findings]
+    [finding] = result.findings
+    assert finding.reason_code == "negative_value" and named.lower() in finding.summary.lower()
