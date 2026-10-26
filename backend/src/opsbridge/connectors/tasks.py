@@ -20,6 +20,7 @@ from typing import Any, Literal, Protocol
 
 import httpx
 
+from opsbridge import safejson
 from opsbridge.simulator.app import org_key
 
 Consistency = Literal["strong", "eventual", "none"]
@@ -163,7 +164,7 @@ class SimTaskConnector:
         try:
             r = self._client.get(f"/orgs/{self.org}/capabilities", timeout=3.0)
             if r.status_code == 200:
-                d = r.json()
+                d = safejson.response_json(r)
                 lookup = d.get("lookup")
                 if isinstance(d.get("idempotency_keys"), bool) and lookup in (
                     "strong",
@@ -219,7 +220,7 @@ class SimTaskConnector:
         except httpx.ConnectError as exc:  # never reached the provider
             raise DefiniteFailure(f"connection refused: {exc}", retryable=True) from exc
         if r.status_code in (200, 201):
-            return self._task(r.json())
+            return self._task(safejson.response_json(r))
         if r.status_code in (503, 504) and r.headers.get("x-sim-not-committed") == "true":
             raise DefiniteFailure(
                 "provider did not commit the task", retryable=True, status=r.status_code
@@ -241,7 +242,7 @@ class SimTaskConnector:
             return None
         if r.status_code != 200:
             raise LookupUnavailable(f"read-back returned {r.status_code}")
-        return self._task(r.json())
+        return self._task(safejson.response_json(r))
 
     def find_by_marker(self, marker: str, timeout: float) -> list[RemoteTask]:
         if self.capabilities.lookup == "none":
@@ -254,4 +255,4 @@ class SimTaskConnector:
             raise LookupUnavailable(f"lookup failed: {type(exc).__name__}") from exc
         if r.status_code != 200:
             raise LookupUnavailable(f"lookup returned {r.status_code}")
-        return [self._task(d) for d in r.json().get("items", [])]
+        return [self._task(d) for d in safejson.response_json(r).get("items", [])]
