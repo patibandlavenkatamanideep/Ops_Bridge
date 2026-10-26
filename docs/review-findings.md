@@ -161,9 +161,16 @@ Not covered:
 - F18, tenant settings split by responsibility (2026-10-26): General, Task connection,
   Policies and People, each at its own address (`/settings/<section>`); the accessibility
   scan now covers every section.
+- F18, a complete operator task by keyboard (2026-10-26): `e2e/keyboard.spec.ts` creates or
+  opens a case, takes it, investigates, proposes, and has an approver find and approve it with
+  Tab, the arrow keys and Enter only. It found that focus was dropped to the page after every
+  action whose button goes away or is disabled (running an investigation, creating a
+  proposal, approving or rejecting, taking or releasing a case, cancelling or reviewing an
+  operation), so a keyboard or screen-reader user lost their place at each step. A status
+  line now says what happened and takes focus (`components/Announcement.tsx`).
 - F18 not done: due dates (invoices carry no payment terms in the packs; an SLA would be a
-  policy decision), saved views per person beyond URLs, and usability sessions with
-  operators.
+  policy decision), saved views per person beyond URLs, screen-reader runs with real
+  assistive technology, and usability sessions with operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
   always does so. Recorded as a harness property, not changed.
