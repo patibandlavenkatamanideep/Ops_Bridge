@@ -82,19 +82,25 @@ Cancelling after a task was sent cannot undo it; record a follow-up instead.
 
 ## Settings (tenant administrators)
 
-Default investigation mode (limited by your service tier), task connector, and retention
-periods in days for original documents, notes, model and tool records (blank = keep).
-The tier enables features; it never grants anyone authority or access to other
-organizations. *Run retention sweep* deletes content past its period immediately; deleted
-originals cannot be restored, and the evidence view says so.
+Settings are split by responsibility; each section has its own address
+(`/t/<organization>/settings/<section>`), so you can bookmark or share it.
 
-*Connector health* (administrators and auditors) shows what the follow-up task connector
-promises right now — idempotency keys and lookup, asked live from the simulator; for GitHub
-only its configuration, because GitHub is not contacted without authorization — what that
-means after an ambiguous create (resend, reconcile by lookup, or human review), attempts in the
-last 24 hours by phase and result, and operations waiting for review. *Check again* repeats
-the live check. *Policies* lists every policy version: *active* is the one in force today;
-an investigation uses the version in force on the invoice's decision date.
+- **General:** default investigation mode (limited by your service tier) and retention periods
+  in days for original documents, notes, model and tool records (blank = keep). The tier
+  enables features; it never grants anyone authority or access to other organizations. *Run
+  retention sweep* deletes content past its period immediately; deleted originals cannot be
+  restored, and the evidence view says so.
+- **Task connection:** where follow-up tasks go (connector, repository, credential reference)
+  with its version history; change, rotate or revoke it with a reason. *Connector health*
+  (administrators and auditors) shows what the connector promises right now (idempotency
+  keys, lookup and request deadlines, asked live from the simulator; for GitHub only its
+  configuration, because GitHub is not contacted without authorization), what that means
+  after an ambiguous create (resend, look up once its deadline has passed, or human review),
+  attempts in the last 24 hours by phase and result, and operations waiting for review.
+  *Check again* repeats the live check.
+- **Policies:** every policy version; *active* is the one in force today, and an
+  investigation uses the version in force on the invoice's decision date.
+- **People:** members, their roles and approval scopes, and invitations.
 
 ## Evaluation (investigators and auditors)
 
