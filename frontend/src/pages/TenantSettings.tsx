@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { ApiError, api, apiAs, tenantPath, type ConnectorHealth, type Invitation, type InvitationCreated, type Member, type MemberUpdate, type SettingsView, type TaskConnection, type TaskConnections } from "../api/client";
-import { ErrorState, Loading } from "../components/States";
+import { EmptyState, ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
 
@@ -14,8 +14,17 @@ const RETENTION_LABELS: Record<string, string> = {
   invitations_days: "Email addresses on used, withdrawn or expired invitations",
 };
 
+// The page is split by responsibility; each section has its own address.
+const SECTIONS = [
+  { id: "general", label: "General" },
+  { id: "task-connection", label: "Task connection" },
+  { id: "policies", label: "Policies" },
+  { id: "people", label: "People" },
+] as const;
+type Section = (typeof SECTIONS)[number]["id"];
+
 export function TenantSettings() {
-  const { tenant = "" } = useParams();
+  const { tenant = "", section = "general" } = useParams();
   const query = useQuery<SettingsView, ApiError>({
     queryKey: ["settings", tenant],
     queryFn: ({ signal }) => apiAs("SettingsOut", tenantPath(tenant, "/settings"), { signal }),
@@ -23,10 +32,33 @@ export function TenantSettings() {
   if (query.isPending) return <Loading label="Loading settings" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   // Keyed on the saved values so the form re-initializes after a save.
-  return <SettingsBody key={JSON.stringify(query.data.settings)} tenant={tenant} view={query.data} />;
+  return (
+    <section aria-labelledby="settings-title">
+      <div className="page-header">
+        <h1 id="settings-title">Tenant settings</h1>
+      </div>
+      <nav aria-label="Settings sections" className="views">
+        {SECTIONS.map((s) => (
+          <Link key={s.id} to={`/t/${tenant}/settings/${s.id}`} aria-current={s.id === section ? "page" : undefined}
+                className={`link-button ${s.id === section ? "current" : ""}`}>
+            {s.label}
+          </Link>
+        ))}
+      </nav>
+      {!SECTIONS.some((s) => s.id === section) ? (
+        <EmptyState title="No such settings section">
+          <p>Choose a section above.</p>
+        </EmptyState>
+      ) : (
+        // Keyed on the saved values so the form re-initializes after a save.
+        <SettingsBody key={JSON.stringify(query.data.settings)} tenant={tenant} view={query.data}
+                      section={section as Section} />
+      )}
+    </section>
+  );
 }
 
-function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) {
+function SettingsBody({ tenant, view, section }: { tenant: string; view: SettingsView; section: Section }) {
   const { can } = useSession();
   const qc = useQueryClient();
   const canPolicy = can(tenant, "tenant.manage_policy");
@@ -63,11 +95,18 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
     save.mutate();
   }
 
+  if (section === "task-connection") {
+    return (
+      <>
+        <TaskConnectionPanel tenant={tenant} connectors={view.entitlements.external_connectors} />
+        <ConnectorHealthPanel tenant={tenant} />
+      </>
+    );
+  }
+  if (section === "policies") return <PoliciesSection view={view} />;
+  if (section === "people") return <MembersSection tenant={tenant} view={view} />;
   return (
-    <section aria-labelledby="settings-title">
-      <div className="page-header">
-        <h1 id="settings-title">Tenant settings</h1>
-      </div>
+    <>
       <dl className="facts">
         <dt>Organization</dt>
         <dd>{view.tenant.name}</dd>
@@ -150,43 +189,42 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
           {sweep.isError && <ErrorState error={sweep.error} />}
         </section>
       )}
+    </>
+  );
+}
 
-      <TaskConnectionPanel tenant={tenant} connectors={view.entitlements.external_connectors} />
-      <ConnectorHealthPanel tenant={tenant} />
-
-      <section aria-labelledby="policies-title">
-        <h2 id="policies-title">Policies</h2>
-        <table className="table">
-          <caption className="visually-hidden">Policy versions of this organization</caption>
-          <thead>
-            <tr>
-              <th scope="col">Policy</th>
-              <th scope="col">Version</th>
-              <th scope="col">Effective from</th>
-              <th scope="col">State</th>
-              <th scope="col">Digest</th>
+function PoliciesSection({ view }: { view: SettingsView }) {
+  return (
+    <section aria-labelledby="policies-title">
+      <h2 id="policies-title">Policies</h2>
+      <table className="table">
+        <caption className="visually-hidden">Policy versions of this organization</caption>
+        <thead>
+          <tr>
+            <th scope="col">Policy</th>
+            <th scope="col">Version</th>
+            <th scope="col">Effective from</th>
+            <th scope="col">State</th>
+            <th scope="col">Digest</th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.policies.map((p) => (
+            <tr key={`${p.policy_id}-${p.version}`}>
+              <th scope="row" className="mono">{p.policy_id}</th>
+              <td>v{p.version}</td>
+              <td>{p.effective_from}</td>
+              <td>{statusLabel(p.state)}</td>
+              <td className="mono small" title={p.sha256}>{p.sha256.slice(7, 19)}…</td>
             </tr>
-          </thead>
-          <tbody>
-            {view.policies.map((p) => (
-              <tr key={`${p.policy_id}-${p.version}`}>
-                <th scope="row" className="mono">{p.policy_id}</th>
-                <td>v{p.version}</td>
-                <td>{p.effective_from}</td>
-                <td>{statusLabel(p.state)}</td>
-                <td className="mono small" title={p.sha256}>{p.sha256.slice(7, 19)}…</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted small">
-          Active means in force today. Each investigation uses the version in force on the invoice’s decision date, so
-          older invoices can still be judged by an earlier version. Policies change by publishing a new version, not
-          by editing one.
-        </p>
-      </section>
-
-      <MembersSection tenant={tenant} view={view} />
+          ))}
+        </tbody>
+      </table>
+      <p className="muted small">
+        Active means in force today. Each investigation uses the version in force on the invoice’s decision date, so
+        older invoices can still be judged by an earlier version. Policies change by publishing a new version, not
+        by editing one.
+      </p>
     </section>
   );
 }
