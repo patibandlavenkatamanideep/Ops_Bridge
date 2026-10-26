@@ -87,6 +87,9 @@ test("a disguised upload is rejected with an explanation", async ({ page }) => {
 test("tenant settings show the policy in force and the connector's current promises", async ({ page }) => {
   await signIn(page, "furn-admin");
   await page.goto("/t/demo-furniture/settings");
+  const sections = page.getByRole("navigation", { name: "Settings sections" });
+  await sections.getByRole("link", { name: "Task connection" }).click();
+  await expect(page).toHaveURL(/\/settings\/task-connection$/);
   const health = page.getByRole("region", { name: "Connector health" });
   await expect(health.locator("dd").filter({ hasText: /^sim_tasks$/ })).toBeVisible();
   await expect(health).toContainText("Reachable");
@@ -94,6 +97,7 @@ test("tenant settings show the policy in force and the connector's current promi
   await expect(health).toContainText("After an ambiguous create");
   await health.getByRole("button", { name: "Check again" }).click();
   await expect(health.getByRole("button", { name: "Check again" })).toBeEnabled();
+  await sections.getByRole("link", { name: "Policies" }).click();
   const policies = page.getByRole("region", { name: "Policies" });
   await expect(policies.getByRole("row").filter({ hasText: "furniture-ap" }).filter({ hasText: "v2" }))
     .toContainText(/active/i);
@@ -103,7 +107,7 @@ test("tenant settings show the policy in force and the connector's current promi
 
 test("an administrator revokes the task connection and restores it, giving a reason each time", async ({ page }) => {
   await signIn(page, "furn-admin");
-  await page.goto("/t/demo-furniture/settings");
+  await page.goto("/t/demo-furniture/settings/task-connection");
   const panel = page.getByRole("region", { name: "Task connection" });
   await expect(panel.locator(".facts")).toContainText("sim_tasks (demo-furniture)");
 
@@ -130,10 +134,11 @@ test("tenant settings: admins see tier-limited options; investigators are denied
   await expect(page.locator(".facts dd").filter({ hasText: "Standard" })).toBeVisible();
   const modes = await page.getByLabel("Default investigation mode").locator("option").allInnerTexts();
   expect(modes.join(" ")).not.toMatch(/anthropic/i);
-  await expect(page.getByRole("row").filter({ has: page.getByText("furn-approver", { exact: true }) }))
-    .toContainText("Approver");
   await page.getByRole("button", { name: "Save settings" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Settings saved." })).toBeVisible();
+  await page.getByRole("navigation", { name: "Settings sections" }).getByRole("link", { name: "People" }).click();
+  await expect(page.getByRole("row").filter({ has: page.getByText("furn-approver", { exact: true }) }))
+    .toContainText("Approver");
 
   await page.context().clearCookies();
   await signIn(page, "furn-investigator");
@@ -144,7 +149,7 @@ test("tenant settings: admins see tier-limited options; investigators are denied
 
 test("an administrator revokes and reinstates a member, giving a reason each time", async ({ page }) => {
   await signIn(page, "furn-admin");
-  await page.goto("/t/demo-furniture/settings");
+  await page.goto("/t/demo-furniture/settings/people");
   const members = page.getByRole("table", { name: "Members of this organization" });
   await expect(members.getByRole("row", { name: /Ada Admin/ })).toContainText("You");
   await expect(members.getByRole("button", { name: "Change Ada Admin" })).toHaveCount(0); // not their own
