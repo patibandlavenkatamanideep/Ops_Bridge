@@ -29,7 +29,7 @@ from .records import (
 )
 from .units import canonical_unit, conversion_factor
 
-RULES_VERSION = "opsbridge-rules/1.0.1"
+RULES_VERSION = "opsbridge-rules/1.1.0"
 
 FindingType = Literal[
     "missing_receipt",
@@ -119,6 +119,45 @@ def _refs(*items: tuple[dict[str, SourceRef], str]) -> tuple[SourceRef, ...]:
     return tuple(out)
 
 
+def _negative_values(data: MatchInput) -> list[tuple[str, tuple[SourceRef, ...]]]:
+    """Each negative quantity or price in the input, named, with its evidence."""
+    out = []
+    for il in data.invoice.lines:
+        if il.quantity < 0:
+            out.append(
+                (f"invoice line {il.line_number} quantity {il.quantity}",
+                 _refs((il.refs, "invoice_line.quantity")))
+            )  # fmt: skip
+        if il.unit_price < 0:
+            out.append(
+                (f"invoice line {il.line_number} unit price {il.unit_price}",
+                 _refs((il.refs, "invoice_line.unit_price")))
+            )  # fmt: skip
+    for po in data.purchase_orders:
+        for pl in po.lines:
+            if pl.quantity < 0 or pl.unit_price < 0:
+                what = "quantity" if pl.quantity < 0 else "unit price"
+                value = pl.quantity if pl.quantity < 0 else pl.unit_price
+                out.append(
+                    (f"{po.po_number} line {pl.line_number} {what} {value}",
+                     _refs((pl.refs, f"po_line.{'quantity' if what == 'quantity' else 'unit_price'}")))
+                )  # fmt: skip
+    for receipt in data.receipts:
+        for rl in receipt.lines:
+            if rl.quantity < 0:
+                out.append(
+                    (f"{receipt.receipt_number} line {rl.po_line_number} quantity {rl.quantity}",
+                     _refs((rl.refs, "receipt_line.quantity")))
+                )  # fmt: skip
+    for a in data.prior_allocations:
+        if a.quantity < 0:
+            out.append(
+                (f"allocation of {a.invoice_number} to PO line {a.po_line_number} quantity "
+                 f"{a.quantity}", _refs((a.refs, "allocation.quantity")))
+            )  # fmt: skip
+    return out
+
+
 def _outcome(findings: list[Finding]) -> Outcome:
     statuses = {f.status for f in findings}
     if "needs_review" in statuses:
@@ -153,6 +192,24 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
                 "invoice_cancelled",
                 f"Invoice {invoice.invoice_number} is cancelled in the source system.",
                 evidence=_refs((invoice.refs, "invoice.status")),
+            )
+        )
+        return done()
+
+    # A negative quantity or price (a credit note, a reversal posted as a negative line, a
+    # mistaken correction) is not modelled: -20 invoiced would count as covered by any
+    # receipt and the case would match. Nothing is concluded from such data.
+    negative = _negative_values(data)
+    if negative:
+        findings.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                "negative_value",
+                "Negative quantities and prices are not supported (credit notes are not "
+                "modelled): " + "; ".join(text for text, _ in negative) + ". A person must "
+                "review this invoice.",
+                evidence=tuple(r for _, refs in negative for r in refs),
             )
         )
         return done()
