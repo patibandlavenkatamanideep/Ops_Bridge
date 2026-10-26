@@ -927,3 +927,13 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   The parser process is capped at 256 MB on Linux (verified in the app image: the bomb is
   rejected in 2.2 s, a 50-page PDF with 3.9 MB of text still parses) and at most two PDFs are
   parsed at once per process. macOS does not enforce the cap (development only).
+
+### Model claims: comparisons and dates (2026-10-26, F15)
+- Model text could reverse a comparison ("receipts total 18 and exceed the invoiced 20"),
+  state a wrong difference direction ("20 that is 2 below the 18 received") or invent a date
+  ("received on 2026-10-15") and still pass validation. Comparisons between stated numbers
+  must now hold, and every date must appear in the cited evidence, findings, case or policy.
+- Found on the way: true difference phrasing ("bills 2 more than the 18 received") and a real
+  date were rejected before; both are accepted now.
+- No false alarms: every dev and validation finding summary passes, and 0 of the 120 recorded
+  held-out mock explanations are rejected.
