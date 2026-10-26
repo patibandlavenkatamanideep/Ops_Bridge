@@ -590,3 +590,10 @@ fieldset {
   gap: 0.5rem;
   font-weight: 400;
 }
+
+/* A status line that takes focus after an action (components/Announcement.tsx). */
+.announcement {
+  margin: 0.5rem 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--accent);
+}
