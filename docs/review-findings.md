@@ -34,6 +34,8 @@ Found while building the source contract (not in the review):
 
 | ID | Finding | Status | Regression evidence |
 |---|---|---|---|
+| X5 | A PDF under 1 MB whose streams inflate to text made the parser subprocess use about 850 MB until the 10 s timeout stopped it; concurrent uploads multiplied that | Fixed (Linux), verified in the app image | The worker caps its address space at 256 MB (a legitimate 50-page, 3.9 MB-text PDF parses in 1.9 s under it; the bomb is rejected in 2.2 s) and at most two PDF parses run at once per process: `test_a_pdf_inflating_past_the_memory_cap_is_rejected_before_the_timeout` (Linux only), `test_no_more_than_two_pdfs_are_parsed_at_once` |
+| X4 | JSON nested about a thousand levels deep made `json.loads` raise RecursionError: an upload or source record failed with an unexpected error instead of a rejection, a source listing escaped the connector's error handling, a model answer failed its step instead of being rejected | Fixed, verified locally | Depth counted before decoding (`safejson`): `test_json_limits_and_exact_numbers`, `test_model_output_nested_beyond_any_schema_is_rejected_not_raised`, `test_a_listing_nested_beyond_any_record_is_refused` (all raised RecursionError before), `tests/test_safejson.py`; API bodies were already refused with 400 by the framework (guard test) |
 | X3 | After a create timed out, a strong lookup that found nothing was taken as proof of absence, so a create the tracker committed after the client gave up landed next to the resend (no idempotency keys: two tasks) | Fixed, verified locally | `test_a_create_still_in_flight_is_not_proved_absent_and_sent_again[True]` (failed before: 2 tasks) and `[False]` (a tracker without deadlines: review, one task) |
 | X2 | Dispatch built its connector from the configuration at the moment it ran, so recovering a write that had already landed (worker died after the create, or a retried read-back) looked wherever the configuration pointed by then | Fixed with tenant task connections, verified locally | Probe on the previous code: GitHub issue created, worker dies, repository setting changed → `outcome_unknown` (unreconcilable) though the issue existed; unchanged configuration → confirmed. Now `test_recovery_after_the_connection_moved_looks_where_the_write_went` |
 | X1 | The policy date came from any current invoice with the number (another supplier's older invoice could put the case under a superseded policy), and proposal checks took the newest policy, even a future-dated one, when no single invoice date applied (such a case could never get a proposal) | Fixed, verified locally | `test_the_policy_is_chosen_by_this_suppliers_invoice_date`, `test_a_case_without_one_invoice_date_is_judged_under_todays_policy` |
@@ -100,7 +102,7 @@ Not covered:
   refused as a "reused key".)
 - F11: only seven fields are correctable (those matching applies); other fields are read-only
   in the UI and refused by the API.
-- F12: parsers remain time-bounded, not memory- or process-isolated (Package 9).
+- F12: parsers are time-bounded; PDF parsing is also memory-capped (Package 9, below).
 - F05: a step may renew its lease for `investigation_step_limit_seconds` (default 300);
   after that the worker stops looking alive and another may take the run, whose late writes
   from the first are refused. A model call already in flight on the stuck worker still
