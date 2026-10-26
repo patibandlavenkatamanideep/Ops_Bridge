@@ -937,3 +937,10 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   date were rejected before; both are accepted now.
 - No false alarms: every dev and validation finding summary passes, and 0 of the 120 recorded
   held-out mock explanations are rejected.
+
+### API responses checked in the browser (2026-10-26, F18)
+- Pages trusted that the server's JSON had the shape the generated types describe. After a
+  deployment where page and server versions differ, a missing field would render as empty;
+  on an approval screen that means approving what was not shown. Every typed response is now
+  checked against its OpenAPI schema (a generated, slimmed copy: under 5 KB gzipped); a
+  mismatch shows "the app and server versions differ; reload" instead.
