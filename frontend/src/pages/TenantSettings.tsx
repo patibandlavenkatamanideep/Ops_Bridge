@@ -1,19 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useParams } from "react-router-dom";
-import {
-  ApiError,
-  api,
-  tenantPath,
-  type ConnectorHealth,
-  type Invitation,
-  type InvitationCreated,
-  type Member,
-  type MemberUpdate,
-  type SettingsView,
-  type TaskConnection,
-  type TaskConnections,
-} from "../api/client";
+import { ApiError, api, apiAs, tenantPath, type ConnectorHealth, type Invitation, type InvitationCreated, type Member, type MemberUpdate, type SettingsView, type TaskConnection, type TaskConnections } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -30,7 +18,7 @@ export function TenantSettings() {
   const { tenant = "" } = useParams();
   const query = useQuery<SettingsView, ApiError>({
     queryKey: ["settings", tenant],
-    queryFn: ({ signal }) => api<SettingsView>(tenantPath(tenant, "/settings"), { signal }),
+    queryFn: ({ signal }) => apiAs("SettingsOut", tenantPath(tenant, "/settings"), { signal }),
   });
   if (query.isPending) return <Loading label="Loading settings" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
@@ -58,7 +46,7 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
           Object.entries(retention).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)]),
         );
       }
-      return api<SettingsView>(tenantPath(tenant, "/settings"), { method: "PUT", body });
+      return apiAs("SettingsOut", tenantPath(tenant, "/settings"), { method: "PUT", body });
     },
     onSuccess: (data) => {
       qc.setQueryData(["settings", tenant], data);
@@ -269,7 +257,7 @@ function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }
   const [notice, setNotice] = useState<string | null>(null);
   const selected = view.members.find((m) => m.id === editing);
   const withdraw = useMutation<SettingsView, ApiError, Invitation>({
-    mutationFn: (inv) => api<SettingsView>(tenantPath(tenant, `/invitations/${inv.id}/revoke`), { method: "POST" }),
+    mutationFn: (inv) => apiAs("SettingsOut", tenantPath(tenant, `/invitations/${inv.id}/revoke`), { method: "POST" }),
     onSuccess: (data, inv) => {
       qc.setQueryData(["settings", tenant], data);
       setNotice(`Invitation for ${inv.email} withdrawn.`);
@@ -430,7 +418,7 @@ function InviteForm({ tenant, onCreated, onCancel }: {
   const heading = useFocusOnMount();
   const create = useMutation<InvitationCreated, ApiError>({
     mutationFn: () =>
-      api<InvitationCreated>(tenantPath(tenant, "/invitations"), {
+      apiAs("InvitationCreatedOut", tenantPath(tenant, "/invitations"), {
         method: "POST",
         body: { email, roles, approval_scope: roles.includes("approver") ? scope : [] },
       }),
@@ -540,7 +528,7 @@ function MemberEditor({ tenant, member, onDone }: {
   const save = useMutation<SettingsView, ApiError>({
     mutationFn: () => {
       const body: MemberUpdate = { roles, approval_scope: approver ? scope : [], status, reason };
-      return api<SettingsView>(tenantPath(tenant, `/members/${member.id}`), { method: "PATCH", body });
+      return apiAs("SettingsOut", tenantPath(tenant, `/members/${member.id}`), { method: "PATCH", body });
     },
     onSuccess: (data) => {
       qc.setQueryData(["settings", tenant], data);
@@ -600,7 +588,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   const canManage = can(tenant, "tenant.manage_connectors");
   const query = useQuery<TaskConnections, ApiError>({
     queryKey: ["task-connection", tenant],
-    queryFn: ({ signal }) => api<TaskConnections>(tenantPath(tenant, "/task-connection"), { signal }),
+    queryFn: ({ signal }) => apiAs("TaskConnectionsOut", tenantPath(tenant, "/task-connection"), { signal }),
   });
   const current = query.data?.active ?? null;
   const [connector, setConnector] = useState("");
@@ -618,7 +606,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   };
   const change = useMutation<TaskConnection, ApiError>({
     mutationFn: () =>
-      api<TaskConnection>(tenantPath(tenant, "/task-connection"), {
+      apiAs("TaskConnectionOut", tenantPath(tenant, "/task-connection"), {
         method: "POST",
         body: {
           connector: chosen,
@@ -632,7 +620,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   });
   const revoke = useMutation<TaskConnection, ApiError>({
     mutationFn: () =>
-      api<TaskConnection>(tenantPath(tenant, "/task-connection/revoke"), {
+      apiAs("TaskConnectionOut", tenantPath(tenant, "/task-connection/revoke"), {
         method: "POST",
         body: { reason: revokeReason },
       }),
@@ -777,7 +765,7 @@ const LOOKUP_LABELS: Record<string, string> = {
 function ConnectorHealthPanel({ tenant }: { tenant: string }) {
   const health = useQuery<ConnectorHealth, ApiError>({
     queryKey: ["connector-health", tenant],
-    queryFn: ({ signal }) => api<ConnectorHealth>(tenantPath(tenant, "/connectors/health"), { signal }),
+    queryFn: ({ signal }) => apiAs("ConnectorHealthOut", tenantPath(tenant, "/connectors/health"), { signal }),
   });
   return (
     <section aria-labelledby="connector-title">
