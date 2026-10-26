@@ -957,3 +957,10 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   connector health, policies, members and invitations. It is now four sections (General,
   Task connection, Policies, People), each at its own address; the accessibility scan covers
   every section.
+
+### A complete task by keyboard; focus kept after actions (2026-10-26, F18)
+- A new browser test works a case with the keyboard only: create or open, take, investigate,
+  propose, and approve as a second user. It found that focus dropped to the page after every
+  action whose button goes away or is disabled (run, create proposal, approve or reject, take
+  or release, cancel or review), so keyboard and screen-reader users lost their place. A
+  status line now says what happened and takes focus.
