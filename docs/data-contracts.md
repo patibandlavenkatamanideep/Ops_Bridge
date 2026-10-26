@@ -151,6 +151,6 @@ Outbox events are written in the approval transaction and marked delivered on co
 ## Versioning rules
 
 Changing a canonical record, a mapping semantic or the rules output bumps the relevant
-version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.0.1`; pack and
+version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.1.0`; pack and
 policy versions in their YAML). Benchmark inputs are frozen by digest; changing them needs a
 new benchmark id. Database changes go through Alembic migrations (0001–0004).
