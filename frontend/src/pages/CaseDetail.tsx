@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type AssigneeList, type CaseOut, type Citation } from "../api/client";
+import { ApiError, apiAs, tenantPath, type AssigneeList, type CaseOut, type Citation } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { StatusBadge, statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -27,10 +27,10 @@ export function CaseDetail() {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const query = useQuery<CaseOut, ApiError>({
     queryKey: ["case", tenant, caseId],
-    queryFn: ({ signal }) => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}`), { signal }),
+    queryFn: ({ signal }) => apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}`), { signal }),
   });
   const resolve = useMutation<CaseOut, ApiError>({
-    mutationFn: () => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}/resolve`), { method: "POST", body: {} }),
+    mutationFn: () => apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}/resolve`), { method: "POST", body: {} }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["case", tenant, caseId] }),
   });
 
@@ -123,11 +123,11 @@ function OwnerControls({ tenant, caseId, c }: { tenant: string; caseId: string; 
   const [target, setTarget] = useState("");
   const people = useQuery<AssigneeList, ApiError>({
     queryKey: ["assignees", tenant],
-    queryFn: ({ signal }) => api<AssigneeList>(tenantPath(tenant, "/assignees"), { signal }),
+    queryFn: ({ signal }) => apiAs("AssigneeList", tenantPath(tenant, "/assignees"), { signal }),
   });
   const change = useMutation<CaseOut, ApiError, string | null>({
     mutationFn: (owner) =>
-      api<CaseOut>(tenantPath(tenant, `/cases/${caseId}/owner`), {
+      apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}/owner`), {
         method: "POST",
         body: { owner_id: owner, expected_owner_id: c.assignee_id },
       }),
