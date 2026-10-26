@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 import uuid
@@ -16,6 +15,7 @@ import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+from opsbridge import safejson
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
     ConnectorCapabilities,
@@ -77,7 +77,7 @@ class ClientCredentialsTokens:
                 timeout=10,
             )
             r.raise_for_status()
-            body = r.json()
+            body = safejson.response_json(r)
             self._token = str(body["access_token"])
             self._expires = time.time() + int(body.get("expires_in", 60))
             return self._token
@@ -106,7 +106,7 @@ class McpToolClient:
                 raise McpDenied(text[:500] or "tool error")
             if result.structured_content:
                 return dict(result.structured_content)
-            return dict(json.loads(text)) if text else {}
+            return dict(safejson.loads(text)) if text else {}
 
         try:
             return anyio.run(go)
