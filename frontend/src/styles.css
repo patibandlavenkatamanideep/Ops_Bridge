@@ -151,6 +151,12 @@ code,
 .filters {
   margin: 0.5rem 0 1rem;
 }
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
 
 .button {
   display: inline-block;
