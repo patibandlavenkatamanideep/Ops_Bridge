@@ -119,7 +119,12 @@ unknown field is refused with 422).
 
 ## API (`/api/v1`, OpenAPI at `/api/v1/openapi.json`)
 
-Generated into `frontend/src/api/openapi.json` and `schema.d.ts` (`make openapi`). Errors are
+Generated into `frontend/src/api/openapi.json`, `schema.d.ts` and `schemas.json` (the
+component schemas reduced to the validation keywords) by `make openapi`; CI fails when they
+differ from the backend. The browser checks every typed response against its schema
+(`apiAs` in `frontend/src/api/client.ts`): a response that does not match (a page and a
+server of different versions) is shown as "the app and server versions differ", never
+rendered half-understood; fields a newer server adds are allowed. Errors are
 `{"error": {"code", "message", "correlation_id", "retryable", "details"}}`; status codes
 distinguish 401, 403, 404 (also for other tenants' resources), 409 (conflict, stale version,
 not entitled), 411/413 (body), 422, 429, 503 (dependency). Writes need the CSRF header.
