@@ -43,3 +43,21 @@ test("retryable failures offer a retry", async () => {
   renderAt("/t/demo-furniture/cases", "/t/:tenant/cases", <CaseQueue />);
   expect(await screen.findByRole("button", { name: "Try again" })).toBeInTheDocument();
 });
+
+test("a view in the URL selects it, asks the server for it and shows what waits", async () => {
+  const urls: string[] = [];
+  mockFetch((url) => {
+    urls.push(url);
+    if (url.includes("/cases/views")) {
+      return json(200, { mine: 0, unassigned: 2, awaiting_approval: 1, needs_review: 1 });
+    }
+    return json(200, { items: [{ ...item, needs_review: true, owner_active: true }], next_cursor: null });
+  });
+  renderAt("/t/demo-furniture/cases?view=needs_review&sort=oldest", "/t/:tenant/cases", <CaseQueue />);
+  const row = within(await screen.findByRole("table")).getAllByRole("row")[1]!;
+  expect(within(row).getByText("Needs review")).toBeInTheDocument();
+  const queueCall = urls.find((u) => u.includes("/cases?"))!;
+  expect(queueCall).toContain("view=needs_review");
+  expect(queueCall).toContain("sort=oldest");
+  expect(screen.getByRole("combobox", { name: "Order" })).toHaveValue("oldest");
+});
