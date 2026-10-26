@@ -28,6 +28,7 @@ from typing import Any
 
 import jsonschema
 
+from opsbridge import safejson
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.domain.units import canonical_unit
 from opsbridge.telemetry import metrics, tracing
@@ -371,7 +372,7 @@ def _common_text_problems(text: str) -> list[str]:
 
 def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | None, list[str]]:
     try:
-        out = json.loads(raw)
+        out = safejson.loads(raw)
         jsonschema.validate(out, EXPLAIN_SCHEMA)
     except (ValueError, jsonschema.ValidationError) as exc:
         return None, [f"schema: {str(exc).splitlines()[0][:200]}"]
@@ -404,7 +405,7 @@ def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | 
 
 def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | None, list[str]]:
     try:
-        out = json.loads(raw)
+        out = safejson.loads(raw)
         jsonschema.validate(out, PROPOSE_SCHEMA)
     except (ValueError, jsonschema.ValidationError) as exc:
         return None, [f"schema: {str(exc).splitlines()[0][:200]}"]
