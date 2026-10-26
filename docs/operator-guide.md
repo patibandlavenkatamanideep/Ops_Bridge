@@ -27,26 +27,35 @@ between them, and your role can differ in each.
 ## Working a case
 
 1. **Open or find the case.** The queue shows discrepancy type, owner, age, evidence
-   readiness and state; search by case, invoice or PO number.
-2. **Run the investigation.** *Rules only* uses no model. A model mode (if your organization
+   readiness and state, and flags cases where a proposal awaits approval or an operation
+   needs review; search by case, invoice or PO number, and sort newest or oldest first.
+   Views: *Mine* and *Unassigned* (open cases; a case whose owner no longer works here as an
+   investigator counts as unassigned), *Awaiting approval*, and *Needs review* (operations
+   whose outcome is unknown: the place to start after an outage). Each view, filter and
+   order is in the page address, so you can bookmark or share it.
+2. **Take the case.** *Take this case* makes you its owner; *Release* gives it back; *Give
+   to* hands it to another investigator. If someone else changed the owner since you opened
+   the page, your change is refused and the page shows who owns it now. Closed cases keep
+   their owner. Every change is in the audit log.
+3. **Run the investigation.** *Rules only* uses no model. A model mode (if your organization
    allows it) adds a written explanation and a draft; the decision itself is always made by
    the rules. *Model use* shows which model ran, or why none did (for example, a policy that
    requires local processing).
-3. **Read the outcome.**
+4. **Read the outcome.**
    - *Matched*: nothing to do beyond a review note.
    - *Discrepancies found*: each finding states the numbers and cites the documents.
    - *Needs information*: something is missing (often a receiving record). Missing does not
      mean "not delivered".
    - *Manual review*: OpsBridge could not evaluate something exactly (unknown unit, other
      currency, similar but different supplier name, unreadable invoice). A person decides.
-4. **Check the evidence.** Click a citation to see the exact line, row or field beside the
+5. **Check the evidence.** Click a citation to see the exact line, row or field beside the
    value OpsBridge extracted. If an extraction is wrong, use *Correct*: the original stays
    on record, your correction and reason are audited, and you re-run the investigation to
    use it.
-5. **Add what is not in a document** in *Conversation* (calls, supplier replies). Avoid bank
+6. **Add what is not in a document** in *Conversation* (calls, supplier replies). Avoid bank
    details and personal contact data. You can correct your own notes; deleting removes the
    text but keeps who, when and why.
-6. **Upload a document** (PDF, text, CSV, JSON) on the Evidence tab if the supplier sent
+7. **Upload a document** (PDF, text, CSV, JSON) on the Evidence tab if the supplier sent
    something new. A file with the same name becomes a new version.
 
 ## Proposals and approval
