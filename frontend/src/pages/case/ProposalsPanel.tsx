@@ -1,15 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import {
-  ApiError,
-  api,
-  tenantPath,
-  type DecisionResult,
-  type OperationItem,
-  type OperationList,
-  type ProposalItem,
-  type ProposalList,
-} from "../../api/client";
+import { ApiError, apiAs, tenantPath, type DecisionResult, type OperationItem, type OperationList, type ProposalItem, type ProposalList } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
 import { useSession } from "../../session";
@@ -21,12 +12,12 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
   const qc = useQueryClient();
   const proposals = useQuery<ProposalList, ApiError>({
     queryKey: ["proposals", tenant, caseId],
-    queryFn: ({ signal }) => api<ProposalList>(tenantPath(tenant, `/cases/${caseId}/proposals`), { signal }),
+    queryFn: ({ signal }) => apiAs("ProposalList", tenantPath(tenant, `/cases/${caseId}/proposals`), { signal }),
     enabled: can(tenant, "proposal.read"),
   });
   const ops = useQuery<OperationList, ApiError>({
     queryKey: ["operations", tenant, caseId],
-    queryFn: ({ signal }) => api<OperationList>(tenantPath(tenant, `/cases/${caseId}/operations`), { signal }),
+    queryFn: ({ signal }) => apiAs("OperationList", tenantPath(tenant, `/cases/${caseId}/operations`), { signal }),
     enabled: can(tenant, "operation.read"),
     refetchInterval: (q) => (q.state.data?.items.some((o) => !TERMINAL.includes(o.status)) ? 1500 : false),
   });
@@ -36,7 +27,7 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
     if (opSignature) qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
   }, [opSignature, qc, tenant, caseId]);
   const create = useMutation<ProposalItem, ApiError>({
-    mutationFn: () => api<ProposalItem>(tenantPath(tenant, `/cases/${caseId}/proposals`), { method: "POST", body: {} }),
+    mutationFn: () => apiAs("ProposalOut", tenantPath(tenant, `/cases/${caseId}/proposals`), { method: "POST", body: {} }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals", tenant, caseId] }),
   });
   const refresh = () => {
@@ -101,7 +92,7 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
   const [reason, setReason] = useState("");
   const decide = useMutation<DecisionResult, ApiError, "approve" | "reject">({
     mutationFn: (decision) =>
-      api<DecisionResult>(tenantPath(tenant, `/cases/${caseId}/proposals/${p.id}/decision`), {
+      apiAs("DecisionOut", tenantPath(tenant, `/cases/${caseId}/proposals/${p.id}/decision`), {
         method: "POST",
         body: { decision, version: p.version, payload_digest: p.payload_digest, reason: reason || null },
       }),
@@ -186,7 +177,7 @@ function OperationCard({ tenant, caseId, op, onChange }: { tenant: string; caseI
   onChange: () => void }) {
   const { can } = useSession();
   const cancel = useMutation<OperationItem, ApiError>({
-    mutationFn: () => api<OperationItem>(tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/cancel`), { method: "POST" }),
+    mutationFn: () => apiAs("OperationOut", tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/cancel`), { method: "POST" }),
     onSuccess: onChange,
   });
   const confirmation = op.confirmation as Record<string, unknown> | null;
@@ -243,7 +234,7 @@ function ReviewForm({ tenant, caseId, op, onDone }: { tenant: string; caseId: st
   const [ref, setRef] = useState("");
   const [note, setNote] = useState("");
   const m = useMutation<OperationItem, ApiError>({
-    mutationFn: () => api<OperationItem>(tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/review`), {
+    mutationFn: () => apiAs("OperationOut", tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/review`), {
       method: "POST",
       body: { finding, remote_ref: finding === "exists" ? ref : null, note },
     }),
