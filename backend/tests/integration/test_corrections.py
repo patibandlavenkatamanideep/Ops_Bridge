@@ -46,3 +46,21 @@ def test_only_fields_matching_uses_can_be_corrected(stack) -> None:  # type: ign
     assert r.status_code == 409 and r.json()["error"]["code"] == "not_correctable", r.text
     after = next(f for f in invoice_fields(st, case_id) if f["field_path"] == "invoice.currency")
     assert after["status"] != "corrected" and after["current_value"] == currency["original_value"]
+
+
+@pytest.mark.parametrize("value", ["-20", "-0.01"])
+def test_a_correction_cannot_make_a_quantity_or_price_negative(stack, value: str) -> None:  # type: ignore[no-untyped-def]
+    """Correcting the invoiced quantity to -20 made INV-9001 match (the 18 received covered
+    it), and a matched investigation is what resolving the case needs."""
+    st = stack
+    case_id = open_case(st, "furn-investigator", "demo-furniture", "INV-9001")
+    investigate(st, "furn-investigator", "demo-furniture", case_id)
+    qty = next(f for f in invoice_fields(st, case_id) if f["field_path"] == "invoice_line.quantity")
+    r = call(
+        st["client"],
+        st["actors"]["furn-investigator"],
+        "POST",
+        f"{T}/cases/{case_id}/fields/{qty['field_id']}/corrections",
+        json={"new_value": value, "reason": "Credit for returned chairs"},
+    )
+    assert r.status_code == 409 and r.json()["error"]["code"] == "invalid_value", r.text
