@@ -11,6 +11,7 @@ import re
 
 import httpx
 
+from opsbridge import safejson
 from opsbridge.simulator.app import org_key
 
 from .source_contract import FetchedRecord, Listing, SourceRecordInvalid, SourceUnavailable
@@ -61,7 +62,7 @@ class PurchasingClient:
             except _NotFound as exc:  # a listing exists for every PO, if only empty
                 raise SourceRecordInvalid(f"no listing for {collection}") from exc
             try:
-                body = r.json()
+                body = safejson.response_json(r)
                 items, cursor = body["items"], body.get("next_cursor")
                 for item in items:
                     key = str(item["key"])
