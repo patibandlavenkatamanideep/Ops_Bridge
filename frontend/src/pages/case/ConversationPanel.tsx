@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
-import { ApiError, api, tenantPath, type Message, type MessageList } from "../../api/client";
+import { ApiError, apiAs, tenantPath, type Message, type MessageList } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { useSession } from "../../session";
 
@@ -12,7 +12,7 @@ export function ConversationPanel({ tenant, caseId }: { tenant: string; caseId: 
   const key = ["messages", tenant, caseId];
   const list = useQuery<MessageList, ApiError>({
     queryKey: key,
-    queryFn: ({ signal }) => api<MessageList>(tenantPath(tenant, `/cases/${caseId}/messages`), { signal }),
+    queryFn: ({ signal }) => apiAs("MessageList", tenantPath(tenant, `/cases/${caseId}/messages`), { signal }),
   });
   const [correcting, setCorrecting] = useState<Message | null>(null);
 
@@ -59,7 +59,7 @@ function MessageItem({ tenant, caseId, message: m, supersededBy, canCorrect, can
   const [reason, setReason] = useState("");
   const del = useMutation<Message, ApiError>({
     mutationFn: () =>
-      api<Message>(tenantPath(tenant, `/cases/${caseId}/messages/${m.id}/delete`), { method: "POST",
+      apiAs("MessageOut", tenantPath(tenant, `/cases/${caseId}/messages/${m.id}/delete`), { method: "POST",
         body: { reason } }),
     onSuccess: () => {
       setDeleting(false);
@@ -117,7 +117,7 @@ function Composer({ tenant, caseId, correcting, onDone }: { tenant: string; case
   const [body, setBody] = useState(correcting?.body ?? "");
   const post = useMutation<Message, ApiError>({
     mutationFn: () =>
-      api<Message>(tenantPath(tenant, `/cases/${caseId}/messages`), { method: "POST",
+      apiAs("MessageOut", tenantPath(tenant, `/cases/${caseId}/messages`), { method: "POST",
         body: { body, supersedes_id: correcting?.id ?? null } }),
     onSuccess: () => {
       setBody("");
