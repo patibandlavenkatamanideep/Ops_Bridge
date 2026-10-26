@@ -59,7 +59,7 @@ try {
   await inv.getByText(/Findings|Cited findings/).first().waitFor();
   await inv.screenshot({ path: `${OUT}02-investigation.png`, fullPage: true });
 
-  await inv.getByRole("button", { name: /Open evidence invoice_line.quantity/ }).first().click(); // cited line
+  await inv.getByRole("button", { name: /open evidence for invoice_line.quantity/ }).first().click(); // cited line
 
   await inv.getByRole("heading", { name: "Source text" }).waitFor();
   await inv.screenshot({ path: `${OUT}03-evidence.png` });
