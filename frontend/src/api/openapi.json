@@ -42,6 +42,45 @@
         "title": "AcceptOut",
         "type": "object"
       },
+      "AssigneeList": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AssigneeOut"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "AssigneeList",
+        "type": "object"
+      },
+      "AssigneeOut": {
+        "properties": {
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "display_name"
+        ],
+        "title": "AssigneeOut",
+        "type": "object"
+      },
       "AttemptOut": {
         "properties": {
           "connector_version": {
@@ -358,6 +397,17 @@
               }
             ],
             "title": "Invoice Number"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
           },
           "po_number": {
             "anyOf": [
@@ -1940,6 +1990,40 @@
         "title": "OperationOut",
         "type": "object"
       },
+      "OwnerIn": {
+        "properties": {
+          "expected_owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Owner Id"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "format": "uuid",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
+          }
+        },
+        "required": [
+          "owner_id",
+          "expected_owner_id"
+        ],
+        "title": "OwnerIn",
+        "type": "object"
+      },
       "PolicyOut": {
         "properties": {
           "effective_from": {
@@ -2240,6 +2324,11 @@
             ],
             "title": "Assignee Group"
           },
+          "awaiting_approval": {
+            "default": false,
+            "title": "Awaiting Approval",
+            "type": "boolean"
+          },
           "case_number": {
             "title": "Case Number",
             "type": "string"
@@ -2263,6 +2352,11 @@
             "title": "Id",
             "type": "string"
           },
+          "needs_review": {
+            "default": false,
+            "title": "Needs Review",
+            "type": "boolean"
+          },
           "owner": {
             "anyOf": [
               {
@@ -2273,6 +2367,22 @@
               }
             ],
             "title": "Owner"
+          },
+          "owner_active": {
+            "default": true,
+            "title": "Owner Active",
+            "type": "boolean"
+          },
+          "owner_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner Id"
           },
           "status": {
             "title": "Status",
@@ -2324,6 +2434,34 @@
           "next_cursor"
         ],
         "title": "QueuePage",
+        "type": "object"
+      },
+      "QueueViewCounts": {
+        "properties": {
+          "awaiting_approval": {
+            "title": "Awaiting Approval",
+            "type": "integer"
+          },
+          "mine": {
+            "title": "Mine",
+            "type": "integer"
+          },
+          "needs_review": {
+            "title": "Needs Review",
+            "type": "integer"
+          },
+          "unassigned": {
+            "title": "Unassigned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "mine",
+          "unassigned",
+          "awaiting_approval",
+          "needs_review"
+        ],
+        "title": "QueueViewCounts",
         "type": "object"
       },
       "ResolveIn": {
@@ -3061,6 +3199,52 @@
         ]
       }
     },
+    "/api/v1/tenants/{tenant}/assignees": {
+      "get": {
+        "description": "Who a case can be given to (active investigators).",
+        "operationId": "assignees_api_v1_tenants__tenant__assignees_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AssigneeList"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Assignees",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
     "/api/v1/tenants/{tenant}/cases": {
       "get": {
         "operationId": "list_cases_api_v1_tenants__tenant__cases_get",
@@ -3139,6 +3323,28 @@
                 }
               ],
               "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "view",
+            "required": false,
+            "schema": {
+              "default": "all",
+              "maxLength": 32,
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "newest",
+              "maxLength": 16,
+              "title": "Sort",
+              "type": "string"
             }
           }
         ],
@@ -3235,6 +3441,52 @@
           }
         },
         "summary": "Create Case",
+        "tags": [
+          "cases"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/cases/views": {
+      "get": {
+        "description": "How many cases each built-in queue view holds for the caller.",
+        "operationId": "queue_view_counts_api_v1_tenants__tenant__cases_views_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueViewCounts"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Queue View Counts",
         "tags": [
           "cases"
         ]
@@ -4144,6 +4396,72 @@
         "summary": "Review",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/cases/{case_id}/owner": {
+      "post": {
+        "description": "Take (owner_id = yourself), assign or release (owner_id = null) a case.",
+        "operationId": "set_owner_api_v1_tenants__tenant__cases__case_id__owner_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CaseOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Owner",
+        "tags": [
+          "cases"
         ]
       }
     },
