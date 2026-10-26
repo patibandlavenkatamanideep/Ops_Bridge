@@ -22,6 +22,7 @@ from typing import Any
 
 import httpx
 
+from opsbridge import safejson
 from opsbridge.config import Settings
 
 from .tasks import (
@@ -123,7 +124,7 @@ class GitHubIssuesConnector:
         except httpx.ConnectError as exc:
             raise DefiniteFailure(f"connection refused: {exc}", retryable=True) from exc
         if r.status_code == 201:
-            return self._task(r.json())
+            return self._task(safejson.response_json(r))
         if self._rate_limited(r):
             raise DefiniteFailure(
                 "rate limited (not processed)", retryable=True, status=r.status_code
@@ -147,7 +148,7 @@ class GitHubIssuesConnector:
             return None
         if r.status_code != 200:
             raise LookupUnavailable(f"read-back returned {r.status_code}")
-        return self._task(r.json())
+        return self._task(safejson.response_json(r))
 
     def find_by_marker(self, marker: str, timeout: float) -> list[RemoteTask]:
         since = (datetime.now(UTC) - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
@@ -170,7 +171,7 @@ class GitHubIssuesConnector:
                 raise LookupUnavailable(f"issue listing failed: {type(exc).__name__}") from exc
             if r.status_code != 200:
                 raise LookupUnavailable(f"issue listing returned {r.status_code}")
-            items = r.json()
+            items = safejson.response_json(r)
             found += [
                 self._task(d)
                 for d in items
