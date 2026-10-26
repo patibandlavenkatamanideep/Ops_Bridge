@@ -21,6 +21,8 @@ from typing import Any
 
 import httpx
 
+from opsbridge import safejson
+
 from .contracts import (
     Capabilities,
     ModelRefused,
@@ -296,7 +298,7 @@ class OllamaAdapter:
             return False, None
         if r.status_code != 200:
             return False, None
-        for m in r.json().get("models", []):
+        for m in safejson.response_json(r).get("models", []):
             if m.get("name") == self.model or m.get("model") == self.model:
                 return True, m.get("digest")
         return False, None
@@ -328,7 +330,7 @@ class OllamaAdapter:
             raise ModelUnavailable(f"Ollama connection error: {type(exc).__name__}") from exc
         if r.status_code != 200:
             raise ModelUnavailable(f"Ollama returned HTTP {r.status_code}")
-        data = r.json()
+        data = safejson.response_json(r)
         return ModelResponse(
             text=(data.get("message") or {}).get("content", ""),
             provider="ollama",
