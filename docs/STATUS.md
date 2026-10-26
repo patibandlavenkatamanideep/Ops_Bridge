@@ -916,3 +916,14 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   check, and keeps its state in the URL. Needs review is the recovery view for operations
   whose outcome is unknown.
 - Not done: due dates (no payment terms in the source data), per-person saved views.
+
+### Parser bounds: nested JSON and PDF memory (2026-10-26, review Package 9)
+- JSON nested about a thousand levels deep made the decoder raise RecursionError: an upload or
+  source record failed with an unexpected error, a source listing escaped the connector's
+  error handling, a model answer failed its step instead of being rejected. Nesting is now
+  counted before decoding wherever outside JSON is read (`safejson`). API request bodies were
+  already refused with 400.
+- A PDF under 1 MB that inflates to text used about 850 MB in the parser until the timeout.
+  The parser process is capped at 256 MB on Linux (verified in the app image: the bomb is
+  rejected in 2.2 s, a 50-page PDF with 3.9 MB of text still parses) and at most two PDFs are
+  parsed at once per process. macOS does not enforce the cap (development only).
