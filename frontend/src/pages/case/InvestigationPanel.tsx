@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ApiError, api, tenantPath, type Citation, type Finding, type Investigation, type Run } from "../../api/client";
+import { ApiError, apiAs, tenantPath, type Citation, type Finding, type Investigation, type Run } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
 import { useSession } from "../../session";
@@ -28,12 +28,12 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
   const [runId, setRunId] = useState<string | null>(null);
   const inv = useQuery<Investigation, ApiError>({
     queryKey: ["investigation", tenant, caseId],
-    queryFn: ({ signal }) => api<Investigation>(tenantPath(tenant, `/cases/${caseId}/investigation`), { signal }),
+    queryFn: ({ signal }) => apiAs("InvestigationOut", tenantPath(tenant, `/cases/${caseId}/investigation`), { signal }),
     retry: false,
   });
   const run = useQuery<Run, ApiError>({
     queryKey: ["run", tenant, caseId, runId],
-    queryFn: ({ signal }) => api<Run>(tenantPath(tenant, `/cases/${caseId}/runs/${runId}`), { signal }),
+    queryFn: ({ signal }) => apiAs("RunOut", tenantPath(tenant, `/cases/${caseId}/runs/${runId}`), { signal }),
     enabled: runId !== null,
     refetchInterval: (q) => (q.state.data && ["completed", "failed"].includes(q.state.data.status) ? false : 1000),
   });
@@ -41,7 +41,7 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
   const modes = membership(tenant)?.model_modes ?? ["rules_only"];
   const [mode, setMode] = useState<string>("");
   const start = useMutation<Run, ApiError>({
-    mutationFn: () => api<Run>(tenantPath(tenant, `/cases/${caseId}/investigations`), {
+    mutationFn: () => apiAs("RunOut", tenantPath(tenant, `/cases/${caseId}/investigations`), {
       method: "POST",
       body: mode ? { model_mode: mode } : {},
     }),
