@@ -467,9 +467,16 @@ def correct_field(
             from opsbridge.domain.money import DecimalParseError, parse_decimal
 
             try:
-                parse_decimal(new_value)
+                parsed = parse_decimal(new_value)
             except DecimalParseError as exc:
                 raise Conflict("invalid_value", f"Not a valid decimal: {exc}") from exc
+            if parsed < 0:
+                # A negative quantity or price made the case match (-20 invoiced counted as
+                # covered by any receipt); credit notes are not modelled.
+                raise Conflict(
+                    "invalid_value",
+                    "A quantity or price cannot be negative here (credit notes are not modelled).",
+                )
         corr = FieldCorrection(
             tenant_id=p.tenant_id,
             field_id=fld.id,
