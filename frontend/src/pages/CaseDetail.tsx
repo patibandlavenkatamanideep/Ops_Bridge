@@ -4,6 +4,7 @@ import { Link, useParams } from "react-router-dom";
 import { ApiError, apiAs, tenantPath, type AssigneeList, type CaseOut, type Citation } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { StatusBadge, statusLabel } from "../components/StatusBadge";
+import { useAnnouncement } from "../components/Announcement";
 import { useSession } from "../session";
 import { ConversationPanel } from "./case/ConversationPanel";
 import { EvidencePanel } from "./case/EvidencePanel";
@@ -121,6 +122,7 @@ function OwnerControls({ tenant, caseId, c }: { tenant: string; caseId: string; 
   const { me } = useSession();
   const qc = useQueryClient();
   const [target, setTarget] = useState("");
+  const [notice, announce] = useAnnouncement();
   const people = useQuery<AssigneeList, ApiError>({
     queryKey: ["assignees", tenant],
     queryFn: ({ signal }) => apiAs("AssigneeList", tenantPath(tenant, "/assignees"), { signal }),
@@ -131,6 +133,11 @@ function OwnerControls({ tenant, caseId, c }: { tenant: string; caseId: string; 
         method: "POST",
         body: { owner_id: owner, expected_owner_id: c.assignee_id },
       }),
+    onSuccess: (updated, owner) => {
+      announce(owner === null ? "You released this case." : owner === me.user_id ? "You own this case."
+        : `Given to ${updated.owner ?? "another investigator"}.`);
+      setTarget("");
+    },
     onSettled: () => {
       void qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
       void qc.invalidateQueries({ queryKey: ["case-views", tenant] });
@@ -170,6 +177,7 @@ function OwnerControls({ tenant, caseId, c }: { tenant: string; caseId: string; 
         </form>
       )}
       {change.isError && <ErrorState error={change.error} />}
+      {notice}
     </div>
   );
 }
