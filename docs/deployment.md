@@ -94,7 +94,10 @@ characters, an S3 artifact bucket with server-side encryption requested (`AES256
 load balancer. `production` also refuses demo user credentials and, because no production
 purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
 `staging`. These are settings checks: they do not show that the bucket actually encrypts or
-that the CIDRs are really the load balancer's. Cookies are `Secure` in both.
+that the CIDRs are really the load balancer's. Cookies are `Secure` in both. A deployment
+keeps the default per-user limit (`OPSBRIDGE_RATE_LIMIT_PER_MINUTE`, 240) unless it has
+reason to change it; the development `.env` raises it to 1200 because the browser tests sign
+in as the same demo users many times a minute.
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
