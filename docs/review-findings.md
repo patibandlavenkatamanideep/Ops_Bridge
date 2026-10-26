@@ -158,9 +158,12 @@ Not covered:
   destination after a version skew, is an error that asks for a reload instead of a page
   that renders, or offers to approve, what it did not understand. Tests:
   `frontend/src/api/validate.test.ts`; every browser test now runs with validation on.
+- F18, tenant settings split by responsibility (2026-10-26): General, Task connection,
+  Policies and People, each at its own address (`/settings/<section>`); the accessibility
+  scan now covers every section.
 - F18 not done: due dates (invoices carry no payment terms in the packs; an SLA would be a
-  policy decision), saved views per person beyond URLs, splitting the tenant settings page,
-  and usability sessions with operators.
+  policy decision), saved views per person beyond URLs, and usability sessions with
+  operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
   always does so. Recorded as a harness property, not changed.
