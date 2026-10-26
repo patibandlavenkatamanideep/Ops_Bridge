@@ -21,6 +21,15 @@ POLICY: ReconciliationPolicy = load_policy_file(
 ).policy
 
 
+def test_model_output_nested_beyond_any_schema_is_rejected_not_raised() -> None:
+    """A compromised model can answer with JSON nested thousands of levels deep; the
+    validators let RecursionError escape and failed the step instead of rejecting the text."""
+    raw = "[" * 100_000 + "]" * 100_000
+    for validate in (validate_explanation, validate_proposal):
+        out, problems = validate(ctx(), raw)
+        assert out is None and problems and "nesting" in problems[0], problems
+
+
 def ctx() -> AgentContext:
     recon = {
         "outcome": "discrepancies_found",
