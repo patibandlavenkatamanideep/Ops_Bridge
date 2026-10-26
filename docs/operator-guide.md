@@ -58,6 +58,11 @@ between them, and your role can differ in each.
 7. **Upload a document** (PDF, text, CSV, JSON) on the Evidence tab if the supplier sent
    something new. A file with the same name becomes a new version.
 
+Every step can be done with the keyboard alone: Tab moves between controls, the arrow keys
+move between the case's tabs, and Enter acts. After an action (running an investigation,
+creating, approving or rejecting a proposal, taking or releasing a case) a status line says
+what happened and keeps your place there.
+
 ## Proposals and approval
 
 An investigator turns the validated draft into a proposal. It shows exactly what will
