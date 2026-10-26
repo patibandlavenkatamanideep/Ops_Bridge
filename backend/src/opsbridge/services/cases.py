@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import and_, or_, select, text
+from sqlalchemy import and_, func, or_, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -18,7 +18,7 @@ from opsbridge.auth.permissions import Forbidden, Principal, require
 from opsbridge.canonical import digest
 from opsbridge.domain import identifiers
 from opsbridge.persistence.db import Database, DbContext
-from opsbridge.persistence.models import Case, User
+from opsbridge.persistence.models import Case, Membership, Operation, Proposal, User
 
 CASE_STATUSES = (
     "new",
@@ -245,6 +245,185 @@ def get_case(db: Database, principal: Principal, case_id: uuid.UUID) -> Case | N
 class QueueItem:
     case: Case
     assignee_name: str | None
+    owner_active: bool = True  # the owner is still an active investigator here
+    awaiting_approval: bool = False  # a proposal waits for a decision
+    needs_review: bool = False  # an operation's outcome is unknown: a person must check it
+
+
+CLOSED_STATUSES = ("resolved", "closed_without_resolution")
+OPEN_STATUSES = tuple(s for s in CASE_STATUSES if s not in CLOSED_STATUSES)
+# Built-in queue views. Each is a URL parameter, so a view can be bookmarked or shared.
+QUEUE_VIEWS = ("all", "mine", "unassigned", "awaiting_approval", "needs_review")
+QUEUE_SORTS = ("newest", "oldest")
+
+
+class OwnerChanged(Exception):
+    """Someone else changed the case's owner since the caller looked."""
+
+    def __init__(self, current: uuid.UUID | None) -> None:
+        super().__init__("owner changed")
+        self.current = current
+
+
+class NotAssignable(Exception):
+    """The case cannot be given to that person, or not in its present state."""
+
+
+def _active_investigator(user_id: Any) -> Any:
+    """`user_id` is an active investigator of the case's own tenant (a member's rows in other
+    tenants are visible to that member, so the tenant is pinned explicitly)."""
+    return (
+        select(Membership.id)
+        .where(
+            Membership.user_id == user_id,
+            Membership.tenant_id == Case.tenant_id,
+            Membership.status == "active",
+            Membership.roles.contains(["investigator"]),
+        )
+        .exists()
+    )
+
+
+def _awaiting_approval() -> Any:
+    return (
+        select(Proposal.id)
+        .where(Proposal.case_id == Case.id, Proposal.status == "awaiting_approval")
+        .exists()
+    )
+
+
+def _needs_review() -> Any:
+    return (
+        select(Operation.id)
+        .where(
+            Operation.case_id == Case.id,
+            Operation.status == "outcome_unknown",
+            Operation.review_required.is_(True),
+        )
+        .exists()
+    )
+
+
+def _view_filter(view: str, principal: Principal) -> Any:
+    if view == "mine":
+        return and_(Case.assignee_id == principal.user_id, Case.status.in_(OPEN_STATUSES))
+    if view == "unassigned":  # nobody, or someone who no longer works here as an investigator
+        return and_(
+            Case.status.in_(OPEN_STATUSES),
+            or_(Case.assignee_id.is_(None), ~_active_investigator(Case.assignee_id)),
+        )
+    if view == "awaiting_approval":
+        return _awaiting_approval()
+    if view == "needs_review":
+        return _needs_review()
+    return text("true")
+
+
+def view_counts(db: Database, principal: Principal) -> dict[str, int]:
+    """How many cases each built-in view holds for this person (all views but `all`)."""
+    ctx = DbContext(tenant_id=principal.tenant_id, user_id=principal.user_id)
+    with db.session(ctx) as s:
+        return {
+            view: int(
+                s.execute(
+                    select(func.count())
+                    .select_from(Case)
+                    .where(_visible_filter(principal), _view_filter(view, principal))
+                ).scalar_one()
+            )
+            for view in QUEUE_VIEWS
+            if view != "all"
+        }
+
+
+def set_owner(
+    db: Database,
+    p: Principal,
+    case_id: uuid.UUID,
+    *,
+    owner_id: uuid.UUID | None,
+    expected_owner_id: uuid.UUID | None,
+    correlation_id: str | None,
+) -> Case:
+    """Take, assign or release a case. `expected_owner_id` is the owner the caller saw: if
+    someone else changed it since, nothing changes (OwnerChanged), so one person's claim is
+    never silently overwritten by another's."""
+    require(p, "case.assign")
+    ctx = DbContext(tenant_id=p.tenant_id, user_id=p.user_id)
+    with db.session(ctx) as s:
+        case = s.execute(
+            select(Case).where(Case.id == case_id, _visible_filter(p)).with_for_update()
+        ).scalar_one_or_none()
+        if case is None:
+            raise LookupError("case")
+        if case.status in CLOSED_STATUSES:
+            raise NotAssignable("A closed case keeps the owner it had.")
+        if case.assignee_id != expected_owner_id:
+            raise OwnerChanged(case.assignee_id)
+        if owner_id is not None:
+            ok = s.execute(
+                select(
+                    select(Membership.id)
+                    .where(
+                        Membership.user_id == owner_id,
+                        Membership.tenant_id == p.tenant_id,
+                        Membership.status == "active",
+                        Membership.roles.contains(["investigator"]),
+                    )
+                    .exists()
+                )
+            ).scalar_one()
+            if not ok:
+                raise NotAssignable(
+                    "Only an active investigator of this organization can own a case."
+                )
+        if case.assignee_id != owner_id:
+            previous = case.assignee_id
+            case.assignee_id = owner_id
+            case.row_version += 1
+            audit.record(
+                s,
+                tenant_id=p.tenant_id,
+                actor_kind="user",
+                actor_id=str(p.user_id),
+                action="case.owner_changed",
+                resource_type="case",
+                resource_id=str(case.id),
+                correlation_id=correlation_id,
+                details={
+                    "from": str(previous) if previous else None,
+                    "to": str(owner_id) if owner_id else None,
+                },
+            )
+            s.flush()
+        s.refresh(case)
+        return case
+
+
+def owner_name(db: Database, p: Principal, owner_id: uuid.UUID | None) -> str | None:
+    if owner_id is None:
+        return None
+    with db.session(DbContext(tenant_id=p.tenant_id, user_id=p.user_id)) as s:
+        user = s.get(User, owner_id)
+        return (user.display_name or user.username) if user else None
+
+
+def assignable_members(db: Database, p: Principal) -> list[dict[str, str]]:
+    """Who a case can be given to: active investigators of this organization."""
+    require(p, "case.assign")
+    ctx = DbContext(tenant_id=p.tenant_id, user_id=p.user_id)
+    with db.session(ctx) as s:
+        rows = s.execute(
+            select(User.id, User.username, User.display_name)
+            .join(Membership, Membership.user_id == User.id)
+            .where(
+                Membership.tenant_id == p.tenant_id,
+                Membership.status == "active",
+                Membership.roles.contains(["investigator"]),
+            )
+            .order_by(User.display_name, User.username)
+        ).all()
+    return [{"id": str(i), "username": u, "display_name": d or u} for i, u, d in rows]
 
 
 def encode_cursor(created_at: datetime, case_id: uuid.UUID) -> str:
@@ -266,13 +445,21 @@ def list_cases(
     search: str | None = None,
     cursor: str | None,
     limit: int,
+    view: str = "all",
+    sort: str = "newest",
 ) -> tuple[list[QueueItem], str | None]:
     ctx = DbContext(tenant_id=principal.tenant_id, user_id=principal.user_id)
     with db.session(ctx) as s:
         q = (
-            select(Case, User.display_name)
+            select(
+                Case,
+                User.display_name,
+                _active_investigator(Case.assignee_id).label("owner_active"),
+                _awaiting_approval().label("awaiting_approval"),
+                _needs_review().label("needs_review"),
+            )
             .outerjoin(User, User.id == Case.assignee_id)
-            .where(_visible_filter(principal))
+            .where(_visible_filter(principal), _view_filter(view, principal))
         )
         if status:
             q = q.where(Case.status == status)
@@ -288,15 +475,28 @@ def list_cases(
                     Case.title.ilike(pattern, escape="\\"),
                 )
             )
+        oldest = sort == "oldest"
         if cursor:
             created_at, cid = decode_cursor(cursor)
             q = q.where(
                 or_(
+                    Case.created_at > created_at, and_(Case.created_at == created_at, Case.id > cid)
+                )
+                if oldest
+                else or_(
                     Case.created_at < created_at, and_(Case.created_at == created_at, Case.id < cid)
                 )
             )
-        rows = s.execute(q.order_by(Case.created_at.desc(), Case.id.desc()).limit(limit + 1)).all()
-        items = [QueueItem(c, name) for c, name in rows[:limit]]
+        order = (
+            (Case.created_at.asc(), Case.id.asc())
+            if oldest
+            else (Case.created_at.desc(), Case.id.desc())
+        )
+        rows = s.execute(q.order_by(*order).limit(limit + 1)).all()
+        items = [
+            QueueItem(c, name, bool(active) or c.assignee_id is None, bool(waiting), bool(review))
+            for c, name, active, waiting, review in rows[:limit]
+        ]
         next_cursor = (
             encode_cursor(items[-1].case.created_at, items[-1].case.id)
             if len(rows) > limit
