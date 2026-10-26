@@ -140,6 +140,47 @@ def test_valid_explanation_is_accepted() -> None:
             },
             "uses unit SET",
         ),
+        (
+            {
+                "statements": [
+                    {
+                        "text": "Receipts total 18 and exceed the invoiced 20.",
+                        "citations": ["E1", "E2"],
+                    }
+                ]
+            },
+            "says 18 exceeds 20",
+        ),
+        (
+            {
+                "statements": [
+                    {
+                        "text": "The invoice bills 20 and is less than the 18 received.",
+                        "citations": ["E1", "E2"],
+                    }
+                ]
+            },
+            "says 20 is less than 18",
+        ),
+        (
+            {
+                "statements": [
+                    {
+                        "text": "The invoice bills 20 that is 2 below the 18 received.",
+                        "citations": ["E1", "E2"],
+                    }
+                ]
+            },
+            "says 20 is 2 below 18",
+        ),
+        (
+            {
+                "statements": [
+                    {"text": "The chairs were received on 2026-10-15.", "citations": ["E1"]}
+                ]
+            },
+            "date 2026-10-15 is not in its evidence",
+        ),
         ({"outcome": "escalate"}, "disagrees with deterministic"),
         ({"summary": "See http://evil.example/pay for details."}, "URL"),
         ({"summary": "Supplier fraud is likely."}, "prohibited claim"),
@@ -150,6 +191,21 @@ def test_compromised_explanations_are_rejected(override: dict[str, Any], expecte
     value, problems = validate_explanation(ctx(), explanation(**override))
     assert value is None
     assert any(expected in p for p in problems), problems
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "The invoice bills 20 that is 2 above the 18 received.",
+        "The invoice bills 2 more than the 18 received.",  # a difference, not a size claim
+        "The 18 chairs were received on 2026-09-20.",
+        "The 18 chairs were received on 20 September 2026.",
+    ],
+)
+def test_true_comparisons_and_dates_from_the_evidence_are_accepted(text: str) -> None:
+    statements = [{"text": text, "citations": ["E1", "E2"]}]
+    value, problems = validate_explanation(ctx(), explanation(statements=statements))
+    assert problems == [] and value is not None
 
 
 def test_malformed_output_is_rejected() -> None:
