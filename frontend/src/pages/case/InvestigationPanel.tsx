@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, apiAs, tenantPath, type Citation, type Finding, type Investigation, type Run } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
+import { useAnnouncement } from "../../components/Announcement";
 import { useSession } from "../../session";
 
 const MODE_LABEL: Record<string, string> = {
@@ -48,15 +49,21 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
     onSuccess: (r) => setRunId(r.run_id),
   });
   const refreshedFor = useRef<string | null>(null);
+  const [notice, announce] = useAnnouncement();
   const finished = run.data?.status === "completed" ? run.data.run_id : null;
+  const failed = run.data?.status === "failed" ? run.data.run_id : null;
   useEffect(() => {
     if (finished && refreshedFor.current !== finished) {
       refreshedFor.current = finished;
       qc.invalidateQueries({ queryKey: ["investigation", tenant, caseId] });
       qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
       qc.invalidateQueries({ queryKey: ["documents", tenant, caseId] });
+      announce("The investigation finished; the new result is below.");
     }
-  }, [finished, qc, tenant, caseId]);
+  }, [finished, qc, tenant, caseId, announce]);
+  useEffect(() => {
+    if (failed) announce("The run failed; nothing was concluded from it. You can run it again.");
+  }, [failed, announce]);
 
   const running = runId !== null && !["completed", "failed"].includes(run.data?.status ?? "");
   const controls = can(tenant, "investigation.run") && (
@@ -83,6 +90,7 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
       <h2 id="inv-title">Investigation</h2>
       {controls}
       {start.isError && <ErrorState error={start.error} />}
+      {notice}
       {runId && run.data && run.data.status !== "completed" && (
         <div className="state" role="status" aria-live="polite">
           <strong>Run {run.data.status}</strong>
