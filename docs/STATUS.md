@@ -944,3 +944,10 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   on an approval screen that means approving what was not shown. Every typed response is now
   checked against its OpenAPI schema (a generated, slimmed copy: under 5 KB gzipped); a
   mismatch shows "the app and server versions differ; reload" instead.
+
+### Negative quantities and prices (2026-10-26)
+- Correcting INV-9001's invoiced quantity to -20 made the case match (the 18 received
+  covered it), which is what resolving the case needs; a source invoice with negative lines
+  (a credit note) matched the same way. Matching now sends any negative quantity or price to
+  manual review (`negative_value`, rules 1.1.0), and corrections refuse negative values.
+- Canary: no case changed, only the rules version; the baseline is updated in its own commit.
