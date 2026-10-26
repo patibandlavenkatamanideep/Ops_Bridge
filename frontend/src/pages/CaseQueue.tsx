@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type QueuePage, type QueueViewCounts } from "../api/client";
+import { ApiError, apiAs, tenantPath, type QueuePage, type QueueViewCounts } from "../api/client";
 import { EmptyState, ErrorState, Loading } from "../components/States";
 import { StatusBadge, formatAge, statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -54,7 +54,7 @@ export function CaseQueue() {
   const views = VIEWS.filter((v) => !v.permission || can(tenant, v.permission));
   const counts = useQuery<QueueViewCounts, ApiError>({
     queryKey: ["case-views", tenant],
-    queryFn: ({ signal }) => api<QueueViewCounts>(tenantPath(tenant, "/cases/views"), { signal }),
+    queryFn: ({ signal }) => apiAs("QueueViewCounts", tenantPath(tenant, "/cases/views"), { signal }),
   });
   const query = useInfiniteQuery<QueuePage, ApiError>({
     queryKey: ["cases", tenant, view, status, sort, term],
@@ -66,7 +66,7 @@ export function CaseQueue() {
       if (sort !== "newest") q.set("sort", sort);
       if (term) q.set("q", term);
       if (pageParam) q.set("cursor", pageParam as string);
-      return api<QueuePage>(tenantPath(tenant, `/cases?${q}`), { signal });
+      return apiAs("QueuePage", tenantPath(tenant, `/cases?${q}`), { signal });
     },
     getNextPageParam: (last) => last.next_cursor,
   });
