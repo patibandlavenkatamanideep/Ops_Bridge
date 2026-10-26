@@ -951,3 +951,9 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   (a credit note) matched the same way. Matching now sends any negative quantity or price to
   manual review (`negative_value`, rules 1.1.0), and corrections refuse negative values.
 - Canary: no case changed, only the rules version; the baseline is updated in its own commit.
+
+### Tenant settings split by responsibility (2026-10-26, F18)
+- One long page held tenant facts, investigation and retention settings, the task connection,
+  connector health, policies, members and invitations. It is now four sections (General,
+  Task connection, Policies, People), each at its own address; the accessibility scan covers
+  every section.
