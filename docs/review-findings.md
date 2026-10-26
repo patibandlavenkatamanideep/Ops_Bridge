@@ -72,6 +72,10 @@ Not covered:
   fixed with request deadlines, also through the hop). With keys, as in that test, the resend
   is safe and the task is then confirmed by read-back instead of by marker, which is what the
   test's method assertion rejects: a timing-dependent test, not a duplicate. Left as is.
+- Also once under load (an integration run while the dev stack and a browser run were busy;
+  not in the next full gate, not in isolation): `test_denied_records_calls[forged_delegation]`
+  failed. Its output was not kept, so the cause is not known; a transport timeout instead of
+  the expected denial is the likely one. Watch for it in CI.
 
 ## What changed, and what it does not cover
 
@@ -131,9 +135,16 @@ Not covered:
   these roles, prose without numbers. Structured claim-to-finding output would need a new
   prompt version and therefore a new benchmark (the frozen recordings would no longer
   replay); not done.
-- F18 not done: saved queue views, owner/due-date filters (no due dates are modelled),
-  splitting the tenant settings page, runtime validation of successful API responses, and
-  usability sessions with operators.
+- F18, queue ownership and views (2026-10-25): a case can be taken, handed to another
+  investigator or released (`POST /cases/{id}/owner`, refused when the owner changed since
+  the caller looked; audited); the queue has views *Mine*, *Unassigned* (including owners
+  who left), *Awaiting approval* and *Needs review* (the recovery view for unknown
+  outcomes) with counts, oldest-first order, and keeps view, filters and order in the URL.
+  Before, nothing could set a case's owner. Tests: `tests/integration/test_case_ownership.py`
+  (5), a queue unit test, `e2e/queue.spec.ts`.
+- F18 not done: due dates (invoices carry no payment terms in the packs; an SLA would be a
+  policy decision), saved views per person beyond URLs, splitting the tenant settings page,
+  runtime validation of successful API responses, and usability sessions with operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
   always does so. Recorded as a harness property, not changed.
