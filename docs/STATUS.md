@@ -905,3 +905,14 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   through the MCP hop). Finding nothing proves absence only once the deadline plus a clock
   allowance has passed and the tracker honours deadlines (the simulator refuses late
   creates); before that the job looks again later; a tracker without deadlines goes to review.
+
+### Case ownership and queue views (2026-10-25)
+- Nothing could make a person a case's owner; the queue's owner column was always empty.
+  Investigators can now take, hand over and release cases; a change made on a stale view is
+  refused rather than overwriting someone else's claim; closed cases keep their owner; every
+  change is audited.
+- The queue has views (Mine, Unassigned, Awaiting approval, Needs review) with counts, an
+  oldest-first order, flags for proposals awaiting a decision and operations needing a human
+  check, and keeps its state in the URL. Needs review is the recovery view for operations
+  whose outcome is unknown.
+- Not done: due dates (no payment terms in the source data), per-person saved views.
