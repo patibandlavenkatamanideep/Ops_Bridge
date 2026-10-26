@@ -200,6 +200,21 @@ def test_chunked_body_without_length_is_refused_before_buffering(stack) -> None:
     assert r.status_code == 411 and r.json()["error"]["code"] == "length_required"
 
 
+def test_a_request_body_nested_too_deeply_is_refused_not_an_error(stack) -> None:  # type: ignore[no-untyped-def]
+    """JSON nested beyond the interpreter's recursion limit: the framework's body parsing
+    already refuses it (a guard, so a change of framework or parser cannot turn it into a 500)."""
+    st = stack
+    actor = st["actors"]["furn-investigator"]
+    st["client"].cookies.clear()
+    st["client"].cookies.set("opsbridge_session", actor.token)
+    r = st["client"].post(
+        f"{T}/cases",
+        content=b'{"title": ' + b"[" * 100_000 + b"]" * 100_000 + b"}",
+        headers={"X-CSRF-Token": actor.csrf, "content-type": "application/json"},
+    )
+    assert r.status_code == 400, r.text
+
+
 def test_original_downloads_are_never_cached_or_rendered_inline(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id = investigated(st, "INV-9001")
