@@ -388,6 +388,8 @@ Phase 1 exit gate evidence:
 - Application processes must have synchronized clocks (NTP); comparisons against
   database-written timestamps use the database clock (found when the Podman VM clock drifted
   3 h 44 min after the laptop slept; fixed for quotas and retention).
+- Service and delegation tokens may say they were issued up to 30 s after an MCP service's
+  clock reads (as sign-in allows); a larger difference refuses every call until clocks agree.
 
 ## Next executable task
 
@@ -964,3 +966,13 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   action whose button goes away or is disabled (run, create proposal, approve or reject, take
   or release, cancel or review), so keyboard and screen-reader users lost their place. A
   status line now says what happened and takes focus.
+
+### MCP services refused fresh service tokens at random (2026-10-27, X7)
+- Keycloak's clock (in the Podman VM) ran up to 9 ms ahead of the host's. A worker token used
+  the moment it was issued could carry an issue time just in the future, and the MCP services'
+  verifier allowed no difference: 2 of 200 fresh tokens were refused with a 401. The worker saw
+  a transport error, so a create became an outcome it did not know. It explains the MCP
+  integration failures seen as a transport error or as a missing denial (not the
+  reconcile-by-marker one, which is timing). Issue and not-before times may now
+  run up to 30 s ahead; expiry is not stretched. On a real MCP server with a new token per
+  call: 11 of 1,200 calls failed before, 0 of 1,200 after.
