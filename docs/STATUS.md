@@ -399,8 +399,8 @@ blockers in `docs/production-readiness.md`):
 1. Done locally: A01 and A02, business-input integrity (validation boundary, migration 0019).
 2. Done locally: A03, versioned evaluation scoring (scoring 2 reports action, correctness
    and outcome disagreement separately; scoring 1 kept for the frozen v1 runs).
-3. Next: A05 one admission contract for executor and Casework MCP; A04 streaming response
-   bounds; A06 public-only verifiers and tenant-owned credential references; A13 behavioural
+3. Done locally: A05, one admission contract for the executor and the Casework MCP tool.
+   Next: A04 streaming response bounds; A06 public-only verifiers and tenant-owned credential references; A13 behavioural
    replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
 4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
    model budget and independent labellers (A09, A10); a cloud account (A11); applying branch
@@ -1014,3 +1014,17 @@ staging, pilot owner).
   measured. `opsbridge eval-rescore` reads a recorded run under another scheme, printing only.
 - Recorded v1 runs under scoring 2: no disagreement on any axis (deterministic rules and
   mock). Tests: `tests/evaluation/test_metrics_scoring2.py` (7).
+
+### One admission contract for executor and Casework MCP (2026-10-27, production review A05)
+- The casework tool admitted creates with weaker checks than the executor: a create
+  delayed past an approval expiry, a cancellation or an evidence correction still landed; a
+  replayed request made extra tasks; the text was re-rendered with the tool's own redactor;
+  revoking the approver blocked reconciliation of a task already sent.
+- Shared admission (`services/execution_admission.py`); the tool admits each executor
+  attempt once (migration 0020, `attempts.admitted_at`), sends the sealed text to the
+  approved destination only, and recovers admitted writes without the approver's current
+  authority. A person's review of an unknown outcome completes the operation like the
+  executor (case, outbox). Tests: `test_casework_admission.py` (10),
+  `test_unknown_outcome_review.py` (2).
+- Correction: migration 0019 had not reached the evaluation database (a shell quoting
+  mistake sent every `-x db=` upgrade to the development database); it has now.
