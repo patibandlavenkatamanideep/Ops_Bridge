@@ -958,7 +958,7 @@ def test_a_local_action_takes_effect_once_even_if_the_worker_dies_while_completi
     case_id, prop = prepared(st, "INV-9009")
     assert prop["action_type"] == "create_supplier_message_draft"
     assert approve(st, case_id, prop).status_code == 200
-    real = execution._finish
+    real = execution.finish_operation
 
     def dies_confirming(s: Any, op: Any, status: str, **kw: Any) -> None:
         if status == "confirmed":
@@ -969,10 +969,10 @@ def test_a_local_action_takes_effect_once_even_if_the_worker_dies_while_completi
         items = get(st, "furn-investigator", f"{T}/cases/{case_id}/messages").json()["items"]
         return [m for m in items if (m["body"] or "").startswith("Supplier message DRAFT")]
 
-    monkeypatch.setattr(execution, "_finish", dies_confirming)
+    monkeypatch.setattr(execution, "finish_operation", dies_confirming)
     with pytest.raises(SimulatedCrash):
         st["worker"].run_once()
-    monkeypatch.setattr(execution, "_finish", real)
+    monkeypatch.setattr(execution, "finish_operation", real)
     assert drafts() == []  # nothing is applied without the operation's confirmation
     expire_attempts_and_leases(worker_db)
     drain(st)
