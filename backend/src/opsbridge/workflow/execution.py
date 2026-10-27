@@ -30,7 +30,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -46,6 +46,7 @@ from opsbridge.connectors.tasks import (
     ConnectorUnavailable,
     DefiniteFailure,
     LookupUnavailable,
+    NotAdmitted,
     RemoteTask,
     TaskConnector,
     TaskRequest,
@@ -54,7 +55,6 @@ from opsbridge.evidence.blobs import store_bytes
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
-    ApprovalDecision,
     Artifact,
     Attempt,
     Case,
@@ -63,6 +63,7 @@ from opsbridge.persistence.models import (
     OutboxEvent,
     Proposal,
 )
+from opsbridge.services import execution_admission as admission
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
 
@@ -96,7 +97,7 @@ def _now() -> datetime:
 
 
 def marker_for(op: Operation) -> str:
-    return f"opsbridge-op:{op.operation_key}"
+    return admission.marker(op.operation_key)
 
 
 def _guard(s: Session, job: jobs.ClaimedJob) -> None:
@@ -172,27 +173,28 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
 
 def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
     """Finish the operation instead of a new write if it was cancelled or is no longer
-    eligible; True when finished."""
-    if op.cancellation == "requested":
-        _finish(
+    eligible (services/execution_admission.py, shared with the casework tool); True when
+    finished."""
+    refused = admission.refusal(s, op)
+    if refused is None:
+        return False
+    if refused.category == "cancelled_by_user":
+        finish_operation(
             s,
             op,
             "cancelled_before_dispatch",
             category="cancelled_by_user",
             cancellation="confirmed",
         )
-        return True
-    problems = _revalidate(s, op)
-    if problems:
-        _finish(
+    else:
+        finish_operation(
             s,
             op,
             "cancelled_before_dispatch",
             category="precondition_failed",
-            detail="; ".join(problems),
+            detail=refused.detail,
         )
-        return True
-    return False
+    return True
 
 
 def _refused_now(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> bool:
@@ -220,38 +222,6 @@ def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
     }
 
 
-def _revalidate(s: Session, op: Operation) -> list[str]:
-    from opsbridge.services.proposals import approver_still_authorized, check_current, payload_of
-
-    problems = []
-    pr = s.get(Proposal, op.proposal_id)
-    ad = s.get(ApprovalDecision, op.approval_id)
-    # Corrections and uploads hold this lock: a change committed first is seen here, and one
-    # waiting here lands after the dispatch decision.
-    case = s.execute(
-        select(Case).where(Case.id == op.case_id).with_for_update()
-    ).scalar_one_or_none()
-    if pr is None or ad is None or case is None:
-        return ["proposal, approval or case missing"]
-    if pr.status != "approved":
-        problems.append(f"proposal is {pr.status}")
-    if (
-        ad.decision != "approved"
-        or ad.payload_digest != pr.payload_digest
-        or op.payload_digest != pr.payload_digest
-    ):
-        problems.append("approval is not bound to this payload")
-    if digest(payload_of(pr)) != op.payload_digest:
-        problems.append("operation payload does not match the approved digest")
-    if ad.expires_at <= _now():
-        problems.append("approval expired before dispatch")
-    if not approver_still_authorized(s, op.tenant_id, ad.approver_id, op.action_type):
-        problems.append("approver no longer holds approval authority for this action")
-    stale = check_current(s, case, pr)
-    problems += stale.reasons
-    return problems
-
-
 _AUDIT_OUTCOME = {
     "confirmed": "ok",
     "outcome_unknown": "unknown",
@@ -259,7 +229,7 @@ _AUDIT_OUTCOME = {
 }
 
 
-def _finish(
+def finish_operation(
     s: Session,
     op: Operation,
     status: str,
@@ -270,8 +240,14 @@ def _finish(
     confirmation: dict[str, Any] | None = None,
     cancellation: str | None = None,
     review: bool = False,
+    actor: tuple[str, str] = ("service", EXECUTOR),
+    count: bool = True,
 ) -> None:
-    if status in TERMINAL:
+    """Set an operation's outcome and everything that follows from it (case transition,
+    proposal, outbox, audit, metrics), for the executor and for a person's review alike.
+    `count` is False when the operation was already counted as finished (a review of an
+    unknown outcome)."""
+    if status in TERMINAL and count:
         elapsed = (_now() - op.created_at).total_seconds()
         connector = op.connector
 
@@ -315,9 +291,9 @@ def _finish(
     audit.record(
         s,
         tenant_id=op.tenant_id,
-        actor_kind="service",
-        actor_id=EXECUTOR,
-        on_behalf_of=op.approved_by,
+        actor_kind=actor[0],
+        actor_id=actor[1],
+        on_behalf_of=op.approved_by if actor[0] == "service" else None,
         action=f"operation.{status}",
         resource_type="operation",
         resource_id=str(op.id),
@@ -457,20 +433,12 @@ def _complete(
         op = s.execute(
             select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
         ).scalar_one()
-        _finish(s, op, status, **kw)
+        finish_operation(s, op, status, **kw)
 
 
 def _task_request(snap: dict[str, Any], deadline: float | None = None) -> TaskRequest:
-    # Exactly the approved outbound text (re-checked before this write); the marker line lets
-    # reconciliation find the task.
-    out = snap["payload"]["outbound"]
-    return TaskRequest(
-        title=out["title"],
-        body=f"{out['body']}\n\nOpsBridge operation marker: {snap['marker']}",
-        assignee_group=out["assignee_group"],
-        marker=snap["marker"],
-        deadline=deadline,
-    )
+    # Exactly the approved outbound text (re-checked before this write).
+    return admission.approved_request(snap["payload"], snap["operation_key"], deadline=deadline)
 
 
 def _remote_dict(t: RemoteTask) -> dict[str, Any]:
@@ -497,8 +465,24 @@ def _create(
     attempt_id = _new_attempt(
         deps, job, snap, "dispatch", "create_follow_up_task", args, connector.version, deadline
     )
+    # A boundary behind another hop admits this attempt once (casework MCP).
+    req = replace(req, attempt_id=str(attempt_id))
     try:
         task = connector.create(req, key, deps.timeout_seconds)
+    except NotAdmitted as exc:
+        # The write boundary refused it when the request reached it: nothing was sent. The
+        # executor's own admission, run again, finishes the operation with the same reasons.
+        _close_attempt(
+            deps,
+            snap["tenant_id"],
+            attempt_id,
+            "definite_failure",
+            category="not_admitted",
+            detail=str(exc),
+        )
+        if not _refused_now(deps, job, snap):
+            _complete(deps, job, snap, "failed", category="not_admitted", detail=str(exc))
+        return
     except DefiniteFailure as exc:
         _close_attempt(
             deps,
@@ -811,7 +795,7 @@ def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, An
                 payload=output,
             )
         )
-        _finish(
+        finish_operation(
             s,
             op,
             "confirmed",
@@ -837,8 +821,8 @@ def mark_unknown_after_exhaustion(db: Database, job: jobs.ClaimedJob, error: str
             is not None
         )
         if op.status == "pending_dispatch" and not attempted:
-            _finish(s, op, "failed", category="dispatch_exhausted", detail=error)
+            finish_operation(s, op, "failed", category="dispatch_exhausted", detail=error)
         else:
-            _finish(
+            finish_operation(
                 s, op, "outcome_unknown", category="dispatch_exhausted", detail=error, review=True
             )
