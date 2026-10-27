@@ -53,9 +53,11 @@ class Guard:
         self,
         ctx: Context,
         tool: str,
-        permission: str,
+        permission: str | None,
         extra: Callable[[CallContext], str | None] | None = None,
     ) -> CallContext:
+        """`permission` is the principal's CURRENT permission the tool needs; None for a tool
+        whose authority is checked otherwise (recovering a write already admitted)."""
         token = get_access_token()
         if token is None:  # the bearer middleware normally rejects first; defence in depth
             raise ToolDenied("no service identity")
@@ -77,7 +79,7 @@ class Guard:
                 )
             ).scalar_one_or_none()
             perms = permissions_for(list(m.roles)) if m else frozenset()
-        if permission not in perms:
+        if permission is not None and permission not in perms:
             self._audit(d, token.client_id, tool, "denied", f"principal lacks {permission}")
             raise ToolDenied(f"the delegated principal lacks {permission}")
         cc = CallContext(token.client_id, d, perms)
