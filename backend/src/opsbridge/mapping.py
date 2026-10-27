@@ -13,15 +13,15 @@ from __future__ import annotations
 
 import dataclasses
 import re
-from collections import defaultdict
+from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from opsbridge.domain.money import DecimalParseError, parse_decimal
+from opsbridge.domain.money import MATCH_CONTEXT, DecimalParseError, parse_decimal
 from opsbridge.domain.records import (
     GoodsReceipt,
     Invoice,
@@ -32,6 +32,14 @@ from opsbridge.domain.records import (
     ReceiptLine,
     SourceRef,
     SupplierAssertion,
+)
+from opsbridge.domain.validation import (
+    Problem,
+    allocation_problems,
+    invoice_problems,
+    norm_id,
+    purchase_order_problems,
+    receipt_problems,
 )
 from opsbridge.evidence.parsers import ParsedDocument
 
@@ -281,7 +289,12 @@ def map_document(
         _map_pdf_text(spec, record_type, parsed, doc, out)
     else:
         _map_text(spec, record_type, parsed, doc, out)
+    _refuse_invalid(out)
     return out
+
+
+def _incomplete(out: MappingResult, key: str) -> None:
+    out.problems.append(f"{key}: not used, because a line could not be read")
 
 
 # --- JSON ------------------------------------------------------------------------------
@@ -319,13 +332,20 @@ def _map_json(
         refs: dict[str, SourceRef] = {}
         header = reader.read(spec.record, getter, prefix, key_hint, refs)
         lines: list[tuple[dict[str, Any], dict[str, SourceRef]]] = []
+        complete = True
         if spec.lines is not None and spec.lines.path:
             try:
                 arr, sub = _json_get(rec, spec.lines.path)
             except _Missing:
                 out.problems.append(f"{key_hint}: missing lines array {spec.lines.path}")
                 continue
-            for li, line_rec in enumerate(arr if isinstance(arr, list) else []):
+            if not isinstance(arr, list):
+                # An object, null or text is not "no lines": nothing could be read from it.
+                out.problems.append(
+                    f"{key_hint}: lines {spec.lines.path} is {type(arr).__name__}, not a list"
+                )
+                continue
+            for li, line_rec in enumerate(arr):
                 lptr = f"{ptr}{sub}/{li}"
 
                 def lgetter(
@@ -342,7 +362,11 @@ def _map_json(
                 )
                 if lv is not None:
                     lines.append((lv, lrefs))
-        if header is not None:
+                else:
+                    complete = False
+        if header is not None and not complete:
+            _incomplete(out, key_hint)
+        elif header is not None:
             _build(rtype, header, refs, lines, out)
 
 
@@ -371,6 +395,7 @@ def _map_csv(
         refs: dict[str, SourceRef] = {}
         header = reader.read(spec.record, getter, _prefix(rtype), f"{rtype}:{key}", refs)
         lines = []
+        complete = True
         if spec.lines is not None:
             for rn, row in members:
 
@@ -387,7 +412,11 @@ def _map_csv(
                 )
                 if lv is not None:
                     lines.append((lv, lrefs))
-        if header is not None:
+                else:
+                    complete = False
+        if header is not None and not complete:
+            _incomplete(out, f"{rtype}:{key}")
+        elif header is not None:
             _build(rtype, header, refs, lines, out)
 
 
@@ -418,6 +447,7 @@ def _map_pdf_text(
     refs: dict[str, SourceRef] = {}
     header = reader.read(spec.record, getter, _prefix(rtype), rtype, refs)
     lines = []
+    complete = True
     amounts: list[tuple[Decimal, Decimal, Decimal, Decimal]] = []
     if spec.lines is not None and spec.lines.pattern:
         rx = re.compile(spec.lines.pattern)
@@ -439,7 +469,9 @@ def _map_pdf_text(
             lv = reader.read(
                 spec.lines.record, lgetter, _line_prefix(rtype), f"{rtype}:{tl.locator}", lrefs
             )
-            if lv is not None:
+            if lv is None:
+                complete = False
+            else:
                 lines.append((lv, lrefs))
                 if "amount" in groups and groups.get("amount"):
                     try:
@@ -455,18 +487,19 @@ def _map_pdf_text(
                         out.problems.append(f"{rtype}: unreadable line amount at {tl.locator}")
     if spec.amount_check:
         issues = []
-        for qty, price, disc, amount in amounts:
-            if qty * price - disc != amount:
-                issues.append(f"line amount {amount} != {qty} x {price} - {disc}")
-        total_raw = found.get("total")
-        if total_raw is not None:
-            try:
-                if sum((a[3] for a in amounts), Decimal(0)) != parse_decimal(total_raw[0]):
-                    issues.append("line amounts do not sum to the invoice total")
-            except DecimalParseError:
-                issues.append("invoice total unreadable")
-        else:
-            issues.append("invoice total not found")
+        with localcontext(MATCH_CONTEXT):  # exact at the largest admitted values
+            for qty, price, disc, amount in amounts:
+                if qty * price - disc != amount:
+                    issues.append(f"line amount {amount} != {qty} x {price} - {disc}")
+            total_raw = found.get("total")
+            if total_raw is not None:
+                try:
+                    if sum((a[3] for a in amounts), Decimal(0)) != parse_decimal(total_raw[0]):
+                        issues.append("line amounts do not sum to the invoice total")
+                except DecimalParseError:
+                    issues.append("invoice total unreadable")
+            else:
+                issues.append("invoice total not found")
         if not lines:
             issues.append("no invoice lines recognized")
         if issues:
@@ -475,7 +508,9 @@ def _map_pdf_text(
                 fv.note = "; ".join(issues)
             out.problems.extend(f"{rtype}: {i}" for i in issues)
             return
-    if header is not None:
+    if header is not None and not complete:
+        _incomplete(out, rtype)
+    elif header is not None:
         _build(rtype, header, refs, lines, out)
 
 
@@ -641,3 +676,68 @@ def _build(
                 refs={k: v for k, v in refs.items() if k == "allocation.quantity"},
             )
         )
+
+
+def _keep_valid(
+    out: MappingResult,
+    records: list[Any],
+    what: str,
+    name: Any,
+    problems_of: Any,
+    identity: Any = None,
+) -> list[Any]:
+    """The records that pass the canonical checks; the rest are reported, not built."""
+    counts = Counter(identity(r) for r in records) if identity else Counter()
+    kept = []
+    reported: set[Any] = set()
+    for r in records:
+        if identity and counts[identity(r)] > 1:
+            # Stored one after the other, the later copy would silently supersede the other.
+            if identity(r) not in reported:
+                reported.add(identity(r))
+                out.problems.append(
+                    f"{what} {name(r)}: appears {counts[identity(r)]} times in this document; "
+                    "none was used"
+                )
+            continue
+        found: list[Problem] = problems_of(r)
+        if found:
+            out.problems.extend(f"{what} {name(r)}: {p.detail}" for p in found)
+            continue
+        kept.append(r)
+    return kept
+
+
+def _refuse_invalid(out: MappingResult) -> None:
+    """Build no record the matcher could not trust (domain/validation.py)."""
+    out.purchase_orders = _keep_valid(
+        out,
+        out.purchase_orders,
+        "purchase order",
+        lambda p: p.po_number,
+        purchase_order_problems,
+        lambda p: norm_id(p.po_number),
+    )
+    out.invoices = _keep_valid(
+        out,
+        out.invoices,
+        "invoice",
+        lambda i: i.invoice_number,
+        invoice_problems,
+        lambda i: (norm_id(i.invoice_number), norm_id(i.supplier_id)),
+    )
+    out.receipts = _keep_valid(
+        out,
+        out.receipts,
+        "goods receipt",
+        lambda g: g.receipt_number,
+        receipt_problems,
+        lambda g: norm_id(g.receipt_number),
+    )
+    out.allocations = _keep_valid(
+        out,
+        out.allocations,
+        "allocation",
+        lambda a: f"{a.invoice_number} to {a.po_number} line {a.po_line_number}",
+        allocation_problems,
+    )
