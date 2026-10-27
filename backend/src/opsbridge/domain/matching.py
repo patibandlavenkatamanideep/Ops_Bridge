@@ -13,10 +13,10 @@ import difflib
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import Literal
 
-from .money import decimal_str, quantize
+from .money import MATCH_CONTEXT, decimal_str, quantize
 from .policy import ReconciliationPolicy
 from .records import (
     Invoice,
@@ -28,8 +28,10 @@ from .records import (
     Supplier,
 )
 from .units import canonical_unit, conversion_factor
+from .validation import Problem, match_input_problems
+from .validation import norm_id as _norm_id
 
-RULES_VERSION = "opsbridge-rules/1.1.0"
+RULES_VERSION = "opsbridge-rules/1.2.0"
 
 FindingType = Literal[
     "missing_receipt",
@@ -94,13 +96,6 @@ class MatchResult:
 
     def of_type(self, finding_type: FindingType) -> list[Finding]:
         return [f for f in self.findings if f.finding_type == finding_type]
-
-
-def _norm_id(value: str | None) -> str | None:
-    if value is None:
-        return None
-    v = value.strip().upper()
-    return v or None
 
 
 _NAME_NOISE = re.compile(r"[^a-z0-9 ]+")
@@ -169,8 +164,49 @@ def _outcome(findings: list[Finding]) -> Outcome:
     return "matched"
 
 
+_INPUT_HEADLINES = {
+    "record_lines_missing": "A record has no lines, so nothing on it can be checked",
+    "line_identity_duplicate": "Lines share an identity, so which one applies is ambiguous",
+    "record_identity_duplicate": "A record appears more than once and would be counted twice",
+    "status_unsupported": "A status or kind is outside the supported set",
+    "value_unsupported": "A quantity or price is outside the supported input",
+    "discount_unsupported": "A discount is negative or exceeds its line",
+    "identifier_invalid": "An identifier is missing or cannot be stored",
+}
+
+
+def _input_findings(problems: list[Problem]) -> list[Finding]:
+    """One review finding per kind of input problem, naming each occurrence."""
+    by_code: dict[str, list[Problem]] = defaultdict(list)
+    for p in problems:
+        by_code[p.code].append(p)
+    out = []
+    for code, group in by_code.items():
+        details = "; ".join(p.detail for p in group)[:600]
+        evidence: list[SourceRef] = []
+        for p in group:
+            evidence += [r for r in p.evidence if r not in evidence]
+        out.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                code,
+                f"{_INPUT_HEADLINES[code]}: {details}. Nothing was concluded; a person must "
+                "review the source records.",
+                values={"problems": details},
+                evidence=tuple(evidence),
+            )
+        )
+    return out
+
+
 def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
     """Evaluate an invoice against its PO, receipts and prior allocations."""
+    with localcontext(MATCH_CONTEXT):
+        return _reconcile(data, policy)
+
+
+def _reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
     findings: list[Finding] = []
     invoice = data.invoice
 
@@ -183,6 +219,13 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
             resolved_po_number=po,
             resolved_supplier_id=supplier,
         )
+
+    # Input the canonical checks refuse (validation.py) is not evaluated at all: a rule that
+    # cannot read a record finds nothing wrong with it, and "nothing found" reads as a match.
+    problems = match_input_problems(data)
+    if problems:
+        findings.extend(_input_findings(problems))
+        return done()
 
     if invoice.status == "cancelled":
         findings.append(
@@ -305,7 +348,21 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
         )
         return done(po.po_number, po.supplier_id)
 
-    # 4. Resolve invoice lines to PO lines by exact identifiers.
+    # 4. Resolve invoice lines to PO lines by exact identifiers (unique: validation.py).
+    if all(line.kind == "charge" for line in invoice.lines):
+        # Charges are excluded from matching, so nothing on this invoice would be checked.
+        findings.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                "goods_lines_absent",
+                f"Invoice {invoice.invoice_number} has only charge lines; charges are not "
+                "matched against the purchase order, so a person must review it.",
+                invoice_line_numbers=tuple(line.line_number for line in invoice.lines),
+                evidence=tuple(r for line in invoice.lines for r in line.refs.values()),
+            )
+        )
+        return done(po.po_number, po.supplier_id)
     po_lines = {_norm_id(line.line_number): line for line in po.lines}
     by_po_line: dict[str, list[InvoiceLine]] = defaultdict(list)
     charges: list[InvoiceLine] = []
