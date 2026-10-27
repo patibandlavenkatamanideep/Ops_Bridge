@@ -393,11 +393,22 @@ Phase 1 exit gate evidence:
 
 ## Next executable task
 
-The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
-review and, if you choose, merge the open PR (#3 at the time of writing; merging is yours); with authorization, the live
-GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
-pilot owner. Local improvement that needs no authorization: the next supplier invoice
-layout for the furniture pack (from approved real samples, not the held-out layout).
+Work plan from the production review of 2026-10-27 (findings A01–A18; matrix, evidence and
+blockers in `docs/production-readiness.md`):
+
+1. Done locally: A01 and A02, business-input integrity (validation boundary, migration 0019).
+2. Next: A03, versioned evaluation metrics (action, correctness and outcome disagreement
+   reported separately; scoring 1 kept for the frozen v1 runs).
+3. Then: A05 one admission contract for executor and Casework MCP; A04 streaming response
+   bounds; A06 public-only verifiers and tenant-owned credential references; A13 behavioural
+   replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
+4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
+   model budget and independent labellers (A09, A10); a cloud account (A11); applying branch
+   rules (A12); operator sessions (A14); a deprovisioning policy (A16).
+
+Earlier plan (2026-10-16), kept for history: the locally achievable build was complete;
+remaining work needed the owner (live GitHub sandbox test, recorded real-model benchmark,
+staging, pilot owner).
 
 ### After-handoff hardening (2026-10-16)
 - Per-organization quotas: investigations per hour (429 `quota_exceeded`, `Retry-After`) and
@@ -976,3 +987,20 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   reconcile-by-marker one, which is timing). Issue and not-before times may now
   run up to 30 s ahead; expiry is not stretched. On a real MCP server with a new token per
   call: 11 of 1,200 calls failed before, 0 of 1,200 after.
+
+### Business-input integrity (2026-10-27, production review A01, A02)
+- An invoice whose lines were an object, null, text or an empty list matched and its case
+  could be resolved; an unreadable line was dropped and the rest matched; two PO lines named
+  "1" kept whichever came last; a receipt listed twice counted twice; a receipt whose return
+  line could not be read still counted the goods as received. Python's default 28-digit
+  context also rounded two different 30-digit totals to the same value.
+- One validation boundary (`domain/validation.py`) used by the mapping (no record is built
+  from incomplete or ambiguous data) and by `reconcile` (nothing is concluded from such
+  input, however it was built); exact 80-digit matching arithmetic; charges-only invoices
+  reviewed; rules `opsbridge-rules/1.2.0`. An investigation does not conclude while a decisive
+  document of the case could not be read completely. Migration 0019: one line per identity
+  on a PO or invoice; existing duplicates stop the upgrade with a list, nothing is deleted.
+- Tests: `tests/domain/test_input_integrity.py` (26), `tests/evidence/test_mapping_integrity.py`
+  (9), `tests/integration/test_input_integrity.py` (7, through the API: resolution refused),
+  `tests/integration/test_migration_0019.py` (refusal under RLS, upgrade, guard, downgrade).
+  Canary 64/64 unchanged; benchmark replay reproduces every recorded run.
