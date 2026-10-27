@@ -775,21 +775,29 @@ def review_unknown_outcome(
             raise NotFound("operation")
         if op.status != "outcome_unknown":
             raise Conflict("invalid_state", "Only operations with an unknown outcome need review.")
+        from opsbridge.workflow.execution import finish_operation
+
+        # The same completion as the executor's (case, proposal, outbox, audit), by this
+        # person; the confirmation says it is their finding, not proof from the provider.
+        # Counted once already, when it finished as unknown.
+        by = ("user", str(p.user_id))
         if finding == "exists":
             if not remote_ref:
                 raise Conflict("invalid_parameters", "Provide the remote reference you found.")
-            op.status, op.remote_ref = "confirmed", remote_ref
-            op.confirmation = {
+            confirmation = {
                 "method": "human_review",
                 "reviewer": str(p.user_id),
                 "note": note[:500],
                 "at": _now().isoformat(),
             }
+            finish_operation(
+                s, op, "confirmed", remote_ref=remote_ref, confirmation=confirmation,
+                actor=by, count=False,
+            )  # fmt: skip
         else:
-            op.status = "failed"
-            op.failure_category = "verified_absent_by_human_review"
-        op.review_required = False
-        op.row_version += 1
+            finish_operation(
+                s, op, "failed", category="verified_absent_by_human_review", actor=by, count=False
+            )
         audit.record(
             s,
             tenant_id=p.tenant_id,
