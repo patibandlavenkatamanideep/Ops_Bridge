@@ -269,6 +269,11 @@ def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> Non
     # every committed run was graded under the current frozen plan and scoring
     assert all(r["comparability"]["comparable"] for r in runs)
     assert detail["comparability"] == {"comparable": True, "reasons": [], "note": None}
+    # v1 is graded under its frozen scoring 1, and says what that scoring's instability was
+    assert detail["scoring_scheme"] == "opsbridge-scoring/1"
+    assert {r["scoring_scheme"] for r in runs} == {"opsbridge-scoring/1"}
+    note = detail["modes"]["rules_only"]["instability_note"]
+    assert "whether the next action was correct, not in the action itself" in note
     cases = detail["modes"]["rules_only"]["pack_cases"]
     assert cases and all(c["case_id"].startswith("fur-") for c in cases)  # no IT-pack case detail
     assert detail["modes"]["rules_only"]["n_cases"] == 40  # aggregates cover the whole benchmark
