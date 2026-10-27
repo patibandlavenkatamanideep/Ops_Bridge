@@ -27,7 +27,7 @@ Nothing here has reached sandbox, staging or pilot.
 |---|---|---|---|---|---|
 | A01 | Malformed or empty invoice lines became a clean match, and the case could be resolved | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
-| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | In progress | 4 | Reproduced on this branch (`metrics.per_case` feeds binary correctness to `flip_rate`) | — |
+| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1) | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Open, confirmed on this branch (`connectors/purchasing.py::_get`) | 3 | — | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Open, confirmed statically on this branch (`mcp_services/casework.py`) | 2 | — | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Open, confirmed on this branch (`factory.verifier`, `services/connections.credential`) | 3 | — | — |
@@ -111,9 +111,47 @@ modes, security 7/7. No cassette was re-recorded.
 excluded tax and shipping lines remain "charges" disclosed by a note; precision limits are
 those of the input contract, not of any real source (none is integrated).
 
+## Package 4, metrics: versioned scoring (A03)
+
+**Reproduced**: the review's probe (expected a task; repeats gave escalate, ask, escalate)
+reports a flip rate of 0 and no case with any flip under scoring 1: it measured whether the
+next action was *correct*, not the action. Scoring 1 also took a case's outcome and types
+from the first repeat with the majority action.
+
+**Fix**: scoring schemes are versioned (`evaluation/manifest.py`). Scoring 1 stays byte for
+byte as frozen in `opsbridge-bench-v1` and still grades it, so every v1 receipt, result and
+replay is unchanged. Scoring 2, frozen into every new benchmark, reports per case:
+- action disagreement: 1 − most common action / repeats, an error being a verdict of its own;
+- correctness disagreement;
+- outcome-and-types disagreement;
+- the share of errored repeats.
+
+Each majority is taken on its own axis, with ties reported. A case counts correct as a whole
+only if its most common whole verdict is untied and matches. A case with missing, duplicated
+or relabelled repeats is incomplete and listed, and the acceptance gate reports
+`incomplete` instead of pass or fail. `verify` accepts a plan whose scoring is a scheme the
+code implements; the API and the evaluation page show each run's scheme and, for scoring 1,
+what its instability figure measured.
+
+**Evidence**: `tests/evaluation/test_metrics_scoring2.py` (7, all failed before): on the
+probe, action disagreement 1/3 and correctness disagreement 0, with scoring 1's 0 kept; the
+same action with different findings is visible; errors are counted; per-axis majorities;
+incompleteness; the frozen v1 plan still verifies; `eval-rescore` reads a recorded run
+without changing it. The existing comparability tests keep their assertions (only the way
+they simulate a changed grader moved to the scheme registry).
+
+**Derived reading of the recorded v1 runs under scoring 2** (`opsbridge eval-rescore`, prints
+only): no disagreement on any axis in any recorded split or mode (held-out 0/40, validation
+0/20, security 0/7, both modes), all complete. The metric was wrong, but it hid nothing in
+these results, because the rules and the mock model are deterministic.
+
+**Not done**: no `opsbridge-bench-v2` is frozen yet. A new benchmark should come with the
+independently labelled corpus of A10; freezing v2 on the public v1 cases would invite
+out-of-sample claims they cannot support.
+
 ## Work plan
 
-1. Package 1 (done above) and Package 4's metric fix (A03), both locally achievable.
+1. Done: Package 1 (A01, A02) and Package 4's metric fix (A03).
 2. Package 2: one admission contract for the executor and the Casework MCP tool (A05),
    sealed outbound text and destination, a separate recovery authority.
 3. Package 3: streaming response bounds (A04); public-only verifiers and tenant-owned
