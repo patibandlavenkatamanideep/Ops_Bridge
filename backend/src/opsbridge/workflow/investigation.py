@@ -44,6 +44,7 @@ from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Case,
+    CaseDocument,
     DocumentVersion,
     GoodsReceiptRecord,
     InvestigationVersion,
@@ -672,6 +673,45 @@ def _match(
             "corrections": [],
             "policy_ref": policy.ref,
         }
+    unread = _documents_needing_review(s, uuid.UUID(case["case_id"]))
+    if unread:
+        # Records that could not be read were not built (mapping.py); what is left would look
+        # complete without them: a receipt without its return, an invoice without a line.
+        if any(kind == "invoice" for kind, _t, _d in unread):
+            reason = "invoice_extraction_needs_review"
+            # A collected invoice keeps the wording of the earlier check (recorded benchmark
+            # runs replay it byte for byte); an uploaded one names its own problem.
+            collected_now = any(
+                d["record_type"] == "invoice" and d["parse_status"] != "parsed"
+                for d in collected.get("documents", [])
+            )
+            about = (
+                "; ".join(p for p in collected.get("problems", []) if p.startswith("invoice"))
+                if collected_now
+                else "; ".join(f"{t}: {d}" for k, t, d in unread if k == "invoice")
+            )
+            summary = (
+                f"The invoice document could not be read reliably ({about[:400]}). Its values "
+                "were not used; a person must review or supply a structured copy."
+            )
+        else:
+            reason = "source_document_needs_review"
+            about = "; ".join(f"{title}: {detail}" for _kind, title, detail in unread)
+            summary = (
+                f"A document of this case could not be read completely ({about[:400]}). Its "
+                "records were not used and nothing was concluded; a person must review it or "
+                "supply a readable copy."
+            )
+        findings.append(_manual_finding(reason, summary))
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": version_ids,
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
     if loaded.match_input is None:
         reasons = collected.get("unavailable") or loaded.missing
         needs_review_docs = [
@@ -733,6 +773,39 @@ def _match(
         "resolved_po_number": result.resolved_po_number,
         "resolved_supplier_id": result.resolved_supplier_id,
     }
+
+
+# Kinds whose records decide a match: one missing can only make the result look better.
+# Supplier messages are excluded: their claims are never used as receipt evidence.
+_DECISIVE_KINDS = ("invoice", "purchase_order", "goods_receipt", "allocation_history")
+
+
+def _documents_needing_review(s: Session, case_id: uuid.UUID) -> list[tuple[str, str, str]]:
+    """(kind, title, detail) of the case's decisive documents whose newest version could not
+    be read completely. Withdrawn documents are history and do not count."""
+    newest = (
+        select(DocumentVersion.document_id, func.max(DocumentVersion.version_no).label("n"))
+        .group_by(DocumentVersion.document_id)
+        .subquery()
+    )
+    rows = s.execute(
+        select(SourceDocument.kind, SourceDocument.title, DocumentVersion.parse_detail)
+        .join(CaseDocument, CaseDocument.document_id == SourceDocument.id)
+        .join(newest, newest.c.document_id == SourceDocument.id)
+        .join(
+            DocumentVersion,
+            (DocumentVersion.document_id == SourceDocument.id)
+            & (DocumentVersion.version_no == newest.c.n),
+        )
+        .where(
+            CaseDocument.case_id == case_id,
+            SourceDocument.withdrawn_at.is_(None),
+            SourceDocument.kind.in_(_DECISIVE_KINDS),
+            DocumentVersion.parse_status != "parsed",
+        )
+        .order_by(SourceDocument.title)
+    ).all()
+    return [(kind, title, detail or "needs review") for kind, title, detail in rows]
 
 
 def _rec_for(outcome: str, policy: ReconciliationPolicy, case: dict[str, Any]) -> dict[str, Any]:
