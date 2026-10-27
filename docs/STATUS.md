@@ -397,9 +397,9 @@ Work plan from the production review of 2026-10-27 (findings A01–A18; matrix, 
 blockers in `docs/production-readiness.md`):
 
 1. Done locally: A01 and A02, business-input integrity (validation boundary, migration 0019).
-2. Next: A03, versioned evaluation metrics (action, correctness and outcome disagreement
-   reported separately; scoring 1 kept for the frozen v1 runs).
-3. Then: A05 one admission contract for executor and Casework MCP; A04 streaming response
+2. Done locally: A03, versioned evaluation scoring (scoring 2 reports action, correctness
+   and outcome disagreement separately; scoring 1 kept for the frozen v1 runs).
+3. Next: A05 one admission contract for executor and Casework MCP; A04 streaming response
    bounds; A06 public-only verifiers and tenant-owned credential references; A13 behavioural
    replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
 4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
@@ -1004,3 +1004,13 @@ staging, pilot owner).
   (9), `tests/integration/test_input_integrity.py` (7, through the API: resolution refused),
   `tests/integration/test_migration_0019.py` (refusal under RLS, upgrade, guard, downgrade).
   Canary 64/64 unchanged; benchmark replay reproduces every recorded run.
+
+### Evaluation scoring versioned (2026-10-27, production review A03)
+- Scoring 1's "instability" was disagreement in next-action correctness: three repeats with
+  two different wrong actions counted as stable. Kept as frozen for `opsbridge-bench-v1`.
+- Scoring 2 (frozen into new benchmarks): action, correctness and outcome/type disagreement
+  and errors per case; per-axis majorities with ties reported; incomplete repeat sets listed
+  and the gate left undecided. API and evaluation page show the scheme and what scoring 1
+  measured. `opsbridge eval-rescore` reads a recorded run under another scheme, printing only.
+- Recorded v1 runs under scoring 2: no disagreement on any axis (deterministic rules and
+  mock). Tests: `tests/evaluation/test_metrics_scoring2.py` (7).
