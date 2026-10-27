@@ -91,6 +91,8 @@ class Delegation:
     operation_id: uuid.UUID | None
     jti: str
     expires_at: int
+    # The executor's attempt a create belongs to; the casework tool admits it once.
+    attempt_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -107,6 +109,7 @@ class DelegationSigner:
         case_id: uuid.UUID | None = None,
         run_id: uuid.UUID | None = None,
         operation_id: uuid.UUID | None = None,
+        attempt_id: uuid.UUID | None = None,
         ttl_seconds: int = 120,
     ) -> str:
         now = int(time.time())
@@ -121,7 +124,12 @@ class DelegationSigner:
             "exp": now + min(ttl_seconds, MAX_DELEGATION_SECONDS),
             "jti": uuid.uuid4().hex,
         }
-        for k, v in (("case_id", case_id), ("run_id", run_id), ("operation_id", operation_id)):
+        for k, v in (
+            ("case_id", case_id),
+            ("run_id", run_id),
+            ("operation_id", operation_id),
+            ("attempt_id", attempt_id),
+        ):
             if v is not None:
                 claims[k] = str(v)
         return jwt.encode(claims, self.private_key, algorithm="EdDSA")
@@ -168,6 +176,7 @@ class DelegationVerifier:
                 operation_id=uuid.UUID(c["operation_id"]) if c.get("operation_id") else None,
                 jti=c["jti"],
                 expires_at=int(c["exp"]),
+                attempt_id=uuid.UUID(c["attempt_id"]) if c.get("attempt_id") else None,
             )
         except (KeyError, ValueError) as exc:
             raise DelegationError("malformed delegation claims") from exc
