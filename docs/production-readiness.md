@@ -29,7 +29,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1) | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Open, confirmed on this branch (`connectors/purchasing.py::_get`) | 3 | — | — |
-| A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Open, confirmed statically on this branch (`mcp_services/casework.py`) | 2 | — | — |
+| A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Open, confirmed on this branch (`factory.verifier`, `services/connections.credential`) | 3 | — | — |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
 | A08 | No actual purchasing source | Blocked | 5 | Contract harness exists (`purchasing-source/1`, 21 contract tests) | Owner chooses a system or export and authorizes access |
@@ -149,11 +149,67 @@ these results, because the rules and the mock model are deterministic.
 independently labelled corpus of A10; freezing v2 on the public v1 cases would invite
 out-of-sample claims they cannot support.
 
+## Package 2: one admission contract for the executor and Casework MCP (A05)
+
+**Reproduced on this branch** (`tests/integration/test_casework_admission.py`, real MCP client
+and server, PostgreSQL, Keycloak service tokens, simulator; each failed before):
+- a create that reached the casework tool after the approval expired, after a cancellation
+  request, or after the evidence was corrected still landed (3 cases);
+- a replayed request with a valid delegation, while the operation was executing and the
+  tracker had no idempotency keys, created two more tasks (3 instead of 1);
+- with a different redactor in the casework service, the task carried text other than the
+  approved text (the title came out upper-cased);
+- once the approver was revoked, reconciling a task already sent was refused.
+
+**Fix**:
+- `services/execution_admission.py` holds the executor's admission (cancellation, proposal
+  and approval state, expiry, the approver's current authority, evidence and policy
+  freshness, destination and text), moved there unchanged, and `approved_request`, the one
+  builder of the request that is sent.
+- The casework tool admits a create with that function when the request reaches it. The
+  executor's attempt id travels in the call and in the signed delegation, and the tool
+  admits each attempt once (`attempts.admitted_at`, migration 0020; the MCP role may update
+  that column only).
+- The tool sends the sealed outbound text and builds a connector only for the approved
+  destination (simulator tasks in the tenant's own organization). Its deployment-wide GitHub
+  fallback is gone: GitHub issues are sent by the worker with the tenant's connection.
+- Read-back and reconciliation of an admitted create no longer need the approver's current
+  authority.
+- A refusal comes back as `NotAdmitted`; the executor runs its own admission again and
+  finishes the operation `cancelled_before_dispatch` with the same reasons.
+
+**Human review of an unknown outcome** now uses the executor's completion
+(`finish_operation`): a follow-up a person found moves the case to `follow_up_pending` and
+drains its outbox event (before, the case stayed awaiting review and the event stayed
+undelivered: `tests/integration/test_unknown_outcome_review.py`). The confirmation is
+labelled `human_review`, and the operation is counted once in the metrics. The API role may
+set `outbox_events.delivered_at` (0020).
+
+**Parity**: `test_direct_and_mcp_refuse_the_same_stale_approval` (expired, corrected ×
+direct, MCP) ends both transports in `cancelled_before_dispatch / precondition_failed` with
+nothing sent. It passed before too, because the executor checked before calling; the delayed
+cases above are what only the tool can catch.
+
+**Migration 0020** was downgraded and upgraded on the development, test and evaluation
+databases, and the column and grants were checked in each with `psql`.
+
+**Correction to Package 1**: the commit for migration 0019 said it had been applied to the
+evaluation database. It had not: a shell loop passed `-x db=…` as one word, so Alembic used
+the development database each time. The evaluation database was upgraded from 0018 on
+2026-10-27 together with 0020 (its duplicate scan found nothing).
+
+**Correction to A03**: the browser stage of A03's gate ran against a dev stack started
+before the A03 API change (the stack does not reload code). The A03 API is covered by
+`test_evaluation_api_shows_own_pack_cases_and_validates_run_ids`, which runs current code; the
+dev stack was restarted for Package 2's gate.
+
+**Not covered**: the admission point is when the tool reads committed state; a change
+committed after that is too late for the write in flight, and a request the tracker accepted
+cannot be withdrawn. GitHub through the casework tool is not supported.
+
 ## Work plan
 
-1. Done: Package 1 (A01, A02) and Package 4's metric fix (A03).
-2. Package 2: one admission contract for the executor and the Casework MCP tool (A05),
-   sealed outbound text and destination, a separate recovery authority.
+1. Done: Package 1 (A01, A02), Package 4's metric fix (A03), Package 2 (A05).
 3. Package 3: streaming response bounds (A04); public-only verifiers and tenant-owned
    credential references (A06).
 4. Package 4: versioned behavioural replay and trial isolation (A13).
