@@ -30,10 +30,11 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | F17 | P2 | `verify` can pass with required gates skipped | Fixed, verified locally | `make verify-strict` fails here on the skipped OCR tests (tesseract not installed), as intended |
 | F18 | P2 | UX needs operator testing | Partly: destination and exact outgoing text shown before approval; Correct offered only for correctable fields; supplier and look-alike confirmation at intake; the server states each viewer's decision reason; expiry noticed while the page is open; queue search debounced; README screenshots fixed | `test_the_server_says_who_may_decide_a_proposal_and_why_not`; browser suite and accessibility scan pass |
 
-Found while building the source contract (not in the review):
+Found along the way (not in the review):
 
 | ID | Finding | Status | Regression evidence |
 |---|---|---|---|
+| X7 | The MCP services refused a fresh service token at random. The identity provider's clock ran a few milliseconds ahead of the service's (up to 9 ms here: Keycloak in the Podman VM), so a token used at once could carry an issue time just in the future, which PyJWT refuses when given no leeway. The 401 reached the worker as an MCP transport error: a create became an outcome it did not know and went to reconciliation, and an MCP integration test failed now and then (each starts with a newly minted token) | Fixed, verified locally | Issue and not-before times may run up to 30 s ahead, as at sign-in; expiry is not stretched; times that are not numbers are refused: `tests/mcp/test_clock_skew.py` (the two "slightly ahead" cases failed before; the five refusal cases pass before and after). Real Keycloak tokens checked the moment they arrived: 2 of 200 refused before, 0 of 400 after. A real records MCP server called with a newly minted token each time: 11 of 1,200 calls failed with "Server returned an error response" before (the error a full gate run hit), 0 of 1,200 after |
 | X6 | A negative quantity or price made a case match: correcting INV-9001's invoiced quantity to -20 turned its discrepancy into "matched" (the 18 received covered it), which is what resolving the case needs; a source invoice with negative lines (a credit note, which is not modelled) matched the same way | Fixed, verified locally | Matching sends any negative quantity or price (invoice, PO, receipt, prior allocation) to manual review (`negative_value`, rules 1.1.0): `test_a_negative_quantity_or_price_goes_to_review_not_to_a_match[5]`; corrections refuse negative values: `test_a_correction_cannot_make_a_quantity_or_price_negative[2]`; all failed before. Canary: no case changed, only the rules version (baseline updated in its own commit) |
 | X5 | A PDF under 1 MB whose streams inflate to text made the parser subprocess use about 850 MB until the 10 s timeout stopped it; concurrent uploads multiplied that | Fixed (Linux), verified in the app image | The worker caps its address space at 256 MB (a legitimate 50-page, 3.9 MB-text PDF parses in 1.9 s under it; the bomb is rejected in 2.2 s) and at most two PDF parses run at once per process: `test_a_pdf_inflating_past_the_memory_cap_is_rejected_before_the_timeout` (Linux only), `test_no_more_than_two_pdfs_are_parsed_at_once` |
 | X4 | JSON nested about a thousand levels deep made `json.loads` raise RecursionError: an upload or source record failed with an unexpected error instead of a rejection, a source listing escaped the connector's error handling, a model answer failed its step instead of being rejected | Fixed, verified locally | Depth counted before decoding (`safejson`): `test_json_limits_and_exact_numbers`, `test_model_output_nested_beyond_any_schema_is_rejected_not_raised`, `test_a_listing_nested_beyond_any_record_is_refused` (all raised RecursionError before), `tests/test_safejson.py`; API bodies were already refused with 400 by the framework (guard test) |
@@ -75,10 +76,14 @@ Not covered:
   fixed with request deadlines, also through the hop). With keys, as in that test, the resend
   is safe and the task is then confirmed by read-back instead of by marker, which is what the
   test's method assertion rejects: a timing-dependent test, not a duplicate. Left as is.
+  (Not X7: the simulator's fault is used by the first create that reaches it, so a create
+  refused at the hop would leave it for the resend, which is then reconciled by marker.)
 - Also once under load (an integration run while the dev stack and a browser run were busy;
   not in the next full gate, not in isolation): `test_denied_records_calls[forged_delegation]`
-  failed. Its output was not kept, so the cause is not known; a transport timeout instead of
-  the expected denial is the likely one. Watch for it in CI.
+  failed, and once (2026-10-26) another MCP test with "MCPError: Server returned an error
+  response". The first run's output was not kept; both fit X7 (a fresh service token refused
+  with a 401, which the test sees as a transport error instead of the expected denial), fixed
+  2026-10-27. Watch for either in CI.
 
 ## What changed, and what it does not cover
 
