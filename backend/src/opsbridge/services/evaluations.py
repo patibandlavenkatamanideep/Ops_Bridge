@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from opsbridge.auth.permissions import Forbidden, Principal
-from opsbridge.evaluation.manifest import SCORING
+from opsbridge.evaluation.manifest import scheme_of
 
 RUN_ID = re.compile(r"^(dev|validation|heldout|security)-(record|replay)-\d{8}T\d{6}Z$")
 BENCHMARK = re.compile(r"^[a-z0-9-]{1,64}$")
@@ -38,18 +38,39 @@ def _load(path: Path) -> dict[str, Any]:
     return data
 
 
+# Shown with every scoring-1 run: what its recorded "flip rate" measured (review A03).
+SCORING_1_INSTABILITY = (
+    "Scoring 1 measured disagreement in whether the next action was correct, not in the "
+    "action itself: repeats giving two different wrong actions count as stable. The numbers "
+    "are kept as recorded; scoring 2 reports action, correctness and outcome disagreement "
+    "separately."
+)
+
+
+def _plan(evals_dir: Path, benchmark_id: str) -> dict[str, Any]:
+    path = evals_dir / "manifests" / f"{benchmark_id}.json"
+    return _load(path) if BENCHMARK.match(benchmark_id) and path.is_file() else {}
+
+
+def _scheme(evals_dir: Path, d: dict[str, Any]) -> str | None:
+    """The scheme a run was graded under: its result says so, or its frozen plan does."""
+    return d.get("scoring") or scheme_of(_plan(evals_dir, d["benchmark_id"]).get("scoring"))
+
+
 def _comparability(evals_dir: Path, d: dict[str, Any]) -> dict[str, Any]:
     """Whether a run was graded under the benchmark's current frozen plan and this code's
     scoring; if not, its numbers must not be compared with current runs."""
     reasons = []
-    plan_path = evals_dir / "manifests" / f"{d['benchmark_id']}.json"
-    plan = _load(plan_path) if BENCHMARK.match(d["benchmark_id"]) and plan_path.is_file() else {}
+    plan = _plan(evals_dir, d["benchmark_id"])
     if not plan:
         reasons.append("the benchmark's frozen plan is missing")
     elif d.get("manifest_sha256") != plan.get("manifest_sha256"):
         reasons.append("graded under a different frozen plan than the current one")
-    if plan and plan.get("scoring") != SCORING:
-        reasons.append("this code's scoring definitions differ from the frozen plan")
+    if plan and scheme_of(plan.get("scoring")) is None:
+        reasons.append(
+            "this code's scoring definitions differ from the frozen plan (no scheme it "
+            "implements matches)"
+        )
     return {
         "comparable": not reasons,
         "reasons": reasons,
@@ -89,6 +110,7 @@ def list_runs(evals_dir: Path, p: Principal) -> list[dict[str, Any]]:
                 "acceptance": d.get("acceptance", []),
                 "receipts_verified": bool((d.get("verification") or {}).get("ok")),
                 "comparability": _comparability(evals_dir, d),
+                "scoring_scheme": _scheme(evals_dir, d),
             }
         )
     return out
@@ -106,24 +128,17 @@ def _find(evals_dir: Path, benchmark: str, run_id: str) -> dict[str, Any]:
 def run_detail(evals_dir: Path, p: Principal, benchmark: str, run_id: str) -> dict[str, Any]:
     require_eval_access(p)
     d = _find(evals_dir, benchmark, run_id)
+    scheme = _scheme(evals_dir, d)
+    case_keys = ("family", "template", "expected", "majority", "verdicts", "correct", "safe_miss")
+    # Scoring 1 recorded a flip rate per case; scoring 2 records disagreement per axis.
+    extra_keys = ("disagreement", "complete", "problems", "whole_verdict", "flip_rate")
     modes = {}
     for mode, m in d["modes"].items():
         cases = [
             {
                 "case_id": cid,
-                **{
-                    k: c[k]
-                    for k in (
-                        "family",
-                        "template",
-                        "expected",
-                        "majority",
-                        "verdicts",
-                        "correct",
-                        "safe_miss",
-                        "flip_rate",
-                    )
-                },
+                **{k: c[k] for k in case_keys},
+                **{k: c[k] for k in extra_keys if k in c},
             }
             for cid, c in sorted(m["cases"].items())
             if c["pack"] == p.tenant_pack
@@ -148,6 +163,8 @@ def run_detail(evals_dir: Path, p: Principal, benchmark: str, run_id: str) -> di
                     "latency_ms",
                 )
             },
+            **{k: m[k] for k in ("complete", "incomplete_cases") if k in m},
+            "instability_note": SCORING_1_INSTABILITY if scheme == "opsbridge-scoring/1" else None,
             "pack_cases": cases,
         }
     return {
@@ -171,6 +188,7 @@ def run_detail(evals_dir: Path, p: Principal, benchmark: str, run_id: str) -> di
         },
         "receipts": d.get("receipts", {}),
         "comparability": _comparability(evals_dir, d),
+        "scoring_scheme": scheme,
         "not_evaluated": [
             "Real-model quality (no live or recorded real-model dataset; mock responses only)",
             "Operator time and business outcomes (no pilot participants)",
