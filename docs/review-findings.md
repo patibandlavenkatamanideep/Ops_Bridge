@@ -1,5 +1,7 @@
 # External review findings (baseline f0dbb1a, 2026-10-22)
 
+The production review of 2026-10-27 (A01–A18) is tracked in `docs/production-readiness.md`.
+
 An external review of `main` at `f0dbb1a` listed 18 findings (F01–F18) and a delivery order:
 Phase A (protect core decisions), B (concurrency and failure), C (deployable artifact),
 D (one real integration), E (operator value). This file tracks each finding against the
