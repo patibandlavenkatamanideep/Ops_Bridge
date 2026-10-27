@@ -60,7 +60,7 @@ def mcp(stack, mcp_db: Database) -> Iterator[dict[str, Any]]:  # type: ignore[no
     ) -> JwksTokenVerifier:
         return JwksTokenVerifier(issuer=s.oidc_issuer, audience=aud, allowed_clients=clients)
 
-    def sim_for(tid: uuid.UUID, name: str) -> SimTaskConnector:
+    def sim_for(tid: uuid.UUID, destination: dict[str, Any]) -> SimTaskConnector:
         return SimTaskConnector(st["base"], MASTER, "demo-furniture")
 
     records = build_records_server(
