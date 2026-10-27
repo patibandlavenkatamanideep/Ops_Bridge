@@ -17,6 +17,7 @@ broadly credentialed service cannot exceed the principal's business authority.
 
 from __future__ import annotations
 
+import math
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -31,10 +32,32 @@ from mcp.server.auth.provider import AccessToken
 DELEGATION_HEADER = "x-opsbridge-delegation"
 DELEGATION_ISSUER = "opsbridge-backend"
 MAX_DELEGATION_SECONDS = 300
+# How far an issuer's clock may run ahead of this service's (sign-in allows the same). A
+# token used the moment it is issued can carry an issue time just after this clock's reading;
+# PyJWT allows no difference unless given `leeway`, which would also stretch expiry, so its
+# not-yet-valid checks are replaced by `check_issued` and expiry stays as issued.
+CLOCK_SKEW_SECONDS = 30
 
 
 class DelegationError(Exception):
     pass
+
+
+def check_issued(claims: dict[str, Any]) -> None:
+    """Refuse a token issued, or valid from, later than the allowed clock difference."""
+    limit = time.time() + CLOCK_SKEW_SECONDS
+    for name in ("iat", "nbf"):
+        if name not in claims:
+            continue
+        value = claims[name]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(value)
+        ):
+            raise jwt.InvalidTokenError(f"{name} is not a time")
+        if value > limit:
+            raise jwt.ImmatureSignatureError(f"the token is not valid yet ({name})")
 
 
 def load_or_create_key(path: Path) -> Ed25519PrivateKey:
@@ -123,8 +146,13 @@ class DelegationVerifier:
                 algorithms=["EdDSA"],
                 audience=self.audience,
                 issuer=DELEGATION_ISSUER,
-                options={"require": ["exp", "iat", "sub", "aud", "iss", "jti"]},
+                options={
+                    "require": ["exp", "iat", "sub", "aud", "iss", "jti"],
+                    "verify_iat": False,
+                    "verify_nbf": False,
+                },
             )
+            check_issued(c)
         except jwt.PyJWTError as exc:
             raise DelegationError(f"invalid delegation token: {type(exc).__name__}") from exc
         if c["exp"] - c["iat"] > MAX_DELEGATION_SECONDS:
@@ -173,8 +201,13 @@ class JwksTokenVerifier:
                 algorithms=["RS256", "ES256", "EdDSA"],
                 audience=self.audience,
                 issuer=self.issuer,
-                options={"require": ["exp", "iat", "iss", "aud"]},
+                options={
+                    "require": ["exp", "iat", "iss", "aud"],
+                    "verify_iat": False,
+                    "verify_nbf": False,
+                },
             )
+            check_issued(c)
         except (jwt.PyJWTError, OSError):
             return None
         client = c.get("azp") or c.get("client_id")
