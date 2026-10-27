@@ -546,6 +546,14 @@ class POLineRecord(Base):
     __table_args__ = (
         _tenant_unique("po_lines"),
         _fk(["purchase_order_id"], "purchase_orders", "fk_po_lines_po", ondelete="CASCADE"),
+        # One line per identity, compared as the matcher compares it (migration 0019).
+        Index(
+            "uq_po_lines_identity",
+            "tenant_id",
+            "purchase_order_id",
+            text("upper(btrim(line_number))"),
+            unique=True,
+        ),
     )
 
 
@@ -595,6 +603,13 @@ class InvoiceLineRecord(Base):
     __table_args__ = (
         _tenant_unique("invoice_lines"),
         _fk(["invoice_id"], "invoices", "fk_invoice_lines_invoice", ondelete="CASCADE"),
+        Index(
+            "uq_invoice_lines_identity",
+            "tenant_id",
+            "invoice_id",
+            text("upper(btrim(line_number))"),
+            unique=True,
+        ),
     )
 
 
