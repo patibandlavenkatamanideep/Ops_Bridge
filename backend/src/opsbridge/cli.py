@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from opsbridge.telemetry.logging import uvicorn_log_config
 
@@ -195,7 +196,7 @@ def _eval_freeze(args: argparse.Namespace) -> int:
 def _eval_bench(args: argparse.Namespace) -> int:
     import os
     from datetime import UTC, datetime
-    from typing import Any, cast
+    from typing import cast
 
     from opsbridge.agents.adapters import MockModelAdapter
     from opsbridge.agents.contracts import ModelAdapter
@@ -381,7 +382,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     in CI and in `make verify` without the signing key."""
     import os
     from datetime import UTC, datetime
-    from typing import Any, cast
+    from typing import cast
 
     from opsbridge.agents.contracts import ModelAdapter
     from opsbridge.config import REPO_ROOT, get_settings
@@ -632,15 +633,21 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
             settings.oidc_issuer, aud, frozenset({"opsbridge-worker"}), jwks_url=jwks_url
         )
 
-        def connector_for(tenant_id: uuid.UUID, name: str) -> TaskConnector:
+        def connector_for(tenant_id: uuid.UUID, destination: dict[str, Any]) -> TaskConnector:
+            """A connector for exactly the approved destination. The worker sends GitHub
+            issues itself, with the tenant's connection; this service executes simulator
+            tasks only, in the tenant's own organization (it never falls back to
+            deployment-wide settings)."""
             with db.session(DbContext(tenant_id=tenant_id)) as s:
                 tenant = s.get(Tenant, tenant_id)
                 assert tenant is not None
                 org = tenant.slug
-            if name == "github_issues":
-                from opsbridge.connectors.github import github_connector_from_settings
-
-                return github_connector_from_settings(settings)
+            if destination.get("connector") != "sim_tasks":
+                raise ValueError(
+                    f"this service does not execute {destination.get('connector')!r} destinations"
+                )
+            if destination.get("organization") != org:
+                raise ValueError("the approved organization is not this tenant's")
             return SimTaskConnector(
                 settings.simulator_url, settings.sim_master_secret.get_secret_value(), org
             )
