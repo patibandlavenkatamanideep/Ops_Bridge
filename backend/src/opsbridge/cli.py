@@ -320,7 +320,9 @@ def _eval_bench(args: argparse.Namespace) -> int:
                     on_trial=progress,
                 )
                 print()
-                mode_results[mode] = metrics.summarize_mode(trials)
+                mode_results[mode] = metrics.summarize_mode(
+                    trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
+                )
                 receipts[mode] = {
                     "record_hash": record.hash,
                     "ledger": str(ledger),
@@ -433,7 +435,9 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                             if (t["error"] or "").startswith("ReplayFailure"):
                                 raise ReplayFailure(t["error"])  # fail closed, as recording does
                             trials.append(t)
-                    replayed[mode] = metrics.summarize_mode(trials)
+                    replayed[mode] = metrics.summarize_mode(
+                        trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
+                    )
         except (ReplayFailure, EgressBlocked) as exc:
             print(f"{split_name}: FAILED CLOSED ({type(exc).__name__}): {exc}")
             failed = True
@@ -466,6 +470,45 @@ def _eval_backfill_tools(args: argparse.Namespace) -> int:
     out = backfill_tool_cassette(run, Path("var/eval") / run.name / "artifacts")
     entries = json.loads(out.read_text(encoding="utf-8"))["entries"]
     print(f"{out}: {len(entries)} tool call(s), each matching the run's recorded digests")
+    return 0
+
+
+def _eval_rescore(args: argparse.Namespace) -> int:
+    """Disagreement in a recorded run's trials under another scoring scheme. A derived
+    reading for comparison only: it prints, writes nothing, and changes no recorded result."""
+    import os
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation import manifest as mf
+    from opsbridge.evaluation import metrics
+
+    os.chdir(REPO_ROOT)
+    run = Path(args.run)
+    frozen = mf.load(Path("evals/manifests") / f"{run.parent.name}.json")
+    print(
+        f"{run.name}: recorded under {mf.scheme_of(frozen['scoring'])}, read under {args.scheme} "
+        "(derived; not the run's result)"
+    )
+    for path in sorted(run.glob("trials-*.jsonl")):
+        trials = [
+            json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line
+        ]
+        s = metrics.summarize_mode(trials, scheme=args.scheme, repeats=int(frozen["repeats"]))
+        mode = path.stem.removeprefix("trials-")
+        if args.scheme == metrics.SCORING_2:
+            i = s["instability"]
+            axes = ", ".join(
+                f"{axis} {i[axis]['cases_with_disagreement']}/{s['n_cases']}"
+                for axis in ("action", "correctness", "outcome_types")
+            )
+            done = "complete" if s["complete"] else f"incomplete: {s['incomplete_cases']}"
+            print(
+                f"  {mode}: cases with disagreement: {axes}; errored repeats "
+                f"{i['errors']['trials_with_error']}; next action {s['next_action']['correct']}/"
+                f"{s['n_cases']}; {done}"
+            )
+        else:
+            print(f"  {mode}: cases with any flip {s['instability']['cases_with_any_flip']}")
     return 0
 
 
@@ -715,6 +758,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--run", required=True, help="evals/runs/<benchmark>/<split>-record-<time>")
     p.set_defaults(func=_eval_backfill_tools)
+
+    p = sub.add_parser(
+        "eval-rescore",
+        help="print a recorded run's disagreement under another scoring scheme (writes nothing)",
+    )
+    p.add_argument("--run", required=True, help="evals/runs/<benchmark>/<split>-<kind>-<time>")
+    p.add_argument("--scheme", default="opsbridge-scoring/2")
+    p.set_defaults(func=_eval_rescore)
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
     p.set_defaults(func=_eval_verify)
