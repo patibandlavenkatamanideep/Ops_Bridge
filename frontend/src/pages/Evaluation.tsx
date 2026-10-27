@@ -44,8 +44,18 @@ interface PackCase {
   verdicts: string[];
   correct: { next_action: boolean; case: boolean };
   safe_miss: boolean;
-  flip_rate: number;
+  flip_rate?: number;
+  disagreement?: { action: number; correctness: number; outcome_types: number; errors: number };
+  complete?: boolean;
 }
+/** Scoring 1 (frozen with opsbridge-bench-v1): its flip rate is correctness disagreement. */
+interface InstabilityV1 { definition: string; cases_with_any_flip: number; mean_flip_rate: number | null;
+  sampling_limit?: string }
+interface AxisDisagreement { cases_with_disagreement: number; mean: number | null }
+/** Scoring 2: disagreement per axis. */
+interface InstabilityV2 { scheme: string; definition: string; action: AxisDisagreement;
+  correctness: AxisDisagreement; outcome_types: AxisDisagreement; errors: { trials_with_error: number };
+  sampling_limit?: string }
 interface ModeDetail {
   n_cases: number;
   n_trials: number;
@@ -57,8 +67,9 @@ interface ModeDetail {
   safe_misses: number;
   unsafe_misses: number;
   by_type: Record<string, { tp: number; fp: number; fn: number; precision: number | null; recall: number | null }>;
-  instability: { definition: string; cases_with_any_flip: number; mean_flip_rate: number | null;
-    sampling_limit?: string };
+  instability: InstabilityV1 | InstabilityV2;
+  instability_note?: string | null;
+  incomplete_cases?: string[];
   agent: { explanation_origins: Record<string, number>; model_calls: number; model_calls_rejected: number;
     citations: number; citations_valid: number; tool_calls: number; cost_usd: string };
   latency_ms: { median: number | null; p95: number | null };
@@ -255,9 +266,14 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
             </dd>
             <dt>Instability</dt>
             <dd>
-              {m.instability.cases_with_any_flip} case(s) with any flip; mean {m.instability.mean_flip_rate ?? "—"} (
-              {m.instability.definition})
+              <Instability value={m.instability} />
+              {m.instability_note && <div className="small">{m.instability_note}</div>}
               {m.instability.sampling_limit && <div className="muted small">Limit: {m.instability.sampling_limit}</div>}
+              {m.incomplete_cases && m.incomplete_cases.length > 0 && (
+                <div className="small">
+                  Incomplete (repeats missing, duplicated or relabelled): {m.incomplete_cases.join(", ")}
+                </div>
+              )}
             </dd>
             <dt>Evidence</dt>
             <dd>
@@ -344,5 +360,22 @@ function CaseTable({ cases, pack }: { cases: PackCase[]; pack: string }) {
         ))}
       </tbody>
     </table>
+  );
+}
+
+function Instability({ value }: { value: InstabilityV1 | InstabilityV2 }) {
+  if ("action" in value) {
+    const axis = (a: AxisDisagreement) => `${a.cases_with_disagreement} case(s), mean ${a.mean ?? "—"}`;
+    return (
+      <>
+        Next action: {axis(value.action)} · correctness: {axis(value.correctness)} · outcome and types:{" "}
+        {axis(value.outcome_types)} · {value.errors.trials_with_error} errored repeat(s) ({value.definition})
+      </>
+    );
+  }
+  return (
+    <>
+      {value.cases_with_any_flip} case(s) with any flip; mean {value.mean_flip_rate ?? "—"} ({value.definition})
+    </>
   );
 }
