@@ -58,6 +58,9 @@ class TaskRequest:
     assignee_group: str | None
     marker: str  # opaque marker embedded in the remote task for reconciliation
     deadline: float | None = None  # epoch seconds after which the provider must not commit it
+    # The executor's attempt this create belongs to: a write boundary behind another hop
+    # (the casework MCP tool) admits each attempt once (transport metadata, not sent on).
+    attempt_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,15 @@ class DefiniteFailure(Exception):
         super().__init__(message)
         self.retryable = retryable
         self.status = status
+
+
+class NotAdmitted(DefiniteFailure):
+    """The write boundary refused the create: the operation was no longer eligible when the
+    request reached it (expired, cancelled, stale evidence...), or the attempt was not the
+    executor's open one. Nothing was sent."""
+
+    def __init__(self, message: str) -> None:
+        super().__init__(message, retryable=False)
 
 
 class AmbiguousFailure(Exception):
