@@ -112,6 +112,29 @@ not used again, not even to recover: such an operation goes to review
    operation (migration 0010). Before 2026-10-22 these committed separately and a crash in
    between duplicated the note or draft on retry (F02).
 
+6. Through the Casework MCP tool (`tool_transport = mcp`, simulator tasks only): the tool is
+   the last write boundary, and a request can reach it long after step 3 (delayed, retried,
+   replayed). It admits a create with the same function as step 3
+   (`services/execution_admission.py::refusal`), reading committed state when the request
+   arrives; the delegation and the call name the executor's open attempt, which is admitted
+   once (`attempts.admitted_at`, migration 0020), so a replayed request cannot write again.
+   It sends exactly the approved outbound text and destination (`approved_request`), never
+   text re-rendered from the raw parameters. A refusal is a tool error ("not admitted"); the
+   executor then runs its own admission again and finishes the operation
+   `cancelled_before_dispatch` with the same reasons. Read-back and reconciliation through
+   the tool recover a create it admitted and need the delegation for the operation but not
+   the approver's current authority, so revoking an approver does not hide a task already
+   sent; a new create still needs it. The tool's connector factory builds only the approved
+   simulator destination in the tenant's own organization; GitHub issues are sent by the
+   worker directly. (Before 2026-10-27 the tool checked less than the executor, rebuilt the
+   text with its own redactor, accepted any create for an executing operation, and recovery
+   needed the approver's current authority: production review A05,
+   `tests/integration/test_casework_admission.py`.)
+7. A person's review of an unknown outcome completes the operation with the executor's
+   completion (`finish_operation`): case transition, outbox, audit. The confirmation is
+   recorded as `human_review`, not as proof from the provider, and the operation is counted
+   in the metrics once, when it first finished (`test_unknown_outcome_review.py`).
+
 Connector declarations (`connectors/tasks.py`):
 
 | Connector | Idempotency keys | Lookup | Conditional writes | Definite | Ambiguous |
