@@ -17,6 +17,7 @@ nothing here has been reviewed by counsel or validated against a regulation.
 | Case conversation message text | `conversation_messages.body` | yes — `conversation_days` (text cleared; row kept) |
 | Audit events, approvals, operations, attempts | their tables (insert-only for the app role where applicable) | no |
 | Invited email address on membership invitations (roles, token **hash**; never the token) | `membership_invitations.email`; not copied into audit events | yes — `invitations_days`, counted from acceptance, withdrawal or expiry (address cleared; row kept). An open invitation keeps its address |
+| Sign-in sessions, including the identity provider's ID token (name, e-mail and other claims) | `user_sessions` | yes, not per tenant: deleted `session_prune_after_hours` (24) after the session expired, went idle or was revoked, by the worker through `ops.prune_sessions` (migration 0021; before 2026-10-28 they were never deleted) |
 | Application logs | process stdout/stderr | not managed by OpsBridge (see Logs) |
 
 Deletion removes stored bytes and free text. It keeps the fact that something existed: the
@@ -116,6 +117,10 @@ parsers and pack mappings as source records. Instructions inside documents are d
 ## Not provided
 
 - No PII discovery across stored data, no data-subject export tooling, no legal hold.
+- User profiles (`users`: name, e-mail, issuer subject) are kept while the account exists;
+  disabling an account at the identity provider ends new sign-ins but not a session that is
+  still valid (sessions are checked locally, up to their idle and absolute limits), and nothing
+  deletes a profile. The deprovisioning policy is the owner's to set (production review A16).
 - No encryption by OpsBridge itself. The local artifact store is plain files under
   `var/artifacts`; the S3 store can request SSE-KMS per upload and relies on the bucket's
   default encryption, not tested against AWS (docs/deployment.md). In a versioned bucket,
