@@ -10,6 +10,7 @@ followed.
 from __future__ import annotations
 
 import re
+import time
 
 import httpx
 
@@ -19,7 +20,18 @@ from opsbridge.simulator.app import org_key
 from . import http_transport
 from .source_contract import FetchedRecord, Listing, SourceRecordInvalid, SourceUnavailable
 
-__all__ = ["FetchedRecord", "PurchasingClient", "SourceRecordInvalid", "SourceUnavailable"]
+__all__ = [
+    "CollectionBudgetExhausted",
+    "FetchedRecord",
+    "PurchasingClient",
+    "SourceRecordInvalid",
+    "SourceUnavailable",
+]
+
+
+class CollectionBudgetExhausted(SourceUnavailable):
+    """The time budget for reading the source in one investigation ran out."""
+
 
 CONNECTOR_VERSION = "purchasing-sim/2"
 MAX_RESPONSE_BYTES = 5 * 1024 * 1024
@@ -42,6 +54,8 @@ class PurchasingClient:
         self.org = org
         # A whole read, slow drip included, may take a few per-request timeouts at most.
         self._total_seconds = 3 * timeout
+        # Set by the caller: a monotonic time after which nothing more is read.
+        self.deadline: float | None = None
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {org_key(master_secret, org)}"},
@@ -99,6 +113,12 @@ class PurchasingClient:
     def _get(
         self, path: str, params: dict[str, str] | None = None
     ) -> http_transport.BoundedResponse:
+        total = self._total_seconds
+        if self.deadline is not None:
+            left = self.deadline - time.monotonic()
+            if left <= 0:
+                raise CollectionBudgetExhausted("the collection time budget is used up")
+            total = min(total, left)
         try:
             r = http_transport.request(
                 self._client,
@@ -106,8 +126,12 @@ class PurchasingClient:
                 path,
                 params=params,
                 max_bytes=MAX_RESPONSE_BYTES,
-                total_seconds=self._total_seconds,
+                total_seconds=total,
             )
+        except http_transport.ReadDeadlineExceeded as exc:
+            if self.deadline is not None and time.monotonic() >= self.deadline:
+                raise CollectionBudgetExhausted("the collection time budget ran out") from exc
+            raise SourceUnavailable(f"{type(exc).__name__} contacting purchasing system") from exc
         except (http_transport.ResponseTooLarge, http_transport.UnsupportedEncoding) as exc:
             raise SourceRecordInvalid(f"response too large or unreadable: {exc}") from exc
         except httpx.HTTPError as exc:  # includes the total deadline
