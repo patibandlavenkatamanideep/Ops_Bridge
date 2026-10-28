@@ -1086,3 +1086,11 @@ staging, pilot owner).
   investigation for minutes. `source_collection_seconds` (120) now bounds the whole
   collection; when it runs out the investigation keeps what it read and goes to manual review
   (`source_collection_timed_out`). Tests: `test_collection_budget.py` (2).
+
+### Ended sessions pruned (2026-10-28, production review A16 in part)
+- Expired, idle and revoked sessions, with the ID tokens they hold, were never deleted. The
+  worker now prunes them `session_prune_after_hours` (24) after they end, through
+  `ops.prune_sessions` (migration 0021, owned by the new NOLOGIN role
+  `opsbridge_session_pruner`, created by the database init script). Test:
+  `test_session_pruning.py`. Profile deletion and IdP disable propagation need the owner's
+  policy.
