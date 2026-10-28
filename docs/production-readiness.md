@@ -39,7 +39,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (build from locks, SBOM, provenance attestation, verification, promote by digest) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed in part, verified locally: behavioural replay comparison; run order explained, declared and tested to fail closed. Its cause (a finding-text defect) is fixed with the next frozen benchmark | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
-| A15 | Capacity and spend bounds unmeasured | Open | 3, 8 | — | Staging for real load figures |
+| A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Open | 3, 8 | — | Identity-provider deprovisioning policy from the owner |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing with each package | all | — | — |
@@ -355,6 +355,23 @@ run (no tag), so its first use is its first test, and no attestation exists yet.
 
 **Not done**: a staging deployment that promotes the attested digest, rollback rehearsal, and
 a vulnerability policy beyond "fixable critical" (the CI image job's current gate).
+
+## Package 3, collection budget (A15, in part)
+
+**Before**: each source request had a deadline but an investigation's reading as a whole had
+none: a receipt listing may follow up to 50 pages and fetch every record, so a slow source
+held an investigation for minutes. In the regression, records delayed 0.7 s each against a
+1 s budget were all read (2.6 s) and the investigation concluded `discrepancies_found`.
+
+**Now**: `source_collection_seconds` (default 120) bounds the whole collection; each read
+gets what is left of it. When it runs out, collection stops, keeps what it read, and the
+investigation goes to manual review (`source_collection_timed_out`) instead of concluding from
+part of the data. Within the budget nothing changes.
+`tests/integration/test_collection_budget.py` (2; the timed-out case failed before).
+
+**Not done**: load measurement on a staging environment (p95/p99, queue age, pool use),
+SLOs agreed with an operator, and spend accounting against provider billing; the 120 s
+default is provisional.
 
 ## Work plan
 
