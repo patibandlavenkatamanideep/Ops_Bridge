@@ -41,7 +41,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Open | 3, 8 | — | Staging for real load figures |
 | A16 | Identity and privacy lifecycle incomplete | Open | 3, 8 | — | Identity-provider deprovisioning policy from the owner |
-| A17 | Image lacks the evaluation evidence the repository verifies | Open, confirmed (`.dockerignore` excludes `evals/runs`) | 8 | — | — |
+| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing with each package | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
@@ -285,6 +285,29 @@ are unchanged.
 **Not done** (staging, A11): per-role database credentials and secret mounts (the compose
 development volume still holds both delegation keys; the containers share one environment
 block), and a parser sandbox with no secrets or network beyond the Linux memory cap.
+
+## Package 8, evidence packaging (A17)
+
+**Decision**: the runtime image serves evaluation *summaries*: results, frozen manifests,
+the signed ledger and its public key. It does not carry the evidence bundle (`evals/runs`:
+cassettes and bound trial files; 83 files, 2.1 MB today), and it does not claim to reproduce
+runs. Full artifact verification and replay run
+from the repository at the commit each result records.
+
+**Before**: `eval-verify` in such an installation reported every record as FAILED (its bound
+files are absent), which reads like tampering. **Now** it verifies what is present, the
+ledger chain and signatures, and says the artifacts are not in this installation and where to
+verify them, exiting 3 (partial) rather than passing. `--summary-only` asks for exactly the
+ledger check and exits 0 when it holds; a tampered ledger still fails.
+
+**Evidence**: `tests/evaluation/test_evidence_packaging.py` (3), using an installation laid
+out like the image (evals/ without runs/): partial and explicit by default (failed before:
+exit 1 with FAILED records), summary-only passes, a tampered ledger fails. In the repository
+`eval-verify` still checks all 26 records' artifacts (gate stage unchanged). The CI image job
+runs both commands inside the built image; the first hosted run of that check is pending.
+
+**Not done**: a separately versioned, checksummed evidence bundle (for example a release
+asset) that a deployment could fetch and verify. Today the bundle lives in the repository.
 
 ## Work plan
 
