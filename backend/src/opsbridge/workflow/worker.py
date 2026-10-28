@@ -22,7 +22,9 @@ from sqlalchemy.exc import DBAPIError
 
 from opsbridge.auth.sessions import prune_sessions
 from opsbridge.config import Settings, get_settings
+from opsbridge.connectors.exports import ExportSource
 from opsbridge.connectors.purchasing import PurchasingClient
+from opsbridge.connectors.source_contract import PurchasingSource
 from opsbridge.connectors.tasks import ConnectorUnavailable, SimTaskConnector, TaskConnector
 from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
@@ -47,7 +49,11 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
     packs = PackRegistry(settings.packs_dir)
     secret = settings.sim_master_secret.get_secret_value()
 
-    def purchasing_for(org: str) -> PurchasingClient:
+    def purchasing_for(org: str) -> PurchasingSource:
+        """The organization's purchasing source: its export when the deployment reads
+        exports, otherwise the simulator."""
+        if settings.purchasing_export_dir is not None:
+            return ExportSource(settings.purchasing_export_dir / org)
         return PurchasingClient(
             settings.simulator_url, secret, org, timeout=settings.connector_timeout_seconds
         )
