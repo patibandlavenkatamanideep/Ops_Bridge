@@ -30,6 +30,13 @@ keys, `var/` and virtual environments never enter the image. Compose profile `ap
   metadata, tokens and keys over `http://keycloak:8080` (`OPSBRIDGE_OIDC_DISCOVERY_URL`,
   dynamic backchannel) while validating the public issuer.
 - MCP DNS-rebinding protection stays on with the service's own address allowed.
+- Evaluation evidence: the image carries results, frozen manifests, the signed ledger and its
+  public key (the evaluation view), not the evidence bundle (`evals/runs`: model and tool
+  cassettes, bound trial files). In the image `opsbridge eval-verify --summary-only` verifies
+  the ledger's chain and signatures; plain `eval-verify` does the same, says the artifacts
+  are not in this installation and exits 3 (partial). Full artifact verification and replay
+  run from the repository at the recorded commit (`make eval-verify`, `make eval-replay-check`);
+  the CI image job checks both behaviours (production review A17).
 
 ## Staging plan (AWS, not provisioned)
 
