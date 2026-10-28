@@ -40,7 +40,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed in part, verified locally: behavioural replay comparison; run order explained, declared and tested to fail closed. Its cause (a finding-text defect) is fixed with the next frozen benchmark | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
-| A16 | Identity and privacy lifecycle incomplete | Open | 3, 8 | — | Identity-provider deprovisioning policy from the owner |
+| A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned. Profile deletion, identity-provider disable propagation, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing with each package | all | — | — |
 
@@ -372,6 +372,28 @@ part of the data. Within the budget nothing changes.
 **Not done**: load measurement on a staging environment (p95/p99, queue age, pool use),
 SLOs agreed with an operator, and spend accounting against provider billing; the 120 s
 default is provisional.
+
+## Package 3, session lifecycle (A16, in part)
+
+**Before**: a session that expired, went idle or was revoked stayed in `user_sessions` for
+good, holding the identity provider's ID token (name, e-mail and other claims); nothing
+deleted them.
+
+**Now**: the worker deletes sessions that ended more than `session_prune_after_hours` (24)
+ago, on its retention schedule, through `ops.prune_sessions` (migration 0021): SECURITY
+DEFINER, owned by the NOLOGIN role `opsbridge_session_pruner`, which may only read and delete
+sessions, while the worker may only execute the function. The role is created by the
+database initialization script (the migrator cannot create roles); 0021 stops with that
+instruction if it is missing. Downgrade and upgrade rehearsed on the test database.
+`tests/integration/test_session_pruning.py`: an active session and one ended five minutes ago
+stay; expired, idle and revoked sessions three days old go. On the development database the
+worker's first run deleted 2,030 ended sessions accumulated from two weeks of browser-test
+sign-ins, each holding an ID token.
+
+**Not done**: deleting user profiles when an account leaves; propagating an identity-provider
+disable to sessions that are still valid (sessions are checked locally up to their idle and
+absolute limits, 30 minutes and 8 hours); backups and object versions. These need the owner's
+deprovisioning policy.
 
 ## Work plan
 
