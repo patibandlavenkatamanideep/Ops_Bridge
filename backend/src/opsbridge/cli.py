@@ -513,22 +513,44 @@ def _eval_rescore(args: argparse.Namespace) -> int:
     return 0
 
 
-def _eval_verify(_args: argparse.Namespace) -> int:
+def _eval_verify(args: argparse.Namespace) -> int:
+    """Verify the evaluation ledger and, where the evidence bundle is present, every record's
+    bound artifacts. The runtime image carries results, manifests, ledger and public key but
+    not the bundle (`evals/runs`): there it verifies chain and signatures, says so, and exits
+    3 (partial) unless `--summary-only` asked for exactly that."""
     import os
 
-    from opsbridge.config import REPO_ROOT
+    from opsbridge import config
     from opsbridge.evaluation import receipt
 
-    os.chdir(REPO_ROOT)
+    os.chdir(config.REPO_ROOT)
     ledger = Path("evals/ledger/opsbridge-bench.jsonl")
-    report = receipt.verify(ledger, Path("evals/keys/opsbridge-eval.pub").read_text().strip())
+    bundle = Path("evals/runs").is_dir()
+    check_artifacts = bundle and not args.summary_only
+    report = receipt.verify(
+        ledger,
+        Path("evals/keys/opsbridge-eval.pub").read_text().strip(),
+        artifacts=check_artifacts,
+    )
     print(f"chain: {report['chain']['message']}")
     print(f"signatures: {report['signatures']['message']}")
     for r in report["artifacts"]:
         print(f"record {r['index']}: {'ok' if r['ok'] else 'FAILED'}")
         if not r["ok"]:
             print(r["output"])
-    return 0 if report["ok"] else 1
+    if not report["ok"]:
+        return 1
+    if check_artifacts:
+        return 0
+    where = (
+        "the evaluation evidence bundle (evals/runs: cassettes and bound trial files) is not "
+        "in this installation; verify it from the repository at the recorded commit "
+        "(make eval-verify)"
+        if not bundle
+        else "skipped (--summary-only)"
+    )
+    print(f"artifacts: not checked: {where}")
+    return 0 if args.summary_only else 3
 
 
 def _probe(args: argparse.Namespace) -> int:
@@ -784,6 +806,11 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=_eval_rescore)
 
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
+    p.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="ledger chain and signatures only (an installation without evals/runs)",
+    )
     p.set_defaults(func=_eval_verify)
 
     p = sub.add_parser("probe", help="health probe for containers (http://127.0.0.1… or tcp://…)")
