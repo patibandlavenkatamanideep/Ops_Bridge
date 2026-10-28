@@ -81,7 +81,10 @@ allowlist (`OPSBRIDGE_GITHUB_REPOSITORY_ALLOWLIST`, JSON list; the sandbox repos
 `OPSBRIDGE_GITHUB_SANDBOX_REPO` is always included), refused otherwise; the credential is a
 secret in the deployment's store, named by the connection's reference and read from
 `OPSBRIDGE_CONNECTION_SECRET_<REF>` (upper case, `-` as `_`), or `OPSBRIDGE_GITHUB_TOKEN` when
-the connection names none; writes refused unless `OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED=true`;
+the connection names none; a reference must be registered by the deployment for that tenant,
+connector and repository (`OPSBRIDGE_CONNECTION_CREDENTIALS`), checked when the connection is
+set and again before the secret is read, so a tenant cannot pick another tenant's credential
+(production review A06); writes refused unless `OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED=true`;
 only synthetic, redacted text plus an opaque marker is sent; tenants can use it only on a tier
 that enables `github_issues`. Approvals bind the repository: moving the connection makes
 pending approvals stale, and dispatch recovers an earlier write in the repository it was
