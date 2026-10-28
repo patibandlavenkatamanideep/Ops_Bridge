@@ -400,7 +400,8 @@ blockers in `docs/production-readiness.md`):
 2. Done locally: A03, versioned evaluation scoring (scoring 2 reports action, correctness
    and outcome disagreement separately; scoring 1 kept for the frozen v1 runs).
 3. Done locally: A05, one admission contract for the executor and the Casework MCP tool.
-   Next: A04 streaming response bounds; A06 public-only verifiers and tenant-owned credential references; A13 behavioural
+   Done locally: A04, streaming response bounds.
+   Next: A06 public-only verifiers and tenant-owned credential references; A13 behavioural
    replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
 4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
    model budget and independent labellers (A09, A10); a cloud account (A11); applying branch
@@ -1028,3 +1029,17 @@ staging, pilot owner).
   `test_unknown_outcome_review.py` (2).
 - Correction: migration 0019 had not reached the evaluation database (a shell quoting
   mistake sent every `-x db=` upgrade to the development database); it has now.
+
+### Responses bounded as they arrive (2026-10-27, production review A04)
+- The purchasing source read a 7 MiB record in full before refusing it against its 5 MiB
+  limit; the task connector had no limit, and an unreadable 201 reply to a create escaped as
+  a raw JSON or key error instead of an ambiguous outcome.
+- `connectors/http_transport.py`: streamed reads stopped at the decoded byte limit, bounded
+  gzip/deflate decoding (other encodings refused), a total read deadline; used by the
+  purchasing source, both task trackers and the Ollama adapter. Unreadable create replies
+  are ambiguous, unreadable lookups prove nothing. Dispatch closes its connector.
+  Tests: `tests/test_http_transport.py` (13).
+- Environment: the shared Podman VM's clock had stopped while the Mac was idle (3 h, later
+  1 h behind), so Keycloak tokens arrived expired and MCP tests failed or stalled. Fixed by
+  setting the VM clock from the host (`podman machine ssh … sudo date -s`); chrony's sources
+  were marked unusable and it would not step again. Not a code change.
