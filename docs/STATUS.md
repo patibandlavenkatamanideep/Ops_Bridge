@@ -1080,3 +1080,9 @@ staging, pilot owner).
   deletion, break-glass through a PR) and `.github/workflows/release.yml` (refuses commits CI
   did not qualify; builds from locks; GHCR; SBOM; provenance attestation, verified; promote by
   digest). Not applied and not run: the owner applies the ruleset and pushes the first tag.
+
+### One time budget for reading the source (2026-10-28, production review A15 in part)
+- Reading the purchasing source had per-request deadlines only; a slow source held an
+  investigation for minutes. `source_collection_seconds` (120) now bounds the whole
+  collection; when it runs out the investigation keeps what it read and goes to manual review
+  (`source_collection_timed_out`). Tests: `test_collection_budget.py` (2).
