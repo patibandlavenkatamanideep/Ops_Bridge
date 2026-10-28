@@ -18,6 +18,7 @@ import pytest
 from pydantic import SecretStr
 from sqlalchemy import Engine, select
 
+from opsbridge.config import ConnectionCredential
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import AuditEvent
 from opsbridge.services import connections
@@ -46,6 +47,12 @@ from .test_approvals_execution import (
 pytestmark = pytest.mark.integration
 T = "/api/v1/tenants/demo-furniture"
 ELSEWHERE = "opsbridge-sandbox/elsewhere"
+# The deployment registers the IT tenant's credential for the repositories it may serve.
+REGISTERED = {
+    "it-github": ConnectionCredential(
+        tenant="demo-it", connector="github_issues", repositories=[SANDBOX_REPO, ELSEWHERE]
+    )
+}
 
 
 @pytest.fixture
@@ -62,6 +69,7 @@ def github(stack, worker_db: Database, monkeypatch: pytest.MonkeyPatch) -> Itera
                 "github_repository_allowlist": [SANDBOX_REPO, ELSEWHERE],
                 "github_live_writes_authorized": True,
                 "github_token": SecretStr("deployment-default-token"),
+                "connection_credentials": REGISTERED,
             }
         )
         stack["exec"]["exec"] = replace(
@@ -191,7 +199,12 @@ def test_connection_changes_are_validated_versioned_and_audited(
 
     admin, settings = (
         it_admin(st, migrator_engine),
-        st["settings"].model_copy(update={"github_repository_allowlist": [SANDBOX_REPO]}),
+        st["settings"].model_copy(
+            update={
+                "github_repository_allowlist": [SANDBOX_REPO],
+                "connection_credentials": REGISTERED,
+            }
+        ),
     )
     for repository, ref, code in (
         ("someone/else", None, "repository_not_allowed"),
