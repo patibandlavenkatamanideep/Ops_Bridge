@@ -227,7 +227,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
             assert tenant is not None
             org = tenant.slug
             version = connections.for_destination(s, tenant_id, destination)
-            token = connections.credential(settings, version, name)
+            token = connections.credential(settings, version, name, org)
         if name == "sim_tasks":
             if destination.get("organization", org) != org:
                 raise ConnectorUnavailable("the approved organization is not this tenant's")
