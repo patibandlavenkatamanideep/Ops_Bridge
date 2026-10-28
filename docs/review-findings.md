@@ -180,7 +180,14 @@ Not covered:
   assistive technology, and usability sessions with operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
-  always does so. Recorded as a harness property, not changed.
+  always does so. Recorded as a harness property, not changed. Explained 2026-10-28 (review
+  A13): a case's first investigation in a run ingests its documents and lists their read
+  problems; a later investigation of the same bytes makes no new version and lists none, so
+  the invoice-extraction finding reads "could not be read reliably ()". That is a product
+  defect (a re-investigation loses the reason) as well as the replay dependence. Fixing it
+  changes the model requests of the recorded security cases, so it waits for the next frozen
+  benchmark; meanwhile the run order is a declared factor and an out-of-order replay is
+  tested to fail closed (`test_replay_mode_order.py`).
 
 ## Migrations and rollback
 
