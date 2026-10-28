@@ -152,6 +152,11 @@ jobs:
         run: |
           test "$(docker run --rm opsbridge/app:ci id -u)" = 10001
           docker run --rm opsbridge/app:ci python -m opsbridge.cli --help > /dev/null
+          # The image carries evaluation results and the signed ledger, not the evidence
+          # bundle (evals/runs): it verifies the ledger, and says full verification is partial.
+          docker run --rm opsbridge/app:ci python -m opsbridge.cli eval-verify --summary-only
+          status=0; docker run --rm opsbridge/app:ci python -m opsbridge.cli eval-verify || status=$?
+          test "$status" = 3
           docker run -d --name api -p 127.0.0.1:8000:8000 \
             -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" opsbridge/app:ci
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
