@@ -354,6 +354,10 @@ Phase 1 exit gate evidence:
 
 ## Known defects and limitations
 
+- An investigation repeated on unchanged source documents loses the reason an invoice could not
+  be read: the finding says "could not be read reliably ()" (read problems are listed only when
+  a document version is first ingested). Outcome and routing are unaffected. The fix changes
+  recorded model requests, so it is planned with the next frozen benchmark (review A13).
 - Rate limiting is shared across API instances (PostgreSQL) but is not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
@@ -1061,3 +1065,18 @@ staging, pilot owner).
   installation without `evals/runs` verifies the ledger, says the artifacts are not there and
   exits 3; `--summary-only` exits 0. Before, it reported every record as FAILED.
   Tests: `tests/evaluation/test_evidence_packaging.py` (3); CI image job runs both commands.
+
+### Behavioural replay and the run-order factor (2026-10-28, production review A13)
+- Replays compare each trial's behaviour, not only its next action (`opsbridge-replay/2`):
+  outcome, types, reason codes, citations, model and tool calls, and (for new runs) digests of
+  findings and citations. All recorded v1 runs reproduce under it.
+- The v1 mock trials depend on the rules-only trials running first: a document's read
+  problems are listed only on its first ingestion in a run (a product defect, listed above,
+  fixed with the next frozen benchmark). Declared; out-of-order replay fails closed
+  (`test_replay_mode_order.py`).
+
+### Branch rules and releases prepared (2026-10-28, production review A12)
+- `infra/github/main-ruleset.json` (PRs only, four CI checks required, no force push or
+  deletion, break-glass through a PR) and `.github/workflows/release.yml` (refuses commits CI
+  did not qualify; builds from locks; GHCR; SBOM; provenance attestation, verified; promote by
+  digest). Not applied and not run: the owner applies the ruleset and pushes the first tag.
