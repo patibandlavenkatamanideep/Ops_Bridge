@@ -122,6 +122,9 @@ class Settings(BaseSettings):
     delegation_public_key_path: Path | None = None
 
     simulator_url: str = "http://localhost:8090"
+    # When set, investigations read each organization's records from an export at
+    # <dir>/<organization> (connectors/exports.py) instead of the simulator.
+    purchasing_export_dir: Path | None = None
     simulator_fault_controls: bool = False
     sim_master_secret: SecretStr = SecretStr("")
 
@@ -171,6 +174,7 @@ class Settings(BaseSettings):
             "evals_dir",
             "delegation_key_path",
             "delegation_public_key_path",
+            "purchasing_export_dir",
         ):
             value: Path | None = getattr(self, name)
             if value is not None and not value.is_absolute():
