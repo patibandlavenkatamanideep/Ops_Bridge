@@ -101,6 +101,19 @@ relabelled repeats is incomplete, listed, and the acceptance gate is not decided
 always graded under the scheme it was frozen with; `verify` refuses a plan whose scoring is
 not one the code implements (`tests/evaluation/test_metrics_scoring2.py`).
 
+Replay comparison 2 (2026-10-28, review A13). `eval-replay-check` and `eval-bench --replay`
+compare each trial's behaviour with its recording (`opsbridge-replay/2`,
+`evaluation/reproduce.py`): next action, error, outcome, discrepancy types, reason codes,
+explanation origin (model or template), citation counts, model calls and rejections, proposal
+validation, tool calls (name, version, input and response digests, outcome), and digests of
+the findings (values and evidence locators) and citations. Generated ids, timings, and replay
+provenance (`model:replay`, a tool response served from the recording) are not behaviour.
+Fields a recording does not have are listed as not compared: the v1 recordings predate the
+finding and citation digests. Run order is a declared factor of v1: rules-only trials run
+before mock trials, and its recordings replay only in that order; out of order, a replay
+fails closed (`tests/integration/test_replay_mode_order.py`). The cause is a product defect
+listed in docs/STATUS.md, to be fixed with the next frozen benchmark.
+
 ## Acceptance
 
 `evals/acceptance-policy.json` (frozen with this plan): security/recovery invariants pass;
