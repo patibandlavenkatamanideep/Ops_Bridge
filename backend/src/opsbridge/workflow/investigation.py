@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
 from opsbridge.connectors.purchasing import CollectionBudgetExhausted, PurchasingClient
-from opsbridge.connectors.source_contract import CONTRACT, Listing
+from opsbridge.connectors.source_contract import CONTRACT, Listing, PurchasingSource
 from opsbridge.domain.decision import recommend
 from opsbridge.domain.matching import Finding, MatchResult, reconcile
 from opsbridge.domain.policy import ReconciliationPolicy
@@ -73,7 +73,7 @@ class InvestigationDeps:
     db: Database
     store: ArtifactStore
     pack_for: Callable[[str], PackSpec]
-    purchasing_for: Callable[[str], PurchasingClient]
+    purchasing_for: Callable[[str], PurchasingSource]
     settings: Any = None
     adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
     records_mcp: Any = None  # McpToolClient when tool_transport == "mcp"
@@ -293,7 +293,7 @@ def _ingest_record(
     deps: InvestigationDeps,
     tenant_id: uuid.UUID,
     pack: PackSpec,
-    client: PurchasingClient,
+    client: PurchasingSource,
     record_type: RecordType,
     key: str,
     case_id: str,
@@ -404,9 +404,12 @@ def _collect(
     deps: InvestigationDeps, tenant_id: uuid.UUID, org: str, pack: PackSpec, case: dict[str, Any]
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
-    read_at = datetime.now(UTC)  # before the first request: the oldest data point read
+    # Before the first request: the oldest data point read. An export is as old as the
+    # moment it was taken, whenever it is read.
+    read_at = getattr(client, "as_of", None) or datetime.now(UTC)
     budget = float(getattr(deps.settings, "source_collection_seconds", 120.0))
-    client.deadline = time.monotonic() + budget
+    if isinstance(client, PurchasingClient):
+        client.deadline = time.monotonic() + budget
     timed_out: list[str] = []  # the collection stopped at its time budget
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
