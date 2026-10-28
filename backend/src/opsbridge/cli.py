@@ -286,6 +286,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
         "receipts": {},
     }
     mode_results: dict[str, dict[str, Any]] = {}
+    mode_trials: dict[str, list[dict[str, Any]]] = {}
     receipts: dict[str, dict[str, Any]] = {}
 
     def progress(_t: dict[str, Any]) -> None:
@@ -321,6 +322,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
                     on_trial=progress,
                 )
                 print()
+                mode_trials[mode] = trials
                 mode_results[mode] = metrics.summarize_mode(
                     trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
                 )
@@ -341,12 +343,29 @@ def _eval_bench(args: argparse.Namespace) -> int:
     summary["acceptance"] = metrics.acceptance(summary, policy, args.split)
     summary["verification"] = receipt.verify(ledger, public_key)
     if kind == "replay":
-        from opsbridge.evaluation.reproduce import differences, recorded_results
+        from opsbridge.evaluation.reproduce import (
+            COMPARISON,
+            differences,
+            recorded_results,
+            trial_differences,
+        )
 
         results_dir = Path(f"evals/results/{args.benchmark}")
         diffs = differences(recorded_results(results_dir, source), mode_results)
+        recorded_trials = {
+            mode: [
+                json.loads(line)
+                for line in (source.parent / f"trials-{mode}.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            for mode in mode_trials
+        }
+        behaviour, not_recorded = trial_differences(recorded_trials, mode_trials)
+        diffs += behaviour
         summary["reproduces"] = {
             "recorded_run": source.parent.name,
+            "comparison": COMPARISON,
+            "not_compared": not_recorded,
             "ok": not diffs,
             "differences": diffs[:100],
         }
@@ -391,7 +410,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     from opsbridge.evaluation.bench import environment
     from opsbridge.evaluation.cassette import ReplayAdapter, ReplayFailure
     from opsbridge.evaluation.egress import EgressBlocked, loopback_only
-    from opsbridge.evaluation.reproduce import differences, recorded_results
+    from opsbridge.evaluation.reproduce import differences, recorded_results, trial_differences
     from opsbridge.simulator.scenarios import load_corpus
 
     os.chdir(REPO_ROOT)
@@ -418,6 +437,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
         adapter = ReplayAdapter.load(cassette)
         check_id = f"check-{split_name}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
         replayed: dict[str, Any] = {}
+        replayed_trials: dict[str, list[dict[str, Any]]] = {}
         try:
             with (
                 loopback_only(),
@@ -436,6 +456,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                             if (t["error"] or "").startswith("ReplayFailure"):
                                 raise ReplayFailure(t["error"])  # fail closed, as recording does
                             trials.append(t)
+                    replayed_trials[mode] = trials
                     replayed[mode] = metrics.summarize_mode(
                         trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
                     )
@@ -444,6 +465,18 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
             failed = True
             continue
         diffs = differences(expected, replayed)
+        recorded_trials = {
+            mode: [
+                json.loads(line)
+                for line in (cassette.parent / f"trials-{mode}.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            for mode in replayed_trials
+        }
+        behaviour, not_recorded = trial_differences(recorded_trials, replayed_trials)
+        diffs += behaviour
+        if not_recorded:
+            print(f"{split_name}: not compared (not in this recording): {', '.join(not_recorded)}")
         counts = ", ".join(
             f"{m} {r['next_action']['correct']}/{r['next_action']['n']}"
             for m, r in replayed.items()
