@@ -30,7 +30,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1) | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Open, confirmed on this branch (`factory.verifier`, `services/connections.credential`) | 3 | — | — |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
 | A08 | No actual purchasing source | Blocked | 5 | Contract harness exists (`purchasing-source/1`, 21 contract tests) | Owner chooses a system or export and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
@@ -252,6 +252,39 @@ twice while the VM clock was being repaired. It never failed in 42 runs without 
 directly, a timed-out create returned a task 1 time in 250 with the reader and 0 in 170
 without (fresh and long-running fake servers). The difference is not significant and no
 mechanism was found; it is recorded rather than dismissed. Watch for it in CI.
+
+## Package 3, keys and credentials (A06)
+
+**Reproduced on this branch**:
+- building a delegation verifier in a deployed environment demanded the private signing key
+  (`factory.verifier` called the private-key loader and took its public half), so every MCP
+  service that only verifies held a key that can mint delegations;
+- a tenant administrator could set a task connection naming another tenant's credential
+  reference, an unregistered one, or one meant for another repository, and dispatch then read
+  that secret (all accepted before: `tests/integration/test_credential_registry.py`).
+
+**Fix**:
+- Delegations carry a key id (`kid`); verifiers are built from public keys only
+  (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or `…_PUBLIC_KEY_PATH`), accept several while keys
+  rotate, refuse an unknown key, and accept a delegation without a key id only when a single
+  key is configured. A deployed verifier without public keys refuses to start; only
+  development derives one from its local key file. `init-keys` writes the public key file and
+  the compose MCP services read it.
+- The deployment registers each credential reference with the tenant, connector and
+  repositories it may serve (`OPSBRIDGE_CONNECTION_CREDENTIALS`). A connection naming an
+  unregistered or foreign reference is refused (`credential_not_registered`), and dispatch
+  checks the registration before reading the secret, so a connection row written around the
+  service still cannot use another tenant's secret. Existing connections whose reference is
+  not registered stop sending until the deployment registers it (fail closed).
+
+**Evidence**: `tests/mcp/test_verifier_keys.py` (5; 4 failed before, the development
+derivation passed before and after) and `test_credential_registry.py` (5; 4 failed before).
+The existing connection tests needed the registration in their settings; their assertions
+are unchanged.
+
+**Not done** (staging, A11): per-role database credentials and secret mounts (the compose
+development volume still holds both delegation keys; the containers share one environment
+block), and a parser sandbox with no secrets or network beyond the Linux memory cap.
 
 ## Work plan
 
