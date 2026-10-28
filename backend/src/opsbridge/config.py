@@ -67,6 +67,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr = SecretStr("")
     session_absolute_hours: int = 8
     session_idle_minutes: int = 30
+    # Ended sessions (and the ID tokens in them) are deleted this long after they ended.
+    session_prune_after_hours: float = Field(default=24.0, gt=0)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     # Per verified user (after the session is checked), and per client address for every
     # API request with or without a cookie: an unverified cookie never selects a budget.
