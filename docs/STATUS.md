@@ -1054,3 +1054,10 @@ staging, pilot owner).
   connection is set and before the secret is read. Unregistered existing references stop
   sending until registered. Tests: `test_verifier_keys.py` (5), `test_credential_registry.py` (5).
 - Not done: per-role secrets and a parser sandbox, which need the staging environment.
+
+### Evaluation evidence in the image (2026-10-28, production review A17)
+- Decided: the image serves evaluation summaries (results, manifests, signed ledger, public
+  key); full verification and replay run from the repository. `eval-verify` in an
+  installation without `evals/runs` verifies the ledger, says the artifacts are not there and
+  exits 3; `--summary-only` exits 0. Before, it reported every record as FAILED.
+  Tests: `tests/evaluation/test_evidence_packaging.py` (3); CI image job runs both commands.
