@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from opsbridge.config import Settings
 from opsbridge.persistence.db import Database, DbContext
@@ -101,6 +101,15 @@ def load_session(db: Database, settings: Settings, token: str | None) -> Session
             idle_expires_at=info[2],
             id_token=info[3],
         )
+
+
+def prune_sessions(db: Database, keep: timedelta) -> int:
+    """Delete sessions that ended (expired, idle or revoked) more than `keep` ago, with the
+    ID tokens they hold; returns how many. Runs as the worker through `ops.prune_sessions`
+    (migration 0021): sessions are otherwise visible only to their own holder."""
+    with db.session(DbContext()) as s:
+        n = s.execute(text("SELECT ops.prune_sessions(:keep)"), {"keep": keep}).scalar_one()
+    return int(n)
 
 
 def revoke_session(db: Database, session_hash: str) -> None:
