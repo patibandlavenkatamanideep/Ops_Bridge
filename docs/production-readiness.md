@@ -42,7 +42,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned. Profile deletion, identity-provider disable propagation, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
-| A18 | Large modules; status documents drift | Ongoing with each package | all | — | — |
+| A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-10-28 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
 22 October) and X1–X7 (found along the way). A01–A18 do not replace them; where they overlap
@@ -397,11 +397,17 @@ deprovisioning policy.
 
 ## Work plan
 
-1. Done: Package 1 (A01, A02), Package 4's metric fix (A03), Package 2 (A05).
-3. Package 3: streaming response bounds (A04); public-only verifiers and tenant-owned
-   credential references (A06).
-4. Package 4: versioned behavioural replay and trial isolation (A13).
-5. Package 8, in-repository part: evidence packaging decision and test (A17); a release
-   workflow and branch-rule settings prepared for the owner (A12).
-6. Blocked until the owner provides access or decisions: A08 (source), A09/A10 (model
-   budget, independent labels), A11 (cloud), A14 (operators), A16 (deprovisioning policy).
+1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
+   A03, A04, A05, A17; in part A06 (public-only verifiers, registered credentials), A13
+   (behavioural replay, run-order factor), A15 (collection budget), A16 (session pruning);
+   prepared for the owner A12 (ruleset, release workflow).
+2. Locally achievable next: A08's first step without access, an export-file source adapter
+   held to the `purchasing-source/1` contract with hand-written fixtures (not proof of any real
+   system).
+3. Needs the owner:
+   - merge PR #17 (A07), apply the `main` ruleset and push the first release tag (A12);
+   - a purchasing system or export and authorization (A08);
+   - a model budget, credential and independent labellers (A09, A10);
+   - a cloud account for staging (A11; also per-role secrets, A06, and load figures, A15);
+   - operator sessions (A14);
+   - a deprovisioning policy (A16).
