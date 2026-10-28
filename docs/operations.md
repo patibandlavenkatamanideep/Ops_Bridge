@@ -183,7 +183,7 @@ Optional local OCR reads such pages so the reviewer sees their text and candidat
 forward-only in practice: each has a `downgrade()`, but downgrades are not exercised against
 production-like data. Release order: migrate, then deploy code that needs the new schema;
 keep schema changes backward compatible for one release so the previous image can still run.
-New cluster-level roles (0004 needs `opsbridge_ops_reader`) come from
+New cluster-level roles (0004 needs `opsbridge_ops_reader`, 0021 `opsbridge_session_pruner`) come from
 `infra/compose/postgres/20-opsbridge-databases.sh` (idempotent; `make infra-up` runs it).
 
 ## Backup and restore
