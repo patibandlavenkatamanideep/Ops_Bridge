@@ -552,7 +552,10 @@ def _probe(args: argparse.Namespace) -> int:
 
 
 def _init_keys(_args: argparse.Namespace) -> int:
-    """Create the delegation signing key once, before services that share it start."""
+    """Create the delegation signing key once, before services that share it start, and
+    write its public key beside it for the services that only verify."""
+    from cryptography.hazmat.primitives import serialization
+
     from opsbridge.config import get_settings
     from opsbridge.mcp_services.auth import load_or_create_key
 
@@ -562,8 +565,14 @@ def _init_keys(_args: argparse.Namespace) -> int:
         return 0
     path = settings.delegation_key_path
     existed = path.exists()
-    load_or_create_key(path)
-    print(f"delegation key {'present' if existed else 'created'} at {path}")
+    key = load_or_create_key(path)
+    public = path.with_suffix(".pub.pem")
+    public.write_bytes(
+        key.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    )
+    print(f"delegation key {'present' if existed else 'created'} at {path}; public key at {public}")
     return 0
 
 
