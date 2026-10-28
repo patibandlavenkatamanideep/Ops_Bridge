@@ -2,7 +2,9 @@
 
 Implements the `purchasing-source/1` contract (`source_contract.py`). Credentials are scoped
 to one org; the base URL comes from configuration (allowlisted), never from documents or
-model output. Responses are size-limited and redirects are not followed.
+model output. Responses are read through `http_transport`: streamed, stopped at the size
+limit as they arrive (not after buffering) and at a total deadline; redirects are not
+followed.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ import httpx
 from opsbridge import safejson
 from opsbridge.simulator.app import org_key
 
+from . import http_transport
 from .source_contract import FetchedRecord, Listing, SourceRecordInvalid, SourceUnavailable
 
 __all__ = ["FetchedRecord", "PurchasingClient", "SourceRecordInvalid", "SourceUnavailable"]
@@ -37,6 +40,8 @@ class PurchasingClient:
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.org = org
+        # A whole read, slow drip included, may take a few per-request timeouts at most.
+        self._total_seconds = 3 * timeout
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             headers={"Authorization": f"Bearer {org_key(master_secret, org)}"},
@@ -91,10 +96,21 @@ class PurchasingClient:
         ctype = r.headers.get("content-type", "application/octet-stream").split(";")[0].strip()
         return FetchedRecord(collection, key, r.content, ctype, r.headers.get("etag"))
 
-    def _get(self, path: str, params: dict[str, str] | None = None) -> httpx.Response:
+    def _get(
+        self, path: str, params: dict[str, str] | None = None
+    ) -> http_transport.BoundedResponse:
         try:
-            r = self._client.get(path, params=params)
-        except httpx.HTTPError as exc:
+            r = http_transport.request(
+                self._client,
+                "GET",
+                path,
+                params=params,
+                max_bytes=MAX_RESPONSE_BYTES,
+                total_seconds=self._total_seconds,
+            )
+        except (http_transport.ResponseTooLarge, http_transport.UnsupportedEncoding) as exc:
+            raise SourceRecordInvalid(f"response too large or unreadable: {exc}") from exc
+        except httpx.HTTPError as exc:  # includes the total deadline
             raise SourceUnavailable(f"{type(exc).__name__} contacting purchasing system") from exc
         if r.status_code in (404, 410):
             raise _NotFound()
@@ -102,8 +118,6 @@ class PurchasingClient:
             raise SourceUnavailable(f"purchasing system returned {r.status_code}")
         if r.status_code != 200:
             raise SourceRecordInvalid(f"purchasing system returned {r.status_code}")
-        if len(r.content) > MAX_RESPONSE_BYTES:
-            raise SourceRecordInvalid("response too large")
         return r
 
 
