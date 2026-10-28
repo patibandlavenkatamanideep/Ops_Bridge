@@ -400,17 +400,17 @@ Phase 1 exit gate evidence:
 Work plan from the production review of 2026-10-27 (findings A01–A18; matrix, evidence and
 blockers in `docs/production-readiness.md`):
 
-1. Done locally: A01 and A02, business-input integrity (validation boundary, migration 0019).
-2. Done locally: A03, versioned evaluation scoring (scoring 2 reports action, correctness
-   and outcome disagreement separately; scoring 1 kept for the frozen v1 runs).
-3. Done locally: A05, one admission contract for the executor and the Casework MCP tool.
-   Done locally: A04, streaming response bounds; A06 in part (public-only verifiers,
-   tenant-registered credentials).
-   Next: A06 public-only verifiers and tenant-owned credential references; A13 behavioural
-   replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
-4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
-   model budget and independent labellers (A09, A10); a cloud account (A11); applying branch
-   rules (A12); operator sessions (A14); a deprovisioning policy (A16).
+1. Done locally (dated entries at the end of this file): A01, A02 (input integrity), A03
+   (versioned scoring), A04 (bounded reads), A05 (one admission contract), A17 (evidence in
+   the image); in part A06 (public-only verifiers, registered credentials), A13 (behavioural
+   replay), A15 (collection budget), A16 (session pruning); prepared A12 (ruleset, release
+   workflow).
+2. Next, locally: an export-file source adapter held to `purchasing-source/1` with
+   hand-written fixtures (A08's first step; proves no real system).
+3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
+   (A12); a purchasing system or export with access (A08); a model budget and independent
+   labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
+   policy (A16).
 
 Earlier plan (2026-10-16), kept for history: the locally achievable build was complete;
 remaining work needed the owner (live GitHub sandbox test, recorded real-model benchmark,
