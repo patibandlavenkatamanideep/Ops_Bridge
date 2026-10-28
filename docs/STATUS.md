@@ -405,8 +405,9 @@ blockers in `docs/production-readiness.md`):
    the image); in part A06 (public-only verifiers, registered credentials), A13 (behavioural
    replay), A15 (collection budget), A16 (session pruning); prepared A12 (ruleset, release
    workflow).
-2. Next, locally: an export-file source adapter held to `purchasing-source/1` with
-   hand-written fixtures (A08's first step; proves no real system).
+2. Done locally since: an export-file source held to `purchasing-source/1` with
+   hand-written fixtures (A08's first step; proves no real system). Next: whatever the
+   owner's answers below unblock.
 3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
    (A12); a purchasing system or export with access (A08); a model budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1094,3 +1095,11 @@ staging, pilot owner).
   `opsbridge_session_pruner`, created by the database init script). Test:
   `test_session_pruning.py`. Profile deletion and IdP disable propagation need the owner's
   policy.
+
+### Export-file purchasing source (2026-10-28, production review A08 first step)
+- `connectors/exports.py` reads an organization's export (files plus an immutable manifest)
+  through `purchasing-source/1`: digests checked, untrusted exports refused (paths outside,
+  repeated identities, mixed snapshots), partial exports never prove absence, and the
+  export's `extracted_at` is the investigation's read time. `OPSBRIDGE_PURCHASING_EXPORT_DIR`
+  selects it. Tests: `test_export_source.py` (15), `test_export_investigation.py` (2).
+  Hand-written exports only; no customer export has been read.
