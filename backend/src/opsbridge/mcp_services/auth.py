@@ -17,9 +17,11 @@ broadly credentialed service cannot exceed the principal's business authority.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -132,25 +134,60 @@ class DelegationSigner:
         ):
             if v is not None:
                 claims[k] = str(v)
-        return jwt.encode(claims, self.private_key, algorithm="EdDSA")
+        return jwt.encode(
+            claims,
+            self.private_key,
+            algorithm="EdDSA",
+            headers={"kid": key_id(self.public_key)},  # which key, while keys rotate
+        )
 
     @property
     def public_key(self) -> Ed25519PublicKey:
         return self.private_key.public_key()
 
 
+def key_id(public_key: Ed25519PublicKey) -> str:
+    """A stable name for a delegation key: the start of its public key's SHA-256."""
+    raw = public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
 @dataclass
 class DelegationVerifier:
-    public_key: Ed25519PublicKey
+    """Verifies delegations with PUBLIC keys only. Several keys are accepted while signing
+    keys rotate; a delegation names its key (`kid`), and one without a name is accepted only
+    when a single key is configured (signers from before key ids)."""
+
+    public_key: Ed25519PublicKey | Sequence[Ed25519PublicKey]
     audience: str
+
+    def _key_for(self, token: str) -> Ed25519PublicKey:
+        keys = (
+            [self.public_key]
+            if isinstance(self.public_key, Ed25519PublicKey)
+            else list(self.public_key)
+        )
+        by_id = {key_id(k): k for k in keys}
+        try:
+            kid = jwt.get_unverified_header(token).get("kid")
+        except jwt.PyJWTError as exc:
+            raise DelegationError(f"invalid delegation token: {type(exc).__name__}") from exc
+        if kid is None:
+            if len(keys) != 1:
+                raise DelegationError("delegation names no key, and several keys are accepted")
+            return keys[0]
+        if kid not in by_id:
+            raise DelegationError("unknown delegation key")
+        return by_id[kid]
 
     def verify(self, token: str | None) -> Delegation:
         if not token:
             raise DelegationError("missing delegation token")
+        key = self._key_for(token)
         try:
             c = jwt.decode(
                 token,
-                self.public_key,
+                key,
                 algorithms=["EdDSA"],
                 audience=self.audience,
                 issuer=DELEGATION_ISSUER,
