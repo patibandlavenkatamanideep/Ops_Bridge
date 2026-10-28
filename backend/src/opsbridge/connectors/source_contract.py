@@ -23,10 +23,12 @@ leaves implicit:
 Keys are the source's stable record identifiers. Credentials are scoped to one organization
 and the base URL comes from configuration, never from documents or model output.
 
-Only the purchasing simulator implements this contract today
-(`connectors/purchasing.py`); no customer purchasing system has been connected or tested
-against it. `tests/contracts/test_purchasing_source_contract.py` is the suite an adapter for
-a real system must pass.
+Two adapters implement this contract: the simulator connector (`connectors/purchasing.py`)
+and the export reader (`connectors/exports.py`, tested with hand-written exports). No customer
+purchasing system or export has been connected or tested against it.
+`tests/contracts/test_purchasing_source_contract.py` is the suite an API adapter for a real
+system must pass; `tests/contracts/test_export_source.py` holds the export reader to the same
+rules.
 """
 
 from __future__ import annotations
