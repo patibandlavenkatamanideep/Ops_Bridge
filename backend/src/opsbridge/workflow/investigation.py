@@ -13,6 +13,7 @@ retried — it is never treated as "the record does not exist".
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -25,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
-from opsbridge.connectors.purchasing import PurchasingClient
+from opsbridge.connectors.purchasing import CollectionBudgetExhausted, PurchasingClient
 from opsbridge.connectors.source_contract import CONTRACT, Listing
 from opsbridge.domain.decision import recommend
 from opsbridge.domain.matching import Finding, MatchResult, reconcile
@@ -404,6 +405,9 @@ def _collect(
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
     read_at = datetime.now(UTC)  # before the first request: the oldest data point read
+    budget = float(getattr(deps.settings, "source_collection_seconds", 120.0))
+    client.deadline = time.monotonic() + budget
+    timed_out: list[str] = []  # the collection stopped at its time budget
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
     unavailable: list[str] = []
@@ -479,6 +483,11 @@ def _collect(
                         f"{record_type.replace('_', ' ')}s for {po_no}: more than "
                         f"{listing.pages} pages"
                     )
+    except CollectionBudgetExhausted:
+        # Keep what was read; what was not read is unknown, so nothing is concluded.
+        timed_out.append(
+            f"stopped after {budget:g} s with {len(linked)} document(s) read; the rest was not read"
+        )
     finally:
         client.close()
     problems.extend(f"{w}: no longer in the purchasing system; not used" for w in withdrawn)
@@ -488,6 +497,7 @@ def _collect(
         "refused": refused,
         "withdrawn": withdrawn,
         "incomplete": incomplete,
+        "timed_out": timed_out,
         "problems": problems,
         "po_number": po_no,
         "source": {
@@ -621,6 +631,25 @@ def _match(
                 "The source system's current document could not be read ("
                 + "; ".join(collected["refused"])[:400]
                 + "). Earlier extractions were not used; a person must review it.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    if collected.get("timed_out"):
+        findings.append(
+            _manual_finding(
+                "source_collection_timed_out",
+                "Reading the purchasing system took longer than its time budget ("
+                + "; ".join(collected["timed_out"])[:400]
+                + "). Nothing was concluded from the part that was read; run the "
+                "investigation again or have a person review it.",
             )
         )
         return {
@@ -1138,6 +1167,7 @@ def _readiness(outcome: str, collected: dict[str, Any]) -> str:
     if (
         collected.get("unavailable")
         or collected.get("incomplete")
+        or collected.get("timed_out")
         or outcome == "needs_information"
     ):
         return "incomplete"
