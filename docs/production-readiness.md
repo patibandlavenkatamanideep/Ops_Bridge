@@ -36,8 +36,8 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Recommendation pending; repository settings are the owner's | 8 | — | Owner applies branch rules |
-| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Open | 4 | Recorded in `docs/review-findings.md` | — |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (build from locks, SBOM, provenance attestation, verification, promote by digest) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag |
+| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed in part, verified locally: behavioural replay comparison; run order explained, declared and tested to fail closed. Its cause (a finding-text defect) is fixed with the next frozen benchmark | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Open | 3, 8 | — | Staging for real load figures |
 | A16 | Identity and privacy lifecycle incomplete | Open | 3, 8 | — | Identity-provider deprovisioning policy from the owner |
@@ -308,6 +308,53 @@ runs both commands inside the built image; the first hosted run of that check is
 
 **Not done**: a separately versioned, checksummed evidence bundle (for example a release
 asset) that a deployment could fetch and verify. Today the bundle lives in the repository.
+
+## Package 4, behavioural replay (A13)
+
+**Before**: a replay reproduced its recording if every repeat's next action matched; outcome,
+types, reason codes, citations, model calls and tool calls could change unnoticed.
+
+**Now** (`opsbridge-replay/2`, `evaluation/reproduce.py::trial_differences`): each trial is
+compared field by field with its recording, ignoring only generated ids, timings and replay
+provenance; a missing or extra repeat is a difference; a field the recording lacks is listed
+as not compared. New trials also record digests of the findings (values and evidence
+locators) and citations. `eval-replay-check` and `eval-bench --replay` use it. Every recorded
+v1 run reproduces under it (held-out 36/40 both modes, security 7/7); the finding and citation
+digests are reported as not in those recordings. A first version flagged 120 differences that
+were only the explanation's provider label (`model:mock` recorded, `model:replay` replayed),
+which is provenance and is now compared as model versus template.
+
+**Run order**: replaying the frozen security recording's mock trials alone diverges at
+`fur-security-304` and fails closed; in reversed order all seven cases fail. Cause: read
+problems are listed only on a document's first ingestion in a run, so the invoice-extraction
+finding, and the model request built from it, depend on which trial investigated first. This
+is also a product defect (a re-investigation loses the reason an invoice could not be read),
+listed in docs/STATUS.md. Fixing it changes the recorded requests, so it is planned with the
+next frozen benchmark; the frozen order is declared, and
+`tests/integration/test_replay_mode_order.py` checks that the frozen order reproduces and
+other orders fail closed rather than differ quietly. Three validation cases recorded fresh
+replay in any order (no such document among them).
+
+**Evidence**: `tests/evaluation/test_reproduce.py` (3 new), `test_replay_mode_order.py` (3).
+
+## Package 8, governance and releases (A12)
+
+**Prepared** (nothing applied; repository administration and publishing are the owner's):
+- `infra/github/main-ruleset.json`: pull requests only, the four CI jobs required on the
+  latest commit, review threads resolved, no force push or deletion; administrators may
+  bypass only through a pull request (break-glass). Required approvals 0 while there is one
+  maintainer. The check names were matched against the CI job names. The apply command is in
+  docs/deployment.md.
+- `.github/workflows/release.yml`: on a version tag it refuses a commit whose required CI
+  checks did not all succeed, builds from the locks, pushes to GHCR, attaches an SPDX SBOM and
+  a build-provenance attestation, verifies the attestation, and reports the digest to
+  promote. Actions pinned to commits of releases at least two weeks old.
+
+**Evidence**: YAML and JSON parse; the required-check names match CI. The workflow has not
+run (no tag), so its first use is its first test, and no attestation exists yet.
+
+**Not done**: a staging deployment that promotes the attested digest, rollback rehearsal, and
+a vulnerability policy beyond "fixable critical" (the CI image job's current gate).
 
 ## Work plan
 
