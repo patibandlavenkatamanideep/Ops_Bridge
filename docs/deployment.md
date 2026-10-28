@@ -38,6 +38,28 @@ keys, `var/` and virtual environments never enter the image. Compose profile `ap
   run from the repository at the recorded commit (`make eval-verify`, `make eval-replay-check`);
   the CI image job checks both behaviours (production review A17).
 
+## Branch rules and releases (prepared; the owner applies them)
+
+**Branch rules for `main`** (`infra/github/main-ruleset.json`, production review A12): changes
+arrive by pull request, the four CI jobs must pass on the latest commit, review threads must
+be resolved, and force pushes and deletion are refused. With one maintainer the required
+approving reviews are 0; raise `required_approving_review_count` to 1 when a second maintainer
+joins. Break-glass: repository administrators may bypass the rules only by merging a pull
+request (`bypass_mode: pull_request`), and should say why in that pull request. Not applied: it
+changes repository administration. To apply (repository owner):
+
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/main-ruleset.json
+
+**Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI passed
+(`git tag v0.2.0 <commit> && git push origin v0.2.0`). The workflow refuses a commit whose four
+required checks did not all succeed, builds the image from the locks, pushes it to
+`ghcr.io/<owner>/opsbridge:<tag>`, attaches an SPDX SBOM and a build-provenance attestation,
+and verifies the attestation (`gh attestation verify`) before reporting the digest. Deploy
+and roll back by **digest**, never by tag. A schema migration must work with the previous
+release's code until that release is retired (add first, remove later), so rolling back the
+image does not need a down-migration. Not yet run: no tag exists, so its first use is its
+first test.
+
 ## Staging plan (AWS, not provisioned)
 
 No cloud account was named. This is a small, conventional container option; Azure
