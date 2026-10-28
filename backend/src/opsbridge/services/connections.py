@@ -5,9 +5,13 @@ simulator organization or the GitHub repository) is what an approval binds, so p
 connection elsewhere makes pending approvals stale instead of redirecting them, and dispatch
 recovers an earlier write at the approved destination. `credential_ref` names a secret in the
 deployment's secret store, read here from `OPSBRIDGE_CONNECTION_SECRET_<REF>` (upper case,
-`-` as `_`); the secret is never stored or shown. A GitHub connection without a reference uses
-the deployment's `OPSBRIDGE_GITHUB_TOKEN`. Repositories must be on the deployment's allowlist,
-and live GitHub writes stay off unless the deployment authorizes them.
+`-` as `_`); the secret is never stored or shown. A reference must be registered by the
+deployment for this tenant, connector and repository (`connection_credentials`): checked when
+the connection is set and again before the secret is read, so a tenant cannot use another
+tenant's credential, nor one a repository allowlist happens to permit. A GitHub connection
+without a reference uses the deployment's `OPSBRIDGE_GITHUB_TOKEN`. Repositories must be on
+the deployment's allowlist, and live GitHub writes stay off unless the deployment authorizes
+them.
 """
 
 from __future__ import annotations
@@ -23,6 +27,7 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import TIERS, Principal, require
+from opsbridge.config import ConnectionCredential as ConnectionCredential
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import TaskConnection, Tenant, TenantSettings, User
 
@@ -79,16 +84,38 @@ def for_destination(
     return next((c for c in rows if c.destination == destination), None)
 
 
-def credential(settings: Any, conn: TaskConnection | None, connector: str) -> str | None:
-    """The secret a connection version uses, or None when it is not configured or the version
-    was revoked (a revoked credential is not used again, not even to recover a write). The
-    simulator's credential is derived per organization; GitHub without a reference (or with
-    no connection, for operations approved before 0017) uses the deployment token."""
+def registered(
+    settings: Any, ref: str, tenant: str, connector: str, repository: str | None
+) -> bool:
+    """Whether the deployment registered `ref` for this tenant, connector and repository."""
+    grant: ConnectionCredential | None = (
+        getattr(settings, "connection_credentials", None) or {}
+    ).get(ref)
+    return (
+        grant is not None
+        and grant.tenant == tenant
+        and grant.connector == connector
+        and (repository or "").lower() in {r.lower() for r in grant.repositories}
+    )
+
+
+def credential(
+    settings: Any, conn: TaskConnection | None, connector: str, tenant: str
+) -> str | None:
+    """The secret a connection version uses, or None when it is not configured, not
+    registered to `tenant` (slug) and the version's destination, or the version was revoked
+    (a revoked credential is not used again, not even to recover a write). Registration is
+    checked before the secret is read. The simulator's credential is derived per
+    organization; GitHub without a reference (or with no connection, for operations
+    approved before 0017) uses the deployment token."""
     if connector == "sim_tasks":
         return None
     if conn is not None and conn.status == "revoked":
         return None
     if conn is not None and conn.credential_ref:
+        repository = (conn.destination or {}).get("repository")
+        if not registered(settings, conn.credential_ref, tenant, connector, repository):
+            return None
         return os.environ.get(SECRET_PREFIX + conn.credential_ref.upper().replace("-", "_"))
     token = getattr(settings, "github_token", None)
     return token.get_secret_value() if token else None
@@ -99,6 +126,11 @@ def allowed_repositories(settings: Any) -> frozenset[str]:
     if getattr(settings, "github_sandbox_repo", None):
         names.append(settings.github_sandbox_repo)
     return frozenset(n.lower() for n in names)
+
+
+def _slug(s: Session, tenant_id: uuid.UUID) -> str:
+    tenant = s.get(Tenant, tenant_id)
+    return tenant.slug if tenant is not None else ""
 
 
 def view(s: Session, conn: TaskConnection, settings: Any) -> dict[str, Any]:
@@ -120,7 +152,7 @@ def view(s: Session, conn: TaskConnection, settings: Any) -> dict[str, Any]:
         "credential_ref": conn.credential_ref,
         "credential_source": source,
         "credential_configured": conn.connector == "sim_tasks"
-        or credential(settings, conn, conn.connector) is not None,
+        or credential(settings, conn, conn.connector, _slug(s, conn.tenant_id)) is not None,
         "status": conn.status,
         "reason": conn.reason,
         "created_at": conn.created_at.isoformat(),
@@ -195,6 +227,14 @@ def change(
                 raise Conflict(
                     "invalid_task_connection",
                     "A credential reference is lower-case letters, digits, '-' and '_'.",
+                )
+            if credential_ref is not None and not registered(
+                settings, credential_ref, tenant.slug, connector, repo
+            ):
+                raise Conflict(
+                    "credential_not_registered",
+                    f"Credential reference {credential_ref!r} is not registered for this "
+                    f"organization and repository {repo!r}; ask the deployment's operator.",
                 )
             destination = {"connector": connector, "repository": repo}
         else:
