@@ -400,7 +400,8 @@ blockers in `docs/production-readiness.md`):
 2. Done locally: A03, versioned evaluation scoring (scoring 2 reports action, correctness
    and outcome disagreement separately; scoring 1 kept for the frozen v1 runs).
 3. Done locally: A05, one admission contract for the executor and the Casework MCP tool.
-   Done locally: A04, streaming response bounds.
+   Done locally: A04, streaming response bounds; A06 in part (public-only verifiers,
+   tenant-registered credentials).
    Next: A06 public-only verifiers and tenant-owned credential references; A13 behavioural
    replay; A17 evidence packaging; A12 release workflow and branch-rule settings prepared.
 4. Needs the owner: merge PR #17 (A07); a purchasing system or export with access (A08); a
@@ -1043,3 +1044,13 @@ staging, pilot owner).
   1 h behind), so Keycloak tokens arrived expired and MCP tests failed or stalled. Fixed by
   setting the VM clock from the host (`podman machine ssh … sudo date -s`); chrony's sources
   were marked unusable and it would not step again. Not a code change.
+
+### Public-only verifiers and registered credentials (2026-10-28, production review A06)
+- MCP verifiers needed the private signing key; now they are built from public keys
+  (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` / `…_PATH`), delegations carry a key id, and keys can
+  rotate with an overlap. A deployed verifier without public keys refuses to start.
+- A tenant could name any credential reference; now the deployment registers each one for a
+  tenant, connector and repositories (`OPSBRIDGE_CONNECTION_CREDENTIALS`), checked when the
+  connection is set and before the secret is read. Unregistered existing references stop
+  sending until registered. Tests: `test_verifier_keys.py` (5), `test_credential_registry.py` (5).
+- Not done: per-role secrets and a parser sandbox, which need the staging environment.
