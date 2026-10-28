@@ -165,7 +165,8 @@ standard AWS chain), never from settings.
 
 **Database roles.** Run the SQL in `infra/compose/postgres/10-opsbridge-roles.sh` and
 `20-opsbridge-databases.sh` once with the master user (roles are NOSUPERUSER NOBYPASSRLS;
-`opsbridge_ops_reader` is NOLOGIN), then migrations as `opsbridge_migrator`.
+`opsbridge_ops_reader` and `opsbridge_session_pruner` are NOLOGIN), then migrations as
+`opsbridge_migrator`.
 
 **Rollout and rollback.** Build the image in CI from the locks, tag it with the commit SHA,
 run the bootstrap task (migrations) first, then update the services. ECS deployment
