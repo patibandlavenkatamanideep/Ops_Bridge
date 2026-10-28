@@ -23,6 +23,11 @@ import httpx
 from opsbridge import safejson
 from opsbridge.simulator.app import org_key
 
+from . import http_transport
+
+# A tracker reply is one task or one page of them: far below this.
+MAX_TRACKER_RESPONSE_BYTES = 1024 * 1024
+
 Consistency = Literal["strong", "eventual", "none"]
 
 
@@ -174,7 +179,7 @@ class SimTaskConnector:
         """The tracker's advertised (idempotency keys, lookup, request deadlines), or None if
         it could not say. A tracker that does not mention deadlines does not honour them."""
         try:
-            r = self._client.get(f"/orgs/{self.org}/capabilities", timeout=3.0)
+            r = self._read("GET", f"/orgs/{self.org}/capabilities", 3.0)
             if r.status_code == 200:
                 d = safejson.response_json(r)
                 lookup = d.get("lookup")
@@ -218,21 +223,25 @@ class SimTaskConnector:
             "marker": req.marker,
         }
         try:
-            r = self._client.post(
-                f"/orgs/{self.org}/tasks", json=body, headers=headers, timeout=timeout
-            )
+            r = self._read("POST", f"/orgs/{self.org}/tasks", timeout, json=body, headers=headers)
         except (
             httpx.TimeoutException,
             httpx.RemoteProtocolError,
             httpx.ReadError,
             httpx.WriteError,
+            httpx.DecodingError,
         ) as exc:
-            # The request may have reached the provider and been committed.
+            # The request may have reached the provider and been committed (an unreadable or
+            # oversized reply included).
             raise AmbiguousFailure(f"{type(exc).__name__} during create") from exc
         except httpx.ConnectError as exc:  # never reached the provider
             raise DefiniteFailure(f"connection refused: {exc}", retryable=True) from exc
         if r.status_code in (200, 201):
-            return self._task(safejson.response_json(r))
+            try:
+                return self._task(safejson.response_json(r))
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                # The tracker said it created something; what it is cannot be read.
+                raise AmbiguousFailure(f"created, but the reply was unreadable: {exc}") from exc
         if r.status_code in (503, 504) and r.headers.get("x-sim-not-committed") == "true":
             raise DefiniteFailure(
                 "provider did not commit the task", retryable=True, status=r.status_code
@@ -247,24 +256,42 @@ class SimTaskConnector:
 
     def get(self, remote_ref: str, timeout: float) -> RemoteTask | None:
         try:
-            r = self._client.get(f"/orgs/{self.org}/tasks/{remote_ref}", timeout=timeout)
+            r = self._read("GET", f"/orgs/{self.org}/tasks/{remote_ref}", timeout)
         except httpx.HTTPError as exc:
             raise LookupUnavailable(f"read-back failed: {type(exc).__name__}") from exc
         if r.status_code == 404:
             return None
         if r.status_code != 200:
             raise LookupUnavailable(f"read-back returned {r.status_code}")
-        return self._task(safejson.response_json(r))
+        try:
+            return self._task(safejson.response_json(r))
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise LookupUnavailable(f"read-back reply unreadable: {exc}") from exc
 
     def find_by_marker(self, marker: str, timeout: float) -> list[RemoteTask]:
         if self.capabilities.lookup == "none":
             raise LookupUnavailable("connector declares no lookup capability")
         try:
-            r = self._client.get(
-                f"/orgs/{self.org}/tasks", params={"marker": marker}, timeout=timeout
-            )
+            r = self._read("GET", f"/orgs/{self.org}/tasks", timeout, params={"marker": marker})
         except httpx.HTTPError as exc:
             raise LookupUnavailable(f"lookup failed: {type(exc).__name__}") from exc
         if r.status_code != 200:
             raise LookupUnavailable(f"lookup returned {r.status_code}")
-        return [self._task(d) for d in safejson.response_json(r).get("items", [])]
+        try:
+            return [self._task(d) for d in safejson.response_json(r).get("items", [])]
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            # An unreadable answer proves nothing about absence.
+            raise LookupUnavailable(f"lookup reply unreadable: {exc}") from exc
+
+    def _read(
+        self, method: str, path: str, timeout: float, **kwargs: Any
+    ) -> http_transport.BoundedResponse:
+        return http_transport.request(
+            self._client,
+            method,
+            path,
+            timeout=timeout,
+            max_bytes=MAX_TRACKER_RESPONSE_BYTES,
+            total_seconds=timeout,
+            **kwargs,
+        )
