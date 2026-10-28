@@ -12,6 +12,7 @@ import time
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
@@ -19,6 +20,7 @@ from opentelemetry.trace import SpanKind
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 
+from opsbridge.auth.sessions import prune_sessions
 from opsbridge.config import Settings, get_settings
 from opsbridge.connectors.purchasing import PurchasingClient
 from opsbridge.connectors.tasks import ConnectorUnavailable, SimTaskConnector, TaskConnector
@@ -161,7 +163,8 @@ class Worker:
             _mark_run_failed(self.db, job, error)
 
     def _maybe_schedule(self) -> None:
-        """Enqueue due retention sweeps at most every `retention_schedule_seconds`."""
+        """Enqueue due retention sweeps, and prune ended sessions, at most every
+        `retention_schedule_seconds`."""
         every = self.settings.retention_schedule_seconds
         if not every or "retention_sweep" not in self.handlers:
             return
@@ -171,6 +174,10 @@ class Worker:
         n = schedule_retention(self.db)
         if n:
             log.info("scheduled %d retention sweep(s)", n)
+        keep = timedelta(hours=self.settings.session_prune_after_hours)
+        pruned = prune_sessions(self.db, keep)
+        if pruned:
+            log.info("pruned %d ended session(s)", pruned)
 
     def run_forever(self) -> None:
         log.info("worker %s started; handlers=%s", self.worker_id, sorted(self.handlers))
