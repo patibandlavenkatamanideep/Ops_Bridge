@@ -6,7 +6,7 @@ import uuid
 from typing import Any
 
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from opsbridge.config import Settings
 from opsbridge.connectors.tasks import ConnectorCapabilities, SimTaskConnector
@@ -43,8 +43,35 @@ def signer(settings: Settings) -> DelegationSigner:
     return DelegationSigner(delegation_key(settings))
 
 
+def public_keys(settings: Settings) -> list[Ed25519PublicKey]:
+    """The keys delegations are verified with: configured PEMs and/or a file of PEM blocks.
+    Without either, only development derives one from its local key file; a deployed
+    verifier must not be able to sign, so it is given public keys and nothing else."""
+    pems = list(settings.delegation_public_keys)
+    path = settings.delegation_public_key_path
+    if path is not None and path.exists():
+        pems += [
+            f"-----BEGIN PUBLIC KEY-----{block}"
+            for block in path.read_text().split("-----BEGIN PUBLIC KEY-----")[1:]
+        ]
+    keys: list[Ed25519PublicKey] = []
+    for pem in pems:
+        key = serialization.load_pem_public_key(pem.strip().encode())
+        if not isinstance(key, Ed25519PublicKey):
+            raise DelegationError("a configured delegation public key is not Ed25519")
+        keys.append(key)
+    if keys:
+        return keys
+    if settings.deployed:
+        raise DelegationError(
+            "no delegation public key: give verifying services "
+            "OPSBRIDGE_DELEGATION_PUBLIC_KEYS or OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH"
+        )
+    return [delegation_key(settings).public_key()]  # development only
+
+
 def verifier(settings: Settings, audience: str) -> DelegationVerifier:
-    return DelegationVerifier(delegation_key(settings).public_key(), audience)
+    return DelegationVerifier(public_keys(settings), audience)
 
 
 def worker_tokens(settings: Settings) -> ClientCredentialsTokens:
