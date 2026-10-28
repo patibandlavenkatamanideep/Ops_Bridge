@@ -101,6 +101,15 @@ fine-grained token limited to that repository with Issues read/write, then
 OPSBRIDGE_RUN_LIVE=github uv --directory backend run pytest tests/live -q`. Until that run
 happens, the connector is **not** live-verified.
 
+## Purchasing exports (`connectors/exports.py`)
+
+Reads an organization's export (`OPSBRIDGE_PURCHASING_EXPORT_DIR/<organization>/`: files plus
+a `manifest.json`, `opsbridge-export/1`) through the same `purchasing-source/1` contract as the
+simulator connector. Files are checked against their SHA-256 digests; untrusted exports
+(paths outside the export, repeated identities, mixed snapshots, unknown schema) are refused;
+the investigation's read time is the export's `extracted_at`. Format and rules:
+docs/integration-onboarding.md, "Exports". Tested only with hand-written exports.
+
 ## Purchasing simulator
 
 A separate FastAPI service with its own SQLite store, per-org HMAC credentials and native
