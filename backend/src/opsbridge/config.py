@@ -156,6 +156,9 @@ class Settings(BaseSettings):
     # An investigation's purchasing data may be acted on (proposals, approvals, dispatch,
     # resolution) for this long after it was read; then the investigation must be re-run.
     source_max_age_hours: float = Field(default=24.0, gt=0)
+    # Reading the purchasing source for one investigation stops after this long (every page
+    # and record together); what was read is kept and nothing is concluded from it.
+    source_collection_seconds: float = Field(default=120.0, gt=0)
 
     @model_validator(mode="after")
     def _absolute_paths(self) -> Settings:
