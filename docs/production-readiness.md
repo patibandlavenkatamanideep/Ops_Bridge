@@ -32,7 +32,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
-| A08 | No actual purchasing source | Blocked | 5 | Contract harness exists (`purchasing-source/1`, 21 contract tests) | Owner chooses a system or export and authorizes access |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only) | 5 | See "Package 5, export source" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
@@ -395,15 +395,42 @@ disable to sessions that are still valid (sessions are checked locally up to the
 absolute limits, 30 minutes and 8 hours); backups and object versions. These need the owner's
 deprovisioning policy.
 
+## Package 5, export source (A08's first step, not proof of any real system)
+
+**Added** (`connectors/exports.py`): a purchasing source read from an export, a directory per
+organization with the record files and an immutable manifest (`opsbridge-export/1`), held to
+the `purchasing-source/1` rules:
+- absence only when stated, so a partial export's missing record is unknown and goes to review;
+- completeness only when declared;
+- withdrawals listed.
+
+Every file is checked against its SHA-256. An export is refused for a path outside it, a
+repeated or conflicting identity, a record modified after `extracted_at` (a mixed snapshot),
+an unknown schema or a malformed manifest. The investigation records the export's
+`extracted_at` as its read time, so an old export cannot be acted on after the age limit,
+however recently it was read. `OPSBRIDGE_PURCHASING_EXPORT_DIR` switches investigations from the
+simulator to exports (`build_investigation_deps`). Production still refuses to start: no real
+source has been validated.
+
+**Evidence**: `tests/contracts/test_export_source.py` (15). Disabling the digest check, the
+mixed-snapshot check, or partial-export absence each makes a test fail.
+`tests/integration/test_export_investigation.py` (2): a hand-written IT-pack export of
+PO-2001, INV-7001 and a receipt of 8 gives the same quantity shortfall as the simulator, and a
+two-day-old export cannot be proposed on. Using the read time instead of `extracted_at`
+makes both fail.
+
+**Not done**: any customer export or system. The fixtures are hand-written, not captured
+from a real export; a real one needs its own sanitized fixtures, a pack mapping for its
+fields, and a decision on how exports are delivered and kept.
+
 ## Work plan
 
 1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
    A03, A04, A05, A17; in part A06 (public-only verifiers, registered credentials), A13
    (behavioural replay, run-order factor), A15 (collection budget), A16 (session pruning);
    prepared for the owner A12 (ruleset, release workflow).
-2. Locally achievable next: A08's first step without access, an export-file source adapter
-   held to the `purchasing-source/1` contract with hand-written fixtures (not proof of any real
-   system).
+2. Done locally since: A08's first step without access, an export-file source held to the
+   `purchasing-source/1` contract with hand-written fixtures (not proof of any real system).
 3. Needs the owner:
    - merge PR #17 (A07), apply the `main` ruleset and push the first release tag (A12);
    - a purchasing system or export and authorization (A08);
