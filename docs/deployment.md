@@ -72,8 +72,13 @@ the sizes above are conventional starting points, not measurements.
 definitions): PostgreSQL passwords for migrator, app, worker and mcp roles (plus the master
 user, kept out of the application); OIDC client secret; worker client secret; session secret
 (≥ 32 chars); delegation Ed25519 private key (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`, PEM; used directly and
-never written to disk — production refuses to start the signer or verifier without it or an
-existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
+never written to disk; given to the API and worker only, which sign) and its public key for
+the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
+`OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH`; a deployed verifier refuses to start without one and
+never loads the private key; list old and new keys together while rotating, then drop the old
+one after the longest delegation lifetime, 5 minutes); the registry of task-connection
+credentials (`OPSBRIDGE_CONNECTION_CREDENTIALS`: reference → tenant, connector, repositories)
+with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`; metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
 
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
