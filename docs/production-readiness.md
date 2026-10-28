@@ -28,7 +28,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A01 | Malformed or empty invoice lines became a clean match, and the case could be resolved | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1) | 4 | See "Package 4, metrics" below | — |
-| A04 | Response size checked after buffering the whole body | Open, confirmed on this branch (`connectors/purchasing.py::_get`) | 3 | — | — |
+| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Open, confirmed on this branch (`factory.verifier`, `services/connections.credential`) | 3 | — | — |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
@@ -206,6 +206,52 @@ dev stack was restarted for Package 2's gate.
 **Not covered**: the admission point is when the tool reads committed state; a change
 committed after that is too late for the write in flight, and a request the tracker accepted
 cannot be withdrawn. GitHub through the casework tool is not supported.
+
+## Package 3, transport bounds (A04)
+
+**Reproduced on this branch**: the purchasing connector read all 7,340,032 bytes of a 7 MiB
+streamed record before refusing it against its 5 MiB limit; the simulator task connector had
+no limit at all, and a 201 reply to a create whose body was malformed, lacked the task id or
+was 2 MiB of junk escaped as a raw `JSONDecodeError` or `KeyError` instead of an ambiguous
+outcome.
+
+**Fix** (`connectors/http_transport.py`): every outside response OpsBridge parses is
+streamed and its *decoded* bytes counted as they arrive; the read stops and the connection
+closes as soon as the count passes the limit, whatever Content-Length claims (a declared
+length past the limit is refused before reading). Gzip and deflate are decoded here with each
+step capped at what the limit still allows; other encodings are refused, and only these two
+are offered. A total deadline covers the whole read, so a body trickling in just inside the
+per-read timeout stops there. The errors subclass httpx's own, so callers keep their
+meaning:
+- purchasing source: oversized or undecodable → invalid record; total deadline →
+  unavailable (never "not found"); limit 5 MiB, deadline 3× the request timeout;
+- task trackers (simulator, GitHub): an unreadable or oversized reply to a create is
+  **ambiguous** (the task may exist) and is reconciled; an unreadable read-back or lookup is
+  "lookup unavailable", never proof of absence; limits 1 MiB and 8 MiB;
+- Ollama: model list 1 MiB, reply 8 MiB; an unreadable reply is "model unavailable", so the
+  rules-only fallback applies.
+The executor now closes each dispatch's connector, and the GitHub connector has a `close`.
+
+**Evidence**: `tests/test_http_transport.py` (13): 7 MiB stream stopped within one chunk of
+5 MiB; a lying Content-Length; a declared oversize refused before reading; 64 MiB of zeros
+compressed with gzip and deflate stopped at the limit; an ordinary compressed body read back
+exactly; Brotli refused; a slow drip stopped at the total deadline; the purchasing source
+stopping early and reporting a stalled read as unavailable; three unreadable 201 replies to a
+create classified as ambiguous. The connector cases failed before as described. The 36
+source-contract tests pass unchanged.
+
+**Not covered**: the MCP SDK's HTTP client and the Anthropic SDK read their own responses
+(not routed through this module); a response already held in memory (test transports only)
+is checked after the fact. Total source-collection time is bounded per request (pages ×
+deadline), not as one budget.
+
+**Open observation**: `tests/contracts/test_github_connector.py::test_ambiguous_failures_never_claim_absence[timeout_after]`
+(a create whose reply comes after the client's timeout must be ambiguous) failed 3 times in
+73 whole-file runs with the bounded reader: once in a gate run during which the Mac slept,
+twice while the VM clock was being repaired. It never failed in 42 runs without it. Run
+directly, a timed-out create returned a task 1 time in 250 with the reader and 0 in 170
+without (fresh and long-running fake servers). The difference is not significant and no
+mechanism was found; it is recorded rather than dismissed. Watch for it in CI.
 
 ## Work plan
 
