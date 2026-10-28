@@ -155,20 +155,24 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
                 deps, job, snapshot, "failed", category="connector_unavailable", detail=str(exc)
             )
         return
-    if succeeded:  # created earlier; only read-back was missing
-        _read_back(
-            deps, job, snapshot, connector, succeeded[-1].remote_ref or "", parent=succeeded[-1].id
-        )
-        return
-    if needs_reconcile:
-        outcome = _reconcile(deps, job, snapshot, connector)
-        if outcome in ("confirmed", "unknown"):
+    try:
+        if succeeded:  # created earlier; only read-back was missing
+            remote_ref = succeeded[-1].remote_ref or ""
+            _read_back(deps, job, snapshot, connector, remote_ref, parent=succeeded[-1].id)
             return
-        if outcome == "pending":  # no new write while an earlier one may still land
-            raise StepFailed(_PENDING, retryable=True)
-        if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
-            return
-    _create(deps, job, snapshot, connector)
+        if needs_reconcile:
+            outcome = _reconcile(deps, job, snapshot, connector)
+            if outcome in ("confirmed", "unknown"):
+                return
+            if outcome == "pending":  # no new write while an earlier one may still land
+                raise StepFailed(_PENDING, retryable=True)
+            if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
+                return
+        _create(deps, job, snapshot, connector)
+    finally:
+        close = getattr(connector, "close", None)  # its HTTP client, whatever happened
+        if callable(close):
+            close()
 
 
 def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
