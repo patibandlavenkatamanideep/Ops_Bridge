@@ -4,7 +4,7 @@
 # The repository layout is kept under /app so paths resolve as in development.
 # Base images are pinned by index digest (tag kept for reading); Dependabot proposes updates.
 
-FROM docker.io/library/node:24.22.0-bookworm-slim@sha256:91acba91b842bec0bf7ea6f5e09c644c7ccad72c4996ed9616d861d1c7cd60d4 AS ui
+FROM docker.io/library/node:26.12.0-bookworm-slim@sha256:742a0fe7320e09e0321222b68165e6ac731d30470e7ea7f98f9bfc3a6e1034fe AS ui
 WORKDIR /app/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
