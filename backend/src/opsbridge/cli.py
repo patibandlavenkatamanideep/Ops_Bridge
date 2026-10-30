@@ -281,6 +281,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
         "response_origin": "mocked (deterministic mock model); no real model evaluated",
         "network": "Python-level egress limited to loopback during the run",
         "repeats": repeats,
+        "workflow_version": mf.workflow_version_of(frozen),
         "code_version": mf.code_version(REPO_ROOT),
         "modes": {},
         "receipts": {},
@@ -300,6 +301,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
                 corpus,
                 REPO_ROOT / "var" / "eval" / run_id,
                 cast(ModelAdapter, adapter),
+                workflow_version=mf.workflow_version_of(frozen),
             ) as env,
         ):
             for mode in modes:
@@ -446,6 +448,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                     corpus,
                     REPO_ROOT / "var" / "eval" / check_id,
                     cast(ModelAdapter, adapter),
+                    workflow_version=mf.workflow_version_of(frozen),
                 ) as env,
             ):
                 for mode in [m for m in frozen["modes"] if m in expected["modes"]]:
