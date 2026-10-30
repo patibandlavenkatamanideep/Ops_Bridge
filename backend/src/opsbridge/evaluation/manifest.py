@@ -1,11 +1,13 @@
 """Frozen benchmark manifest: what a comparison is allowed to depend on, by digest.
 
 `freeze` records the corpus splits (with case ids), document rendering, policies, prompt
-templates, scoring definitions, modes, repeat schedule and acceptance policy. `verify`
-re-hashes them before a benchmark run; any drift stops the run, because results produced
-from changed inputs are not comparable with the frozen plan. Code is deliberately not
-frozen (validation-driven fixes are allowed); the code version of each run is recorded
-with its results instead.
+templates, scoring definitions, modes, repeat schedule, acceptance policy and the
+investigation workflow version its trials run. `verify` re-hashes them before a benchmark
+run; any drift stops the run, because results produced from changed inputs are not
+comparable with the frozen plan. Code is deliberately not frozen (validation-driven fixes are
+allowed); the code version of each run is recorded with its results instead. Behaviour that
+changes what a recorded run asked the model is versioned as a workflow instead, so a plan's
+recordings replay with the workflow that made them.
 """
 
 from __future__ import annotations
@@ -21,6 +23,11 @@ from typing import Any
 from opsbridge.agents.prompts import manifest as prompt_manifest
 from opsbridge.canonical import digest
 from opsbridge.simulator.scenarios import load_corpus
+from opsbridge.workflow.investigation import (
+    LEGACY_WORKFLOW_VERSION,
+    WORKFLOW_VERSION,
+    WORKFLOW_VERSIONS,
+)
 
 SCHEMA = "opsbridge-eval-manifest/1"
 SPLITS = ("dev", "validation", "heldout", "security")
@@ -85,6 +92,12 @@ CURRENT_SCHEME = "opsbridge-scoring/2"
 def scheme_of(scoring: Any) -> str | None:
     """The scheme a frozen plan's scoring definitions are, or None if this code has none."""
     return next((name for name, body in SCHEMES.items() if body == scoring), None)
+
+
+def workflow_version_of(manifest: dict[str, Any]) -> str:
+    """The investigation workflow a plan's trials run. Plans frozen before plans named one
+    (opsbridge-bench-v1) were recorded with investigation/1.1.0."""
+    return str(manifest.get("workflow_version", LEGACY_WORKFLOW_VERSION))
 
 
 def file_digest(path: Path) -> str:
@@ -199,6 +212,7 @@ def freeze(
         "modes": modes,
         "repeats": repeats,
         "scoring": SCHEMES[scheme],
+        "workflow_version": WORKFLOW_VERSION,
         **inputs(root),
     }
     body["manifest_sha256"] = digest({k: v for k, v in body.items() if k != "manifest_sha256"})
@@ -240,6 +254,11 @@ def verify(manifest: dict[str, Any], root: Path) -> list[str]:
         problems.append("prompt templates changed since freezing")
     if scheme_of(manifest.get("scoring")) is None:
         problems.append(SCORING_CHANGED)
+    if workflow_version_of(manifest) not in WORKFLOW_VERSIONS:
+        problems.append(
+            f"the plan's trials run {workflow_version_of(manifest)}, which this code does not "
+            "implement; its recordings cannot be replayed with another workflow"
+        )
     return problems
 
 
