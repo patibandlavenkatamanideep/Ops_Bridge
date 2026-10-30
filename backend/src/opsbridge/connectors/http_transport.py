@@ -5,8 +5,12 @@ connection is closed as soon as the count passes the limit, whatever Content-Len
 (a declared length past the limit is refused before the body is read). Compressed bodies are
 decoded here, never by the client, with each decompression step capped at what the limit
 still allows, so a small gzip body cannot expand without bound; encodings that cannot be
-decoded this way are refused. A total deadline covers the whole read: a body trickling in
-just inside the per-read timeout stops there.
+decoded this way are refused. A compressed body counts only if its stream reached its own
+end: one that stops short (even after a complete-looking document), fails its checksum, or
+has anything after its end is refused. A second gzip member is refused too: HTTP servers send
+one, and accepting more would let bytes after the checked end reach the parser. A response
+with no body bytes at all (204, 304) has no stream to check and is empty. A total deadline
+covers the whole read: a body trickling in just inside the per-read timeout stops there.
 
 The errors subclass httpx's own, so a caller's existing handling stays right: a create whose
 reply could not be read is still a read failure after the request was sent (ambiguous), and
@@ -43,6 +47,10 @@ class UnsupportedEncoding(httpx.DecodingError):
     """The body uses a content encoding this module cannot decode within a bound."""
 
 
+class CorruptEncoding(httpx.DecodingError):
+    """The compressed body is damaged, ends before its stream does, or continues after it."""
+
+
 @dataclass(frozen=True)
 class BoundedResponse:
     status_code: int
@@ -57,6 +65,8 @@ class _Decoder:
     """Decodes one content encoding, never producing more than it is asked for."""
 
     def __init__(self, encoding: str | None, request: httpx.Request) -> None:
+        self._request = request
+        self._fed = False
         name = (encoding or "identity").strip().lower()
         if name in ("identity", ""):
             self._z = None
@@ -71,12 +81,35 @@ class _Decoder:
         """Decoded bytes of `raw`, at most `room` of them (room = limit + 1 left)."""
         if self._z is None:
             return raw
+        if not raw:
+            return b""
+        self._fed = True
+        if self._z.eof:
+            raise CorruptEncoding(
+                "data after the end of the compressed body", request=self._request
+            )
         out = bytearray()
         data = raw
-        while data and len(out) < room:
-            out += self._z.decompress(data, room - len(out))
-            data = self._z.unconsumed_tail
+        try:
+            while data and len(out) < room:
+                out += self._z.decompress(data, room - len(out))
+                data = self._z.unconsumed_tail
+        except zlib.error as exc:
+            raise CorruptEncoding(
+                f"compressed body is damaged: {exc}", request=self._request
+            ) from exc
+        if self._z.unused_data:
+            raise CorruptEncoding(
+                "data after the end of the compressed body", request=self._request
+            )
         return bytes(out)
+
+    def finish(self) -> None:
+        """Raises unless a compressed body that started also reached its end."""
+        if self._z is not None and self._fed and not self._z.eof:
+            raise CorruptEncoding(
+                "compressed body ended before its stream did", request=self._request
+            )
 
 
 def request(
@@ -90,8 +123,8 @@ def request(
     **kwargs: Any,
 ) -> BoundedResponse:
     """`client.request(...)`, reading at most `max_bytes` decoded bytes within
-    `total_seconds`. Raises ResponseTooLarge, ReadDeadlineExceeded, UnsupportedEncoding or
-    the client's own httpx errors."""
+    `total_seconds`. Raises ResponseTooLarge, ReadDeadlineExceeded, UnsupportedEncoding,
+    CorruptEncoding or the client's own httpx errors."""
     now = clock or _monotonic
     started = now()
     headers = {"Accept-Encoding": ACCEPTED_ENCODINGS, **(kwargs.pop("headers", None) or {})}
@@ -124,4 +157,5 @@ def request(
                     f"response passed the {max_bytes}-byte limit; the rest was not read",
                     request=r.request,
                 )
+        decoder.finish()
         return BoundedResponse(r.status_code, r.headers, bytes(body))
