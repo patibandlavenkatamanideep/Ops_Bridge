@@ -261,6 +261,17 @@ def acceptance(summary: dict[str, Any], policy: dict[str, Any], split: str) -> l
     out = []
     for mode in gate["applies_to"]:
         s = summary["modes"].get(mode)
+        if split == "heldout" and s is not None and gate.get("evaluated") is False:
+            # The plan's policy says why its held-out split cannot decide the gate.
+            out.append(
+                {
+                    "gate": gate["id"],
+                    "mode": mode,
+                    "status": "not_evaluated",
+                    "reason": gate["not_evaluated_reason"],
+                }
+            )
+            continue
         if split != "heldout" or s is None:
             out.append(
                 {
