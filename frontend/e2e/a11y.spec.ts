@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
-import { createOrOpenCase, rerunInvestigation, signIn } from "./helpers";
+import { createOrOpenCase, heldOutRecordLink, rerunInvestigation, signIn } from "./helpers";
 
 // Automated WCAG 2.1 A/AA checks with axe-core on every main screen. This catches a subset
 // of accessibility problems; it is not a substitute for testing with assistive technology.
@@ -37,7 +37,7 @@ test("investigator screens", async ({ page }) => {
   await page.goto("/t/demo-furniture/evaluation");
   await expect(page.getByRole("heading", { name: "Evaluation" })).toBeVisible();
   await expectNoSeriousViolations(page, "evaluation runs");
-  await page.getByRole("row").filter({ hasText: "heldout" }).filter({ hasText: "record" }).getByRole("link").click();
+  await heldOutRecordLink(page).click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(/heldout/i);
   await expectNoSeriousViolations(page, "evaluation run");
 });
