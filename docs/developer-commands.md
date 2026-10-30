@@ -57,6 +57,12 @@ key once), `verify-restore --database D --artifact-dir /abs/path` or `--artifact
 checks; refuses the live databases and relative paths; the bucket uses the configured S3
 endpoint, region and prefix).
 
+Pilot command: `pilot-report --tenant-id T --since S --until U [--as-of C] --reference
+FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
+`opsbridge-pilot/1`, docs/pilot-plan.md) from one tenant's cases opened in the window and the
+reviewer's reference CSV. It reads in a read-only transaction under that tenant's row-level
+security, and refuses a reference file with any problem, listing each one by line.
+
 Linux with Docker (ubuntu-24.04) is exercised by hosted CI, which runs `setup`, `lint`,
 `typecheck`, `test`, `eval-canary`, `build`, `infra-up`, `migrate`, `seed-demo`,
 `alerts-test`, `test-integration` and `test-e2e` (results in docs/STATUS.md). Windows/WSL has not been exercised.
