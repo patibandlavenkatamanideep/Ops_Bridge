@@ -97,8 +97,9 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   (`agents/steps.py`); pattern redaction (`privacy/redaction.py`); authorized PostgreSQL
   full-text retrieval (`evidence/retrieval.py`, lexical only).
 - Workflow now: collect_context → retrieve_policy → reconcile_records → explain_findings →
-  propose_follow_up → validate_proposal (`investigation/1.1.0`). Tenant settings
-  (migration 0003) hold the default model mode; furniture = mock, IT = ollama.
+  propose_follow_up → validate_proposal (`investigation/1.1.0` then; 1.2.0 since
+  2026-10-29). Tenant settings (migration 0003) hold the default model mode; furniture =
+  mock, IT = ollama.
 - UI: model-mode selector (tier-limited), explanation origin, gated draft follow-up.
 - Details and limits: docs/agents-and-models.md.
 
@@ -354,10 +355,6 @@ Phase 1 exit gate evidence:
 
 ## Known defects and limitations
 
-- An investigation repeated on unchanged source documents loses the reason an invoice could not
-  be read: the finding says "could not be read reliably ()" (read problems are listed only when
-  a document version is first ingested). Outcome and routing are unaffected. The fix changes
-  recorded model requests, so it is planned with the next frozen benchmark (review A13).
 - Rate limiting is shared across API instances (PostgreSQL) but is not a DDoS control.
 - Browser tests create `INV-E2E-*` cases in the local demo database; there is no cleanup yet.
   Accumulated cases pushed INV-9001 off the first queue page and broke browser tests; the
@@ -401,13 +398,13 @@ Work plan from the production review of 2026-10-27 (findings A01–A18; matrix, 
 blockers in `docs/production-readiness.md`):
 
 1. Done locally (dated entries at the end of this file): A01, A02 (input integrity), A03
-   (versioned scoring), A04 (bounded reads), A05 (one admission contract), A17 (evidence in
-   the image); in part A06 (public-only verifiers, registered credentials), A13 (behavioural
-   replay), A15 (collection budget), A16 (session pruning); prepared A12 (ruleset, release
-   workflow).
+   (versioned scoring), A04 (bounded reads), A05 (one admission contract), A13 (behavioural
+   replay; finding-text defect fixed as `investigation/1.2.0`), A17 (evidence in the image);
+   in part A06 (public-only verifiers, registered credentials), A15 (collection budget), A16
+   (session pruning); prepared A12 (ruleset, release workflow).
 2. Done locally since: an export-file source held to `purchasing-source/1` with
-   hand-written fixtures (A08's first step; proves no real system). Next: whatever the
-   owner's answers below unblock.
+   hand-written fixtures (A08's first step; proves no real system); the closure pass of
+   2026-10-29 (dated entry below). Next: whatever the owner's answers below unblock.
 3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
    (A12); a purchasing system or export with access (A08); a model budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1103,3 +1100,29 @@ staging, pilot owner).
   export's `extracted_at` is the investigation's read time. `OPSBRIDGE_PURCHASING_EXPORT_DIR`
   selects it. Tests: `test_export_source.py` (15), `test_export_investigation.py` (2).
   Hand-written exports only; no customer export has been read.
+
+### Closure pass (2026-10-29, production review A03, A04, A12, A13)
+- Compressed replies: a gzip or deflate body that stopped short (a complete-looking document
+  without its checksum trailer) or carried bytes or a second member after its end was
+  accepted, and a damaged one escaped as `zlib.error`; six damaged 201 replies to a create
+  became tasks. Now only a complete stream counts and every failure is a decoding error, so a
+  create stays ambiguous. Tests: `tests/test_http_transport.py` (23 new).
+- The intermittent GitHub timeout test: the fake's "late" reply was timed on uvloop's clock,
+  which on macOS counts host sleep, against a client deadline on `time.monotonic()`, which
+  does not; after a host sleep the reply arrived in time and the connector correctly returned
+  the issue that existed. Reproduced by jumping only the server's clock (5 of 5 creates
+  returned the issue). Not a connector defect. The fake now holds the reply until the test is
+  done, the test asserts the remote effect, and the simulator's timed faults wait by
+  `time.monotonic()`. Tests: `test_github_connector.py`, `test_simulator_faults.py`.
+- The finding-text defect: `investigation/1.2.0` names the stored reason an invoice could
+  not be read on every run. Under 1.1.0 a repeat said "()", and a parser-level reason (no
+  text layer) was never named. Runs record their workflow version; frozen plans name theirs
+  (v1: 1.1.0), and v1 recordings replay unchanged under 1.1.0. Tests:
+  `test_reinvestigation_reason.py`, `test_reinvestigation_regression_cases.py` (public v1
+  cases 303/304 as regression evidence), `test_comparability.py`.
+- Release qualification: the workflow built a fresh image after checking CI check names. It
+  now requires the tag to equal every declared version and a successful CI run on `main` for
+  the commit, read from the Actions API (`scripts/release_check.py`, 14 tests). It qualifies
+  the candidate digest it built and promotes that digest without rebuilding. Not run (no tag).
+- Run pages name their scoring scheme; browser tests cover a scoring-1 run and scoring-2
+  rendering (the latter on an intercepted response: no scoring-2 result exists).
