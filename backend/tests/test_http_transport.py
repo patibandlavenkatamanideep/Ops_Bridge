@@ -5,6 +5,10 @@ limit protected parsing, not memory. A 7 MiB stream against a 5 MiB limit was co
 full. Reads now stop as soon as the decoded body passes the limit, whatever the
 Content-Length says or however well the body compresses, and a body that trickles in slowly
 stops at a total deadline the per-read timeout never reaches.
+
+A compressed body is accepted only when its stream reached its own end: one that stops short
+(even after a complete-looking document), fails its checksum, or carries anything after its
+end (a second gzip member included) is a decoding error, never a body.
 """
 
 from __future__ import annotations
@@ -19,9 +23,15 @@ import httpx
 import pytest
 
 from opsbridge.connectors import http_transport as ht
+from opsbridge.connectors.github import GitHubIssuesConnector
 from opsbridge.connectors.purchasing import PurchasingClient
 from opsbridge.connectors.source_contract import SourceRecordInvalid, SourceUnavailable
-from opsbridge.connectors.tasks import AmbiguousFailure, SimTaskConnector, TaskRequest
+from opsbridge.connectors.tasks import (
+    AmbiguousFailure,
+    LookupUnavailable,
+    SimTaskConnector,
+    TaskRequest,
+)
 
 MiB = 1024 * 1024
 CHUNK = 64 * 1024
@@ -179,3 +189,102 @@ def test_an_unreadable_reply_to_a_create_is_ambiguous(reply: bytes) -> None:
     )
     with pytest.raises(AmbiguousFailure):
         tracker.create(TaskRequest("t", "b", None, "m"), None, 2.0)
+
+
+TASK = json.dumps({"id": "T-1", "marker": "m", "title": "t"}).encode()
+LISTING = json.dumps({"items": [json.loads(TASK)]}).encode()
+ISSUE = json.dumps({"number": 7, "html_url": "https://github.test/o/r/issues/7"}).encode()
+
+
+def compress(encoding: str, data: bytes) -> bytes:
+    return gzip.compress(data) if encoding == "gzip" else zlib.compress(data)
+
+
+def damaged(encoding: str, data: bytes, damage: str) -> bytes:
+    packed = compress(encoding, data)
+    if damage == "trailer_missing":  # the whole document decodes; the checksum never arrives
+        return packed[:-4]
+    if damage == "cut_mid_stream":
+        return packed[: len(packed) // 2]
+    if damage == "corrupt":
+        middle = len(packed) // 2
+        return packed[:middle] + bytes([packed[middle] ^ 0xFF]) + packed[middle + 1 :]
+    if damage == "trailing_bytes":
+        return packed + b"junk"
+    assert damage == "second_member"
+    return packed + compress(encoding, data)
+
+
+DAMAGE = ["trailer_missing", "cut_mid_stream", "corrupt", "trailing_bytes", "second_member"]
+
+
+def _encoded(status: int, encoding: str, raw: bytes) -> Any:
+    return lambda request: httpx.Response(
+        status, headers={"content-encoding": encoding}, content=streamed(raw)
+    )
+
+
+@pytest.mark.parametrize("damage", DAMAGE)
+@pytest.mark.parametrize("encoding", ["gzip", "deflate"])
+def test_a_damaged_compressed_body_is_a_decoding_error(encoding: str, damage: str) -> None:
+    client = _client(_encoded(200, encoding, damaged(encoding, TASK, damage)))
+    with pytest.raises(ht.CorruptEncoding):
+        ht.request(client, "GET", "/damaged", max_bytes=5 * MiB, total_seconds=30)
+    assert issubclass(ht.CorruptEncoding, httpx.DecodingError)  # the callers' existing contract
+
+
+def test_a_compressed_body_with_no_bytes_is_empty() -> None:
+    # 204 and 304 replies carry no body whatever their headers say; there is no stream to check.
+    client = _client(lambda request: httpx.Response(204, headers={"content-encoding": "gzip"}))
+    r = ht.request(client, "DELETE", "/x", max_bytes=5 * MiB, total_seconds=30)
+    assert r.status_code == 204 and r.content == b""
+
+
+@pytest.mark.parametrize("damage", DAMAGE)
+def test_an_unreadable_compressed_reply_to_a_tracker_create_is_ambiguous(damage: str) -> None:
+    # The tracker answered 201; a reply that cannot be fully decoded proves nothing either way.
+    tracker = SimTaskConnector(
+        "http://sim", "secret", "org", idempotency_keys=False, lookup="strong",
+        transport=httpx.MockTransport(_encoded(201, "gzip", damaged("gzip", TASK, damage))),
+    )  # fmt: skip
+    with pytest.raises(AmbiguousFailure):
+        tracker.create(TaskRequest("t", "b", None, "m"), None, 2.0)
+
+
+@pytest.mark.parametrize("damage", DAMAGE)
+def test_an_unreadable_compressed_reply_to_an_issue_create_is_ambiguous(damage: str) -> None:
+    github = GitHubIssuesConnector(
+        "o/r", "token", allowlist=frozenset({"o/r"}), writes_authorized=True,
+        base_url="http://github.test",
+        transport=httpx.MockTransport(_encoded(201, "gzip", damaged("gzip", ISSUE, damage))),
+    )  # fmt: skip
+    with pytest.raises(AmbiguousFailure):
+        github.create(TaskRequest("t", "b", None, "m"), None, 2.0)
+
+
+def test_an_unreadable_compressed_read_back_proves_nothing() -> None:
+    # A truncated read-back is not "the task is absent" and not "the task is there".
+    def handler(request: httpx.Request) -> httpx.Response:
+        doc = TASK if request.url.path.endswith("/T-1") else LISTING
+        return _encoded(200, "gzip", damaged("gzip", doc, "trailer_missing"))(request)
+
+    tracker = SimTaskConnector(
+        "http://sim", "secret", "org", idempotency_keys=False, lookup="strong",
+        transport=httpx.MockTransport(handler),
+    )  # fmt: skip
+    with pytest.raises(LookupUnavailable):
+        tracker.get("T-1", 2.0)
+    with pytest.raises(LookupUnavailable):
+        tracker.find_by_marker("m", 2.0)
+
+
+def test_an_unreadable_compressed_source_record_is_not_read() -> None:
+    record = json.dumps({"invoiceId": "INV-1"}).encode()
+    source = PurchasingClient(
+        "http://sim", "secret", "org",
+        transport=httpx.MockTransport(
+            _encoded(200, "gzip", damaged("gzip", record, "trailer_missing"))
+        ),
+    )  # fmt: skip
+    with pytest.raises(SourceUnavailable):
+        source.fetch("invoices", "INV-1")
