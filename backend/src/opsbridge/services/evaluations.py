@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from opsbridge.auth.permissions import Forbidden, Principal
-from opsbridge.evaluation.manifest import scheme_of
+from opsbridge.evaluation.manifest import scheme_of, workflow_version_of
 
 RUN_ID = re.compile(r"^(dev|validation|heldout|security)-(record|replay)-\d{8}T\d{6}Z$")
 BENCHMARK = re.compile(r"^[a-z0-9-]{1,64}$")
@@ -55,6 +55,18 @@ def _plan(evals_dir: Path, benchmark_id: str) -> dict[str, Any]:
 def _scheme(evals_dir: Path, d: dict[str, Any]) -> str | None:
     """The scheme a run was graded under: its result says so, or its frozen plan does."""
     return d.get("scoring") or scheme_of(_plan(evals_dir, d["benchmark_id"]).get("scoring"))
+
+
+def _purpose(evals_dir: Path, d: dict[str, Any]) -> str | None:
+    """What the run's plan is for, when the plan says (a regression re-run, for example)."""
+    return d.get("purpose") or _plan(evals_dir, d["benchmark_id"]).get("purpose")
+
+
+def _workflow(evals_dir: Path, d: dict[str, Any]) -> str | None:
+    """The investigation workflow the run's trials followed: its result says so, or its
+    frozen plan does (None when neither is available)."""
+    plan = _plan(evals_dir, d["benchmark_id"])
+    return d.get("workflow_version") or (workflow_version_of(plan) if plan else None)
 
 
 def _comparability(evals_dir: Path, d: dict[str, Any]) -> dict[str, Any]:
@@ -111,6 +123,7 @@ def list_runs(evals_dir: Path, p: Principal) -> list[dict[str, Any]]:
                 "receipts_verified": bool((d.get("verification") or {}).get("ok")),
                 "comparability": _comparability(evals_dir, d),
                 "scoring_scheme": _scheme(evals_dir, d),
+                "purpose": _purpose(evals_dir, d),
             }
         )
     return out
@@ -189,6 +202,8 @@ def run_detail(evals_dir: Path, p: Principal, benchmark: str, run_id: str) -> di
         "receipts": d.get("receipts", {}),
         "comparability": _comparability(evals_dir, d),
         "scoring_scheme": scheme,
+        "purpose": _purpose(evals_dir, d),
+        "workflow_version": _workflow(evals_dir, d),
         "not_evaluated": [
             "Real-model quality (no live or recorded real-model dataset; mock responses only)",
             "Operator time and business outcomes (no pilot participants)",
