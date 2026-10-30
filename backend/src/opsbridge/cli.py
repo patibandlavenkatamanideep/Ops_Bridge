@@ -184,7 +184,12 @@ def _eval_freeze(args: argparse.Namespace) -> int:
         print(f"{out} exists; a frozen benchmark is never re-frozen. Use a new benchmark id.")
         return 2
     body = manifest.freeze(
-        REPO_ROOT, args.benchmark, modes=args.modes.split(","), repeats=args.repeats
+        REPO_ROOT,
+        args.benchmark,
+        modes=args.modes.split(","),
+        repeats=args.repeats,
+        acceptance_policy=args.acceptance_policy,
+        purpose=args.purpose,
     )
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
@@ -217,6 +222,11 @@ def _eval_bench(args: argparse.Namespace) -> int:
         print("Refusing to run: inputs differ from the frozen benchmark:")
         for problem in problems:
             print(f"  - {problem}")
+        return 2
+    try:
+        policy = mf.load_acceptance_policy(frozen, REPO_ROOT)
+    except ValueError as exc:
+        print(f"Refusing to run: {exc}")
         return 2
     split = frozen["splits"][args.split]
     corpus = load_corpus(Path(split["path"]))
@@ -267,7 +277,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
     public_key = receipt.ensure_key(key, Path("evals/keys/opsbridge-eval.pub"))
     bound = {
         "opsbridge_manifest": str(mpath),
-        "opsbridge_acceptance_policy": "evals/acceptance-policy.json",
+        "opsbridge_acceptance_policy": mf.acceptance_policy_of(frozen),
         "opsbridge_prompts": str(prompts),
         **{f"opsbridge_policy_{Path(p).stem}": p for p in frozen["files"] if "/policies/" in p},
     }
@@ -282,6 +292,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
         "network": "Python-level egress limited to loopback during the run",
         "repeats": repeats,
         "workflow_version": mf.workflow_version_of(frozen),
+        **({"purpose": frozen["purpose"]} if frozen.get("purpose") else {}),
         "code_version": mf.code_version(REPO_ROOT),
         "modes": {},
         "receipts": {},
@@ -341,7 +352,6 @@ def _eval_bench(args: argparse.Namespace) -> int:
         summary["paired_rules_vs_mock"] = metrics.paired(
             mode_results["rules_only"], mode_results["mock"]
         )
-    policy = json.loads(Path("evals/acceptance-policy.json").read_text(encoding="utf-8"))
     summary["acceptance"] = metrics.acceptance(summary, policy, args.split)
     summary["verification"] = receipt.verify(ledger, public_key)
     if kind == "replay":
@@ -399,9 +409,23 @@ def _eval_bench(args: argparse.Namespace) -> int:
 
 def _eval_replay_check(args: argparse.Namespace) -> int:
     """Replay each split's latest recorded run under the egress guard and compare verdicts
-    case by case. No receipts are sealed and nothing under evals/ is written, so it can run
-    in CI and in `make verify` without the signing key."""
+    case by case, for one benchmark or every frozen plan. No receipts are sealed and nothing
+    under evals/ is written, so it can run in CI and in `make verify` without the signing
+    key."""
     import os
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation import manifest as mf
+
+    os.chdir(REPO_ROOT)
+    failed = False
+    for benchmark in [args.benchmark] if args.benchmark else mf.frozen_plans(REPO_ROOT):
+        failed |= _replay_plan(benchmark, args.split or ["heldout", "security"])
+    return 1 if failed else 0
+
+
+def _replay_plan(benchmark: str, splits: list[str]) -> bool:
+    """Replays one plan's recorded splits; True if any failed or differed."""
     from datetime import UTC, datetime
     from typing import cast
 
@@ -415,29 +439,29 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     from opsbridge.evaluation.reproduce import differences, recorded_results, trial_differences
     from opsbridge.simulator.scenarios import load_corpus
 
-    os.chdir(REPO_ROOT)
-    frozen = mf.load(Path("evals/manifests") / f"{args.benchmark}.json")
+    frozen = mf.load(Path("evals/manifests") / f"{benchmark}.json")
     problems = mf.verify(frozen, REPO_ROOT)
     if problems:
-        print("Refusing: inputs differ from the frozen benchmark:")
+        print(f"{benchmark}: refusing: inputs differ from the frozen benchmark:")
         for problem in problems:
             print(f"  - {problem}")
-        return 2
+        return True
     failed = False
-    for split_name in args.split or ["heldout", "security"]:
+    for split in splits:
+        split_name = f"{benchmark} {split}"  # how each line below names it
         recorded = sorted(
-            Path(f"evals/runs/{args.benchmark}").glob(f"{split_name}-record-*/model-cassette.json")
+            Path(f"evals/runs/{benchmark}").glob(f"{split}-record-*/model-cassette.json")
         )
         if not recorded:
             print(f"{split_name}: no recorded run to replay")
             failed = True
             continue
         cassette = recorded[-1]
-        expected = recorded_results(Path(f"evals/results/{args.benchmark}"), cassette)
-        corpus = load_corpus(Path(frozen["splits"][split_name]["path"]))
+        expected = recorded_results(Path(f"evals/results/{benchmark}"), cassette)
+        corpus = load_corpus(Path(frozen["splits"][split]["path"]))
         repeats = int(frozen["repeats"])
         adapter = ReplayAdapter.load(cassette)
-        check_id = f"check-{split_name}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
+        check_id = f"check-{benchmark}-{split}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
         replayed: dict[str, Any] = {}
         replayed_trials: dict[str, list[dict[str, Any]]] = {}
         try:
@@ -493,7 +517,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                 print(f"  - {d}")
         else:
             print(f"{split_name}: reproduces {cassette.parent.name} case by case ({counts})")
-    return 1 if failed else 0
+    return failed
 
 
 def _eval_backfill_tools(args: argparse.Namespace) -> int:
@@ -803,6 +827,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--benchmark", default="opsbridge-bench-v1")
     p.add_argument("--modes", default="rules_only,mock")
     p.add_argument("--repeats", type=int, default=3)
+    p.add_argument(
+        "--acceptance-policy",
+        default="evals/acceptance-policy.json",
+        help="the policy this plan's runs are judged by; it must name this benchmark",
+    )
+    p.add_argument("--purpose", default=None, help="what the plan is for, shown with its runs")
     p.add_argument("--out", default=None)
     p.set_defaults(func=_eval_freeze)
 
@@ -822,7 +852,7 @@ def main(argv: list[str] | None = None) -> int:
         "eval-replay-check",
         help="replay recorded runs offline and compare verdicts; seals and writes nothing tracked",
     )
-    p.add_argument("--benchmark", default="opsbridge-bench-v1")
+    p.add_argument("--benchmark", default=None, help="default: every frozen plan")
     p.add_argument("--split", action="append", choices=["dev", "validation", "heldout", "security"])
     p.set_defaults(func=_eval_replay_check)
 
