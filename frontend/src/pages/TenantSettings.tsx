@@ -1,20 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { useParams } from "react-router-dom";
-import {
-  ApiError,
-  api,
-  tenantPath,
-  type ConnectorHealth,
-  type Invitation,
-  type InvitationCreated,
-  type Member,
-  type MemberUpdate,
-  type SettingsView,
-  type TaskConnection,
-  type TaskConnections,
-} from "../api/client";
-import { ErrorState, Loading } from "../components/States";
+import { Link, useParams } from "react-router-dom";
+import { ApiError, api, apiAs, tenantPath, type ConnectorHealth, type Invitation, type InvitationCreated, type Member, type MemberUpdate, type SettingsView, type TaskConnection, type TaskConnections } from "../api/client";
+import { EmptyState, ErrorState, Loading } from "../components/States";
 import { statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
 
@@ -26,19 +14,51 @@ const RETENTION_LABELS: Record<string, string> = {
   invitations_days: "Email addresses on used, withdrawn or expired invitations",
 };
 
+// The page is split by responsibility; each section has its own address.
+const SECTIONS = [
+  { id: "general", label: "General" },
+  { id: "task-connection", label: "Task connection" },
+  { id: "policies", label: "Policies" },
+  { id: "people", label: "People" },
+] as const;
+type Section = (typeof SECTIONS)[number]["id"];
+
 export function TenantSettings() {
-  const { tenant = "" } = useParams();
+  const { tenant = "", section = "general" } = useParams();
   const query = useQuery<SettingsView, ApiError>({
     queryKey: ["settings", tenant],
-    queryFn: ({ signal }) => api<SettingsView>(tenantPath(tenant, "/settings"), { signal }),
+    queryFn: ({ signal }) => apiAs("SettingsOut", tenantPath(tenant, "/settings"), { signal }),
   });
   if (query.isPending) return <Loading label="Loading settings" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={() => query.refetch()} />;
   // Keyed on the saved values so the form re-initializes after a save.
-  return <SettingsBody key={JSON.stringify(query.data.settings)} tenant={tenant} view={query.data} />;
+  return (
+    <section aria-labelledby="settings-title">
+      <div className="page-header">
+        <h1 id="settings-title">Tenant settings</h1>
+      </div>
+      <nav aria-label="Settings sections" className="views">
+        {SECTIONS.map((s) => (
+          <Link key={s.id} to={`/t/${tenant}/settings/${s.id}`} aria-current={s.id === section ? "page" : undefined}
+                className={`link-button ${s.id === section ? "current" : ""}`}>
+            {s.label}
+          </Link>
+        ))}
+      </nav>
+      {!SECTIONS.some((s) => s.id === section) ? (
+        <EmptyState title="No such settings section">
+          <p>Choose a section above.</p>
+        </EmptyState>
+      ) : (
+        // Keyed on the saved values so the form re-initializes after a save.
+        <SettingsBody key={JSON.stringify(query.data.settings)} tenant={tenant} view={query.data}
+                      section={section as Section} />
+      )}
+    </section>
+  );
 }
 
-function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) {
+function SettingsBody({ tenant, view, section }: { tenant: string; view: SettingsView; section: Section }) {
   const { can } = useSession();
   const qc = useQueryClient();
   const canPolicy = can(tenant, "tenant.manage_policy");
@@ -58,7 +78,7 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
           Object.entries(retention).filter(([, v]) => v.trim() !== "").map(([k, v]) => [k, Number(v)]),
         );
       }
-      return api<SettingsView>(tenantPath(tenant, "/settings"), { method: "PUT", body });
+      return apiAs("SettingsOut", tenantPath(tenant, "/settings"), { method: "PUT", body });
     },
     onSuccess: (data) => {
       qc.setQueryData(["settings", tenant], data);
@@ -75,11 +95,18 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
     save.mutate();
   }
 
+  if (section === "task-connection") {
+    return (
+      <>
+        <TaskConnectionPanel tenant={tenant} connectors={view.entitlements.external_connectors} />
+        <ConnectorHealthPanel tenant={tenant} />
+      </>
+    );
+  }
+  if (section === "policies") return <PoliciesSection view={view} />;
+  if (section === "people") return <MembersSection tenant={tenant} view={view} />;
   return (
-    <section aria-labelledby="settings-title">
-      <div className="page-header">
-        <h1 id="settings-title">Tenant settings</h1>
-      </div>
+    <>
       <dl className="facts">
         <dt>Organization</dt>
         <dd>{view.tenant.name}</dd>
@@ -162,43 +189,42 @@ function SettingsBody({ tenant, view }: { tenant: string; view: SettingsView }) 
           {sweep.isError && <ErrorState error={sweep.error} />}
         </section>
       )}
+    </>
+  );
+}
 
-      <TaskConnectionPanel tenant={tenant} connectors={view.entitlements.external_connectors} />
-      <ConnectorHealthPanel tenant={tenant} />
-
-      <section aria-labelledby="policies-title">
-        <h2 id="policies-title">Policies</h2>
-        <table className="table">
-          <caption className="visually-hidden">Policy versions of this organization</caption>
-          <thead>
-            <tr>
-              <th scope="col">Policy</th>
-              <th scope="col">Version</th>
-              <th scope="col">Effective from</th>
-              <th scope="col">State</th>
-              <th scope="col">Digest</th>
+function PoliciesSection({ view }: { view: SettingsView }) {
+  return (
+    <section aria-labelledby="policies-title">
+      <h2 id="policies-title">Policies</h2>
+      <table className="table">
+        <caption className="visually-hidden">Policy versions of this organization</caption>
+        <thead>
+          <tr>
+            <th scope="col">Policy</th>
+            <th scope="col">Version</th>
+            <th scope="col">Effective from</th>
+            <th scope="col">State</th>
+            <th scope="col">Digest</th>
+          </tr>
+        </thead>
+        <tbody>
+          {view.policies.map((p) => (
+            <tr key={`${p.policy_id}-${p.version}`}>
+              <th scope="row" className="mono">{p.policy_id}</th>
+              <td>v{p.version}</td>
+              <td>{p.effective_from}</td>
+              <td>{statusLabel(p.state)}</td>
+              <td className="mono small" title={p.sha256}>{p.sha256.slice(7, 19)}…</td>
             </tr>
-          </thead>
-          <tbody>
-            {view.policies.map((p) => (
-              <tr key={`${p.policy_id}-${p.version}`}>
-                <th scope="row" className="mono">{p.policy_id}</th>
-                <td>v{p.version}</td>
-                <td>{p.effective_from}</td>
-                <td>{statusLabel(p.state)}</td>
-                <td className="mono small" title={p.sha256}>{p.sha256.slice(7, 19)}…</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <p className="muted small">
-          Active means in force today. Each investigation uses the version in force on the invoice’s decision date, so
-          older invoices can still be judged by an earlier version. Policies change by publishing a new version, not
-          by editing one.
-        </p>
-      </section>
-
-      <MembersSection tenant={tenant} view={view} />
+          ))}
+        </tbody>
+      </table>
+      <p className="muted small">
+        Active means in force today. Each investigation uses the version in force on the invoice’s decision date, so
+        older invoices can still be judged by an earlier version. Policies change by publishing a new version, not
+        by editing one.
+      </p>
     </section>
   );
 }
@@ -269,7 +295,7 @@ function MembersSection({ tenant, view }: { tenant: string; view: SettingsView }
   const [notice, setNotice] = useState<string | null>(null);
   const selected = view.members.find((m) => m.id === editing);
   const withdraw = useMutation<SettingsView, ApiError, Invitation>({
-    mutationFn: (inv) => api<SettingsView>(tenantPath(tenant, `/invitations/${inv.id}/revoke`), { method: "POST" }),
+    mutationFn: (inv) => apiAs("SettingsOut", tenantPath(tenant, `/invitations/${inv.id}/revoke`), { method: "POST" }),
     onSuccess: (data, inv) => {
       qc.setQueryData(["settings", tenant], data);
       setNotice(`Invitation for ${inv.email} withdrawn.`);
@@ -430,7 +456,7 @@ function InviteForm({ tenant, onCreated, onCancel }: {
   const heading = useFocusOnMount();
   const create = useMutation<InvitationCreated, ApiError>({
     mutationFn: () =>
-      api<InvitationCreated>(tenantPath(tenant, "/invitations"), {
+      apiAs("InvitationCreatedOut", tenantPath(tenant, "/invitations"), {
         method: "POST",
         body: { email, roles, approval_scope: roles.includes("approver") ? scope : [] },
       }),
@@ -540,7 +566,7 @@ function MemberEditor({ tenant, member, onDone }: {
   const save = useMutation<SettingsView, ApiError>({
     mutationFn: () => {
       const body: MemberUpdate = { roles, approval_scope: approver ? scope : [], status, reason };
-      return api<SettingsView>(tenantPath(tenant, `/members/${member.id}`), { method: "PATCH", body });
+      return apiAs("SettingsOut", tenantPath(tenant, `/members/${member.id}`), { method: "PATCH", body });
     },
     onSuccess: (data) => {
       qc.setQueryData(["settings", tenant], data);
@@ -600,7 +626,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   const canManage = can(tenant, "tenant.manage_connectors");
   const query = useQuery<TaskConnections, ApiError>({
     queryKey: ["task-connection", tenant],
-    queryFn: ({ signal }) => api<TaskConnections>(tenantPath(tenant, "/task-connection"), { signal }),
+    queryFn: ({ signal }) => apiAs("TaskConnectionsOut", tenantPath(tenant, "/task-connection"), { signal }),
   });
   const current = query.data?.active ?? null;
   const [connector, setConnector] = useState("");
@@ -618,7 +644,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   };
   const change = useMutation<TaskConnection, ApiError>({
     mutationFn: () =>
-      api<TaskConnection>(tenantPath(tenant, "/task-connection"), {
+      apiAs("TaskConnectionOut", tenantPath(tenant, "/task-connection"), {
         method: "POST",
         body: {
           connector: chosen,
@@ -632,7 +658,7 @@ function TaskConnectionPanel({ tenant, connectors }: { tenant: string; connector
   });
   const revoke = useMutation<TaskConnection, ApiError>({
     mutationFn: () =>
-      api<TaskConnection>(tenantPath(tenant, "/task-connection/revoke"), {
+      apiAs("TaskConnectionOut", tenantPath(tenant, "/task-connection/revoke"), {
         method: "POST",
         body: { reason: revokeReason },
       }),
@@ -777,7 +803,7 @@ const LOOKUP_LABELS: Record<string, string> = {
 function ConnectorHealthPanel({ tenant }: { tenant: string }) {
   const health = useQuery<ConnectorHealth, ApiError>({
     queryKey: ["connector-health", tenant],
-    queryFn: ({ signal }) => api<ConnectorHealth>(tenantPath(tenant, "/connectors/health"), { signal }),
+    queryFn: ({ signal }) => apiAs("ConnectorHealthOut", tenantPath(tenant, "/connectors/health"), { signal }),
   });
   return (
     <section aria-labelledby="connector-title">

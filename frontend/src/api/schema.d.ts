@@ -38,6 +38,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/assignees": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Assignees
+         * @description Who a case can be given to (active investigators).
+         */
+        get: operations["assignees_api_v1_tenants__tenant__assignees_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/cases": {
         parameters: {
             query?: never;
@@ -50,6 +70,26 @@ export interface paths {
         put?: never;
         /** Create Case */
         post: operations["create_case_api_v1_tenants__tenant__cases_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/views": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Queue View Counts
+         * @description How many cases each built-in queue view holds for the caller.
+         */
+        get: operations["queue_view_counts_api_v1_tenants__tenant__cases_views_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -256,6 +296,26 @@ export interface paths {
         put?: never;
         /** Review */
         post: operations["review_api_v1_tenants__tenant__cases__case_id__operations__operation_id__review_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/owner": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set Owner
+         * @description Take (owner_id = yourself), assign or release (owner_id = null) a case.
+         */
+        post: operations["set_owner_api_v1_tenants__tenant__cases__case_id__owner_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -613,6 +673,20 @@ export interface components {
             /** Tenant Slug */
             tenant_slug: string;
         };
+        /** AssigneeList */
+        AssigneeList: {
+            /** Items */
+            items: components["schemas"]["AssigneeOut"][];
+        };
+        /** AssigneeOut */
+        AssigneeOut: {
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Username */
+            username: string;
+        };
         /** AttemptOut */
         AttemptOut: {
             /** Connector Version */
@@ -711,6 +785,8 @@ export interface components {
             id: string;
             /** Invoice Number */
             invoice_number: string | null;
+            /** Owner */
+            owner?: string | null;
             /** Po Number */
             po_number: string | null;
             /** Requester Id */
@@ -1186,6 +1262,13 @@ export interface components {
             /** Updated At */
             updated_at: string;
         };
+        /** OwnerIn */
+        OwnerIn: {
+            /** Expected Owner Id */
+            expected_owner_id: string | null;
+            /** Owner Id */
+            owner_id: string | null;
+        };
         /** PolicyOut */
         PolicyOut: {
             /** Effective From */
@@ -1287,6 +1370,11 @@ export interface components {
             age_seconds: number;
             /** Assignee Group */
             assignee_group: string | null;
+            /**
+             * Awaiting Approval
+             * @default false
+             */
+            awaiting_approval: boolean;
             /** Case Number */
             case_number: string;
             /** Created At */
@@ -1297,8 +1385,20 @@ export interface components {
             evidence_readiness: string;
             /** Id */
             id: string;
+            /**
+             * Needs Review
+             * @default false
+             */
+            needs_review: boolean;
             /** Owner */
             owner: string | null;
+            /**
+             * Owner Active
+             * @default true
+             */
+            owner_active: boolean;
+            /** Owner Id */
+            owner_id?: string | null;
             /** Status */
             status: string;
             /** Title */
@@ -1310,6 +1410,17 @@ export interface components {
             items: components["schemas"]["QueueItemOut"][];
             /** Next Cursor */
             next_cursor: string | null;
+        };
+        /** QueueViewCounts */
+        QueueViewCounts: {
+            /** Awaiting Approval */
+            awaiting_approval: number;
+            /** Mine */
+            mine: number;
+            /** Needs Review */
+            needs_review: number;
+            /** Unassigned */
+            unassigned: number;
         };
         /** ResolveIn */
         ResolveIn: {
@@ -1589,6 +1700,37 @@ export interface operations {
             };
         };
     };
+    assignees_api_v1_tenants__tenant__assignees_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssigneeList"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_cases_api_v1_tenants__tenant__cases_get: {
         parameters: {
             query?: {
@@ -1596,6 +1738,8 @@ export interface operations {
                 cursor?: string | null;
                 limit?: number;
                 q?: string | null;
+                view?: string;
+                sort?: string;
             };
             header?: never;
             path: {
@@ -1649,6 +1793,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CaseOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    queue_view_counts_api_v1_tenants__tenant__cases_views_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueViewCounts"];
                 };
             };
             /** @description Validation Error */
@@ -2129,6 +2304,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["OperationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_owner_api_v1_tenants__tenant__cases__case_id__owner_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CaseOut"];
                 };
             };
             /** @description Validation Error */

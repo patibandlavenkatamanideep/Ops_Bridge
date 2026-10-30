@@ -1,10 +1,13 @@
 // Thin fetch wrapper: same-origin cookies, CSRF header on writes, typed error bodies.
 import type { components } from "./schema";
+import { validate, type SchemaName, type Schemas } from "./validate";
 
 export type Me = components["schemas"]["MeOut"];
 export type Membership = components["schemas"]["MembershipOut"];
 export type CaseOut = components["schemas"]["CaseOut"];
 export type QueuePage = components["schemas"]["QueuePage"];
+export type QueueViewCounts = components["schemas"]["QueueViewCounts"];
+export type AssigneeList = components["schemas"]["AssigneeList"];
 export type QueueItem = components["schemas"]["QueueItemOut"];
 export type CaseCreate = components["schemas"]["CaseCreateIn"];
 export type Investigation = components["schemas"]["InvestigationOut"];
@@ -120,6 +123,24 @@ export async function api<T>(path: string, init: { method?: Method; body?: unkno
     );
   }
   return data as T;
+}
+
+/**
+ * `api` for a response documented with `schema`: the body is checked against that schema, so
+ * a page never renders (or offers to approve) data it only half understands after the app and
+ * server versions drift apart.
+ */
+export async function apiAs<K extends SchemaName>(schema: K, path: string, init: Parameters<typeof api>[1] = {}):
+  Promise<Schemas[K]> {
+  const data = await api<unknown>(path, init);
+  const problems = validate(schema, data);
+  if (problems.length > 0) {
+    console.error(`Unexpected ${String(schema)} from ${path}:`, problems);
+    throw new ApiError(0, "unexpected_response",
+      "The server sent data this page does not understand. Reload the page; if this persists, the app and " +
+        "server versions differ.", null, false, { schema, problems });
+  }
+  return data as Schemas[K];
 }
 
 function safeJson(text: string): unknown {

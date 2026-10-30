@@ -22,8 +22,10 @@ from typing import Any
 
 import httpx
 
+from opsbridge import safejson
 from opsbridge.config import Settings
 
+from . import http_transport
 from .tasks import (
     AmbiguousFailure,
     ConnectorCapabilities,
@@ -33,6 +35,9 @@ from .tasks import (
     RemoteTask,
     TaskRequest,
 )
+
+# A page of 100 issues with long bodies stays well under this.
+MAX_GITHUB_RESPONSE_BYTES = 8 * 1024 * 1024
 
 API_VERSION = "2026-03-10"
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
@@ -98,8 +103,11 @@ class GitHubIssuesConnector:
             raw={"number": d["number"], "html_url": d.get("html_url")},
         )
 
+    def close(self) -> None:
+        self._client.close()
+
     @staticmethod
-    def _rate_limited(r: httpx.Response) -> bool:
+    def _rate_limited(r: http_transport.BoundedResponse) -> bool:
         return r.status_code == 429 or (
             r.status_code == 403
             and (r.headers.get("x-ratelimit-remaining") == "0" or "retry-after" in r.headers)
@@ -112,18 +120,24 @@ class GitHubIssuesConnector:
             )
         body = {"title": req.title[:256], "body": req.body}
         try:
-            r = self._client.post(f"/repos/{self.repo}/issues", json=body, timeout=timeout)
+            r = self._read("POST", f"/repos/{self.repo}/issues", timeout, json=body)
         except (
             httpx.TimeoutException,
             httpx.RemoteProtocolError,
             httpx.ReadError,
             httpx.WriteError,
+            httpx.DecodingError,
         ) as exc:
             raise AmbiguousFailure(f"{type(exc).__name__} creating issue") from exc
         except httpx.ConnectError as exc:
             raise DefiniteFailure(f"connection refused: {exc}", retryable=True) from exc
         if r.status_code == 201:
-            return self._task(r.json())
+            try:
+                return self._task(safejson.response_json(r))
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise AmbiguousFailure(
+                    f"issue created, but the reply was unreadable: {exc}"
+                ) from exc
         if self._rate_limited(r):
             raise DefiniteFailure(
                 "rate limited (not processed)", retryable=True, status=r.status_code
@@ -140,23 +154,27 @@ class GitHubIssuesConnector:
         if not remote_ref.isdigit():
             return None
         try:
-            r = self._client.get(f"/repos/{self.repo}/issues/{remote_ref}", timeout=timeout)
+            r = self._read("GET", f"/repos/{self.repo}/issues/{remote_ref}", timeout)
         except httpx.HTTPError as exc:
             raise LookupUnavailable(f"read-back failed: {type(exc).__name__}") from exc
         if r.status_code in (404, 410):
             return None
         if r.status_code != 200:
             raise LookupUnavailable(f"read-back returned {r.status_code}")
-        return self._task(r.json())
+        try:
+            return self._task(safejson.response_json(r))
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise LookupUnavailable(f"read-back reply unreadable: {exc}") from exc
 
     def find_by_marker(self, marker: str, timeout: float) -> list[RemoteTask]:
         since = (datetime.now(UTC) - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
         found: list[RemoteTask] = []
         for page in (1, 2, 3):
             try:
-                r = self._client.get(
+                r = self._read(
+                    "GET",
                     f"/repos/{self.repo}/issues",
-                    timeout=timeout,
+                    timeout,
                     params={
                         "state": "all",
                         "since": since,
@@ -170,15 +188,31 @@ class GitHubIssuesConnector:
                 raise LookupUnavailable(f"issue listing failed: {type(exc).__name__}") from exc
             if r.status_code != 200:
                 raise LookupUnavailable(f"issue listing returned {r.status_code}")
-            items = r.json()
-            found += [
-                self._task(d)
-                for d in items
-                if "pull_request" not in d and marker in (d.get("body") or "")
-            ]
+            try:
+                items = safejson.response_json(r)
+                found += [
+                    self._task(d)
+                    for d in items
+                    if "pull_request" not in d and marker in (d.get("body") or "")
+                ]
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                raise LookupUnavailable(f"issue listing unreadable: {exc}") from exc
             if len(items) < 100:
                 break
         return found
+
+    def _read(
+        self, method: str, path: str, timeout: float, **kwargs: Any
+    ) -> http_transport.BoundedResponse:
+        return http_transport.request(
+            self._client,
+            method,
+            path,
+            timeout=timeout,
+            max_bytes=MAX_GITHUB_RESPONSE_BYTES,
+            total_seconds=timeout,
+            **kwargs,
+        )
 
 
 def github_connector_from_settings(settings: Settings) -> GitHubIssuesConnector:

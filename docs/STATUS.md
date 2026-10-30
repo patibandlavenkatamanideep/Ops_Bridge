@@ -97,8 +97,9 @@ Working copy: `~/Projects/Ops_Bridge` (see docs/adr/0009).
   (`agents/steps.py`); pattern redaction (`privacy/redaction.py`); authorized PostgreSQL
   full-text retrieval (`evidence/retrieval.py`, lexical only).
 - Workflow now: collect_context → retrieve_policy → reconcile_records → explain_findings →
-  propose_follow_up → validate_proposal (`investigation/1.1.0`). Tenant settings
-  (migration 0003) hold the default model mode; furniture = mock, IT = ollama.
+  propose_follow_up → validate_proposal (`investigation/1.1.0` then; 1.2.0 since
+  2026-10-29). Tenant settings (migration 0003) hold the default model mode; furniture =
+  mock, IT = ollama.
 - UI: model-mode selector (tier-limited), explanation origin, gated draft follow-up.
 - Details and limits: docs/agents-and-models.md.
 
@@ -388,14 +389,30 @@ Phase 1 exit gate evidence:
 - Application processes must have synchronized clocks (NTP); comparisons against
   database-written timestamps use the database clock (found when the Podman VM clock drifted
   3 h 44 min after the laptop slept; fixed for quotas and retention).
+- Service and delegation tokens may say they were issued up to 30 s after an MCP service's
+  clock reads (as sign-in allows); a larger difference refuses every call until clocks agree.
 
 ## Next executable task
 
-The locally achievable build is complete. Remaining work needs the owner (see "Blockers"):
-review and, if you choose, merge the open PR (#3 at the time of writing; merging is yours); with authorization, the live
-GitHub sandbox test and a recorded real-model benchmark; a cloud account for staging; a
-pilot owner. Local improvement that needs no authorization: the next supplier invoice
-layout for the furniture pack (from approved real samples, not the held-out layout).
+Work plan from the production review of 2026-10-27 (findings A01–A18; matrix, evidence and
+blockers in `docs/production-readiness.md`):
+
+1. Done locally (dated entries at the end of this file): A01, A02 (input integrity), A03
+   (versioned scoring), A04 (bounded reads), A05 (one admission contract), A13 (behavioural
+   replay; finding-text defect fixed as `investigation/1.2.0`), A17 (evidence in the image);
+   in part A06 (public-only verifiers, registered credentials), A15 (collection budget), A16
+   (session pruning); prepared A12 (ruleset, release workflow).
+2. Done locally since: an export-file source held to `purchasing-source/1` with
+   hand-written fixtures (A08's first step; proves no real system); the closure pass of
+   2026-10-29 (dated entry below). Next: whatever the owner's answers below unblock.
+3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
+   (A12); a purchasing system or export with access (A08); a model budget and independent
+   labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
+   policy (A16).
+
+Earlier plan (2026-10-16), kept for history: the locally achievable build was complete;
+remaining work needed the owner (live GitHub sandbox test, recorded real-model benchmark,
+staging, pilot owner).
 
 ### After-handoff hardening (2026-10-16)
 - Per-organization quotas: investigations per hour (429 `quota_exceeded`, `Retry-After`) and
@@ -894,3 +911,218 @@ layout for the furniture pack (from approved real samples, not the held-out layo
   Approvals bind the destination; dispatch writes and recovers at the approved destination.
   A probe on the previous code showed recovery looking in the newly configured repository and
   leaving a created issue as `outcome_unknown`.
+
+### No resend while a create may still land (2026-10-25)
+- After a create timed out, a reliable lookup that found nothing was taken as proof that it
+  had not happened, and the task was sent again. A tracker can still commit the first request
+  after the client gave up (or the Casework MCP hop can deliver it late), so a tracker without
+  idempotency keys got the task twice; reproduced with a create committed 6 s after the
+  request.
+- Creates now carry a request deadline (recorded on the attempt, migration 0018, passed
+  through the MCP hop). Finding nothing proves absence only once the deadline plus a clock
+  allowance has passed and the tracker honours deadlines (the simulator refuses late
+  creates); before that the job looks again later; a tracker without deadlines goes to review.
+
+### Case ownership and queue views (2026-10-25)
+- Nothing could make a person a case's owner; the queue's owner column was always empty.
+  Investigators can now take, hand over and release cases; a change made on a stale view is
+  refused rather than overwriting someone else's claim; closed cases keep their owner; every
+  change is audited.
+- The queue has views (Mine, Unassigned, Awaiting approval, Needs review) with counts, an
+  oldest-first order, flags for proposals awaiting a decision and operations needing a human
+  check, and keeps its state in the URL. Needs review is the recovery view for operations
+  whose outcome is unknown.
+- Not done: due dates (no payment terms in the source data), per-person saved views.
+
+### Parser bounds: nested JSON and PDF memory (2026-10-26, review Package 9)
+- JSON nested about a thousand levels deep made the decoder raise RecursionError: an upload or
+  source record failed with an unexpected error, a source listing escaped the connector's
+  error handling, a model answer failed its step instead of being rejected. Nesting is now
+  counted before decoding wherever outside JSON is read (`safejson`). API request bodies were
+  already refused with 400.
+- A PDF under 1 MB that inflates to text used about 850 MB in the parser until the timeout.
+  The parser process is capped at 256 MB on Linux (verified in the app image: the bomb is
+  rejected in 2.2 s, a 50-page PDF with 3.9 MB of text still parses) and at most two PDFs are
+  parsed at once per process. macOS does not enforce the cap (development only).
+
+### Model claims: comparisons and dates (2026-10-26, F15)
+- Model text could reverse a comparison ("receipts total 18 and exceed the invoiced 20"),
+  state a wrong difference direction ("20 that is 2 below the 18 received") or invent a date
+  ("received on 2026-10-15") and still pass validation. Comparisons between stated numbers
+  must now hold, and every date must appear in the cited evidence, findings, case or policy.
+- Found on the way: true difference phrasing ("bills 2 more than the 18 received") and a real
+  date were rejected before; both are accepted now.
+- No false alarms: every dev and validation finding summary passes, and 0 of the 120 recorded
+  held-out mock explanations are rejected.
+
+### API responses checked in the browser (2026-10-26, F18)
+- Pages trusted that the server's JSON had the shape the generated types describe. After a
+  deployment where page and server versions differ, a missing field would render as empty;
+  on an approval screen that means approving what was not shown. Every typed response is now
+  checked against its OpenAPI schema (a generated, slimmed copy: under 5 KB gzipped); a
+  mismatch shows "the app and server versions differ; reload" instead.
+
+### Negative quantities and prices (2026-10-26)
+- Correcting INV-9001's invoiced quantity to -20 made the case match (the 18 received
+  covered it), which is what resolving the case needs; a source invoice with negative lines
+  (a credit note) matched the same way. Matching now sends any negative quantity or price to
+  manual review (`negative_value`, rules 1.1.0), and corrections refuse negative values.
+- Canary: no case changed, only the rules version; the baseline is updated in its own commit.
+
+### Tenant settings split by responsibility (2026-10-26, F18)
+- One long page held tenant facts, investigation and retention settings, the task connection,
+  connector health, policies, members and invitations. It is now four sections (General,
+  Task connection, Policies, People), each at its own address; the accessibility scan covers
+  every section.
+
+### A complete task by keyboard; focus kept after actions (2026-10-26, F18)
+- A new browser test works a case with the keyboard only: create or open, take, investigate,
+  propose, and approve as a second user. It found that focus dropped to the page after every
+  action whose button goes away or is disabled (run, create proposal, approve or reject, take
+  or release, cancel or review), so keyboard and screen-reader users lost their place. A
+  status line now says what happened and takes focus.
+
+### MCP services refused fresh service tokens at random (2026-10-27, X7)
+- Keycloak's clock (in the Podman VM) ran up to 9 ms ahead of the host's. A worker token used
+  the moment it was issued could carry an issue time just in the future, and the MCP services'
+  verifier allowed no difference: 2 of 200 fresh tokens were refused with a 401. The worker saw
+  a transport error, so a create became an outcome it did not know. It explains the MCP
+  integration failures seen as a transport error or as a missing denial (not the
+  reconcile-by-marker one, which is timing). Issue and not-before times may now
+  run up to 30 s ahead; expiry is not stretched. On a real MCP server with a new token per
+  call: 11 of 1,200 calls failed before, 0 of 1,200 after.
+
+### Business-input integrity (2026-10-27, production review A01, A02)
+- An invoice whose lines were an object, null, text or an empty list matched and its case
+  could be resolved; an unreadable line was dropped and the rest matched; two PO lines named
+  "1" kept whichever came last; a receipt listed twice counted twice; a receipt whose return
+  line could not be read still counted the goods as received. Python's default 28-digit
+  context also rounded two different 30-digit totals to the same value.
+- One validation boundary (`domain/validation.py`) used by the mapping (no record is built
+  from incomplete or ambiguous data) and by `reconcile` (nothing is concluded from such
+  input, however it was built); exact 80-digit matching arithmetic; charges-only invoices
+  reviewed; rules `opsbridge-rules/1.2.0`. An investigation does not conclude while a decisive
+  document of the case could not be read completely. Migration 0019: one line per identity
+  on a PO or invoice; existing duplicates stop the upgrade with a list, nothing is deleted.
+- Tests: `tests/domain/test_input_integrity.py` (26), `tests/evidence/test_mapping_integrity.py`
+  (9), `tests/integration/test_input_integrity.py` (7, through the API: resolution refused),
+  `tests/integration/test_migration_0019.py` (refusal under RLS, upgrade, guard, downgrade).
+  Canary 64/64 unchanged; benchmark replay reproduces every recorded run.
+
+### Evaluation scoring versioned (2026-10-27, production review A03)
+- Scoring 1's "instability" was disagreement in next-action correctness: three repeats with
+  two different wrong actions counted as stable. Kept as frozen for `opsbridge-bench-v1`.
+- Scoring 2 (frozen into new benchmarks): action, correctness and outcome/type disagreement
+  and errors per case; per-axis majorities with ties reported; incomplete repeat sets listed
+  and the gate left undecided. API and evaluation page show the scheme and what scoring 1
+  measured. `opsbridge eval-rescore` reads a recorded run under another scheme, printing only.
+- Recorded v1 runs under scoring 2: no disagreement on any axis (deterministic rules and
+  mock). Tests: `tests/evaluation/test_metrics_scoring2.py` (7).
+
+### One admission contract for executor and Casework MCP (2026-10-27, production review A05)
+- The casework tool admitted creates with weaker checks than the executor: a create
+  delayed past an approval expiry, a cancellation or an evidence correction still landed; a
+  replayed request made extra tasks; the text was re-rendered with the tool's own redactor;
+  revoking the approver blocked reconciliation of a task already sent.
+- Shared admission (`services/execution_admission.py`); the tool admits each executor
+  attempt once (migration 0020, `attempts.admitted_at`), sends the sealed text to the
+  approved destination only, and recovers admitted writes without the approver's current
+  authority. A person's review of an unknown outcome completes the operation like the
+  executor (case, outbox). Tests: `test_casework_admission.py` (10),
+  `test_unknown_outcome_review.py` (2).
+- Correction: migration 0019 had not reached the evaluation database (a shell quoting
+  mistake sent every `-x db=` upgrade to the development database); it has now.
+
+### Responses bounded as they arrive (2026-10-27, production review A04)
+- The purchasing source read a 7 MiB record in full before refusing it against its 5 MiB
+  limit; the task connector had no limit, and an unreadable 201 reply to a create escaped as
+  a raw JSON or key error instead of an ambiguous outcome.
+- `connectors/http_transport.py`: streamed reads stopped at the decoded byte limit, bounded
+  gzip/deflate decoding (other encodings refused), a total read deadline; used by the
+  purchasing source, both task trackers and the Ollama adapter. Unreadable create replies
+  are ambiguous, unreadable lookups prove nothing. Dispatch closes its connector.
+  Tests: `tests/test_http_transport.py` (13).
+- Environment: the shared Podman VM's clock had stopped while the Mac was idle (3 h, later
+  1 h behind), so Keycloak tokens arrived expired and MCP tests failed or stalled. Fixed by
+  setting the VM clock from the host (`podman machine ssh … sudo date -s`); chrony's sources
+  were marked unusable and it would not step again. Not a code change.
+
+### Public-only verifiers and registered credentials (2026-10-28, production review A06)
+- MCP verifiers needed the private signing key; now they are built from public keys
+  (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` / `…_PATH`), delegations carry a key id, and keys can
+  rotate with an overlap. A deployed verifier without public keys refuses to start.
+- A tenant could name any credential reference; now the deployment registers each one for a
+  tenant, connector and repositories (`OPSBRIDGE_CONNECTION_CREDENTIALS`), checked when the
+  connection is set and before the secret is read. Unregistered existing references stop
+  sending until registered. Tests: `test_verifier_keys.py` (5), `test_credential_registry.py` (5).
+- Not done: per-role secrets and a parser sandbox, which need the staging environment.
+
+### Evaluation evidence in the image (2026-10-28, production review A17)
+- Decided: the image serves evaluation summaries (results, manifests, signed ledger, public
+  key); full verification and replay run from the repository. `eval-verify` in an
+  installation without `evals/runs` verifies the ledger, says the artifacts are not there and
+  exits 3; `--summary-only` exits 0. Before, it reported every record as FAILED.
+  Tests: `tests/evaluation/test_evidence_packaging.py` (3); CI image job runs both commands.
+
+### Behavioural replay and the run-order factor (2026-10-28, production review A13)
+- Replays compare each trial's behaviour, not only its next action (`opsbridge-replay/2`):
+  outcome, types, reason codes, citations, model and tool calls, and (for new runs) digests of
+  findings and citations. All recorded v1 runs reproduce under it.
+- The v1 mock trials depend on the rules-only trials running first: a document's read
+  problems are listed only on its first ingestion in a run (a product defect, listed above,
+  fixed with the next frozen benchmark). Declared; out-of-order replay fails closed
+  (`test_replay_mode_order.py`).
+
+### Branch rules and releases prepared (2026-10-28, production review A12)
+- `infra/github/main-ruleset.json` (PRs only, four CI checks required, no force push or
+  deletion, break-glass through a PR) and `.github/workflows/release.yml` (refuses commits CI
+  did not qualify; builds from locks; GHCR; SBOM; provenance attestation, verified; promote by
+  digest). Not applied and not run: the owner applies the ruleset and pushes the first tag.
+
+### One time budget for reading the source (2026-10-28, production review A15 in part)
+- Reading the purchasing source had per-request deadlines only; a slow source held an
+  investigation for minutes. `source_collection_seconds` (120) now bounds the whole
+  collection; when it runs out the investigation keeps what it read and goes to manual review
+  (`source_collection_timed_out`). Tests: `test_collection_budget.py` (2).
+
+### Ended sessions pruned (2026-10-28, production review A16 in part)
+- Expired, idle and revoked sessions, with the ID tokens they hold, were never deleted. The
+  worker now prunes them `session_prune_after_hours` (24) after they end, through
+  `ops.prune_sessions` (migration 0021, owned by the new NOLOGIN role
+  `opsbridge_session_pruner`, created by the database init script). Test:
+  `test_session_pruning.py`. Profile deletion and IdP disable propagation need the owner's
+  policy.
+
+### Export-file purchasing source (2026-10-28, production review A08 first step)
+- `connectors/exports.py` reads an organization's export (files plus an immutable manifest)
+  through `purchasing-source/1`: digests checked, untrusted exports refused (paths outside,
+  repeated identities, mixed snapshots), partial exports never prove absence, and the
+  export's `extracted_at` is the investigation's read time. `OPSBRIDGE_PURCHASING_EXPORT_DIR`
+  selects it. Tests: `test_export_source.py` (15), `test_export_investigation.py` (2).
+  Hand-written exports only; no customer export has been read.
+
+### Closure pass (2026-10-29, production review A03, A04, A12, A13)
+- Compressed replies: a gzip or deflate body that stopped short (a complete-looking document
+  without its checksum trailer) or carried bytes or a second member after its end was
+  accepted, and a damaged one escaped as `zlib.error`; six damaged 201 replies to a create
+  became tasks. Now only a complete stream counts and every failure is a decoding error, so a
+  create stays ambiguous. Tests: `tests/test_http_transport.py` (23 new).
+- The intermittent GitHub timeout test: the fake's "late" reply was timed on uvloop's clock,
+  which on macOS counts host sleep, against a client deadline on `time.monotonic()`, which
+  does not; after a host sleep the reply arrived in time and the connector correctly returned
+  the issue that existed. Reproduced by jumping only the server's clock (5 of 5 creates
+  returned the issue). Not a connector defect. The fake now holds the reply until the test is
+  done, the test asserts the remote effect, and the simulator's timed faults wait by
+  `time.monotonic()`. Tests: `test_github_connector.py`, `test_simulator_faults.py`.
+- The finding-text defect: `investigation/1.2.0` names the stored reason an invoice could
+  not be read on every run. Under 1.1.0 a repeat said "()", and a parser-level reason (no
+  text layer) was never named. Runs record their workflow version; frozen plans name theirs
+  (v1: 1.1.0), and v1 recordings replay unchanged under 1.1.0. Tests:
+  `test_reinvestigation_reason.py`, `test_reinvestigation_regression_cases.py` (public v1
+  cases 303/304 as regression evidence), `test_comparability.py`.
+- Release qualification: the workflow built a fresh image after checking CI check names. It
+  now requires the tag to equal every declared version and a successful CI run on `main` for
+  the commit, read from the Actions API (`scripts/release_check.py`, 14 tests). It qualifies
+  the candidate digest it built and promotes that digest without rebuilding. Not run (no tag).
+- Run pages name their scoring scheme; browser tests cover a scoring-1 run and scoring-2
+  rendering (the latter on an intercepted response: no scoring-2 result exists).

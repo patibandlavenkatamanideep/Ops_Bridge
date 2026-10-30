@@ -1,7 +1,7 @@
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type QueuePage } from "../api/client";
+import { Link, useParams, useSearchParams } from "react-router-dom";
+import { ApiError, apiAs, tenantPath, type QueuePage, type QueueViewCounts } from "../api/client";
 import { EmptyState, ErrorState, Loading } from "../components/States";
 import { StatusBadge, formatAge, statusLabel } from "../components/StatusBadge";
 import { useSession } from "../session";
@@ -17,21 +17,56 @@ const STATUSES = [
   "closed_without_resolution",
 ];
 
+// Built-in views; each lives in the URL (?view=…), so it can be bookmarked or shared.
+const VIEWS: { id: string; label: string; permission?: string }[] = [
+  { id: "all", label: "All cases" },
+  { id: "mine", label: "Mine", permission: "case.assign" },
+  { id: "unassigned", label: "Unassigned", permission: "case.assign" },
+  { id: "awaiting_approval", label: "Awaiting approval", permission: "proposal.read" },
+  { id: "needs_review", label: "Needs review", permission: "operation.read" },
+];
+
 export function CaseQueue() {
   const { tenant = "" } = useParams();
   const { can } = useSession();
-  const [status, setStatus] = useState("");
-  const [search, setSearch] = useState("");
+  const [params, setParams] = useSearchParams();
+  const view = params.get("view") ?? "all";
+  const status = params.get("status") ?? "";
+  const sort = params.get("sort") === "oldest" ? "oldest" : "newest";
+  const [search, setSearch] = useState(params.get("q") ?? "");
   const term = useDebounced(search.trim(), 300); // one request per pause in typing, not per key
+  useEffect(() => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (term) next.set("q", term);
+      else next.delete("q");
+      return next;
+    }, { replace: true });
+  }, [term, setParams]);
+  function choose(key: string, value: string, fallback: string) {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (value && value !== fallback) next.set(key, value);
+      else next.delete(key);
+      return next;
+    });
+  }
+  const views = VIEWS.filter((v) => !v.permission || can(tenant, v.permission));
+  const counts = useQuery<QueueViewCounts, ApiError>({
+    queryKey: ["case-views", tenant],
+    queryFn: ({ signal }) => apiAs("QueueViewCounts", tenantPath(tenant, "/cases/views"), { signal }),
+  });
   const query = useInfiniteQuery<QueuePage, ApiError>({
-    queryKey: ["cases", tenant, status, term],
+    queryKey: ["cases", tenant, view, status, sort, term],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam, signal }) => {
-      const params = new URLSearchParams({ limit: "25" });
-      if (status) params.set("status", status);
-      if (term) params.set("q", term);
-      if (pageParam) params.set("cursor", pageParam as string);
-      return api<QueuePage>(tenantPath(tenant, `/cases?${params}`), { signal });
+      const q = new URLSearchParams({ limit: "25" });
+      if (view !== "all") q.set("view", view);
+      if (status) q.set("status", status);
+      if (sort !== "newest") q.set("sort", sort);
+      if (term) q.set("q", term);
+      if (pageParam) q.set("cursor", pageParam as string);
+      return apiAs("QueuePage", tenantPath(tenant, `/cases?${q}`), { signal });
     },
     getNextPageParam: (last) => last.next_cursor,
   });
@@ -48,6 +83,18 @@ export function CaseQueue() {
           </Link>
         )}
       </div>
+      <nav aria-label="Queue views" className="views">
+        {views.map((v) => {
+          const n = (counts.data as Record<string, number> | undefined)?.[v.id];
+          return (
+            <button key={v.id} type="button" className={`link-button ${v.id === view ? "current" : ""}`}
+                    aria-pressed={v.id === view} onClick={() => choose("view", v.id, "all")}>
+              {v.label}
+              {typeof n === "number" ? ` (${n})` : ""}
+            </button>
+          );
+        })}
+      </nav>
       <div className="filters">
         <label>
           Search{" "}
@@ -56,13 +103,20 @@ export function CaseQueue() {
         </label>{" "}
         <label>
           Status{" "}
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
+          <select value={status} onChange={(e) => choose("status", e.target.value, "")}>
             <option value="">All statuses</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {statusLabel(s)}
               </option>
             ))}
+          </select>
+        </label>{" "}
+        <label>
+          Order{" "}
+          <select value={sort} onChange={(e) => choose("sort", e.target.value, "newest")}>
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
           </select>
         </label>
       </div>
@@ -72,12 +126,18 @@ export function CaseQueue() {
         <ErrorState error={query.error} onRetry={() => query.refetch()} />
       ) : items.length === 0 ? (
         <EmptyState title="No cases">
-          <p>{status ? "No cases have this status." : "Blocked invoices you can see will appear here."}</p>
+          <p>
+            {view !== "all"
+              ? "Nothing in this view right now."
+              : status
+                ? "No cases have this status."
+                : "Blocked invoices you can see will appear here."}
+          </p>
         </EmptyState>
       ) : (
         <>
           <table className="table">
-            <caption className="visually-hidden">Cases, newest first</caption>
+            <caption className="visually-hidden">Cases, {sort === "oldest" ? "oldest" : "newest"} first</caption>
             <thead>
               <tr>
                 <th scope="col">Case</th>
@@ -97,11 +157,16 @@ export function CaseQueue() {
                     </Link>
                   </td>
                   <td>{c.discrepancy_types.length ? c.discrepancy_types.map(statusLabel).join(", ") : "—"}</td>
-                  <td>{c.owner ?? c.assignee_group ?? "Unassigned"}</td>
+                  <td>
+                    {c.owner ? (c.owner_active ? c.owner : `${c.owner} (no longer an investigator)`) : "Unassigned"}
+                    {c.assignee_group && <div className="muted small">{c.assignee_group}</div>}
+                  </td>
                   <td>{formatAge(c.age_seconds)}</td>
                   <td>{statusLabel(c.evidence_readiness)}</td>
                   <td>
                     <StatusBadge status={c.status} />
+                    {c.awaiting_approval && <span className="badge">Awaiting approval</span>}
+                    {c.needs_review && <span className="badge">Needs review</span>}
                   </td>
                 </tr>
               ))}

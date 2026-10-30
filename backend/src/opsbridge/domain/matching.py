@@ -13,10 +13,10 @@ import difflib
 import re
 from collections import defaultdict
 from dataclasses import dataclass, field
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from typing import Literal
 
-from .money import decimal_str, quantize
+from .money import MATCH_CONTEXT, decimal_str, quantize
 from .policy import ReconciliationPolicy
 from .records import (
     Invoice,
@@ -28,8 +28,10 @@ from .records import (
     Supplier,
 )
 from .units import canonical_unit, conversion_factor
+from .validation import Problem, match_input_problems
+from .validation import norm_id as _norm_id
 
-RULES_VERSION = "opsbridge-rules/1.0.1"
+RULES_VERSION = "opsbridge-rules/1.2.0"
 
 FindingType = Literal[
     "missing_receipt",
@@ -96,13 +98,6 @@ class MatchResult:
         return [f for f in self.findings if f.finding_type == finding_type]
 
 
-def _norm_id(value: str | None) -> str | None:
-    if value is None:
-        return None
-    v = value.strip().upper()
-    return v or None
-
-
 _NAME_NOISE = re.compile(r"[^a-z0-9 ]+")
 
 
@@ -119,6 +114,45 @@ def _refs(*items: tuple[dict[str, SourceRef], str]) -> tuple[SourceRef, ...]:
     return tuple(out)
 
 
+def _negative_values(data: MatchInput) -> list[tuple[str, tuple[SourceRef, ...]]]:
+    """Each negative quantity or price in the input, named, with its evidence."""
+    out = []
+    for il in data.invoice.lines:
+        if il.quantity < 0:
+            out.append(
+                (f"invoice line {il.line_number} quantity {il.quantity}",
+                 _refs((il.refs, "invoice_line.quantity")))
+            )  # fmt: skip
+        if il.unit_price < 0:
+            out.append(
+                (f"invoice line {il.line_number} unit price {il.unit_price}",
+                 _refs((il.refs, "invoice_line.unit_price")))
+            )  # fmt: skip
+    for po in data.purchase_orders:
+        for pl in po.lines:
+            if pl.quantity < 0 or pl.unit_price < 0:
+                what = "quantity" if pl.quantity < 0 else "unit price"
+                value = pl.quantity if pl.quantity < 0 else pl.unit_price
+                out.append(
+                    (f"{po.po_number} line {pl.line_number} {what} {value}",
+                     _refs((pl.refs, f"po_line.{'quantity' if what == 'quantity' else 'unit_price'}")))
+                )  # fmt: skip
+    for receipt in data.receipts:
+        for rl in receipt.lines:
+            if rl.quantity < 0:
+                out.append(
+                    (f"{receipt.receipt_number} line {rl.po_line_number} quantity {rl.quantity}",
+                     _refs((rl.refs, "receipt_line.quantity")))
+                )  # fmt: skip
+    for a in data.prior_allocations:
+        if a.quantity < 0:
+            out.append(
+                (f"allocation of {a.invoice_number} to PO line {a.po_line_number} quantity "
+                 f"{a.quantity}", _refs((a.refs, "allocation.quantity")))
+            )  # fmt: skip
+    return out
+
+
 def _outcome(findings: list[Finding]) -> Outcome:
     statuses = {f.status for f in findings}
     if "needs_review" in statuses:
@@ -130,8 +164,49 @@ def _outcome(findings: list[Finding]) -> Outcome:
     return "matched"
 
 
+_INPUT_HEADLINES = {
+    "record_lines_missing": "A record has no lines, so nothing on it can be checked",
+    "line_identity_duplicate": "Lines share an identity, so which one applies is ambiguous",
+    "record_identity_duplicate": "A record appears more than once and would be counted twice",
+    "status_unsupported": "A status or kind is outside the supported set",
+    "value_unsupported": "A quantity or price is outside the supported input",
+    "discount_unsupported": "A discount is negative or exceeds its line",
+    "identifier_invalid": "An identifier is missing or cannot be stored",
+}
+
+
+def _input_findings(problems: list[Problem]) -> list[Finding]:
+    """One review finding per kind of input problem, naming each occurrence."""
+    by_code: dict[str, list[Problem]] = defaultdict(list)
+    for p in problems:
+        by_code[p.code].append(p)
+    out = []
+    for code, group in by_code.items():
+        details = "; ".join(p.detail for p in group)[:600]
+        evidence: list[SourceRef] = []
+        for p in group:
+            evidence += [r for r in p.evidence if r not in evidence]
+        out.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                code,
+                f"{_INPUT_HEADLINES[code]}: {details}. Nothing was concluded; a person must "
+                "review the source records.",
+                values={"problems": details},
+                evidence=tuple(evidence),
+            )
+        )
+    return out
+
+
 def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
     """Evaluate an invoice against its PO, receipts and prior allocations."""
+    with localcontext(MATCH_CONTEXT):
+        return _reconcile(data, policy)
+
+
+def _reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
     findings: list[Finding] = []
     invoice = data.invoice
 
@@ -145,6 +220,13 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
             resolved_supplier_id=supplier,
         )
 
+    # Input the canonical checks refuse (validation.py) is not evaluated at all: a rule that
+    # cannot read a record finds nothing wrong with it, and "nothing found" reads as a match.
+    problems = match_input_problems(data)
+    if problems:
+        findings.extend(_input_findings(problems))
+        return done()
+
     if invoice.status == "cancelled":
         findings.append(
             Finding(
@@ -153,6 +235,24 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
                 "invoice_cancelled",
                 f"Invoice {invoice.invoice_number} is cancelled in the source system.",
                 evidence=_refs((invoice.refs, "invoice.status")),
+            )
+        )
+        return done()
+
+    # A negative quantity or price (a credit note, a reversal posted as a negative line, a
+    # mistaken correction) is not modelled: -20 invoiced would count as covered by any
+    # receipt and the case would match. Nothing is concluded from such data.
+    negative = _negative_values(data)
+    if negative:
+        findings.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                "negative_value",
+                "Negative quantities and prices are not supported (credit notes are not "
+                "modelled): " + "; ".join(text for text, _ in negative) + ". A person must "
+                "review this invoice.",
+                evidence=tuple(r for _, refs in negative for r in refs),
             )
         )
         return done()
@@ -248,7 +348,21 @@ def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
         )
         return done(po.po_number, po.supplier_id)
 
-    # 4. Resolve invoice lines to PO lines by exact identifiers.
+    # 4. Resolve invoice lines to PO lines by exact identifiers (unique: validation.py).
+    if all(line.kind == "charge" for line in invoice.lines):
+        # Charges are excluded from matching, so nothing on this invoice would be checked.
+        findings.append(
+            Finding(
+                "manual_review",
+                "needs_review",
+                "goods_lines_absent",
+                f"Invoice {invoice.invoice_number} has only charge lines; charges are not "
+                "matched against the purchase order, so a person must review it.",
+                invoice_line_numbers=tuple(line.line_number for line in invoice.lines),
+                evidence=tuple(r for line in invoice.lines for r in line.refs.values()),
+            )
+        )
+        return done(po.po_number, po.supplier_id)
     po_lines = {_norm_id(line.line_number): line for line in po.lines}
     by_po_line: dict[str, list[InvoiceLine]] = defaultdict(list)
     charges: list[InvoiceLine] = []

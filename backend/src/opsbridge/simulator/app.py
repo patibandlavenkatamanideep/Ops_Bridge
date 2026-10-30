@@ -12,6 +12,8 @@ production mode. Task-creation error semantics are part of the connector contrac
 - 400/401/403/404/409/422: definite failure, nothing committed.
 - 503 with `X-Sim-Not-Committed: true`: definite, retryable, nothing committed.
 - 500/502/504, timeouts and dropped responses: ambiguous — the task may exist.
+A create carrying `X-Request-Deadline` (epoch seconds) is not committed once the deadline has
+passed (504 with `X-Sim-Not-Committed: true`), unless deadlines are switched off for the org.
 """
 
 import asyncio
@@ -19,6 +21,7 @@ import hashlib
 import hmac
 import os
 import re
+import time
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
@@ -46,6 +49,16 @@ def org_key(master: str, org: str) -> str:
     return hmac.new(master.encode(), f"opsbridge-sim:{org}".encode(), hashlib.sha256).hexdigest()
 
 
+async def _wait(seconds: float) -> None:
+    """Waits `seconds` by `time.monotonic()`, the clock clients time their deadlines with.
+    The event loop's timer alone is not that clock: uvicorn runs uvloop, whose clock on macOS
+    counts time the host slept, so a fault meant to answer after a client's deadline answered
+    before it after a host sleep."""
+    until = time.monotonic() + seconds
+    while (left := until - time.monotonic()) > 0:
+        await asyncio.sleep(min(left, 0.05))
+
+
 class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     body: str = Field(default="", max_length=20_000)
@@ -69,6 +82,7 @@ class CapabilitiesIn(BaseModel):
     org: str = Field(pattern=ORG_RE)
     idempotency: bool
     search: bool
+    deadlines: bool = True
 
 
 def create_simulator(
@@ -105,7 +119,7 @@ def create_simulator(
         if fault is None:
             return None
         if fault.mode == "delay":
-            await asyncio.sleep(fault.delay_ms / 1000)
+            await _wait(fault.delay_ms / 1000)
             return None
         return fault.mode
 
@@ -120,10 +134,18 @@ def create_simulator(
         idempotency_key: Annotated[
             str | None, Header(alias="Idempotency-Key", max_length=120)
         ] = None,
+        deadline: Annotated[float | None, Header(alias="X-Request-Deadline")] = None,
     ) -> Any:
         caps = store.capabilities(org)
         key = idempotency_key if caps["idempotency"] else None
         mode = await apply_fault(org, "tasks.create")
+        if caps["deadlines"] and deadline is not None and time.time() > deadline:
+            store.log(org, "tasks.create", "deadline_passed")
+            return JSONResponse(
+                {"error": "request deadline passed; nothing committed"},
+                status_code=504,
+                headers={"X-Sim-Not-Committed": "true"},
+            )
         if mode == "fail_400":
             store.log(org, "tasks.create", "fault_400")
             return JSONResponse({"error": "rejected by validation"}, status_code=400)
@@ -145,7 +167,7 @@ def create_simulator(
             return JSONResponse({"error": "internal"}, status_code=500)
         if mode == "timeout_after_commit":
             store.log(org, "tasks.create", "timeout_after_commit")
-            await asyncio.sleep(slow_response_seconds)
+            await _wait(slow_response_seconds)
         else:
             store.log(org, "tasks.create", "created" if created else "idempotent_replay")
         return JSONResponse(task, status_code=201 if created else 200)
@@ -167,6 +189,7 @@ def create_simulator(
         return {
             "idempotency_keys": caps["idempotency"],
             "lookup": "strong" if caps["search"] else "none",
+            "request_deadlines": caps["deadlines"],
         }
 
     @app.get("/orgs/{org}/tasks")
@@ -233,7 +256,7 @@ def create_simulator(
 
         @app.post("/_control/capabilities")
         def set_caps(body: CapabilitiesIn) -> dict[str, str]:
-            store.set_capabilities(body.org, body.idempotency, body.search)
+            store.set_capabilities(body.org, body.idempotency, body.search, body.deadlines)
             return {"status": "ok"}
 
         @app.get("/_control/stats/{org}")

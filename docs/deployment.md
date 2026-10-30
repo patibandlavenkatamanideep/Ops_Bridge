@@ -30,6 +30,35 @@ keys, `var/` and virtual environments never enter the image. Compose profile `ap
   metadata, tokens and keys over `http://keycloak:8080` (`OPSBRIDGE_OIDC_DISCOVERY_URL`,
   dynamic backchannel) while validating the public issuer.
 - MCP DNS-rebinding protection stays on with the service's own address allowed.
+- Evaluation evidence: the image carries results, frozen manifests, the signed ledger and its
+  public key (the evaluation view), not the evidence bundle (`evals/runs`: model and tool
+  cassettes, bound trial files). In the image `opsbridge eval-verify --summary-only` verifies
+  the ledger's chain and signatures; plain `eval-verify` does the same, says the artifacts
+  are not in this installation and exits 3 (partial). Full artifact verification and replay
+  run from the repository at the recorded commit (`make eval-verify`, `make eval-replay-check`);
+  the CI image job checks both behaviours (production review A17).
+
+## Branch rules and releases (prepared; the owner applies them)
+
+**Branch rules for `main`** (`infra/github/main-ruleset.json`, production review A12): changes
+arrive by pull request, the four CI jobs must pass on the latest commit, review threads must
+be resolved, and force pushes and deletion are refused. With one maintainer the required
+approving reviews are 0; raise `required_approving_review_count` to 1 when a second maintainer
+joins. Break-glass: repository administrators may bypass the rules only by merging a pull
+request (`bypass_mode: pull_request`), and should say why in that pull request. Not applied: it
+changes repository administration. To apply (repository owner):
+
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/main-ruleset.json
+
+**Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI passed
+(`git tag v0.2.0 <commit> && git push origin v0.2.0`). The workflow refuses a commit whose four
+required checks did not all succeed, builds the image from the locks, pushes it to
+`ghcr.io/<owner>/opsbridge:<tag>`, attaches an SPDX SBOM and a build-provenance attestation,
+and verifies the attestation (`gh attestation verify`) before reporting the digest. Deploy
+and roll back by **digest**, never by tag. A schema migration must work with the previous
+release's code until that release is retired (add first, remove later), so rolling back the
+image does not need a down-migration. Not yet run: no tag exists, so its first use is its
+first test.
 
 ## Staging plan (AWS, not provisioned)
 
@@ -72,8 +101,13 @@ the sizes above are conventional starting points, not measurements.
 definitions): PostgreSQL passwords for migrator, app, worker and mcp roles (plus the master
 user, kept out of the application); OIDC client secret; worker client secret; session secret
 (≥ 32 chars); delegation Ed25519 private key (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`, PEM; used directly and
-never written to disk — production refuses to start the signer or verifier without it or an
-existing key file); metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
+never written to disk; given to the API and worker only, which sign) and its public key for
+the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
+`OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH`; a deployed verifier refuses to start without one and
+never loads the private key; list old and new keys together while rotating, then drop the old
+one after the longest delegation lifetime, 5 minutes); the registry of task-connection
+credentials (`OPSBRIDGE_CONNECTION_CREDENTIALS`: reference → tenant, connector, repositories)
+with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`; metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
 spend ceiling).
 
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
@@ -94,7 +128,10 @@ characters, an S3 artifact bucket with server-side encryption requested (`AES256
 load balancer. `production` also refuses demo user credentials and, because no production
 purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
 `staging`. These are settings checks: they do not show that the bucket actually encrypts or
-that the CIDRs are really the load balancer's. Cookies are `Secure` in both.
+that the CIDRs are really the load balancer's. Cookies are `Secure` in both. A deployment
+keeps the default per-user limit (`OPSBRIDGE_RATE_LIMIT_PER_MINUTE`, 240) unless it has
+reason to change it; the development `.env` raises it to 1200 because the browser tests sign
+in as the same demo users many times a minute.
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
@@ -128,7 +165,8 @@ standard AWS chain), never from settings.
 
 **Database roles.** Run the SQL in `infra/compose/postgres/10-opsbridge-roles.sh` and
 `20-opsbridge-databases.sh` once with the master user (roles are NOSUPERUSER NOBYPASSRLS;
-`opsbridge_ops_reader` is NOLOGIN), then migrations as `opsbridge_migrator`.
+`opsbridge_ops_reader` and `opsbridge_session_pruner` are NOLOGIN), then migrations as
+`opsbridge_migrator`.
 
 **Rollout and rollback.** Build the image in CI from the locks, tag it with the commit SHA,
 run the bootstrap task (migrations) first, then update the services. ECS deployment

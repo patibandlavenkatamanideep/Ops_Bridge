@@ -1,5 +1,7 @@
 # External review findings (baseline f0dbb1a, 2026-10-22)
 
+The production review of 2026-10-27 (A01–A18) is tracked in `docs/production-readiness.md`.
+
 An external review of `main` at `f0dbb1a` listed 18 findings (F01–F18) and a delivery order:
 Phase A (protect core decisions), B (concurrency and failure), C (deployable artifact),
 D (one real integration), E (operator value). This file tracks each finding against the
@@ -25,15 +27,20 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | F12 | P1 | Unreadable replacement leaves old records current | Fixed, verified locally | `test_an_unreadable_replacement_invoice_is_not_matched_on_the_old_extraction[*]` (3) |
 | F13 | P1 | Production configuration may keep development defaults | Fixed (settings checks), verified locally | `tests/test_deployment_settings.py` (16) |
 | F14 | P1 | `main` unprotected; CI does not qualify the runtime image | In-repository part done; branch protection and publishing remain the owner's | CI runs on pushes to `main`; API-type drift step; image job (build, smoke, SBOM, scan) — first run on PR #4; base images pinned by digest; Dependabot config |
-| F15 | P2 | Validators check numbers and citations, not claim meaning | Partly fixed, verified locally | role and unit checks: `test_compromised_explanations_are_rejected[…stated as invoiced / uses unit SET]`; no false alarms on any corpus finding summary (`test_finding_numbers.py`); 0 of 120 recorded held-out mock explanations newly rejected |
+| F15 | P2 | Validators check numbers and citations, not claim meaning | Partly fixed, verified locally | role and unit checks: `test_compromised_explanations_are_rejected[…stated as invoiced / uses unit SET]`; comparisons and dates (2026-10-26): `[…says 18 exceeds 20 / says 20 is less than 18 / says 20 is 2 below 18 / date 2026-10-15 is not in its evidence]` (all passed validation before) and `test_true_comparisons_and_dates_from_the_evidence_are_accepted`; no false alarms on any corpus finding summary (`test_finding_numbers.py`); 0 of 120 recorded held-out mock explanations newly rejected (re-measured after each change) |
 | F16 | P2 | Local artifact reads do not verify digests | Fixed, verified locally | `tests/evidence/test_local_store.py`, `test_an_altered_original_is_refused_not_served` |
 | F17 | P2 | `verify` can pass with required gates skipped | Fixed, verified locally | `make verify-strict` fails here on the skipped OCR tests (tesseract not installed), as intended |
 | F18 | P2 | UX needs operator testing | Partly: destination and exact outgoing text shown before approval; Correct offered only for correctable fields; supplier and look-alike confirmation at intake; the server states each viewer's decision reason; expiry noticed while the page is open; queue search debounced; README screenshots fixed | `test_the_server_says_who_may_decide_a_proposal_and_why_not`; browser suite and accessibility scan pass |
 
-Found while building the source contract (not in the review):
+Found along the way (not in the review):
 
 | ID | Finding | Status | Regression evidence |
 |---|---|---|---|
+| X7 | The MCP services refused a fresh service token at random. The identity provider's clock ran a few milliseconds ahead of the service's (up to 9 ms here: Keycloak in the Podman VM), so a token used at once could carry an issue time just in the future, which PyJWT refuses when given no leeway. The 401 reached the worker as an MCP transport error: a create became an outcome it did not know and went to reconciliation, and an MCP integration test failed now and then (each starts with a newly minted token) | Fixed, verified locally | Issue and not-before times may run up to 30 s ahead, as at sign-in; expiry is not stretched; times that are not numbers are refused: `tests/mcp/test_clock_skew.py` (the two "slightly ahead" cases failed before; the five refusal cases pass before and after). Real Keycloak tokens checked the moment they arrived: 2 of 200 refused before, 0 of 400 after. A real records MCP server called with a newly minted token each time: 11 of 1,200 calls failed with "Server returned an error response" before (the error a full gate run hit), 0 of 1,200 after |
+| X6 | A negative quantity or price made a case match: correcting INV-9001's invoiced quantity to -20 turned its discrepancy into "matched" (the 18 received covered it), which is what resolving the case needs; a source invoice with negative lines (a credit note, which is not modelled) matched the same way | Fixed, verified locally | Matching sends any negative quantity or price (invoice, PO, receipt, prior allocation) to manual review (`negative_value`, rules 1.1.0): `test_a_negative_quantity_or_price_goes_to_review_not_to_a_match[5]`; corrections refuse negative values: `test_a_correction_cannot_make_a_quantity_or_price_negative[2]`; all failed before. Canary: no case changed, only the rules version (baseline updated in its own commit) |
+| X5 | A PDF under 1 MB whose streams inflate to text made the parser subprocess use about 850 MB until the 10 s timeout stopped it; concurrent uploads multiplied that | Fixed (Linux), verified in the app image | The worker caps its address space at 256 MB (a legitimate 50-page, 3.9 MB-text PDF parses in 1.9 s under it; the bomb is rejected in 2.2 s) and at most two PDF parses run at once per process: `test_a_pdf_inflating_past_the_memory_cap_is_rejected_before_the_timeout` (Linux only), `test_no_more_than_two_pdfs_are_parsed_at_once` |
+| X4 | JSON nested about a thousand levels deep made `json.loads` raise RecursionError: an upload or source record failed with an unexpected error instead of a rejection, a source listing escaped the connector's error handling, a model answer failed its step instead of being rejected | Fixed, verified locally | Depth counted before decoding (`safejson`): `test_json_limits_and_exact_numbers`, `test_model_output_nested_beyond_any_schema_is_rejected_not_raised`, `test_a_listing_nested_beyond_any_record_is_refused` (all raised RecursionError before), `tests/test_safejson.py`; API bodies were already refused with 400 by the framework (guard test) |
+| X3 | After a create timed out, a strong lookup that found nothing was taken as proof of absence, so a create the tracker committed after the client gave up landed next to the resend (no idempotency keys: two tasks) | Fixed, verified locally | `test_a_create_still_in_flight_is_not_proved_absent_and_sent_again[True]` (failed before: 2 tasks) and `[False]` (a tracker without deadlines: review, one task) |
 | X2 | Dispatch built its connector from the configuration at the moment it ran, so recovering a write that had already landed (worker died after the create, or a retried read-back) looked wherever the configuration pointed by then | Fixed with tenant task connections, verified locally | Probe on the previous code: GitHub issue created, worker dies, repository setting changed → `outcome_unknown` (unreconcilable) though the issue existed; unchanged configuration → confirmed. Now `test_recovery_after_the_connection_moved_looks_where_the_write_went` |
 | X1 | The policy date came from any current invoice with the number (another supplier's older invoice could put the case under a superseded policy), and proposal checks took the newest policy, even a future-dated one, when no single invoice date applied (such a case could never get a proposal) | Fixed, verified locally | `test_the_policy_is_chosen_by_this_suppliers_invoice_date`, `test_a_case_without_one_invoice_date_is_judged_under_todays_policy` |
 
@@ -67,9 +74,18 @@ Not covered:
 - Observed once in three full integration runs (never in eight isolated runs):
   `test_timeout_after_commit_behind_the_mcp_hop_is_reconciled` logged "ambiguous failure
   reconciled as absent" and failed. Behind the MCP hop a timed-out create may still be in
-  flight when the strong lookup runs, so "absent" is not proof there; the simulator's
-  idempotency keys prevent a duplicate, a destination without them could get one. Not
-  investigated further yet.
+  flight when the lookup runs. Without idempotency keys that was a real duplicate risk (X3,
+  fixed with request deadlines, also through the hop). With keys, as in that test, the resend
+  is safe and the task is then confirmed by read-back instead of by marker, which is what the
+  test's method assertion rejects: a timing-dependent test, not a duplicate. Left as is.
+  (Not X7: the simulator's fault is used by the first create that reaches it, so a create
+  refused at the hop would leave it for the resend, which is then reconciled by marker.)
+- Also once under load (an integration run while the dev stack and a browser run were busy;
+  not in the next full gate, not in isolation): `test_denied_records_calls[forged_delegation]`
+  failed, and once (2026-10-26) another MCP test with "MCPError: Server returned an error
+  response". The first run's output was not kept; both fit X7 (a fresh service token refused
+  with a 401, which the test sees as a transport error instead of the expected denial), fixed
+  2026-10-27. Watch for either in CI.
 
 ## What changed, and what it does not cover
 
@@ -94,7 +110,7 @@ Not covered:
   refused as a "reused key".)
 - F11: only seven fields are correctable (those matching applies); other fields are read-only
   in the UI and refused by the API.
-- F12: parsers remain time-bounded, not memory- or process-isolated (Package 9).
+- F12: parsers are time-bounded; PDF parsing is also memory-capped (Package 9, below).
 - F05: a step may renew its lease for `investigation_step_limit_seconds` (default 300);
   after that the worker stops looking alive and another may take the run, whose late writes
   from the first are refused. A model call already in flight on the stuck worker still
@@ -125,16 +141,53 @@ Not covered:
   report that now names every skipped gate and test.
 - F15: a number next to a role word (invoiced, ordered, received, returned, allocated,
   claimed) must equal a finding value of that role, and a number followed by a unit must use
-  the findings' unit. Not checked: comparisons ("above"/"below"), dates, subjects beyond
-  these roles, prose without numbers. Structured claim-to-finding output would need a new
+  the findings' unit. Comparisons between two stated numbers in one clause must hold ("A is B
+  above C" needs A above C by B, to B's precision; "B exceeds C" needs B > C unless B is the
+  amount a recorded value exceeds C by). Every date written (ISO, day/month/year either way,
+  "20 September 2026", "September 20, 2026") must be one the cited evidence, findings, case or
+  policy show; dates are masked before the number checks, so a date's day is no longer read
+  as a quantity. Found on the way: the role check rejected true difference phrasing ("bills 2
+  more than the 18 received") and a supported date whose year sat in a CSV excerpt ("1,2026"
+  read as one number); both fixed. Not checked: comparisons split across clauses, relative
+  dates ("last week"), subjects beyond these roles, prose without numbers. Structured claim-to-finding output would need a new
   prompt version and therefore a new benchmark (the frozen recordings would no longer
   replay); not done.
-- F18 not done: saved queue views, owner/due-date filters (no due dates are modelled),
-  splitting the tenant settings page, runtime validation of successful API responses, and
-  usability sessions with operators.
+- F18, queue ownership and views (2026-10-25): a case can be taken, handed to another
+  investigator or released (`POST /cases/{id}/owner`, refused when the owner changed since
+  the caller looked; audited); the queue has views *Mine*, *Unassigned* (including owners
+  who left), *Awaiting approval* and *Needs review* (the recovery view for unknown
+  outcomes) with counts, oldest-first order, and keeps view, filters and order in the URL.
+  Before, nothing could set a case's owner. Tests: `tests/integration/test_case_ownership.py`
+  (5), a queue unit test, `e2e/queue.spec.ts`.
+- F18, runtime validation of successful API responses (2026-10-26): every typed response is
+  checked in the browser against the OpenAPI schema it is documented with (a generated,
+  slimmed copy: +24 KB, under 5 KB gzipped); a mismatch, such as a proposal without its
+  destination after a version skew, is an error that asks for a reload instead of a page
+  that renders, or offers to approve, what it did not understand. Tests:
+  `frontend/src/api/validate.test.ts`; every browser test now runs with validation on.
+- F18, tenant settings split by responsibility (2026-10-26): General, Task connection,
+  Policies and People, each at its own address (`/settings/<section>`); the accessibility
+  scan now covers every section.
+- F18, a complete operator task by keyboard (2026-10-26): `e2e/keyboard.spec.ts` creates or
+  opens a case, takes it, investigates, proposes, and has an approver find and approve it with
+  Tab, the arrow keys and Enter only. It found that focus was dropped to the page after every
+  action whose button goes away or is disabled (running an investigation, creating a
+  proposal, approving or rejecting, taking or releasing a case, cancelling or reviewing an
+  operation), so a keyboard or screen-reader user lost their place at each step. A status
+  line now says what happened and takes focus (`components/Announcement.tsx`).
+- F18 not done: due dates (invoices carry no payment terms in the packs; an SLA would be a
+  policy decision), saved views per person beyond URLs, screen-reader runs with real
+  assistive technology, and usability sessions with operators.
 - Observed while checking F15: the benchmark's mock trials depend on the `rules_only` trials
   having run first on the same cases (a replay of `mock` alone diverges); the frozen run order
-  always does so. Recorded as a harness property, not changed.
+  always does so. Recorded as a harness property, not changed. Explained 2026-10-28 (review
+  A13): a case's first investigation in a run ingests its documents and lists their read
+  problems; a later investigation of the same bytes makes no new version and lists none, so
+  the invoice-extraction finding reads "could not be read reliably ()". That is a product
+  defect (a re-investigation loses the reason) as well as the replay dependence. Fixing it
+  changes the model requests of the recorded security cases, so it waits for the next frozen
+  benchmark; meanwhile the run order is a declared factor and an out-of-order replay is
+  tested to fail closed (`test_replay_mode_order.py`).
 
 ## Migrations and rollback
 
@@ -146,8 +199,9 @@ Not covered:
 | 0013 | `cases.supplier_id`; current-invoice index per supplier | Restores the per-number index; fails if two suppliers' same-numbered invoices are current. |
 | 0014 | `cases.intake_key`, `cases.intake_digest` (+ unique per requester and key) | Drops them; replays are then recognised only for manual cases. |
 | 0015 | `blob_deletions` (forced RLS, worker only) | Drops the queue; pending deletions are then forgotten (bytes stay: safe). |
+| 0018 | `attempts.deadline_at` | Drops it; absence after a timeout can then no longer be proved for a provider without idempotency keys (such operations go to review: safe). |
 | 0017 | `task_connections` (forced RLS; version 1 per tenant from its connector setting) | Drops it; the connector is read from `tenant_settings.task_connector` again (kept in step), the GitHub repository and token from deployment settings. A GitHub tenant starts 0017 with no repository and must set one. |
 | 0016 | `source_documents.withdrawn_at` | Drops it; withdrawn documents' records stay superseded, and an unchanged record that returns is not reinstated until its bytes change: re-ingest it, or re-upgrade. |
 
-All eight ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
+All nine ran on the dev, test and eval databases; `alembic check` reports no drift. Backup and
 restore drill at 0015: 7465 rows, counts equal, every table with forced RLS.

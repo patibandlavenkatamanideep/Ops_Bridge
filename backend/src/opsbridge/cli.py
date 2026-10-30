@@ -6,6 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from opsbridge.telemetry.logging import uvicorn_log_config
 
@@ -195,7 +196,7 @@ def _eval_freeze(args: argparse.Namespace) -> int:
 def _eval_bench(args: argparse.Namespace) -> int:
     import os
     from datetime import UTC, datetime
-    from typing import Any, cast
+    from typing import cast
 
     from opsbridge.agents.adapters import MockModelAdapter
     from opsbridge.agents.contracts import ModelAdapter
@@ -280,11 +281,13 @@ def _eval_bench(args: argparse.Namespace) -> int:
         "response_origin": "mocked (deterministic mock model); no real model evaluated",
         "network": "Python-level egress limited to loopback during the run",
         "repeats": repeats,
+        "workflow_version": mf.workflow_version_of(frozen),
         "code_version": mf.code_version(REPO_ROOT),
         "modes": {},
         "receipts": {},
     }
     mode_results: dict[str, dict[str, Any]] = {}
+    mode_trials: dict[str, list[dict[str, Any]]] = {}
     receipts: dict[str, dict[str, Any]] = {}
 
     def progress(_t: dict[str, Any]) -> None:
@@ -298,6 +301,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
                 corpus,
                 REPO_ROOT / "var" / "eval" / run_id,
                 cast(ModelAdapter, adapter),
+                workflow_version=mf.workflow_version_of(frozen),
             ) as env,
         ):
             for mode in modes:
@@ -320,7 +324,10 @@ def _eval_bench(args: argparse.Namespace) -> int:
                     on_trial=progress,
                 )
                 print()
-                mode_results[mode] = metrics.summarize_mode(trials)
+                mode_trials[mode] = trials
+                mode_results[mode] = metrics.summarize_mode(
+                    trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
+                )
                 receipts[mode] = {
                     "record_hash": record.hash,
                     "ledger": str(ledger),
@@ -338,12 +345,29 @@ def _eval_bench(args: argparse.Namespace) -> int:
     summary["acceptance"] = metrics.acceptance(summary, policy, args.split)
     summary["verification"] = receipt.verify(ledger, public_key)
     if kind == "replay":
-        from opsbridge.evaluation.reproduce import differences, recorded_results
+        from opsbridge.evaluation.reproduce import (
+            COMPARISON,
+            differences,
+            recorded_results,
+            trial_differences,
+        )
 
         results_dir = Path(f"evals/results/{args.benchmark}")
         diffs = differences(recorded_results(results_dir, source), mode_results)
+        recorded_trials = {
+            mode: [
+                json.loads(line)
+                for line in (source.parent / f"trials-{mode}.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            for mode in mode_trials
+        }
+        behaviour, not_recorded = trial_differences(recorded_trials, mode_trials)
+        diffs += behaviour
         summary["reproduces"] = {
             "recorded_run": source.parent.name,
+            "comparison": COMPARISON,
+            "not_compared": not_recorded,
             "ok": not diffs,
             "differences": diffs[:100],
         }
@@ -379,7 +403,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     in CI and in `make verify` without the signing key."""
     import os
     from datetime import UTC, datetime
-    from typing import Any, cast
+    from typing import cast
 
     from opsbridge.agents.contracts import ModelAdapter
     from opsbridge.config import REPO_ROOT, get_settings
@@ -388,7 +412,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
     from opsbridge.evaluation.bench import environment
     from opsbridge.evaluation.cassette import ReplayAdapter, ReplayFailure
     from opsbridge.evaluation.egress import EgressBlocked, loopback_only
-    from opsbridge.evaluation.reproduce import differences, recorded_results
+    from opsbridge.evaluation.reproduce import differences, recorded_results, trial_differences
     from opsbridge.simulator.scenarios import load_corpus
 
     os.chdir(REPO_ROOT)
@@ -415,6 +439,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
         adapter = ReplayAdapter.load(cassette)
         check_id = f"check-{split_name}-{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}"
         replayed: dict[str, Any] = {}
+        replayed_trials: dict[str, list[dict[str, Any]]] = {}
         try:
             with (
                 loopback_only(),
@@ -423,6 +448,7 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                     corpus,
                     REPO_ROOT / "var" / "eval" / check_id,
                     cast(ModelAdapter, adapter),
+                    workflow_version=mf.workflow_version_of(frozen),
                 ) as env,
             ):
                 for mode in [m for m in frozen["modes"] if m in expected["modes"]]:
@@ -433,12 +459,27 @@ def _eval_replay_check(args: argparse.Namespace) -> int:
                             if (t["error"] or "").startswith("ReplayFailure"):
                                 raise ReplayFailure(t["error"])  # fail closed, as recording does
                             trials.append(t)
-                    replayed[mode] = metrics.summarize_mode(trials)
+                    replayed_trials[mode] = trials
+                    replayed[mode] = metrics.summarize_mode(
+                        trials, scheme=mf.scheme_of(frozen["scoring"]) or "", repeats=repeats
+                    )
         except (ReplayFailure, EgressBlocked) as exc:
             print(f"{split_name}: FAILED CLOSED ({type(exc).__name__}): {exc}")
             failed = True
             continue
         diffs = differences(expected, replayed)
+        recorded_trials = {
+            mode: [
+                json.loads(line)
+                for line in (cassette.parent / f"trials-{mode}.jsonl").read_text().splitlines()
+                if line.strip()
+            ]
+            for mode in replayed_trials
+        }
+        behaviour, not_recorded = trial_differences(recorded_trials, replayed_trials)
+        diffs += behaviour
+        if not_recorded:
+            print(f"{split_name}: not compared (not in this recording): {', '.join(not_recorded)}")
         counts = ", ".join(
             f"{m} {r['next_action']['correct']}/{r['next_action']['n']}"
             for m, r in replayed.items()
@@ -469,22 +510,83 @@ def _eval_backfill_tools(args: argparse.Namespace) -> int:
     return 0
 
 
-def _eval_verify(_args: argparse.Namespace) -> int:
+def _eval_rescore(args: argparse.Namespace) -> int:
+    """Disagreement in a recorded run's trials under another scoring scheme. A derived
+    reading for comparison only: it prints, writes nothing, and changes no recorded result."""
     import os
 
     from opsbridge.config import REPO_ROOT
-    from opsbridge.evaluation import receipt
+    from opsbridge.evaluation import manifest as mf
+    from opsbridge.evaluation import metrics
 
     os.chdir(REPO_ROOT)
+    run = Path(args.run)
+    frozen = mf.load(Path("evals/manifests") / f"{run.parent.name}.json")
+    print(
+        f"{run.name}: recorded under {mf.scheme_of(frozen['scoring'])}, read under {args.scheme} "
+        "(derived; not the run's result)"
+    )
+    for path in sorted(run.glob("trials-*.jsonl")):
+        trials = [
+            json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line
+        ]
+        s = metrics.summarize_mode(trials, scheme=args.scheme, repeats=int(frozen["repeats"]))
+        mode = path.stem.removeprefix("trials-")
+        if args.scheme == metrics.SCORING_2:
+            i = s["instability"]
+            axes = ", ".join(
+                f"{axis} {i[axis]['cases_with_disagreement']}/{s['n_cases']}"
+                for axis in ("action", "correctness", "outcome_types")
+            )
+            done = "complete" if s["complete"] else f"incomplete: {s['incomplete_cases']}"
+            print(
+                f"  {mode}: cases with disagreement: {axes}; errored repeats "
+                f"{i['errors']['trials_with_error']}; next action {s['next_action']['correct']}/"
+                f"{s['n_cases']}; {done}"
+            )
+        else:
+            print(f"  {mode}: cases with any flip {s['instability']['cases_with_any_flip']}")
+    return 0
+
+
+def _eval_verify(args: argparse.Namespace) -> int:
+    """Verify the evaluation ledger and, where the evidence bundle is present, every record's
+    bound artifacts. The runtime image carries results, manifests, ledger and public key but
+    not the bundle (`evals/runs`): there it verifies chain and signatures, says so, and exits
+    3 (partial) unless `--summary-only` asked for exactly that."""
+    import os
+
+    from opsbridge import config
+    from opsbridge.evaluation import receipt
+
+    os.chdir(config.REPO_ROOT)
     ledger = Path("evals/ledger/opsbridge-bench.jsonl")
-    report = receipt.verify(ledger, Path("evals/keys/opsbridge-eval.pub").read_text().strip())
+    bundle = Path("evals/runs").is_dir()
+    check_artifacts = bundle and not args.summary_only
+    report = receipt.verify(
+        ledger,
+        Path("evals/keys/opsbridge-eval.pub").read_text().strip(),
+        artifacts=check_artifacts,
+    )
     print(f"chain: {report['chain']['message']}")
     print(f"signatures: {report['signatures']['message']}")
     for r in report["artifacts"]:
         print(f"record {r['index']}: {'ok' if r['ok'] else 'FAILED'}")
         if not r["ok"]:
             print(r["output"])
-    return 0 if report["ok"] else 1
+    if not report["ok"]:
+        return 1
+    if check_artifacts:
+        return 0
+    where = (
+        "the evaluation evidence bundle (evals/runs: cassettes and bound trial files) is not "
+        "in this installation; verify it from the repository at the recorded commit "
+        "(make eval-verify)"
+        if not bundle
+        else "skipped (--summary-only)"
+    )
+    print(f"artifacts: not checked: {where}")
+    return 0 if args.summary_only else 3
 
 
 def _probe(args: argparse.Namespace) -> int:
@@ -508,7 +610,10 @@ def _probe(args: argparse.Namespace) -> int:
 
 
 def _init_keys(_args: argparse.Namespace) -> int:
-    """Create the delegation signing key once, before services that share it start."""
+    """Create the delegation signing key once, before services that share it start, and
+    write its public key beside it for the services that only verify."""
+    from cryptography.hazmat.primitives import serialization
+
     from opsbridge.config import get_settings
     from opsbridge.mcp_services.auth import load_or_create_key
 
@@ -518,8 +623,14 @@ def _init_keys(_args: argparse.Namespace) -> int:
         return 0
     path = settings.delegation_key_path
     existed = path.exists()
-    load_or_create_key(path)
-    print(f"delegation key {'present' if existed else 'created'} at {path}")
+    key = load_or_create_key(path)
+    public = path.with_suffix(".pub.pem")
+    public.write_bytes(
+        key.public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+    )
+    print(f"delegation key {'present' if existed else 'created'} at {path}; public key at {public}")
     return 0
 
 
@@ -589,15 +700,21 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
             settings.oidc_issuer, aud, frozenset({"opsbridge-worker"}), jwks_url=jwks_url
         )
 
-        def connector_for(tenant_id: uuid.UUID, name: str) -> TaskConnector:
+        def connector_for(tenant_id: uuid.UUID, destination: dict[str, Any]) -> TaskConnector:
+            """A connector for exactly the approved destination. The worker sends GitHub
+            issues itself, with the tenant's connection; this service executes simulator
+            tasks only, in the tenant's own organization (it never falls back to
+            deployment-wide settings)."""
             with db.session(DbContext(tenant_id=tenant_id)) as s:
                 tenant = s.get(Tenant, tenant_id)
                 assert tenant is not None
                 org = tenant.slug
-            if name == "github_issues":
-                from opsbridge.connectors.github import github_connector_from_settings
-
-                return github_connector_from_settings(settings)
+            if destination.get("connector") != "sim_tasks":
+                raise ValueError(
+                    f"this service does not execute {destination.get('connector')!r} destinations"
+                )
+            if destination.get("organization") != org:
+                raise ValueError("the approved organization is not this tenant's")
             return SimTaskConnector(
                 settings.simulator_url, settings.sim_master_secret.get_secret_value(), org
             )
@@ -716,7 +833,20 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--run", required=True, help="evals/runs/<benchmark>/<split>-record-<time>")
     p.set_defaults(func=_eval_backfill_tools)
 
+    p = sub.add_parser(
+        "eval-rescore",
+        help="print a recorded run's disagreement under another scoring scheme (writes nothing)",
+    )
+    p.add_argument("--run", required=True, help="evals/runs/<benchmark>/<split>-<kind>-<time>")
+    p.add_argument("--scheme", default="opsbridge-scoring/2")
+    p.set_defaults(func=_eval_rescore)
+
     p = sub.add_parser("eval-verify", help="verify benchmark receipts, signatures and artifacts")
+    p.add_argument(
+        "--summary-only",
+        action="store_true",
+        help="ledger chain and signatures only (an installation without evals/runs)",
+    )
     p.set_defaults(func=_eval_verify)
 
     p = sub.add_parser("probe", help="health probe for containers (http://127.0.0.1… or tcp://…)")

@@ -65,6 +65,7 @@ export function App() {
           <Route path="cases/new" element={<NewCase />} />
           <Route path="cases/:caseId" element={<CaseDetail />} />
           <Route path="settings" element={<TenantSettings />} />
+          <Route path="settings/:section" element={<TenantSettings />} />
           <Route path="evaluation" element={<Evaluation />} />
           <Route path="evaluation/:benchmark/:runId" element={<Evaluation />} />
         </Route>

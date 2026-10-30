@@ -151,6 +151,12 @@ code,
 .filters {
   margin: 0.5rem 0 1rem;
 }
+.views {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  margin: 0.5rem 0;
+}
 
 .button {
   display: inline-block;
@@ -583,4 +589,11 @@ fieldset {
   align-items: center;
   gap: 0.5rem;
   font-weight: 400;
+}
+
+/* A status line that takes focus after an action (components/Announcement.tsx). */
+.announcement {
+  margin: 0.5rem 0;
+  padding: 0.4rem 0.6rem;
+  border-left: 3px solid var(--accent);
 }

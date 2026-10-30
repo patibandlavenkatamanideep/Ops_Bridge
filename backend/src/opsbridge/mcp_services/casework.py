@@ -1,15 +1,27 @@
 """Casework MCP: approved follow-up task operations, read-back and reconciliation.
 
-`create_follow_up_task` takes only an operation id. Title, body, assignee group and the
-idempotency key are loaded from the approved operation record, so a caller (or a model)
-cannot substitute its own parameters. Additional checks, on top of the executor's own:
+`create_follow_up_task` takes only an operation id and the executor's attempt id. What is
+sent is the outbound text and destination sealed in the approved payload (the same request
+the executor would build), so a caller (or a model) cannot substitute its own parameters,
+and a different redactor or setting here cannot change the approved bytes.
+
+A create is admitted when the request reaches this tool, with the executor's own admission
+function (services/execution_admission.py): cancellation, proposal and approval state,
+approval expiry, the approver's current authority, evidence and policy freshness, the
+approved destination and text. A request can arrive long after the executor checked. On top:
 - caller service identity is an allowed executor (`opsbridge-worker`);
-- the delegation names this operation and the approver as principal;
+- the delegation names this operation, this attempt and the approver as principal;
 - the principal still holds `proposal.decide` with the action in scope;
-- the operation is `executing`, its payload digest matches the approved proposal, and
-  its approval is unexpired.
+- the operation is `executing` and its payload digest matches the approved proposal;
+- the attempt is the executor's open create for this operation and is admitted once
+  (`attempts.admitted_at`), so a replayed or retransmitted request cannot write again.
+
+Read-back and reconciliation recover a write already admitted; they are not new writes.
+They need the delegation for the operation and an admitted create, but not the approver's
+current authority: revoking the approver must not hide a task that was already sent.
+
 Business outcomes are returned as data (`outcome` + `category`) so the executor can apply
-its definite/ambiguous rules; authorization failures are tool errors.
+its definite/ambiguous rules; authorization and admission failures are tool errors.
 """
 
 from __future__ import annotations
@@ -21,7 +33,7 @@ from typing import Any
 import anyio
 from mcp.server.auth.settings import AuthSettings
 from mcp.server.mcpserver import Context, MCPServer
-from sqlalchemy import select
+from sqlalchemy import select, text
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
@@ -31,14 +43,13 @@ from opsbridge.connectors.tasks import (
     DefiniteFailure,
     LookupUnavailable,
     TaskConnector,
-    TaskRequest,
 )
-from opsbridge.evidence.records import case_identifiers
 from opsbridge.persistence.db import Database
-from opsbridge.persistence.models import ApprovalDecision, Membership, Operation, Proposal
-from opsbridge.privacy.redaction import redact
+from opsbridge.persistence.models import ApprovalDecision, Attempt, Membership, Operation, Proposal
+from opsbridge.services import execution_admission as admission
 
 from .auth import DelegationVerifier
+from .client import NOT_ADMITTED
 from .common import CallContext, Guard, ToolDenied, as_uuid
 
 TOOL_VERSION = "casework/1"
@@ -52,7 +63,7 @@ def build_casework_server(
     delegation_verifier: DelegationVerifier,
     resource_url: str,
     issuer_url: str,
-    connector_for: Callable[[uuid.UUID, str], TaskConnector],
+    connector_for: Callable[[uuid.UUID, dict[str, Any]], TaskConnector],
     timeout_seconds: float = 5.0,
 ) -> MCPServer:
     server = MCPServer(
@@ -74,6 +85,8 @@ def build_casework_server(
     def load(
         cc: CallContext, operation_id: str, *, need_executing: bool
     ) -> tuple[Operation, TaskConnector]:
+        """The operation, checked for this caller, and a connector for its APPROVED
+        destination. `need_executing` is a create; otherwise recovery of an admitted one."""
         op_id = as_uuid(operation_id, "operation id")
         if cc.service_client not in EXECUTOR_CLIENTS:
             raise ToolDenied(f"service {cc.service_client} may not execute casework operations")
@@ -85,14 +98,15 @@ def build_casework_server(
                 raise ToolDenied("operation not found in the delegated tenant")
             if op.approved_by != cc.delegation.principal_id:
                 raise ToolDenied("delegated principal is not the approver of this operation")
-            m = s.execute(
-                select(Membership).where(
-                    Membership.user_id == cc.delegation.principal_id, Membership.status == "active"
-                )
-            ).scalar_one_or_none()
-            if m is None or op.action_type not in (m.approval_scope or []):
-                raise ToolDenied("approver's scope no longer covers this action")
             if need_executing:
+                m = s.execute(
+                    select(Membership).where(
+                        Membership.user_id == cc.delegation.principal_id,
+                        Membership.status == "active",
+                    )
+                ).scalar_one_or_none()
+                if m is None or op.action_type not in (m.approval_scope or []):
+                    raise ToolDenied("approver's scope no longer covers this action")
                 pr = s.get(Proposal, op.proposal_id)
                 ad = s.get(ApprovalDecision, op.approval_id)
                 if op.status != "executing":
@@ -105,25 +119,69 @@ def build_casework_server(
                     or digest(op.payload) != op.payload_digest
                 ):
                     raise ToolDenied("operation payload is not bound to its approval")
+            elif (
+                s.execute(
+                    select(Attempt.id).where(
+                        Attempt.operation_id == op.id,
+                        Attempt.kind == "dispatch",
+                        Attempt.admitted_at.is_not(None),
+                    )
+                ).first()
+                is None
+            ):
+                # Nothing was ever sent through this service, so there is nothing to recover;
+                # without that, reading tasks needs the approver's current authority.
+                raise ToolDenied("no create was admitted for this operation")
             s.expunge(op)
-        return op, connector_for(cc.delegation.tenant_id, op.connector)
+        try:
+            return op, connector_for(cc.delegation.tenant_id, op.payload.get("destination") or {})
+        except ValueError as exc:
+            raise ToolDenied(str(exc)) from exc
+
+    def admit(cc: CallContext, op: Operation, attempt_id: str | None) -> None:
+        """Admit this create once, with the executor's own admission, at this moment."""
+        att = as_uuid(attempt_id or "", "attempt id")
+        if cc.delegation.attempt_id != att:
+            raise ToolDenied(f"{NOT_ADMITTED}: the delegation does not name this attempt")
+        with db.session(cc.db_ctx) as s:
+            current = s.get(Operation, op.id)
+            assert current is not None
+            refused = admission.refusal(s, current, lock_case=False)
+            if refused is not None:
+                raise ToolDenied(f"{NOT_ADMITTED} ({refused.category}): {refused.detail}")
+            claimed = s.execute(
+                text(
+                    "UPDATE attempts SET admitted_at = now() WHERE id = :a AND operation_id = :o "
+                    "AND kind = 'dispatch' AND status = 'started' AND admitted_at IS NULL "
+                    "AND NOT EXISTS (SELECT 1 FROM attempts later WHERE later.operation_id = :o "
+                    "AND later.started_at > attempts.started_at) RETURNING id"
+                ),
+                {"a": att, "o": op.id},
+            ).first()
+            if claimed is None:
+                raise ToolDenied(
+                    f"{NOT_ADMITTED}: attempt {att} is not the executor's open create for this "
+                    "operation, or was already admitted"
+                )
 
     @server.tool(
         description="Create the approved follow-up task for an operation (parameters from the record)."
     )
-    async def create_follow_up_task(operation_id: str, ctx: Context) -> dict[str, Any]:
+    async def create_follow_up_task(
+        operation_id: str,
+        ctx: Context,
+        deadline: float | None = None,
+        attempt_id: str | None = None,
+    ) -> dict[str, Any]:
+        """`deadline` (epoch seconds) is the caller's: the task must not be committed after it,
+        so the caller can later prove absence by lookup. `attempt_id` is the executor's open
+        create; it is admitted once."""
         cc = guard.authorize(ctx, "create_follow_up_task", "proposal.decide")
 
         def go() -> dict[str, Any]:
             op, conn = load(cc, operation_id, need_executing=True)
-            with db.session(cc.db_ctx) as s:
-                keep = case_identifiers(s, op.case_id)  # the case's own ids stay readable
-            params = op.payload["parameters"]
-            marker = f"opsbridge-op:{op.operation_key}"
-            body = f"{redact(params.get('body') or '', keep).text}\n\nOpsBridge operation marker: {marker}"
-            req = TaskRequest(
-                redact(params["title"], keep).text, body, params.get("assignee_group"), marker
-            )
+            admit(cc, op, attempt_id)
+            req = admission.approved_request(op.payload, op.operation_key, deadline=deadline)
             key = op.operation_key if conn.capabilities.idempotency_keys else None
             try:
                 t = conn.create(req, key, timeout_seconds)
@@ -152,7 +210,7 @@ def build_casework_server(
     async def get_follow_up_task(
         operation_id: str, remote_ref: str, ctx: Context
     ) -> dict[str, Any]:
-        cc = guard.authorize(ctx, "get_follow_up_task", "proposal.decide")
+        cc = guard.authorize(ctx, "get_follow_up_task", None)  # recovery: see load()
 
         def go() -> dict[str, Any]:
             _op, conn = load(cc, operation_id, need_executing=False)
@@ -178,12 +236,12 @@ def build_casework_server(
         description="Find tasks carrying an operation's marker (reconciliation after ambiguity)."
     )
     async def reconcile_operation(operation_id: str, ctx: Context) -> dict[str, Any]:
-        cc = guard.authorize(ctx, "reconcile_operation", "proposal.decide")
+        cc = guard.authorize(ctx, "reconcile_operation", None)  # recovery: see load()
 
         def go() -> dict[str, Any]:
             op, conn = load(cc, operation_id, need_executing=False)
             try:
-                found = conn.find_by_marker(f"opsbridge-op:{op.operation_key}", timeout_seconds)
+                found = conn.find_by_marker(admission.marker(op.operation_key), timeout_seconds)
             except LookupUnavailable as exc:
                 return {
                     "outcome": "lookup_unavailable",

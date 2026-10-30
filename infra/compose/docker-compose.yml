@@ -170,7 +170,11 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      # Verifies delegations with the public key only (the signing key stays with API/worker
+      # in staging; this development volume still holds both).
+      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
     command: ["python", "-m", "opsbridge.cli", "mcp-records", "--host", "0.0.0.0", "--port", "8101"]
     volumes: [opsbridge_appdata:/app/var]
     depends_on:
@@ -189,7 +193,11 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      # Verifies delegations with the public key only (the signing key stays with API/worker
+      # in staging; this development volume still holds both).
+      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
     command: ["python", "-m", "opsbridge.cli", "mcp-casework", "--host", "0.0.0.0", "--port", "8102"]
     volumes: [opsbridge_appdata:/app/var]
     depends_on:

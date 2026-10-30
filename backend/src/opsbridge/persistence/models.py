@@ -546,6 +546,14 @@ class POLineRecord(Base):
     __table_args__ = (
         _tenant_unique("po_lines"),
         _fk(["purchase_order_id"], "purchase_orders", "fk_po_lines_po", ondelete="CASCADE"),
+        # One line per identity, compared as the matcher compares it (migration 0019).
+        Index(
+            "uq_po_lines_identity",
+            "tenant_id",
+            "purchase_order_id",
+            text("upper(btrim(line_number))"),
+            unique=True,
+        ),
     )
 
 
@@ -595,6 +603,13 @@ class InvoiceLineRecord(Base):
     __table_args__ = (
         _tenant_unique("invoice_lines"),
         _fk(["invoice_id"], "invoices", "fk_invoice_lines_invoice", ondelete="CASCADE"),
+        Index(
+            "uq_invoice_lines_identity",
+            "tenant_id",
+            "invoice_id",
+            text("upper(btrim(line_number))"),
+            unique=True,
+        ),
     )
 
 
@@ -1051,6 +1066,12 @@ class Attempt(Base):
     fencing_token: Mapped[int | None] = mapped_column(BigInteger)
     started_at: Mapped[datetime] = created()
     finished_at: Mapped[datetime | None]
+    # A create's request deadline (migration 0018): the provider commits nothing after it, so
+    # only once it has passed can a lookup that finds nothing prove the create did not happen.
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # When the casework MCP tool admitted this create (migration 0020): once per attempt, so
+    # a replayed request cannot write again.
+    admitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     __table_args__ = (
         _tenant_unique("attempts"),
         _fk(["operation_id"], "operations", "fk_attempts_operation"),

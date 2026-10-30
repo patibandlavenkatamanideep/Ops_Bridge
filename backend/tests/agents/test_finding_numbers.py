@@ -10,7 +10,14 @@ from __future__ import annotations
 
 import pytest
 
-from opsbridge.agents.steps import AgentContext, _allowed_numbers, _numbers, _role_problems
+from opsbridge.agents.steps import (
+    AgentContext,
+    _allowed_numbers,
+    _comparison_problems,
+    _date_problems,
+    _numbers,
+    _role_problems,
+)
 from opsbridge.config import REPO_ROOT
 from opsbridge.domain.matching import reconcile
 from opsbridge.evaluation.rules_baseline import PolicyBook, build_input
@@ -54,5 +61,8 @@ def test_finding_summaries_only_state_recorded_numbers(scenario, inputs) -> None
         )
         unsupported = _numbers(d["summary"]) - _allowed_numbers(ctx, [])
         assert not unsupported, f"{d['reason_code']}: {d['summary']} states {sorted(unsupported)}"
-        # The role and unit check must accept the matcher's own wording (no false alarms).
+        # The role, unit, comparison and date checks must accept the matcher's own wording
+        # (no false alarms).
         assert _role_problems(ctx, d["summary"]) == [], d["summary"]
+        assert _comparison_problems(ctx, d["summary"]) == [], d["summary"]
+        assert _date_problems(ctx, d["summary"], []) == [], d["summary"]

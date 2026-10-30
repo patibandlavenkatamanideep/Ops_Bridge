@@ -46,7 +46,18 @@ test("administrator settings", async ({ page }) => {
   await signIn(page, "furn-admin");
   await page.goto("/t/demo-furniture/settings");
   await expect(page.getByRole("heading", { name: "Tenant settings" })).toBeVisible();
-  await expectNoSeriousViolations(page, "tenant settings");
+  await expect(page.getByLabel("Default investigation mode")).toBeVisible();
+  await expectNoSeriousViolations(page, "tenant settings: general");
+  const sections = page.getByRole("navigation", { name: "Settings sections" });
+  for (const [name, ready] of [
+    ["Task connection", page.getByRole("region", { name: "Connector health" }).locator("dl")],
+    ["Policies", page.getByRole("region", { name: "Policies" })],
+    ["People", page.getByRole("table", { name: "Members of this organization" })],
+  ] as const) {
+    await sections.getByRole("link", { name }).click();
+    await expect(ready).toBeVisible();
+    await expectNoSeriousViolations(page, `tenant settings: ${name.toLowerCase()}`);
+  }
   await page.getByRole("button", { name: "Change Ana Notes-Approver" }).click();
   await expect(page.getByRole("form", { name: "Change membership of Ana Notes-Approver" })).toBeVisible();
   await expectNoSeriousViolations(page, "tenant settings with the member editor open");

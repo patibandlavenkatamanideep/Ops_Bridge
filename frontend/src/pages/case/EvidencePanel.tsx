@@ -1,15 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import {
-  ApiError,
-  api,
-  tenantPath,
-  type Citation,
-  type DocumentList,
-  type FieldItem,
-  type UploadResult,
-  type VersionDetail,
-} from "../../api/client";
+import { ApiError, api, apiAs, tenantPath, type Citation, type DocumentList, type FieldItem, type UploadResult, type VersionDetail } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
 import { useSession } from "../../session";
@@ -29,7 +20,7 @@ function locatorLine(locator: string): { page: number | null; line: number | nul
 export function EvidencePanel({ tenant, caseId, focus }: { tenant: string; caseId: string; focus: Citation | null }) {
   const docs = useQuery<DocumentList, ApiError>({
     queryKey: ["documents", tenant, caseId],
-    queryFn: ({ signal }) => api<DocumentList>(tenantPath(tenant, `/cases/${caseId}/documents`), { signal }),
+    queryFn: ({ signal }) => apiAs("DocumentList", tenantPath(tenant, `/cases/${caseId}/documents`), { signal }),
   });
   const { can } = useSession();
   const [selected, setSelected] = useState<string | null>(null);
@@ -108,7 +99,7 @@ function UploadForm({ tenant, caseId, onUploaded }: { tenant: string; caseId: st
       const form = new FormData();
       form.append("kind", kind);
       form.append("file", file!);
-      return api<UploadResult>(tenantPath(tenant, `/cases/${caseId}/documents`), { method: "POST", body: form });
+      return apiAs("UploadOut", tenantPath(tenant, `/cases/${caseId}/documents`), { method: "POST", body: form });
     },
     onSuccess: (r) => {
       void qc.invalidateQueries({ queryKey: ["documents", tenant, caseId] });
@@ -174,7 +165,7 @@ function VersionView({ tenant, caseId, versionId, focus }: { tenant: string; cas
   const detail = useQuery<VersionDetail, ApiError>({
     queryKey: ["version", tenant, caseId, versionId],
     queryFn: ({ signal }) =>
-      api<VersionDetail>(tenantPath(tenant, `/cases/${caseId}/documents/versions/${versionId}`), { signal }),
+      apiAs("VersionDetailOut", tenantPath(tenant, `/cases/${caseId}/documents/versions/${versionId}`), { signal }),
   });
   const highlightRef = useRef<HTMLElement | null>(null);
   useEffect(() => {

@@ -26,6 +26,7 @@ from opsbridge.agents.contracts import ModelAdapter
 from opsbridge.api.deps import resolve_principal
 from opsbridge.auth.permissions import Principal
 from opsbridge.auth.sessions import SessionInfo
+from opsbridge.canonical import digest
 from opsbridge.config import Settings
 from opsbridge.persistence.db import Database, DbContext, make_engine
 from opsbridge.persistence.models import Base, ModelCall, ToolInvocation, User, WorkflowRun
@@ -34,7 +35,7 @@ from opsbridge.services.cases import CaseCreate, create_case
 from opsbridge.services.investigations import latest_investigation, start_investigation
 from opsbridge.simulator.app import create_simulator
 from opsbridge.simulator.scenarios import Corpus, Scenario, seed_simulator
-from opsbridge.workflow.investigation import run_investigation
+from opsbridge.workflow.investigation import WORKFLOW_VERSION, run_investigation
 from opsbridge.workflow.jobs import ClaimedJob
 from opsbridge.workflow.worker import Worker, build_investigation_deps
 
@@ -74,6 +75,10 @@ class TrialResult:
     proposal_validation: dict[str, Any] | None = None
     latency_ms: int = 0
     error: str | None = None
+    # Behaviour beyond the next action, for replay comparison 2 (reproduce.py): digests of the
+    # findings (values and evidence) and of the citations, without the ids a run generates.
+    findings_sha256: str | None = None
+    citations_sha256: str | None = None
 
     @property
     def correct(self) -> dict[str, bool]:
@@ -99,15 +104,25 @@ def _truncate(engine: Any) -> None:
 
 
 class BenchEnvironment:
-    """One isolated benchmark environment (simulator + eval database + worker)."""
+    """One isolated benchmark environment (simulator + eval database + worker).
+
+    Every trial runs the investigation workflow `workflow_version`: a frozen plan's own (see
+    manifest.workflow_version_of), so recordings replay with the behaviour that made them."""
 
     def __init__(
-        self, settings: Settings, corpus: Corpus, workdir: Path, model_adapter: ModelAdapter | None
+        self,
+        settings: Settings,
+        corpus: Corpus,
+        workdir: Path,
+        model_adapter: ModelAdapter | None,
+        *,
+        workflow_version: str = WORKFLOW_VERSION,
     ) -> None:
         self.base_settings = settings
         self.corpus = corpus
         self.workdir = workdir
         self.model_adapter = model_adapter
+        self.workflow_version = workflow_version
         self.cases: dict[str, uuid.UUID] = {}
         self._stack = ExitStack()
 
@@ -213,6 +228,7 @@ class BenchEnvironment:
                 mode,
                 correlation_id=None,
                 enforce_quota=self.settings.quotas_enabled,
+                workflow_version=self.workflow_version,
             )
             while self.worker.run_once():
                 if len(getattr(adapter, "failures", [])) > failures_before:
@@ -273,14 +289,41 @@ class BenchEnvironment:
         t.explanation_origin = iv.explanation_origin
         t.citations = len(view.citations)
         t.citations_valid = sum(1 for c in view.citations if c.get("status") == "valid")
+        t.findings_sha256 = behaviour_digest(iv.findings)
+        t.citations_sha256 = behaviour_digest(view.citations)
         draft = rec.get("proposal_draft") or {}
         t.proposal_validation = draft.get("validation") if draft else None
         return t
 
 
+_RUN_IDS = frozenset({"document_id", "version_id"})
+
+
+def behaviour_digest(items: list[dict[str, Any]]) -> str:
+    """Digest of findings or citations as behaviour: the document and version ids a run
+    generates are left out; values, statuses, locators and the cited content's own SHA-256
+    stay, so a different value or a different source changes the digest."""
+
+    def strip(value: Any) -> Any:
+        if isinstance(value, dict):
+            return {k: strip(v) for k, v in value.items() if k not in _RUN_IDS}
+        if isinstance(value, list):
+            return [strip(v) for v in value]
+        return value
+
+    return digest([strip(i) for i in items])
+
+
 @contextmanager
 def environment(
-    settings: Settings, corpus: Corpus, workdir: Path, model_adapter: ModelAdapter | None
+    settings: Settings,
+    corpus: Corpus,
+    workdir: Path,
+    model_adapter: ModelAdapter | None,
+    *,
+    workflow_version: str = WORKFLOW_VERSION,
 ) -> Iterator[BenchEnvironment]:
-    with BenchEnvironment(settings, corpus, workdir, model_adapter) as env:
+    with BenchEnvironment(
+        settings, corpus, workdir, model_adapter, workflow_version=workflow_version
+    ) as env:
         yield env

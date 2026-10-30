@@ -7,6 +7,7 @@ checked against the external system, not inferred from OpsBridge's view.
 from __future__ import annotations
 
 import threading
+import time
 import uuid
 from dataclasses import replace
 from datetime import date
@@ -531,6 +532,42 @@ def test_stale_worker_cannot_write_after_losing_its_lease(stack, worker_db: Data
 # --- ambiguous outcomes and crash recovery -----------------------------------------------------
 
 
+@pytest.mark.parametrize("deadlines", [True, False])
+def test_a_create_still_in_flight_is_not_proved_absent_and_sent_again(
+    stack, worker_db: Database, deadlines: bool
+) -> None:  # type: ignore[no-untyped-def]
+    """The tracker commits a create only after the client gave up waiting. A lookup in that
+    window finds nothing; treating that as proof of absence sent the task a second time when
+    the tracker has no idempotency keys (the slow first create then landed as well).
+
+    A tracker that honours request deadlines refuses the late create, so after the deadline
+    finding nothing is proof and the task is sent once. One that does not honour them can
+    still commit it at any time, so the operation goes to review instead of a resend."""
+    st = stack
+    st["store"].set_capabilities(ORG, False, True, deadlines)  # no keys, reliable lookup
+    try:
+        case_id, prop = prepared(st, "INV-9001")
+        approve(st, case_id, prop)
+        httpx.post(
+            f"{st['base']}/_control/faults",
+            json={"org": ORG, "route": "tasks.create", "mode": "delay", "delay_ms": 6000},
+        ).raise_for_status()  # commits 6 s after the request; the client waits 2 s
+        drain(st)
+        expire_attempts_and_leases(worker_db)  # the retry comes before the slow create lands
+        drain(st)
+        time.sleep(6.5)  # the first create has landed by now
+        expire_attempts_and_leases(worker_db)
+        drain(st)
+    finally:
+        st["store"].set_capabilities(ORG, True, True)
+    [op] = operations(st, case_id)
+    assert len(remote_tasks(st, op)) == 1, op
+    if deadlines:  # the late create was refused; the resend after the deadline is the one
+        assert op["status"] == "confirmed", op
+    else:  # it landed late; nothing was resent, and a person checks it
+        assert (op["status"], op["review_required"]) == ("outcome_unknown", True), op
+
+
 def test_timeout_after_commit_reconciles_instead_of_recreating(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     use_connector(st, lambda: sim(st), timeout_seconds=1.0)
@@ -921,7 +958,7 @@ def test_a_local_action_takes_effect_once_even_if_the_worker_dies_while_completi
     case_id, prop = prepared(st, "INV-9009")
     assert prop["action_type"] == "create_supplier_message_draft"
     assert approve(st, case_id, prop).status_code == 200
-    real = execution._finish
+    real = execution.finish_operation
 
     def dies_confirming(s: Any, op: Any, status: str, **kw: Any) -> None:
         if status == "confirmed":
@@ -932,10 +969,10 @@ def test_a_local_action_takes_effect_once_even_if_the_worker_dies_while_completi
         items = get(st, "furn-investigator", f"{T}/cases/{case_id}/messages").json()["items"]
         return [m for m in items if (m["body"] or "").startswith("Supplier message DRAFT")]
 
-    monkeypatch.setattr(execution, "_finish", dies_confirming)
+    monkeypatch.setattr(execution, "finish_operation", dies_confirming)
     with pytest.raises(SimulatedCrash):
         st["worker"].run_once()
-    monkeypatch.setattr(execution, "_finish", real)
+    monkeypatch.setattr(execution, "finish_operation", real)
     assert drafts() == []  # nothing is applied without the operation's confirmation
     expire_attempts_and_leases(worker_db)
     drain(st)

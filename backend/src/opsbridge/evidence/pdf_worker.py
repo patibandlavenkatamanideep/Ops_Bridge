@@ -18,6 +18,22 @@ import warnings
 
 MAX_IMAGE_PIXELS = 40_000_000  # about 300 dpi for an A3 page
 MAX_IMAGES_PER_PAGE = 4
+# A file of under 1 MB whose streams inflate to text made this process use 850 MB before the
+# timeout stopped it; several at once could exhaust the container.
+MEMORY_LIMIT_BYTES = 256 * 1024 * 1024
+
+
+def _limit_memory() -> None:
+    """Cap this process's address space where the OS enforces it (Linux: the container and
+    CI). Past the cap, parsing fails with MemoryError and the file is rejected. macOS refuses
+    lower limits; there only the parent's timeout applies."""
+    if not sys.platform.startswith("linux"):
+        return
+    import resource
+
+    _, hard = resource.getrlimit(resource.RLIMIT_AS)
+    cap = MEMORY_LIMIT_BYTES if hard == resource.RLIM_INFINITY else min(MEMORY_LIMIT_BYTES, hard)
+    resource.setrlimit(resource.RLIMIT_AS, (cap, hard))
 
 
 def page_images(reader: object, pages: int) -> tuple[list[list[object]], list[str]]:
@@ -62,6 +78,7 @@ def _decode(reader: object, pages: int) -> tuple[list[list[object]], list[str]]:
 
 
 def main() -> int:
+    _limit_memory()
     data = sys.stdin.buffer.read()
     max_pages = int(sys.argv[1]) if len(sys.argv) > 1 else 50
     if len(sys.argv) > 3 and sys.argv[2] == "images":
@@ -101,6 +118,14 @@ def main() -> int:
                 "pages": pages,
                 "images": images,
             }
+    except MemoryError:
+        out = {
+            "status": "rejected",
+            "detail": "PDF needs more memory than the parser may use",
+            "page_count": 0,
+            "pages": [],
+            "images": 0,
+        }
     except Exception as exc:  # malformed PDFs raise many exception types
         out = {
             "status": "rejected",

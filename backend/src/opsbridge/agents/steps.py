@@ -23,11 +23,13 @@ import re
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
 import jsonschema
 
+from opsbridge import safejson
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.domain.units import canonical_unit
 from opsbridge.telemetry import metrics, tracing
@@ -310,6 +312,12 @@ def _role_problems(ctx: AgentContext, text: str) -> list[str]:
         words_after = re.findall(r"[a-z]+", after.lower())
         if words_before and words_before[-1] in _NOT_A_QUANTITY:
             continue
+        # "2 more than", "1.86 USD above": an amount of difference, not a quantity in a role.
+        nxt = re.findall(r"[A-Za-z]+", text[m.end() : m.end() + 24])[:2]
+        if nxt and nxt[0].isupper() and len(nxt) > 1:
+            nxt = nxt[1:]  # past a unit such as EA or USD
+        if nxt and (nxt[0].lower() in _GREATER or nxt[0].lower() in _LESSER):
+            continue
         number = format(Decimal(m.group().replace(",", "")).normalize(), "f")
         role = next((_ROLE_OF[w] for w in reversed(words_before[-4:]) if w in _ROLE_OF), None)
         role = role or next((_ROLE_OF[w] for w in words_after[:3] if w in _ROLE_OF), None)
@@ -331,6 +339,168 @@ def _role_problems(ctx: AgentContext, text: str) -> list[str]:
                 problems.append(
                     f"{m.group()} {unit_word.group(1)} uses unit {unit}, not {sorted(units)}"
                 )
+    return problems
+
+
+_MONTHS = {
+    name: number
+    for number, names in enumerate(
+        [
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
+        ],
+        start=1,
+    )
+    for name in names
+}
+_MONTH = "(" + "|".join(sorted(_MONTHS, key=len, reverse=True)) + r")\.?"
+_DATES = re.compile(
+    r"(?<![\d-])(\d{4})-(\d{1,2})-(\d{1,2})(?![\d])"  # 2026-09-20
+    r"|(?<![\d/.])(\d{1,2})[/.](\d{1,2})[/.](\d{4})(?![\d])"  # 20/09/2026, 09/20/2026
+    rf"|\b(\d{{1,2}})(?:st|nd|rd|th)?\s+{_MONTH},?\s+(\d{{4}})\b"  # 20 September 2026
+    rf"|\b{_MONTH}\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})\b",  # September 20, 2026
+    re.IGNORECASE,
+)
+
+
+def _valid(year: str, month: str | int, day: str) -> set[date]:
+    try:
+        return {date(int(year), int(month), int(day))}
+    except ValueError:
+        return set()
+
+
+def _date_mentions(text: str) -> list[tuple[re.Match[str], set[date]]]:
+    """Each date written in `text` with the days it can mean (20/09 and 09/20 are read both
+    ways when both are valid)."""
+    out = []
+    for m in _DATES.finditer(text):
+        g = m.groups()
+        if g[0]:
+            days = _valid(g[0], g[1], g[2])
+        elif g[3]:
+            days = _valid(g[5], g[4], g[3]) | _valid(g[5], g[3], g[4])
+        elif g[6]:
+            days = _valid(g[8], _MONTHS[g[7].lower()], g[6])
+        else:
+            days = _valid(g[11], _MONTHS[g[9].lower()], g[10])
+        if days:
+            out.append((m, days))
+    return out
+
+
+def _mask_dates(text: str) -> str:
+    """Dates replaced by a word, so their parts are not read as quantities ("received 20
+    September 2026" is not 20 received); dates are checked on their own (_date_problems)."""
+    for m, _ in reversed(_date_mentions(text)):
+        text = text[: m.start()] + "a date" + text[m.end() :]
+    return text
+
+
+def _date_problems(ctx: AgentContext, text: str, labels: list[str]) -> list[str]:
+    """A date must be one the cited evidence, the findings, the case or the policy show; a
+    supported year no longer lets a made-up day through."""
+    known: set[date] = set()
+    sources = [str(v) for f in ctx.recon["findings"] for v in (f.get("values") or {}).values()]
+    sources += [str(v) for v in ctx.case.values()] + [str(v) for v in ctx.policy_out.values()]
+    for e in ctx.evidence:
+        if e.label in labels:
+            sources += [e.value or "", e.excerpt or ""]
+    for source in sources:
+        for _, days in _date_mentions(source):
+            known |= days
+    return [
+        f"date {m.group()} is not in its evidence"
+        for m, days in _date_mentions(text)
+        if not days & known
+    ]
+
+
+_GREATER = frozenset(
+    {
+        "more",
+        "above",
+        "over",
+        "exceed",
+        "exceeds",
+        "exceeded",
+        "exceeding",
+        "higher",
+        "greater",
+        "larger",
+    }
+)
+_LESSER = frozenset({"less", "fewer", "below", "under", "lower", "smaller"})
+_COPULA = re.compile(r"\b(?:is|are|was|were)\b", re.IGNORECASE)
+
+
+def _quantities(clause: str) -> list[tuple[int, int, Decimal]]:
+    """(start, end, value) of the numbers in a clause that can be quantities or amounts."""
+    out = []
+    for m in _NUMBER.finditer(clause):
+        rest = clause[m.end() :]
+        if rest[:1] == "-" or re.match(r"\s*(?:%|percent\b)", rest):
+            continue  # an identifier part, or a percentage (not compared here)
+        before = re.findall(r"[a-z]+", clause[: m.start()].lower())
+        if before and before[-1] in _NOT_A_QUANTITY:
+            continue
+        out.append((m.start(), m.end(), Decimal(m.group().replace(",", ""))))
+    return out
+
+
+def _close(value: Decimal, stated: Decimal, text: str) -> bool:
+    """`value` equals `stated` to the precision `text` was written with."""
+    places = len(text.split(".")[1]) if "." in text else 0
+    return abs(value - stated) <= Decimal(5) / Decimal(10) ** (places + 1)
+
+
+def _comparison_problems(ctx: AgentContext, text: str) -> list[str]:
+    """Comparisons between stated numbers must hold. "A is B above C" needs A above C by B;
+    "B exceeds C" needs B > C, unless B is the amount by which a recorded value exceeds C
+    ("bills 2 more than the 18 received": 20 - 18). Only comparisons with numbers on both
+    sides of the word, inside one clause, are checked."""
+    recorded = {
+        Decimal(n)
+        for f in ctx.recon["findings"]
+        for v in (f.get("values") or {}).values()
+        for n in _numbers(str(v).lstrip("-"))
+    }
+    problems = []
+    for clause in _CLAUSE_END.split(text):
+        numbers = _quantities(clause)
+        for word in re.finditer(r"[A-Za-z]+", clause):
+            kind = word.group().lower()
+            if kind not in _GREATER and kind not in _LESSER:
+                continue
+            before = [n for n in numbers if n[1] <= word.start()]
+            after = [n for n in numbers if n[0] >= word.end()]
+            if not before or not after:
+                continue
+            greater = kind in _GREATER
+            c = after[0][2]
+            b_start, b_end, b = before[-1]
+            stated_b = clause[b_start:b_end]
+            if len(before) >= 2 and _COPULA.search(clause[before[-2][1] : b_start]):
+                a = before[-2][2]  # "A is B above C"
+                if (a > c) != greater or a == c or not _close(abs(a - c), b, stated_b):
+                    problems.append(f"says {a} is {stated_b} {kind} {c}")
+                continue
+            if (b > c) == greater and b != c:
+                continue
+            if any(_close(abs(x - c), b, stated_b) and (x > c) == greater for x in recorded):
+                continue  # B is a difference from C, not a size
+            verb = "exceeds" if kind.startswith("exceed") else f"is {kind} than"
+            problems.append(f"says {stated_b} {verb} {c}")
     return problems
 
 
@@ -371,7 +541,7 @@ def _common_text_problems(text: str) -> list[str]:
 
 def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | None, list[str]]:
     try:
-        out = json.loads(raw)
+        out = safejson.loads(raw)
         jsonschema.validate(out, EXPLAIN_SCHEMA)
     except (ValueError, jsonschema.ValidationError) as exc:
         return None, [f"schema: {str(exc).splitlines()[0][:200]}"]
@@ -390,12 +560,17 @@ def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | 
         if missing:
             problems.append(f"statement {i + 1} cites unknown evidence {missing}")
             continue
-        unsupported = _numbers(st["text"]) - _allowed_numbers(ctx, st["citations"])
+        plain = _mask_dates(st["text"])
+        unsupported = _numbers(plain) - _allowed_numbers(ctx, st["citations"])
         if unsupported:
             problems.append(
                 f"statement {i + 1} uses numbers not in its evidence: {sorted(unsupported)}"
             )
-        problems += [f"statement {i + 1}: {p}" for p in _role_problems(ctx, st["text"])]
+        problems += [f"statement {i + 1}: {p}" for p in _role_problems(ctx, plain)]
+        problems += [f"statement {i + 1}: {p}" for p in _comparison_problems(ctx, plain)]
+        problems += [
+            f"statement {i + 1}: {p}" for p in _date_problems(ctx, st["text"], st["citations"])
+        ]
         problems += [f"statement {i + 1}: {p}" for p in _common_text_problems(st["text"])]
     for text in [out["summary"], *out["uncertainties"]]:
         problems += _common_text_problems(text)
@@ -404,7 +579,7 @@ def validate_explanation(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | 
 
 def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | None, list[str]]:
     try:
-        out = json.loads(raw)
+        out = safejson.loads(raw)
         jsonschema.validate(out, PROPOSE_SCHEMA)
     except (ValueError, jsonschema.ValidationError) as exc:
         return None, [f"schema: {str(exc).splitlines()[0][:200]}"]
@@ -426,13 +601,17 @@ def validate_proposal(ctx: AgentContext, raw: str) -> tuple[dict[str, Any] | Non
     known = {e.label for e in ctx.evidence}
     if [c for c in out["citations"] if c not in known]:
         problems.append("cites unknown evidence")
+    labels = out["citations"] or [e.label for e in ctx.evidence]
     for field_name in ("title", "body", "rationale"):
+        plain = _mask_dates(out[field_name])
         problems += [f"{field_name}: {p}" for p in _common_text_problems(out[field_name])]
-        problems += [f"{field_name}: {p}" for p in _role_problems(ctx, out[field_name])]
-    allowed = _allowed_numbers(ctx, out["citations"] or [e.label for e in ctx.evidence])
+        problems += [f"{field_name}: {p}" for p in _role_problems(ctx, plain)]
+        problems += [f"{field_name}: {p}" for p in _comparison_problems(ctx, plain)]
+        problems += [f"{field_name}: {p}" for p in _date_problems(ctx, out[field_name], labels)]
+    allowed = _allowed_numbers(ctx, labels)
     # The rule-selected title comes from the policy's template (e.g. a condition count).
     allowed |= _numbers(str(rec.get("title") or ""))
-    unsupported = _numbers(out["title"] + " " + out["body"]) - allowed
+    unsupported = _numbers(_mask_dates(out["title"] + " " + out["body"])) - allowed
     if unsupported:
         problems.append(f"uses numbers not in the evidence: {sorted(unsupported)}")
     return (out if not problems else None), problems

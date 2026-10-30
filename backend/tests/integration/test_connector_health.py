@@ -30,7 +30,11 @@ def test_health_shows_live_capabilities_and_recent_attempts(stack: dict[str, Any
     st = stack
     health = get(st, "furn-admin", f"{T}/connectors/health").json()
     assert health["connector"] == "sim_tasks" and health["reachable"] is True
-    assert health["capabilities"] == {"idempotency_keys": True, "lookup": "strong"}
+    assert health["capabilities"] == {
+        "idempotency_keys": True,
+        "lookup": "strong",
+        "request_deadlines": True,
+    }
     assert "advertised" in health["capability_source"]
     assert health["attempts_24h"] == [] and health["awaiting_review"] == 0
 
@@ -44,13 +48,24 @@ def test_health_shows_live_capabilities_and_recent_attempts(stack: dict[str, Any
         ("readback", "succeeded", 1),
     }
 
-    st["store"].set_capabilities(ORG, False, False)  # the tracker stops promising safety
+    st["store"].set_capabilities(ORG, False, False, False)  # it stops promising safety
     try:
         health = get(st, "furn-admin", f"{T}/connectors/health").json()
     finally:
         st["store"].set_capabilities(ORG, True, True)
-    assert health["capabilities"] == {"idempotency_keys": False, "lookup": "none"}
+    assert health["capabilities"] == {
+        "idempotency_keys": False,
+        "lookup": "none",
+        "request_deadlines": False,
+    }
     assert "human review" in health["meaning"]
+
+    st["store"].set_capabilities(ORG, False, True, False)  # lookup, but no deadlines
+    try:
+        health = get(st, "furn-admin", f"{T}/connectors/health").json()
+    finally:
+        st["store"].set_capabilities(ORG, True, True)
+    assert "human review" in health["meaning"] and "never resent" in health["meaning"]
 
 
 def test_an_unreachable_tracker_is_reported_as_such(stack: dict[str, Any]) -> None:
@@ -63,7 +78,11 @@ def test_an_unreachable_tracker_is_reported_as_such(stack: dict[str, Any]) -> No
         client.cookies.set("opsbridge_session", st["actors"]["furn-admin"].token)
         health = client.get(f"{T}/connectors/health").json()
     assert health["reachable"] is False
-    assert health["capabilities"] == {"idempotency_keys": False, "lookup": "none"}
+    assert health["capabilities"] == {
+        "idempotency_keys": False,
+        "lookup": "none",
+        "request_deadlines": False,
+    }
     assert "did not answer" in health["capability_source"]
 
 

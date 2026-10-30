@@ -88,6 +88,32 @@ differs from the frozen plan, a benchmark run refuses to start, and the evaluati
 runs graded under another plan or scoring as *not comparable*: a change of grading, not
 evidence of a model or rules regression (`tests/evaluation/test_comparability.py`).
 
+Scoring schemes (2026-10-27, production review A03). The definitions above are scoring 1,
+frozen with `opsbridge-bench-v1` and still used to grade it. Its "flip rate" was computed
+over next-action *correctness*, so two different wrong actions counted as stable. Scoring 2
+(`manifest.SCORING_2`), used by every benchmark frozen from now on, reports separately per
+case: action disagreement (1 − most common action / repeats, an error being a verdict of its
+own), correctness disagreement, outcome-and-types disagreement, and the share of errored
+repeats. Each majority is taken on its own axis (scoring 1 took outcome and types from the
+first repeat with the majority action); a case counts correct as a whole only if its most
+common whole verdict, untied, matches the label. A case with missing, duplicated or
+relabelled repeats is incomplete, listed, and the acceptance gate is not decided. A plan is
+always graded under the scheme it was frozen with; `verify` refuses a plan whose scoring is
+not one the code implements (`tests/evaluation/test_metrics_scoring2.py`).
+
+Replay comparison 2 (2026-10-28, review A13). `eval-replay-check` and `eval-bench --replay`
+compare each trial's behaviour with its recording (`opsbridge-replay/2`,
+`evaluation/reproduce.py`): next action, error, outcome, discrepancy types, reason codes,
+explanation origin (model or template), citation counts, model calls and rejections, proposal
+validation, tool calls (name, version, input and response digests, outcome), and digests of
+the findings (values and evidence locators) and citations. Generated ids, timings, and replay
+provenance (`model:replay`, a tool response served from the recording) are not behaviour.
+Fields a recording does not have are listed as not compared: the v1 recordings predate the
+finding and citation digests. Run order is a declared factor of v1: rules-only trials run
+before mock trials, and its recordings replay only in that order; out of order, a replay
+fails closed (`tests/integration/test_replay_mode_order.py`). The cause is a product defect
+listed in docs/STATUS.md, to be fixed with the next frozen benchmark.
+
 ## Acceptance
 
 `evals/acceptance-policy.json` (frozen with this plan): security/recovery invariants pass;

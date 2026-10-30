@@ -13,6 +13,7 @@ retried — it is never treated as "the record does not exist".
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections.abc import Callable
 from contextlib import nullcontext
@@ -25,8 +26,8 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.canonical import digest
-from opsbridge.connectors.purchasing import PurchasingClient
-from opsbridge.connectors.source_contract import CONTRACT, Listing
+from opsbridge.connectors.purchasing import CollectionBudgetExhausted, PurchasingClient
+from opsbridge.connectors.source_contract import CONTRACT, Listing, PurchasingSource
 from opsbridge.domain.decision import recommend
 from opsbridge.domain.matching import Finding, MatchResult, reconcile
 from opsbridge.domain.policy import ReconciliationPolicy
@@ -44,6 +45,7 @@ from opsbridge.mapping import PackSpec, RecordType
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Case,
+    CaseDocument,
     DocumentVersion,
     GoodsReceiptRecord,
     InvestigationVersion,
@@ -62,7 +64,13 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 
-WORKFLOW_VERSION = "investigation/1.1.0"
+# The behaviour a run follows, recorded on the run when it is created. 1.2.0: an invoice that
+# could not be read is named with the reason stored on its document version, on every run.
+# 1.1.0 took the reason from the current read's problems only, so a repeated investigation of
+# unchanged bytes said "()"; it is kept to replay recordings made with it (opsbridge-bench-v1).
+WORKFLOW_VERSION = "investigation/1.2.0"
+LEGACY_WORKFLOW_VERSION = "investigation/1.1.0"
+WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, WORKFLOW_VERSION)
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -71,7 +79,7 @@ class InvestigationDeps:
     db: Database
     store: ArtifactStore
     pack_for: Callable[[str], PackSpec]
-    purchasing_for: Callable[[str], PurchasingClient]
+    purchasing_for: Callable[[str], PurchasingSource]
     settings: Any = None
     adapter_overrides: dict[str, Any] | None = None  # tests inject scripted/compromised models
     records_mcp: Any = None  # McpToolClient when tool_transport == "mcp"
@@ -180,6 +188,13 @@ def run_investigation(
         run = s.get(WorkflowRun, run_id)
         if run is None:
             raise StepFailed("run not found in tenant", retryable=False)
+        if run.workflow_version not in WORKFLOW_VERSIONS:
+            # Created by a newer release: never run it as a version it was not created for.
+            raise StepFailed(
+                f"run is for {run.workflow_version}, which this worker does not implement",
+                retryable=True,
+            )
+        workflow_version = run.workflow_version
         if run.status == "completed":
             existing = s.execute(
                 select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
@@ -233,7 +248,7 @@ def run_investigation(
         3,
         "reconcile_records",
         {"policy": policy_out, "collected": collected},
-        lambda: _reconcile(deps, tenant_id, case_snapshot, policy_out, collected),
+        lambda: _reconcile(deps, tenant_id, case_snapshot, policy_out, collected, workflow_version),
     )
     agent = _agent_runtime(deps, tenant_id, run_id, policy_out)
     explained = _run_step(
@@ -291,7 +306,7 @@ def _ingest_record(
     deps: InvestigationDeps,
     tenant_id: uuid.UUID,
     pack: PackSpec,
-    client: PurchasingClient,
+    client: PurchasingSource,
     record_type: RecordType,
     key: str,
     case_id: str,
@@ -402,7 +417,13 @@ def _collect(
     deps: InvestigationDeps, tenant_id: uuid.UUID, org: str, pack: PackSpec, case: dict[str, Any]
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
-    read_at = datetime.now(UTC)  # before the first request: the oldest data point read
+    # Before the first request: the oldest data point read. An export is as old as the
+    # moment it was taken, whenever it is read.
+    read_at = getattr(client, "as_of", None) or datetime.now(UTC)
+    budget = float(getattr(deps.settings, "source_collection_seconds", 120.0))
+    if isinstance(client, PurchasingClient):
+        client.deadline = time.monotonic() + budget
+    timed_out: list[str] = []  # the collection stopped at its time budget
     linked: list[dict[str, Any]] = []
     problems: list[str] = []
     unavailable: list[str] = []
@@ -478,6 +499,11 @@ def _collect(
                         f"{record_type.replace('_', ' ')}s for {po_no}: more than "
                         f"{listing.pages} pages"
                     )
+    except CollectionBudgetExhausted:
+        # Keep what was read; what was not read is unknown, so nothing is concluded.
+        timed_out.append(
+            f"stopped after {budget:g} s with {len(linked)} document(s) read; the rest was not read"
+        )
     finally:
         client.close()
     problems.extend(f"{w}: no longer in the purchasing system; not used" for w in withdrawn)
@@ -487,6 +513,7 @@ def _collect(
         "refused": refused,
         "withdrawn": withdrawn,
         "incomplete": incomplete,
+        "timed_out": timed_out,
         "problems": problems,
         "po_number": po_no,
         "source": {
@@ -554,6 +581,7 @@ def _reconcile(
     case: dict[str, Any],
     policy_out: dict[str, Any],
     collected: dict[str, Any],
+    workflow_version: str,
 ) -> dict[str, Any]:
     from opsbridge.services.freshness import capture
 
@@ -571,11 +599,16 @@ def _reconcile(
             hours = float(getattr(deps.settings, "source_max_age_hours", 24))
             until = datetime.fromisoformat(read_at) + timedelta(hours=hours)
             state = {**state, "source_read_at": read_at, "source_valid_until": until.isoformat()}
-        return {**_match(s, case, policy_out, collected), "evidence_state": state}
+        match = _match(s, case, policy_out, collected, workflow_version)
+        return {**match, "evidence_state": state}
 
 
 def _match(
-    s: Session, case: dict[str, Any], policy_out: dict[str, Any], collected: dict[str, Any]
+    s: Session,
+    case: dict[str, Any],
+    policy_out: dict[str, Any],
+    collected: dict[str, Any],
+    workflow_version: str,
 ) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     uncertainty: list[str] = list(collected.get("problems", []))
@@ -631,6 +664,25 @@ def _match(
             "corrections": [],
             "policy_ref": policy.ref,
         }
+    if collected.get("timed_out"):
+        findings.append(
+            _manual_finding(
+                "source_collection_timed_out",
+                "Reading the purchasing system took longer than its time budget ("
+                + "; ".join(collected["timed_out"])[:400]
+                + "). Nothing was concluded from the part that was read; run the "
+                "investigation again or have a person review it.",
+            )
+        )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": [],
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
     if collected.get("incomplete"):
         findings.append(
             _manual_finding(
@@ -663,6 +715,44 @@ def _match(
                 + "). Name the supplier on the case; no invoice was matched.",
             )
         )
+        return {
+            "outcome": "manual_review",
+            "findings": findings,
+            "recommendation": _rec_for("manual_review", policy, case),
+            "uncertainty": uncertainty,
+            "version_ids": version_ids,
+            "corrections": [],
+            "policy_ref": policy.ref,
+        }
+    unread = _documents_needing_review(s, uuid.UUID(case["case_id"]))
+    if unread:
+        # Records that could not be read were not built (mapping.py); what is left would look
+        # complete without them: a receipt without its return, an invoice without a line.
+        if any(kind == "invoice" for kind, _t, _d in unread):
+            reason = "invoice_extraction_needs_review"
+            about = "; ".join(f"{t}: {d}" for k, t, d in unread if k == "invoice")
+            if workflow_version == LEGACY_WORKFLOW_VERSION and any(
+                d["record_type"] == "invoice" and d["parse_status"] != "parsed"
+                for d in collected.get("documents", [])
+            ):
+                # 1.1.0, replayed byte for byte: a collected invoice named only the problems
+                # of this run's read, none when its bytes were unchanged.
+                about = "; ".join(
+                    p for p in collected.get("problems", []) if p.startswith("invoice")
+                )
+            summary = (
+                f"The invoice document could not be read reliably ({about[:400]}). Its values "
+                "were not used; a person must review or supply a structured copy."
+            )
+        else:
+            reason = "source_document_needs_review"
+            about = "; ".join(f"{title}: {detail}" for _kind, title, detail in unread)
+            summary = (
+                f"A document of this case could not be read completely ({about[:400]}). Its "
+                "records were not used and nothing was concluded; a person must review it or "
+                "supply a readable copy."
+            )
+        findings.append(_manual_finding(reason, summary))
         return {
             "outcome": "manual_review",
             "findings": findings,
@@ -733,6 +823,39 @@ def _match(
         "resolved_po_number": result.resolved_po_number,
         "resolved_supplier_id": result.resolved_supplier_id,
     }
+
+
+# Kinds whose records decide a match: one missing can only make the result look better.
+# Supplier messages are excluded: their claims are never used as receipt evidence.
+_DECISIVE_KINDS = ("invoice", "purchase_order", "goods_receipt", "allocation_history")
+
+
+def _documents_needing_review(s: Session, case_id: uuid.UUID) -> list[tuple[str, str, str]]:
+    """(kind, title, detail) of the case's decisive documents whose newest version could not
+    be read completely. Withdrawn documents are history and do not count."""
+    newest = (
+        select(DocumentVersion.document_id, func.max(DocumentVersion.version_no).label("n"))
+        .group_by(DocumentVersion.document_id)
+        .subquery()
+    )
+    rows = s.execute(
+        select(SourceDocument.kind, SourceDocument.title, DocumentVersion.parse_detail)
+        .join(CaseDocument, CaseDocument.document_id == SourceDocument.id)
+        .join(newest, newest.c.document_id == SourceDocument.id)
+        .join(
+            DocumentVersion,
+            (DocumentVersion.document_id == SourceDocument.id)
+            & (DocumentVersion.version_no == newest.c.n),
+        )
+        .where(
+            CaseDocument.case_id == case_id,
+            SourceDocument.withdrawn_at.is_(None),
+            SourceDocument.kind.in_(_DECISIVE_KINDS),
+            DocumentVersion.parse_status != "parsed",
+        )
+        .order_by(SourceDocument.title)
+    ).all()
+    return [(kind, title, detail or "needs review") for kind, title, detail in rows]
 
 
 def _rec_for(outcome: str, policy: ReconciliationPolicy, case: dict[str, Any]) -> dict[str, Any]:
@@ -1065,6 +1188,7 @@ def _readiness(outcome: str, collected: dict[str, Any]) -> str:
     if (
         collected.get("unavailable")
         or collected.get("incomplete")
+        or collected.get("timed_out")
         or outcome == "needs_information"
     ):
         return "incomplete"

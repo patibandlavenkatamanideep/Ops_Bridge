@@ -6,6 +6,8 @@ connector. It enforces the documented headers and returns documented status code
 
 from __future__ import annotations
 
+import asyncio
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -22,6 +24,10 @@ class FakeGitHub:
     faults: list[str] = field(default_factory=list)  # applied to the next create, FIFO
     hide_recent_seconds: float = 0.0  # simulate a listing that lags behind writes
     requests: list[dict[str, Any]] = field(default_factory=list)
+    # `timeout_after` replies wait for this, set by the test when it is done (before the
+    # server stops). A timer would race the client's deadline on another clock: on macOS
+    # uvloop's clock counts time the host slept and the client's does not.
+    release_held_replies: threading.Event = field(default_factory=threading.Event)
 
     def app(self) -> FastAPI:
         app = FastAPI()
@@ -74,10 +80,9 @@ class FakeGitHub:
             self.issues.append(issue)
             if fault == "500_after":
                 return JSONResponse({"message": "Server Error"}, status_code=500)
-            if fault == "timeout_after":
-                import asyncio
-
-                await asyncio.sleep(3)
+            if fault == "timeout_after":  # committed; the reply comes after the client gave up
+                while not self.release_held_replies.is_set():
+                    await asyncio.sleep(0.05)
             return JSONResponse(issue, status_code=201)
 
         @app.get(f"/repos/{owner}/{name}/issues/{{number}}")

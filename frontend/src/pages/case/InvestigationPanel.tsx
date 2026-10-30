@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { ApiError, api, tenantPath, type Citation, type Finding, type Investigation, type Run } from "../../api/client";
+import { ApiError, apiAs, tenantPath, type Citation, type Finding, type Investigation, type Run } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
+import { useAnnouncement } from "../../components/Announcement";
 import { useSession } from "../../session";
 
 const MODE_LABEL: Record<string, string> = {
@@ -28,12 +29,12 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
   const [runId, setRunId] = useState<string | null>(null);
   const inv = useQuery<Investigation, ApiError>({
     queryKey: ["investigation", tenant, caseId],
-    queryFn: ({ signal }) => api<Investigation>(tenantPath(tenant, `/cases/${caseId}/investigation`), { signal }),
+    queryFn: ({ signal }) => apiAs("InvestigationOut", tenantPath(tenant, `/cases/${caseId}/investigation`), { signal }),
     retry: false,
   });
   const run = useQuery<Run, ApiError>({
     queryKey: ["run", tenant, caseId, runId],
-    queryFn: ({ signal }) => api<Run>(tenantPath(tenant, `/cases/${caseId}/runs/${runId}`), { signal }),
+    queryFn: ({ signal }) => apiAs("RunOut", tenantPath(tenant, `/cases/${caseId}/runs/${runId}`), { signal }),
     enabled: runId !== null,
     refetchInterval: (q) => (q.state.data && ["completed", "failed"].includes(q.state.data.status) ? false : 1000),
   });
@@ -41,22 +42,28 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
   const modes = membership(tenant)?.model_modes ?? ["rules_only"];
   const [mode, setMode] = useState<string>("");
   const start = useMutation<Run, ApiError>({
-    mutationFn: () => api<Run>(tenantPath(tenant, `/cases/${caseId}/investigations`), {
+    mutationFn: () => apiAs("RunOut", tenantPath(tenant, `/cases/${caseId}/investigations`), {
       method: "POST",
       body: mode ? { model_mode: mode } : {},
     }),
     onSuccess: (r) => setRunId(r.run_id),
   });
   const refreshedFor = useRef<string | null>(null);
+  const [notice, announce] = useAnnouncement();
   const finished = run.data?.status === "completed" ? run.data.run_id : null;
+  const failed = run.data?.status === "failed" ? run.data.run_id : null;
   useEffect(() => {
     if (finished && refreshedFor.current !== finished) {
       refreshedFor.current = finished;
       qc.invalidateQueries({ queryKey: ["investigation", tenant, caseId] });
       qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
       qc.invalidateQueries({ queryKey: ["documents", tenant, caseId] });
+      announce("The investigation finished; the new result is below.");
     }
-  }, [finished, qc, tenant, caseId]);
+  }, [finished, qc, tenant, caseId, announce]);
+  useEffect(() => {
+    if (failed) announce("The run failed; nothing was concluded from it. You can run it again.");
+  }, [failed, announce]);
 
   const running = runId !== null && !["completed", "failed"].includes(run.data?.status ?? "");
   const controls = can(tenant, "investigation.run") && (
@@ -83,6 +90,7 @@ export function InvestigationPanel({ tenant, caseId, onCite }: { tenant: string;
       <h2 id="inv-title">Investigation</h2>
       {controls}
       {start.isError && <ErrorState error={start.error} />}
+      {notice}
       {runId && run.data && run.data.status !== "completed" && (
         <div className="state" role="status" aria-live="polite">
           <strong>Run {run.data.status}</strong>

@@ -25,7 +25,7 @@ async function resetNewHire(admin: Page): Promise<void> {
 
 test("an invited person opens the link, signs in and joins with the invited roles", async ({ browser }) => {
   const admin = await browser.newPage();
-  await signIn(admin, "furn-admin", "/t/demo-furniture/settings");
+  await signIn(admin, "furn-admin", "/t/demo-furniture/settings/people");
   await expect(admin.getByRole("heading", { name: "Tenant settings" })).toBeVisible();
   await resetNewHire(admin);
 
@@ -62,7 +62,7 @@ test("an invited person opens the link, signs in and joins with the invited role
 
 test("an invitation link does not work for anyone else", async ({ browser }) => {
   const admin = await browser.newPage();
-  await signIn(admin, "furn-admin", "/t/demo-furniture/settings");
+  await signIn(admin, "furn-admin", "/t/demo-furniture/settings/people");
   await resetNewHire(admin);
   await admin.getByRole("button", { name: "Invite a person" }).click();
   const form = admin.getByRole("form", { name: "Invite a person" });

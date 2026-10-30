@@ -8,12 +8,31 @@ inputs are rejected so a malformed source value cannot silently become a number.
 from __future__ import annotations
 
 import re
-from decimal import ROUND_HALF_EVEN, ROUND_HALF_UP, Context, Decimal, InvalidOperation
+from decimal import (
+    ROUND_HALF_EVEN,
+    ROUND_HALF_UP,
+    Context,
+    Decimal,
+    DivisionByZero,
+    InvalidOperation,
+    Overflow,
+)
 
 # Decimal context with ample precision; quantization is always explicit.
 DECIMAL_CONTEXT = Context(prec=34)
 
-_DECIMAL_RE = re.compile(r"^[+-]?(\d{1,18})(\.\d{1,12})?$")
+# The largest quantity or price the input contract admits.
+MAX_INTEGER_DIGITS = 18
+MAX_FRACTION_DIGITS = 12
+# Matching arithmetic: sums and products of admitted values are exact at this precision
+# (a product has at most 2 x 30 significant digits). Python's default context keeps 28 and
+# would round two different 30-digit totals to the same value. Divisions are inexact and are
+# always quantized explicitly afterwards.
+MATCH_CONTEXT = Context(prec=80, traps=[InvalidOperation, DivisionByZero, Overflow])
+
+_DECIMAL_RE = re.compile(
+    rf"^[+-]?(\d{{1,{MAX_INTEGER_DIGITS}}})(\.\d{{1,{MAX_FRACTION_DIGITS}}})?$"
+)
 
 ROUNDING_MODES = {
     "ROUND_HALF_EVEN": ROUND_HALF_EVEN,

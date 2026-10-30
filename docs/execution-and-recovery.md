@@ -112,11 +112,34 @@ not used again, not even to recover: such an operation goes to review
    operation (migration 0010). Before 2026-10-22 these committed separately and a crash in
    between duplicated the note or draft on retry (F02).
 
+6. Through the Casework MCP tool (`tool_transport = mcp`, simulator tasks only): the tool is
+   the last write boundary, and a request can reach it long after step 3 (delayed, retried,
+   replayed). It admits a create with the same function as step 3
+   (`services/execution_admission.py::refusal`), reading committed state when the request
+   arrives; the delegation and the call name the executor's open attempt, which is admitted
+   once (`attempts.admitted_at`, migration 0020), so a replayed request cannot write again.
+   It sends exactly the approved outbound text and destination (`approved_request`), never
+   text re-rendered from the raw parameters. A refusal is a tool error ("not admitted"); the
+   executor then runs its own admission again and finishes the operation
+   `cancelled_before_dispatch` with the same reasons. Read-back and reconciliation through
+   the tool recover a create it admitted and need the delegation for the operation but not
+   the approver's current authority, so revoking an approver does not hide a task already
+   sent; a new create still needs it. The tool's connector factory builds only the approved
+   simulator destination in the tenant's own organization; GitHub issues are sent by the
+   worker directly. (Before 2026-10-27 the tool checked less than the executor, rebuilt the
+   text with its own redactor, accepted any create for an executing operation, and recovery
+   needed the approver's current authority: production review A05,
+   `tests/integration/test_casework_admission.py`.)
+7. A person's review of an unknown outcome completes the operation with the executor's
+   completion (`finish_operation`): case transition, outbox, audit. The confirmation is
+   recorded as `human_review`, not as proof from the provider, and the operation is counted
+   in the metrics once, when it first finished (`test_unknown_outcome_review.py`).
+
 Connector declarations (`connectors/tasks.py`):
 
 | Connector | Idempotency keys | Lookup | Conditional writes | Definite | Ambiguous |
 |---|---|---|---|---|---|
-| sim_tasks | discovered (`GET /orgs/{org}/capabilities`) | discovered: strong (marker search) or none | no | 400/401/403/404/409/422; 503 + `X-Sim-Not-Committed` | timeouts, dropped connections, other 5xx |
+| sim_tasks | discovered (`GET /orgs/{org}/capabilities`) | discovered: strong (marker search) or none; request deadlines discovered | no | 400/401/403/404/409/422; 503/504 + `X-Sim-Not-Committed` | timeouts, dropped connections, other 5xx |
 | github_issues | no | eventual | no | 400/401/403/404/410/422 | timeouts, 5xx |
 
 Capabilities are a contract the executor relies on. The simulator connector discovers them
@@ -128,10 +151,17 @@ received a resend after a timeout and created a second task. Fixed and covered b
 `test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate` and the same
 scenario through Casework MCP.)
 
-Reconciliation: strong lookup with one match → confirmed; none → safe to create; several →
-`outcome_unknown` (duplicates exist). Without lookup, idempotency keys make a resend safe.
-Without either → `outcome_unknown` + review. An inconclusive lookup is never treated as
-absence.
+Reconciliation: a lookup with one match → confirmed; several → `outcome_unknown`
+(duplicates exist). With idempotency keys a resend is safe. Without them, finding nothing is
+proof of absence only when no earlier create can still land: the lookup is strong, the
+provider honours request deadlines, and every earlier create's deadline plus a 2-second clock
+allowance has passed; until then the result is "pending" and the job looks again later
+without writing. A provider without deadlines, an inconclusive lookup, or no lookup →
+`outcome_unknown` + review. Each create carries `X-Request-Deadline` (now + the connector
+timeout; recorded on its attempt, migration 0018), also through the Casework MCP hop. (Until
+2026-10-25 a strong lookup that found nothing right after a timeout was taken as proof; a
+create the tracker committed after the client gave up then landed next to the resend:
+`test_a_create_still_in_flight_is_not_proved_absent_and_sent_again`.)
 
 ## What the tests demonstrate
 

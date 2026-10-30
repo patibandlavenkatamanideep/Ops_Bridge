@@ -32,6 +32,7 @@ from opsbridge.persistence.models import (
     WorkflowStep,
 )
 from opsbridge.workflow import jobs
+from opsbridge.workflow.investigation import WORKFLOW_VERSION, WORKFLOW_VERSIONS
 
 from .cases import _visible_filter, transition
 
@@ -108,8 +109,13 @@ def start_investigation(
     correlation_id: str | None,
     *,
     enforce_quota: bool = True,
+    workflow_version: str = WORKFLOW_VERSION,
 ) -> tuple[WorkflowRun, bool]:
+    """`workflow_version` other than the current one is for replaying benchmark recordings
+    made with an earlier workflow (the run records which one it followed)."""
     require(p, "investigation.run")
+    if workflow_version not in WORKFLOW_VERSIONS:
+        raise ValueError(f"unknown workflow version {workflow_version!r}")
     with db.session(_ctx(p)) as s:
         settings_row = s.get(TenantSettings, p.tenant_id)
         mode = model_mode or (settings_row.model_mode if settings_row else "rules_only")
@@ -148,7 +154,7 @@ def start_investigation(
             case_id=case.id,
             kind="investigation",
             status="queued",
-            workflow_version="investigation/1.1.0",
+            workflow_version=workflow_version,
             model_mode=mode,
             response_mode="live",
             requested_by=p.user_id,
@@ -467,9 +473,16 @@ def correct_field(
             from opsbridge.domain.money import DecimalParseError, parse_decimal
 
             try:
-                parse_decimal(new_value)
+                parsed = parse_decimal(new_value)
             except DecimalParseError as exc:
                 raise Conflict("invalid_value", f"Not a valid decimal: {exc}") from exc
+            if parsed < 0:
+                # A negative quantity or price made the case match (-20 invoiced counted as
+                # covered by any receipt); credit notes are not modelled.
+                raise Conflict(
+                    "invalid_value",
+                    "A quantity or price cannot be negative here (credit notes are not modelled).",
+                )
         corr = FieldCorrection(
             tenant_id=p.tenant_id,
             field_id=fld.id,

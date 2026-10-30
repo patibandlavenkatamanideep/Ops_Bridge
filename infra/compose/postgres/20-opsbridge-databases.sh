@@ -9,16 +9,22 @@
 #                   because the containers keep their artifacts in their own volume
 set -euo pipefail
 
-# NOLOGIN role that owns the aggregate-only metrics function (migration 0004). It has no
-# login, no BYPASSRLS and only column-level SELECT granted by the migration.
+# NOLOGIN roles that own SECURITY DEFINER functions, each with only what its function needs
+# (granted by the migrations): opsbridge_ops_reader owns the aggregate-only metrics and
+# retention-schedule functions (0004, 0005); opsbridge_session_pruner owns ops.prune_sessions
+# and may only read and delete ended sessions (0021). No login, no BYPASSRLS.
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<'SQL'
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'opsbridge_ops_reader') THEN
     CREATE ROLE opsbridge_ops_reader NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'opsbridge_session_pruner') THEN
+    CREATE ROLE opsbridge_session_pruner NOLOGIN NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE;
+  END IF;
 END $$;
 GRANT opsbridge_ops_reader TO opsbridge_migrator;
+GRANT opsbridge_session_pruner TO opsbridge_migrator;
 SQL
 
 for db in opsbridge opsbridge_test opsbridge_eval opsbridge_demo; do

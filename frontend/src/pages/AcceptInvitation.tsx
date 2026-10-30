@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ApiError, api, type InvitationAccepted } from "../api/client";
+import { ApiError, apiAs, type InvitationAccepted } from "../api/client";
 import { PlainHeader } from "../components/Layout";
 import { EmptyState, ErrorState } from "../components/States";
 import { useSession } from "../session";
@@ -47,7 +47,7 @@ export function AcceptInvitation() {
   const qc = useQueryClient();
   const navigate = useNavigate();
   const accept = useMutation<InvitationAccepted, ApiError>({
-    mutationFn: () => api<InvitationAccepted>("/api/v1/invitations/accept", { method: "POST", body: { token } }),
+    mutationFn: () => apiAs("AcceptOut", "/api/v1/invitations/accept", { method: "POST", body: { token } }),
     onSuccess: async (joined) => {
       clearInviteToken();
       await qc.invalidateQueries({ queryKey: ["me"] });

@@ -198,6 +198,13 @@ def test_listing_responses_other_than_a_page_are_errors(
         stub(lambda request: response).list_for_po("receipts", PO)
 
 
+def test_a_listing_nested_beyond_any_record_is_refused() -> None:
+    deep = b"[" * 100_000 + b"]" * 100_000  # the decoder used to raise RecursionError here
+    handle = lambda request: httpx.Response(200, content=deep)  # noqa: E731
+    with pytest.raises(SourceRecordInvalid):
+        stub(handle).list_for_po("receipts", PO)
+
+
 def test_a_timeout_is_unavailable_not_absent() -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("no answer", request=request)

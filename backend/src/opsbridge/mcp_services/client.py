@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import threading
 import time
 import uuid
@@ -16,16 +15,21 @@ import httpx2
 from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
+from opsbridge import safejson
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
     ConnectorCapabilities,
     DefiniteFailure,
     LookupUnavailable,
+    NotAdmitted,
     RemoteTask,
     TaskRequest,
 )
 
 from .auth import DELEGATION_HEADER, DelegationSigner
+
+# Prefix of the casework tool's refusal to admit a create (casework.py).
+NOT_ADMITTED = "not admitted"
 
 
 class McpDenied(Exception):
@@ -77,7 +81,7 @@ class ClientCredentialsTokens:
                 timeout=10,
             )
             r.raise_for_status()
-            body = r.json()
+            body = safejson.response_json(r)
             self._token = str(body["access_token"])
             self._expires = time.time() + int(body.get("expires_in", 60))
             return self._token
@@ -106,7 +110,7 @@ class McpToolClient:
                 raise McpDenied(text[:500] or "tool error")
             if result.structured_content:
                 return dict(result.structured_content)
-            return dict(json.loads(text)) if text else {}
+            return dict(safejson.loads(text)) if text else {}
 
         try:
             return anyio.run(go)
@@ -144,7 +148,7 @@ class McpCaseworkConnector:
     version: str = "casework-mcp/1"
     audience: str = "opsbridge-casework-mcp"
 
-    def _delegation(self) -> str:
+    def _delegation(self, attempt_id: str | None = None) -> str:
         return self.signer.sign(
             tenant_id=self.tenant_id,
             principal_id=self.approver_id,
@@ -152,6 +156,7 @@ class McpCaseworkConnector:
             tools=["create_follow_up_task", "get_follow_up_task", "reconcile_operation"],
             case_id=self.case_id,
             operation_id=self.operation_id,
+            attempt_id=uuid.UUID(attempt_id) if attempt_id else None,
             ttl_seconds=120,
         )
 
@@ -159,10 +164,19 @@ class McpCaseworkConnector:
         try:
             out = self.client.call(
                 "create_follow_up_task",
-                {"operation_id": str(self.operation_id)},
-                self._delegation(),
+                # The deadline travels with the call: the casework service must not let the
+                # task be committed after it, however late the hop delivers the request. The
+                # attempt is the executor's open one; the service admits it once.
+                {
+                    "operation_id": str(self.operation_id),
+                    "deadline": req.deadline,
+                    "attempt_id": req.attempt_id,
+                },
+                self._delegation(req.attempt_id),
             )
         except McpDenied as exc:
+            if NOT_ADMITTED in str(exc):
+                raise NotAdmitted(f"casework service refused: {exc}") from exc
             raise DefiniteFailure(f"casework service refused: {exc}", retryable=False) from exc
         except McpTransportError as exc:
             raise AmbiguousFailure(f"MCP call outcome unknown: {exc}") from exc

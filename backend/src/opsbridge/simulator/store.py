@@ -28,7 +28,8 @@ CREATE TABLE IF NOT EXISTS faults (
   id TEXT PRIMARY KEY, org TEXT NOT NULL, route TEXT NOT NULL, mode TEXT NOT NULL,
   remaining INTEGER NOT NULL, delay_ms INTEGER NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS capabilities (
-  org TEXT PRIMARY KEY, idempotency INTEGER NOT NULL, search INTEGER NOT NULL);
+  org TEXT PRIMARY KEY, idempotency INTEGER NOT NULL, search INTEGER NOT NULL,
+  deadlines INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS request_log (
   seq INTEGER PRIMARY KEY AUTOINCREMENT, org TEXT, route TEXT, outcome TEXT, at TEXT);
 """
@@ -64,6 +65,11 @@ class SimStore:
             columns = {r[1] for r in self._conn.execute("PRAGMA table_info(records)")}
             if "deleted_at" not in columns:  # a store created before deletions existed
                 self._conn.execute("ALTER TABLE records ADD COLUMN deleted_at TEXT")
+            caps = {r[1] for r in self._conn.execute("PRAGMA table_info(capabilities)")}
+            if "deadlines" not in caps:  # a store created before request deadlines existed
+                self._conn.execute(
+                    "ALTER TABLE capabilities ADD COLUMN deadlines INTEGER NOT NULL DEFAULT 1"
+                )
 
     # --- records ------------------------------------------------------------------------
 
@@ -257,23 +263,26 @@ class SimStore:
             else:
                 self._conn.execute("DELETE FROM faults WHERE org=?", (org,))
 
-    def set_capabilities(self, org: str, idempotency: bool, search: bool) -> None:
+    def set_capabilities(
+        self, org: str, idempotency: bool, search: bool, deadlines: bool = True
+    ) -> None:
         with self._lock:
             self._conn.execute(
-                "INSERT INTO capabilities (org, idempotency, search) VALUES (?,?,?) ON CONFLICT (org) "
-                "DO UPDATE SET idempotency=excluded.idempotency, search=excluded.search",
-                (org, int(idempotency), int(search)),
+                "INSERT INTO capabilities (org, idempotency, search, deadlines) VALUES (?,?,?,?) "
+                "ON CONFLICT (org) DO UPDATE SET idempotency=excluded.idempotency, "
+                "search=excluded.search, deadlines=excluded.deadlines",
+                (org, int(idempotency), int(search), int(deadlines)),
             )
 
     def capabilities(self, org: str) -> dict[str, bool]:
         with self._lock:
             row = self._conn.execute(
-                "SELECT idempotency, search FROM capabilities WHERE org=?", (org,)
+                "SELECT idempotency, search, deadlines FROM capabilities WHERE org=?", (org,)
             ).fetchone()
         return (
-            {"idempotency": bool(row[0]), "search": bool(row[1])}
+            {"idempotency": bool(row[0]), "search": bool(row[1]), "deadlines": bool(row[2])}
             if row
-            else {"idempotency": True, "search": True}
+            else {"idempotency": True, "search": True, "deadlines": True}
         )
 
     def log(self, org: str, route: str, outcome: str) -> None:

@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type KeyboardEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type CaseOut, type Citation } from "../api/client";
+import { ApiError, apiAs, tenantPath, type AssigneeList, type CaseOut, type Citation } from "../api/client";
 import { ErrorState, Loading } from "../components/States";
 import { StatusBadge, statusLabel } from "../components/StatusBadge";
+import { useAnnouncement } from "../components/Announcement";
 import { useSession } from "../session";
 import { ConversationPanel } from "./case/ConversationPanel";
 import { EvidencePanel } from "./case/EvidencePanel";
@@ -27,10 +28,10 @@ export function CaseDetail() {
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const query = useQuery<CaseOut, ApiError>({
     queryKey: ["case", tenant, caseId],
-    queryFn: ({ signal }) => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}`), { signal }),
+    queryFn: ({ signal }) => apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}`), { signal }),
   });
   const resolve = useMutation<CaseOut, ApiError>({
-    mutationFn: () => api<CaseOut>(tenantPath(tenant, `/cases/${caseId}/resolve`), { method: "POST", body: {} }),
+    mutationFn: () => apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}/resolve`), { method: "POST", body: {} }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["case", tenant, caseId] }),
   });
 
@@ -68,12 +69,17 @@ export function CaseDetail() {
         <dd>{c.discrepancy_types.length ? c.discrepancy_types.map(statusLabel).join(", ") : "—"}</dd>
         <dt>Evidence</dt>
         <dd>{statusLabel(c.evidence_readiness)}</dd>
+        <dt>Owner</dt>
+        <dd>{c.owner ?? "Unassigned"}</dd>
         <dt>Assigned group</dt>
         <dd>{c.assignee_group ?? "—"}</dd>
         <dt>Opened</dt>
         <dd>{new Date(c.created_at).toLocaleString()}</dd>
       </dl>
       {c.description && <p className="description">{c.description}</p>}
+      {can(tenant, "case.assign") && !["resolved", "closed_without_resolution"].includes(c.status) && (
+        <OwnerControls tenant={tenant} caseId={caseId} c={c} />
+      )}
       {/* Offered only when the latest investigation found no discrepancy; the server enforces this too. */}
       {can(tenant, "investigation.run") && ["awaiting_review", "follow_up_pending"].includes(c.status) &&
         c.discrepancy_types.length === 0 && c.evidence_readiness === "complete" && (
@@ -107,5 +113,71 @@ export function CaseDetail() {
         )}
       </div>
     </article>
+  );
+}
+
+/** Take, hand over or release the case. The owner the page shows is sent along, so a change
+ * someone else made meanwhile is refused instead of overwritten. */
+function OwnerControls({ tenant, caseId, c }: { tenant: string; caseId: string; c: CaseOut }) {
+  const { me } = useSession();
+  const qc = useQueryClient();
+  const [target, setTarget] = useState("");
+  const [notice, announce] = useAnnouncement();
+  const people = useQuery<AssigneeList, ApiError>({
+    queryKey: ["assignees", tenant],
+    queryFn: ({ signal }) => apiAs("AssigneeList", tenantPath(tenant, "/assignees"), { signal }),
+  });
+  const change = useMutation<CaseOut, ApiError, string | null>({
+    mutationFn: (owner) =>
+      apiAs("CaseOut", tenantPath(tenant, `/cases/${caseId}/owner`), {
+        method: "POST",
+        body: { owner_id: owner, expected_owner_id: c.assignee_id },
+      }),
+    onSuccess: (updated, owner) => {
+      announce(owner === null ? "You released this case." : owner === me.user_id ? "You own this case."
+        : `Given to ${updated.owner ?? "another investigator"}.`);
+      setTarget("");
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
+      void qc.invalidateQueries({ queryKey: ["case-views", tenant] });
+      void qc.invalidateQueries({ queryKey: ["cases", tenant] });
+    },
+  });
+  const mine = c.assignee_id === me.user_id;
+  const others = (people.data?.items ?? []).filter((m) => m.id !== c.assignee_id);
+  return (
+    <div className="actions" role="group" aria-label="Case owner">
+      {!mine && (
+        <button type="button" className="button secondary" disabled={change.isPending}
+                onClick={() => change.mutate(me.user_id)}>
+          {c.assignee_id ? "Take over this case" : "Take this case"}
+        </button>
+      )}
+      {c.assignee_id && (
+        <button type="button" className="button secondary" disabled={change.isPending}
+                onClick={() => change.mutate(null)}>
+          Release
+        </button>
+      )}
+      {others.length > 0 && (
+        <form className="inline-form" onSubmit={(e) => { e.preventDefault(); if (target) change.mutate(target); }}>
+          <label>
+            Give to{" "}
+            <select value={target} onChange={(e) => setTarget(e.target.value)}>
+              <option value="">Choose an investigator</option>
+              {others.map((m) => (
+                <option key={m.id} value={m.id}>{m.display_name}</option>
+              ))}
+            </select>
+          </label>{" "}
+          <button type="submit" className="button secondary" disabled={!target || change.isPending}>
+            Assign
+          </button>
+        </form>
+      )}
+      {change.isError && <ErrorState error={change.error} />}
+      {notice}
+    </div>
   );
 }

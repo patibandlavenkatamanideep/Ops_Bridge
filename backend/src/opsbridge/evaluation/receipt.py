@@ -199,16 +199,17 @@ def run_mode(
     return trials, sealed
 
 
-def verify(ledger: Path, public_key: str) -> dict[str, Any]:
+def verify(ledger: Path, public_key: str, *, artifacts: bool = True) -> dict[str, Any]:
     """Chain + signatures through the public API; artifacts through the documented CLI
-    (`evalseal verify --ledger … --artifacts --index i`) for every record."""
+    (`evalseal verify --ledger … --artifacts --index i`) for every record, unless
+    `artifacts` is False (an installation without the evidence bundle)."""
     chain_ok, chain_msg = verify_chain(ledger)
     sig_ok, sig_msg = verify_signatures(ledger, expected_public_key=public_key)
     beside = Path(sys.executable).parent / "evalseal"
     exe = str(beside) if beside.exists() else shutil.which("evalseal")
     records: list[dict[str, Any]] = []
     n = sum(1 for line in ledger.read_text(encoding="utf-8").splitlines() if line.strip())
-    for i in range(n):
+    for i in range(n if artifacts else 0):
         if exe is None:
             records.append({"index": i, "ok": False, "output": "evalseal CLI not found"})
             continue

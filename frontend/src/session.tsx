@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext, type ReactNode } from "react";
-import { ApiError, api, setCsrfToken, type Me, type Membership } from "./api/client";
+import { ApiError, apiAs, setCsrfToken, type Me, type Membership } from "./api/client";
 
 interface SessionValue {
   me: Me;
@@ -20,7 +20,7 @@ export function useMe() {
   return useQuery<Me, ApiError>({
     queryKey: ["me"],
     queryFn: async () => {
-      const me = await api<Me>("/api/v1/me");
+      const me = await apiAs("MeOut", "/api/v1/me");
       setCsrfToken(me.csrf_token);
       return me;
     },

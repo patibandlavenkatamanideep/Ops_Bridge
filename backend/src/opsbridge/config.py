@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import quote, urlparse
 
-from pydantic import Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -19,6 +19,16 @@ ModelMode = Literal["mock", "anthropic", "ollama", "rules_only"]
 
 class ConfigurationError(RuntimeError):
     pass
+
+
+class ConnectionCredential(BaseModel):
+    """A secret-store reference the deployment registered for one tenant and destination.
+    Tenant administrators choose among these; they never name arbitrary secrets."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    tenant: str  # the tenant's slug
+    connector: Literal["github_issues"]
+    repositories: list[str]  # owner/name, compared case-insensitively
 
 
 class Settings(BaseSettings):
@@ -57,6 +67,8 @@ class Settings(BaseSettings):
     session_secret: SecretStr = SecretStr("")
     session_absolute_hours: int = 8
     session_idle_minutes: int = 30
+    # Ended sessions (and the ID tokens in them) are deleted this long after they ended.
+    session_prune_after_hours: float = Field(default=24.0, gt=0)
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
     # Per verified user (after the session is checked), and per client address for every
     # API request with or without a cookie: an unverified cookie never selects a budget.
@@ -101,9 +113,18 @@ class Settings(BaseSettings):
     )
     delegation_key_path: Path = REPO_ROOT / "var" / "keys" / "delegation_ed25519.pem"
     # PEM from a secret store (staging/production); takes precedence and is never written.
+    # Only the services that SIGN delegations (API, worker) need it.
     delegation_private_key: SecretStr | None = None
+    # Public keys the MCP services verify delegations with (PEM; several while keys rotate),
+    # given directly or as a file of PEM blocks. A deployed verifier needs one of these; in
+    # development the public key may be derived from the local key file.
+    delegation_public_keys: list[str] = Field(default_factory=list)
+    delegation_public_key_path: Path | None = None
 
     simulator_url: str = "http://localhost:8090"
+    # When set, investigations read each organization's records from an export at
+    # <dir>/<organization> (connectors/exports.py) instead of the simulator.
+    purchasing_export_dir: Path | None = None
     simulator_fault_controls: bool = False
     sim_master_secret: SecretStr = SecretStr("")
 
@@ -123,6 +144,9 @@ class Settings(BaseSettings):
 
     github_sandbox_repo: str | None = None
     github_token: SecretStr | None = None  # used by GitHub connections without a credential ref
+    # Credential references a tenant may choose, each registered to a tenant and destination
+    # (JSON in OPSBRIDGE_CONNECTION_CREDENTIALS); the secret is OPSBRIDGE_CONNECTION_SECRET_<REF>.
+    connection_credentials: dict[str, ConnectionCredential] = Field(default_factory=dict)
     github_live_writes_authorized: bool = False
     # Repositories a tenant's GitHub task connection may name (the sandbox repo is included).
     github_repository_allowlist: list[str] = Field(default_factory=list)
@@ -137,13 +161,23 @@ class Settings(BaseSettings):
     # An investigation's purchasing data may be acted on (proposals, approvals, dispatch,
     # resolution) for this long after it was read; then the investigation must be re-run.
     source_max_age_hours: float = Field(default=24.0, gt=0)
+    # Reading the purchasing source for one investigation stops after this long (every page
+    # and record together); what was read is kept and nothing is concluded from it.
+    source_collection_seconds: float = Field(default=120.0, gt=0)
 
     @model_validator(mode="after")
     def _absolute_paths(self) -> Settings:
         # Relative paths in .env are relative to the repository root, not the process cwd.
-        for name in ("artifact_dir", "packs_dir", "evals_dir", "delegation_key_path"):
-            value: Path = getattr(self, name)
-            if not value.is_absolute():
+        for name in (
+            "artifact_dir",
+            "packs_dir",
+            "evals_dir",
+            "delegation_key_path",
+            "delegation_public_key_path",
+            "purchasing_export_dir",
+        ):
+            value: Path | None = getattr(self, name)
+            if value is not None and not value.is_absolute():
                 object.__setattr__(self, name, (REPO_ROOT / value).resolve())
         return self
 

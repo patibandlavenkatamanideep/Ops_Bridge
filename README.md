@@ -44,14 +44,15 @@ only after a different person approves the exact version they reviewed.
 - **Evaluation**: frozen benchmark with hand-labelled held-out cases, strict offline replay,
   EvalSeal receipts with tamper detection.
 
-## Status (2026-10-17)
+## Status (2026-10-28)
 
 | Level | State |
 |---|---|
-| Local application | Phases 0–9 complete and verified locally (`make verify`: 15 gates; clean clone and clean container launch reproduced) |
+| Local application | All build phases, and the fixes from the production review of 2026-10-27, verified locally (`make verify`: 15 stages; unit 447, integration 253, browser 31) |
+| Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done locally: A01–A05, A17; in part A06, A13, A15, A16; prepared for the owner A12; the rest need access or decisions. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
-| Hosted CI | **Passing** — GitHub Actions on ubuntu-24.04 (PR #1, run 39000811947): lint, types, unit 253, canary, receipts, build; integration 123; browser 23. The first two runs failed and exposed three defects, now fixed (docs/case-study.md) |
+| Hosted CI | **Passing** on PR #17 (run 40713169830): lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, SBOM and vulnerability scan |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Operator pilot measured | **No** — pilot plan only |
 
@@ -108,6 +109,7 @@ Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
 [operator guide](docs/operator-guide.md) · [pilot plan](docs/pilot-plan.md) ·
 [integration onboarding](docs/integration-onboarding.md) · [case study](docs/case-study.md) ·
 [acceptance scenarios](docs/acceptance-scenarios.md) · [final report](docs/final-report.md) · [status](docs/STATUS.md) ·
+[production readiness](docs/production-readiness.md) ·
 [requirements traceability](docs/requirements-traceability.md)
 
 ## License

@@ -40,10 +40,10 @@ samples in the customer's format, and `opsbridge eval-rules --corpus <their vali
 ## 4. Source system adapter
 
 The workflow reads purchasing records through an adapter that implements the
-`purchasing-source/1` contract (`connectors/source_contract.py`); `PurchasingClient`
-(`connectors/purchasing.py`) is the only implementation and talks to the simulator. For a
-real system, implement the same two operations against its API or export location with a
-read-only service account:
+`purchasing-source/1` contract (`connectors/source_contract.py`). Two implementations
+exist: `PurchasingClient` (`connectors/purchasing.py`) talks to the simulator's API, and
+`ExportSource` (`connectors/exports.py`) reads an export (see "Exports" below). For a real
+system's API, implement the same two operations with a read-only service account:
 
 - `fetch(collection, key)` returns the original bytes, content type and version (digests are
   taken over the bytes). It returns None only when the source says the record does not exist;
@@ -71,6 +71,22 @@ system's own cases (its pagination style, rate limits, change timestamps). No cu
 system has been connected or run through it; that needs a chosen system, a sandbox and the
 owner's authorization.
 
+**Exports** (when OpsBridge cannot reach the system): the customer delivers, per
+organization, a directory `<OPSBRIDGE_PURCHASING_EXPORT_DIR>/<organization>/` holding the
+record files and a `manifest.json` (`opsbridge-export/1`): the producing system, the one moment
+the snapshot shows (`extracted_at`, with a time zone), whether it holds every record in scope
+(`complete`), and per record its collection, key, PO number, file, content type, SHA-256 and
+optionally `modified_at`; withdrawn records are listed separately. Every file is checked
+against its digest before use; a file outside the export, a repeated or conflicting identity,
+a record modified after `extracted_at` (a mixed snapshot) or an unknown schema refuses the
+export. A record is absent only when a complete export does not list it; in a partial export
+its absence is unknown and the case goes to review. The data is as old as the export: an
+investigation records `extracted_at` as its read time, so the age limit applies to the
+export. Tests: `tests/contracts/test_export_source.py` (15, hand-written exports) and
+`tests/integration/test_export_investigation.py` (2). No customer export has been read: a
+real one needs its own fixtures, captured and sanitized from that system's export, and the
+pack mapping for its fields.
+
 ## 5. Task connector (follow-up work)
 
 Each tenant's task connection (Tenant settings → Task connection) names the connector, its
@@ -78,7 +94,9 @@ destination and a credential reference; add a new connector to `services/connect
 (destination shape, validation) and to `workflow/worker.py::connector_for`, which builds it
 from the approved destination. Implement `TaskConnector` (`connectors/tasks.py`): `create`, `get` (read-back) and
 `find_by_marker`, and declare `capabilities` honestly — idempotency keys, lookup
-consistency (strong, eventual or none), which HTTP statuses are definite vs ambiguous. If
+consistency (strong, eventual or none), whether the provider honours a request deadline
+(commits nothing after it: only then can a strong lookup that finds nothing prove an
+ambiguous create absent), which HTTP statuses are definite vs ambiguous. If
 the provider advertises capabilities, discover them per dispatch and assume the weakest
 contract when discovery fails (as `SimTaskConnector` does); a capability the provider does
 not actually honour can produce duplicates. Include the operation marker in every created

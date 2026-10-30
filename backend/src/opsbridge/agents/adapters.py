@@ -21,6 +21,9 @@ from typing import Any
 
 import httpx
 
+from opsbridge import safejson
+from opsbridge.connectors import http_transport
+
 from .contracts import (
     Capabilities,
     ModelRefused,
@@ -35,6 +38,9 @@ from .contracts import (
 # Deterministic mock
 # ---------------------------------------------------------------------------------------
 
+# Bounded reads from a local model server: its model list, and one non-streamed reply.
+OLLAMA_TAGS_MAX_BYTES = 1024 * 1024
+OLLAMA_REPLY_MAX_BYTES = 8 * 1024 * 1024
 _CONTEXT_RE = re.compile(r"<context_json>\n(.*?)\n</context_json>", re.S)
 
 
@@ -291,14 +297,21 @@ class OllamaAdapter:
     def available(self) -> tuple[bool, str | None]:
         """Return (available, digest) without generating anything."""
         try:
-            r = self._client.get("/api/tags", timeout=2.0)
-        except httpx.HTTPError:
+            r = http_transport.request(
+                self._client,
+                "GET",
+                "/api/tags",
+                timeout=2.0,
+                max_bytes=OLLAMA_TAGS_MAX_BYTES,
+                total_seconds=2.0,
+            )
+            if r.status_code != 200:
+                return False, None
+            for m in safejson.response_json(r).get("models", []):
+                if m.get("name") == self.model or m.get("model") == self.model:
+                    return True, m.get("digest")
+        except (httpx.HTTPError, ValueError, AttributeError, TypeError):
             return False, None
-        if r.status_code != 200:
-            return False, None
-        for m in r.json().get("models", []):
-            if m.get("name") == self.model or m.get("model") == self.model:
-                return True, m.get("digest")
         return False, None
 
     def generate(self, request: ModelRequest) -> ModelResponse:
@@ -321,14 +334,27 @@ class OllamaAdapter:
         }
         start = time.monotonic()
         try:
-            r = self._client.post("/api/chat", json=body, timeout=request.timeout_seconds)
-        except httpx.TimeoutException as exc:
+            r = http_transport.request(
+                self._client,
+                "POST",
+                "/api/chat",
+                json=body,
+                timeout=request.timeout_seconds,
+                max_bytes=OLLAMA_REPLY_MAX_BYTES,
+                total_seconds=request.timeout_seconds,
+            )
+        except httpx.TimeoutException as exc:  # the total deadline included
             raise ModelTimeout("Ollama request timed out") from exc
-        except httpx.HTTPError as exc:
+        except httpx.HTTPError as exc:  # an oversized or undecodable reply included
             raise ModelUnavailable(f"Ollama connection error: {type(exc).__name__}") from exc
         if r.status_code != 200:
             raise ModelUnavailable(f"Ollama returned HTTP {r.status_code}")
-        data = r.json()
+        try:
+            data = safejson.response_json(r)
+            if not isinstance(data, dict):
+                raise ValueError("reply is not an object")
+        except ValueError as exc:
+            raise ModelUnavailable(f"Ollama reply unreadable: {exc}") from exc
         return ModelResponse(
             text=(data.get("message") or {}).get("content", ""),
             provider="ollama",

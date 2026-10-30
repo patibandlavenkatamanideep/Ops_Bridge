@@ -81,7 +81,10 @@ allowlist (`OPSBRIDGE_GITHUB_REPOSITORY_ALLOWLIST`, JSON list; the sandbox repos
 `OPSBRIDGE_GITHUB_SANDBOX_REPO` is always included), refused otherwise; the credential is a
 secret in the deployment's store, named by the connection's reference and read from
 `OPSBRIDGE_CONNECTION_SECRET_<REF>` (upper case, `-` as `_`), or `OPSBRIDGE_GITHUB_TOKEN` when
-the connection names none; writes refused unless `OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED=true`;
+the connection names none; a reference must be registered by the deployment for that tenant,
+connector and repository (`OPSBRIDGE_CONNECTION_CREDENTIALS`), checked when the connection is
+set and again before the secret is read, so a tenant cannot pick another tenant's credential
+(production review A06); writes refused unless `OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED=true`;
 only synthetic, redacted text plus an opaque marker is sent; tenants can use it only on a tier
 that enables `github_issues`. Approvals bind the repository: moving the connection makes
 pending approvals stale, and dispatch recovers an earlier write in the repository it was
@@ -97,6 +100,15 @@ fine-grained token limited to that repository with Issues read/write, then
 `OPSBRIDGE_GITHUB_SANDBOX_REPO=owner/name OPSBRIDGE_GITHUB_TOKEN=… OPSBRIDGE_GITHUB_LIVE_WRITES_AUTHORIZED=true
 OPSBRIDGE_RUN_LIVE=github uv --directory backend run pytest tests/live -q`. Until that run
 happens, the connector is **not** live-verified.
+
+## Purchasing exports (`connectors/exports.py`)
+
+Reads an organization's export (`OPSBRIDGE_PURCHASING_EXPORT_DIR/<organization>/`: files plus
+a `manifest.json`, `opsbridge-export/1`) through the same `purchasing-source/1` contract as the
+simulator connector. Files are checked against their SHA-256 digests; untrusted exports
+(paths outside the export, repeated identities, mixed snapshots, unknown schema) are refused;
+the investigation's read time is the export's `extracted_at`. Format and rules:
+docs/integration-onboarding.md, "Exports". Tested only with hand-written exports.
 
 ## Purchasing simulator
 

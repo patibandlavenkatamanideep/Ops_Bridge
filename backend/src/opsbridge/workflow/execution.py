@@ -30,7 +30,7 @@ from __future__ import annotations
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -46,6 +46,7 @@ from opsbridge.connectors.tasks import (
     ConnectorUnavailable,
     DefiniteFailure,
     LookupUnavailable,
+    NotAdmitted,
     RemoteTask,
     TaskConnector,
     TaskRequest,
@@ -54,7 +55,6 @@ from opsbridge.evidence.blobs import store_bytes
 from opsbridge.evidence.storage import ArtifactStore
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
-    ApprovalDecision,
     Artifact,
     Attempt,
     Case,
@@ -63,6 +63,7 @@ from opsbridge.persistence.models import (
     OutboxEvent,
     Proposal,
 )
+from opsbridge.services import execution_admission as admission
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
 
@@ -96,7 +97,7 @@ def _now() -> datetime:
 
 
 def marker_for(op: Operation) -> str:
-    return f"opsbridge-op:{op.operation_key}"
+    return admission.marker(op.operation_key)
 
 
 def _guard(s: Session, job: jobs.ClaimedJob) -> None:
@@ -154,43 +155,50 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
                 deps, job, snapshot, "failed", category="connector_unavailable", detail=str(exc)
             )
         return
-    if succeeded:  # created earlier; only read-back was missing
-        _read_back(
-            deps, job, snapshot, connector, succeeded[-1].remote_ref or "", parent=succeeded[-1].id
-        )
-        return
-    if needs_reconcile:
-        outcome = _reconcile(deps, job, snapshot, connector)
-        if outcome in ("confirmed", "unknown"):
+    try:
+        if succeeded:  # created earlier; only read-back was missing
+            remote_ref = succeeded[-1].remote_ref or ""
+            _read_back(deps, job, snapshot, connector, remote_ref, parent=succeeded[-1].id)
             return
-        if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
-            return
-    _create(deps, job, snapshot, connector)
+        if needs_reconcile:
+            outcome = _reconcile(deps, job, snapshot, connector)
+            if outcome in ("confirmed", "unknown"):
+                return
+            if outcome == "pending":  # no new write while an earlier one may still land
+                raise StepFailed(_PENDING, retryable=True)
+            if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
+                return
+        _create(deps, job, snapshot, connector)
+    finally:
+        close = getattr(connector, "close", None)  # its HTTP client, whatever happened
+        if callable(close):
+            close()
 
 
 def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
     """Finish the operation instead of a new write if it was cancelled or is no longer
-    eligible; True when finished."""
-    if op.cancellation == "requested":
-        _finish(
+    eligible (services/execution_admission.py, shared with the casework tool); True when
+    finished."""
+    refused = admission.refusal(s, op)
+    if refused is None:
+        return False
+    if refused.category == "cancelled_by_user":
+        finish_operation(
             s,
             op,
             "cancelled_before_dispatch",
             category="cancelled_by_user",
             cancellation="confirmed",
         )
-        return True
-    problems = _revalidate(s, op)
-    if problems:
-        _finish(
+    else:
+        finish_operation(
             s,
             op,
             "cancelled_before_dispatch",
             category="precondition_failed",
-            detail="; ".join(problems),
+            detail=refused.detail,
         )
-        return True
-    return False
+    return True
 
 
 def _refused_now(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> bool:
@@ -218,38 +226,6 @@ def _snapshot(op: Operation, attempts: list[Attempt]) -> dict[str, Any]:
     }
 
 
-def _revalidate(s: Session, op: Operation) -> list[str]:
-    from opsbridge.services.proposals import approver_still_authorized, check_current, payload_of
-
-    problems = []
-    pr = s.get(Proposal, op.proposal_id)
-    ad = s.get(ApprovalDecision, op.approval_id)
-    # Corrections and uploads hold this lock: a change committed first is seen here, and one
-    # waiting here lands after the dispatch decision.
-    case = s.execute(
-        select(Case).where(Case.id == op.case_id).with_for_update()
-    ).scalar_one_or_none()
-    if pr is None or ad is None or case is None:
-        return ["proposal, approval or case missing"]
-    if pr.status != "approved":
-        problems.append(f"proposal is {pr.status}")
-    if (
-        ad.decision != "approved"
-        or ad.payload_digest != pr.payload_digest
-        or op.payload_digest != pr.payload_digest
-    ):
-        problems.append("approval is not bound to this payload")
-    if digest(payload_of(pr)) != op.payload_digest:
-        problems.append("operation payload does not match the approved digest")
-    if ad.expires_at <= _now():
-        problems.append("approval expired before dispatch")
-    if not approver_still_authorized(s, op.tenant_id, ad.approver_id, op.action_type):
-        problems.append("approver no longer holds approval authority for this action")
-    stale = check_current(s, case, pr)
-    problems += stale.reasons
-    return problems
-
-
 _AUDIT_OUTCOME = {
     "confirmed": "ok",
     "outcome_unknown": "unknown",
@@ -257,7 +233,7 @@ _AUDIT_OUTCOME = {
 }
 
 
-def _finish(
+def finish_operation(
     s: Session,
     op: Operation,
     status: str,
@@ -268,8 +244,14 @@ def _finish(
     confirmation: dict[str, Any] | None = None,
     cancellation: str | None = None,
     review: bool = False,
+    actor: tuple[str, str] = ("service", EXECUTOR),
+    count: bool = True,
 ) -> None:
-    if status in TERMINAL:
+    """Set an operation's outcome and everything that follows from it (case transition,
+    proposal, outbox, audit, metrics), for the executor and for a person's review alike.
+    `count` is False when the operation was already counted as finished (a review of an
+    unknown outcome)."""
+    if status in TERMINAL and count:
         elapsed = (_now() - op.created_at).total_seconds()
         connector = op.connector
 
@@ -313,9 +295,9 @@ def _finish(
     audit.record(
         s,
         tenant_id=op.tenant_id,
-        actor_kind="service",
-        actor_id=EXECUTOR,
-        on_behalf_of=op.approved_by,
+        actor_kind=actor[0],
+        actor_id=actor[1],
+        on_behalf_of=op.approved_by if actor[0] == "service" else None,
         action=f"operation.{status}",
         resource_type="operation",
         resource_id=str(op.id),
@@ -355,6 +337,7 @@ def _new_attempt(
     tool: str,
     args: dict[str, Any],
     connector_version: str,
+    deadline_at: datetime | None = None,
 ) -> uuid.UUID:
     with deps.db.session(_ctx(snap["tenant_id"])) as s:
         _guard(s, job)
@@ -385,6 +368,7 @@ def _new_attempt(
             response_mode="live",
             worker_id=job.lease_owner,
             fencing_token=job.fencing_token,
+            deadline_at=deadline_at,
         )
         s.add(a)
         s.flush()
@@ -453,19 +437,12 @@ def _complete(
         op = s.execute(
             select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
         ).scalar_one()
-        _finish(s, op, status, **kw)
+        finish_operation(s, op, status, **kw)
 
 
-def _task_request(snap: dict[str, Any]) -> TaskRequest:
-    # Exactly the approved outbound text (re-checked before this write); the marker line lets
-    # reconciliation find the task.
-    out = snap["payload"]["outbound"]
-    return TaskRequest(
-        title=out["title"],
-        body=f"{out['body']}\n\nOpsBridge operation marker: {snap['marker']}",
-        assignee_group=out["assignee_group"],
-        marker=snap["marker"],
-    )
+def _task_request(snap: dict[str, Any], deadline: float | None = None) -> TaskRequest:
+    # Exactly the approved outbound text (re-checked before this write).
+    return admission.approved_request(snap["payload"], snap["operation_key"], deadline=deadline)
 
 
 def _remote_dict(t: RemoteTask) -> dict[str, Any]:
@@ -475,7 +452,10 @@ def _remote_dict(t: RemoteTask) -> dict[str, Any]:
 def _create(
     deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any], connector: TaskConnector
 ) -> None:
-    req = _task_request(snap)
+    # The provider must not commit the task after this moment (when it honours deadlines):
+    # that is what lets a later lookup that finds nothing prove it did not happen.
+    deadline = datetime.now(UTC) + timedelta(seconds=deps.timeout_seconds)
+    req = _task_request(snap, deadline.timestamp())
     key = snap["operation_key"] if connector.capabilities.idempotency_keys else None
     args = {  # the complete request as sent, so the attempt's digest covers the body too
         "destination": snap["payload"]["destination"],
@@ -484,12 +464,29 @@ def _create(
         "assignee_group": req.assignee_group,
         "marker": req.marker,
         "idempotency_key": key,
+        "deadline": deadline.isoformat(),
     }
     attempt_id = _new_attempt(
-        deps, job, snap, "dispatch", "create_follow_up_task", args, connector.version
+        deps, job, snap, "dispatch", "create_follow_up_task", args, connector.version, deadline
     )
+    # A boundary behind another hop admits this attempt once (casework MCP).
+    req = replace(req, attempt_id=str(attempt_id))
     try:
         task = connector.create(req, key, deps.timeout_seconds)
+    except NotAdmitted as exc:
+        # The write boundary refused it when the request reached it: nothing was sent. The
+        # executor's own admission, run again, finishes the operation with the same reasons.
+        _close_attempt(
+            deps,
+            snap["tenant_id"],
+            attempt_id,
+            "definite_failure",
+            category="not_admitted",
+            detail=str(exc),
+        )
+        if not _refused_now(deps, job, snap):
+            _complete(deps, job, snap, "failed", category="not_admitted", detail=str(exc))
+        return
     except DefiniteFailure as exc:
         _close_attempt(
             deps,
@@ -514,10 +511,12 @@ def _create(
         )
         outcome = _reconcile(deps, job, snap, connector)
         if outcome == "absent":
-            # Strong lookup proved the earlier write did not happen; retry later via backoff.
+            # The earlier write did not happen (proved) or a resend cannot duplicate it.
             raise StepFailed(
                 "ambiguous failure reconciled as absent; will retry", retryable=True
             ) from exc
+        if outcome == "pending":
+            raise StepFailed(_PENDING, retryable=True) from exc
         return
     _close_attempt(
         deps,
@@ -606,7 +605,12 @@ def _read_back(
 def _reconcile(
     deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any], connector: TaskConnector
 ) -> str:
-    """Returns 'confirmed', 'absent' (safe to create) or 'unknown' (review required)."""
+    """Returns 'confirmed', 'absent' (safe to create), 'pending' (look again later: an earlier
+    create may still land) or 'unknown' (review required).
+
+    Finding nothing proves absence only when no earlier create can still be committed: the
+    provider honours request deadlines and every earlier create's deadline (plus a clock
+    allowance) has passed. With idempotency keys a resend cannot duplicate, so it is safe."""
     caps = connector.capabilities
     if caps.lookup != "none":
         attempt_id = _new_attempt(
@@ -664,8 +668,10 @@ def _reconcile(
                     review=True,
                 )
                 return "unknown"
-            if caps.lookup == "strong":
-                return "absent"
+            if caps.lookup == "strong" and not caps.idempotency_keys and caps.request_deadlines:
+                settled = _creates_settled_at(deps, snap)
+                if settled is not None:
+                    return "absent" if _now() >= settled else "pending"
     if caps.idempotency_keys:
         return "absent"  # re-sending with the same idempotency key cannot create a duplicate
     _complete(
@@ -678,6 +684,31 @@ def _reconcile(
         review=True,
     )
     return "unknown"
+
+
+_PENDING = "an earlier create may still land until its deadline passes; checking again later"
+# Allowance for clock difference between the worker, which sets a deadline, and the provider,
+# which enforces it.
+DEADLINE_ALLOWANCE = timedelta(seconds=2)
+
+
+def _creates_settled_at(deps: ExecutionDeps, snap: dict[str, Any]) -> datetime | None:
+    """When no earlier create of this operation can still be committed: the latest create
+    deadline plus the clock allowance. None when a create went out without a deadline
+    (before 0018), so absence cannot be proved for it."""
+    with deps.db.session(_ctx(snap["tenant_id"])) as s:
+        deadlines = (
+            s.execute(
+                select(Attempt.deadline_at).where(
+                    Attempt.operation_id == snap["operation_id"], Attempt.kind == "dispatch"
+                )
+            )
+            .scalars()
+            .all()
+        )
+    if not deadlines or any(d is None for d in deadlines):
+        return None
+    return max(d for d in deadlines if d is not None) + DEADLINE_ALLOWANCE
 
 
 def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> None:
@@ -768,7 +799,7 @@ def _execute_local(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, An
                 payload=output,
             )
         )
-        _finish(
+        finish_operation(
             s,
             op,
             "confirmed",
@@ -794,8 +825,8 @@ def mark_unknown_after_exhaustion(db: Database, job: jobs.ClaimedJob, error: str
             is not None
         )
         if op.status == "pending_dispatch" and not attempted:
-            _finish(s, op, "failed", category="dispatch_exhausted", detail=error)
+            finish_operation(s, op, "failed", category="dispatch_exhausted", detail=error)
         else:
-            _finish(
+            finish_operation(
                 s, op, "outcome_unknown", category="dispatch_exhausted", detail=error, review=True
             )

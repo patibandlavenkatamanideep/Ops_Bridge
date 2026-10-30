@@ -22,12 +22,21 @@ repeats × 2 modes; unit = case, majority over repeats.
 | Correct outcome / discrepancy types / whole case | 36 / 37 / 36 of 40 | 36 / 37 / 36 of 40 |
 | Misses: safe (escalated to a person) / unsafe | 4 / 0 | 4 / 0 |
 | Trial errors | 0 of 120 | 0 of 120 |
-| Instability (non-majority verdicts / repeats) | 0 cases with any flip | 0 cases with any flip (deterministic mock: 3 repeats cannot show flip rates below 1/3, and no flips are expected from a mock) |
+| Instability, scoring 1 as recorded (see note) | 0 cases with any flip | 0 cases with any flip (deterministic mock: 3 repeats cannot show flip rates below 1/3, and no flips are expected from a mock) |
+| Disagreement, scoring 2 (derived, 2026-10-27) | action 0/40, correctness 0/40, outcome and types 0/40 | the same |
 | Citations valid | 204/204 | 204/204 |
 | Model calls (rejected by validators) | 0 | 243 (0) |
 | Explanation origin | template ×120 | model:mock ×120 |
 | Median / p95 run latency | 103 / 131 ms | 110.5 / 131 ms |
 | Cost | 0 | 0 (mock) |
+
+Note on instability (production review A03, 2026-10-27). Scoring 1, frozen with this
+benchmark, computed the flip rate over whether each repeat's next action was *correct*, not
+over the action itself: repeats giving two different wrong actions counted as stable. The
+recorded row is kept as it was graded. Reading the same recorded trials under scoring 2
+(`opsbridge eval-rescore --run …`, which prints and writes nothing) shows no disagreement on
+any axis in any recorded split or mode, so the defect hid nothing in these results: the
+rules and the mock model are deterministic. A real model would need scoring 2.
 
 Per discrepancy type (majority verdicts, both modes identical): quantity mismatch
 precision 1.0, recall 8/9; price mismatch precision 1.0, recall 7/8; missing receipt

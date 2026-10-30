@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ApiError, api, tenantPath, type CaseCreate, type CaseOut } from "../api/client";
+import { ApiError, apiAs, tenantPath, type CaseCreate, type CaseOut } from "../api/client";
 import { ErrorState } from "../components/States";
 
 export function NewCase() {
@@ -13,7 +13,7 @@ export function NewCase() {
   const [form, setForm] = useState({ title: "", description: "", invoice_number: "", po_number: "", supplier_id: "" });
   const mutation = useMutation<CaseOut, ApiError, CaseCreate>({
     mutationFn: (body) =>
-      api<CaseOut>(tenantPath(tenant, "/cases"), {
+      apiAs("CaseOut", tenantPath(tenant, "/cases"), {
         method: "POST",
         body,
         headers: { "Idempotency-Key": idempotencyKey.current },

@@ -1,13 +1,19 @@
 """Benchmark metrics computed from trial records (definitions frozen in the manifest).
 
-The unit is the case: repeats are aggregated by majority verdict per case before any
-case-level proportion, and repeats are never counted as extra cases. A trial that errors
-counts as incorrect. Intervals are Wilson 95% over cases; the rules-vs-agent comparison is
-paired by case.
+The unit is the case: repeats are aggregated per case before any case-level proportion, and
+repeats are never counted as extra cases. A trial that errors counts as incorrect. Intervals
+are Wilson 95% over cases; the rules-vs-agent comparison is paired by case.
+
+Two scoring schemes (manifest.SCHEMES). Scoring 1 is frozen with opsbridge-bench-v1 and is
+computed exactly as recorded; its "flip rate" is disagreement in next-action correctness, so
+two different wrong actions count as stable. Scoring 2 reports action, correctness and
+outcome/type disagreement and errors separately, takes each majority on its own axis, and
+marks a case with missing, duplicate or relabelled repeats incomplete.
 """
 
 from __future__ import annotations
 
+import json
 from collections import Counter, defaultdict
 from statistics import median
 from typing import Any
@@ -16,6 +22,8 @@ from evalseal import exact_mcnemar, flip_rate, wilson_ci
 
 TYPES = ("missing_receipt", "quantity_mismatch", "price_mismatch")
 ESCALATE = "escalate:assign_case"
+SCORING_1 = "opsbridge-scoring/1"
+SCORING_2 = "opsbridge-scoring/2"
 
 
 def _majority(values: list[Any]) -> Any:
@@ -101,8 +109,22 @@ def instability(cases: dict[str, dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def summarize_mode(trials: list[dict[str, Any]]) -> dict[str, Any]:
-    cases = per_case(trials)
+def summarize_mode(
+    trials: list[dict[str, Any]], scheme: str = SCORING_1, repeats: int | None = None
+) -> dict[str, Any]:
+    """Summary of one mode's trials under `scheme` (a frozen plan's own scheme)."""
+    if scheme == SCORING_2:
+        return _summarize_2(trials, repeats)
+    if scheme != SCORING_1:
+        raise ValueError(f"unknown scoring scheme {scheme!r}")
+    return _summarize(trials, per_case(trials), instability)
+
+
+def _summarize(
+    trials: list[dict[str, Any]],
+    cases: dict[str, dict[str, Any]],
+    instability_of: Any,
+) -> dict[str, Any]:
     n = len(cases)
     k = {
         key: sum(1 for c in cases.values() if c["correct"][key])
@@ -158,7 +180,7 @@ def summarize_mode(trials: list[dict[str, Any]]) -> dict[str, Any]:
             )
             for o in ("matched", "discrepancies_found", "needs_information", "manual_review")
         },
-        "instability": instability(cases),
+        "instability": instability_of(cases),
         "agent": {
             "explanation_origins": dict(origins),
             "model_calls": sum(t["model_calls"] for t in trials),
@@ -249,6 +271,17 @@ def acceptance(summary: dict[str, Any], policy: dict[str, Any], split: str) -> l
                 }
             )
             continue
+        if s.get("incomplete_cases"):
+            out.append(
+                {
+                    "gate": gate["id"],
+                    "mode": mode,
+                    "status": "incomplete",
+                    "reason": f"{len(s['incomplete_cases'])} case(s) lack a complete set of "
+                    "repeats; the gate is not decided",
+                }
+            )
+            continue
         rate, ci = s["next_action"]["rate"], s["next_action"]["wilson95"]
         status = "pass" if rate is not None and rate >= gate["threshold"] else "fail"
         detail = ""
@@ -267,3 +300,151 @@ def acceptance(summary: dict[str, Any], policy: dict[str, Any], split: str) -> l
             }
         )
     return out
+
+
+# --- scoring 2 --------------------------------------------------------------------------
+
+
+def _first_majority(values: list[Any]) -> tuple[Any, int, bool]:
+    """(most common value, its count, whether it tied); ties go to the earliest value."""
+    counts = Counter(values)
+    top = max(counts.values())
+    tied = sum(1 for c in counts.values() if c == top) > 1
+    return next(v for v in values if counts[v] == top), top, tied
+
+
+def _disagreement(values: list[Any]) -> float:
+    return round(1 - max(Counter(values).values()) / len(values), 4)
+
+
+def _verdict(t: dict[str, Any]) -> dict[str, Any]:
+    """One repeat's verdict on each axis; an error is a verdict of its own."""
+    if t["error"]:
+        return {"action": "error", "outcome_types": "error", "right": False}
+    return {
+        "action": t["next_action"],
+        "outcome_types": (t["outcome"], tuple(sorted(t["types"]))),
+        "right": bool(t["correct"]["next_action"]),
+    }
+
+
+def _completeness(ts: list[dict[str, Any]], repeats: int) -> list[str]:
+    seen = Counter(t["repeat"] for t in ts)
+    problems = [f"missing repeat {r}" for r in range(repeats) if r not in seen]
+    problems += [f"repeat {r} recorded {n} times" for r, n in sorted(seen.items()) if n > 1]
+    problems += [f"unexpected repeat {r}" for r in sorted(seen) if not 0 <= r < repeats]
+    if len({json.dumps(t["expected"], sort_keys=True) for t in ts}) > 1:
+        problems.append("labels differ between repeats")
+    return problems
+
+
+def per_case_2(trials: list[dict[str, Any]], repeats: int) -> dict[str, dict[str, Any]]:
+    by_case: dict[str, list[dict[str, Any]]] = defaultdict(list)
+    for t in trials:
+        by_case[t["case_id"]].append(t)
+    out: dict[str, dict[str, Any]] = {}
+    for case_id, ts in by_case.items():
+        ts = sorted(ts, key=lambda t: t["repeat"])
+        verdicts = [_verdict(t) for t in ts]
+        actions = [v["action"] for v in verdicts]
+        pairs = [v["outcome_types"] for v in verdicts]
+        whole = [(v["action"], v["outcome_types"]) for v in verdicts]
+        action, _, action_tied = _first_majority(actions)
+        pair, _, pair_tied = _first_majority(pairs)
+        verdict, count, whole_tied = _first_majority(whole)
+        # Correctness of a majority is that of the repeats that gave it (bench.correct), so
+        # nothing here re-decides what "correct" means.
+        by_action = next(t for t, v in zip(ts, verdicts, strict=True) if v["action"] == action)
+        by_pair = next(t for t, v in zip(ts, verdicts, strict=True) if v["outcome_types"] == pair)
+        by_whole = next(
+            t
+            for t, v in zip(ts, verdicts, strict=True)
+            if (v["action"], v["outcome_types"]) == verdict
+        )
+        ok_action = action != "error" and bool(by_action["correct"]["next_action"])
+        ok_outcome = pair != "error" and bool(by_pair["correct"]["outcome"])
+        ok_types = pair != "error" and bool(by_pair["correct"]["types"])
+        ok_case = not whole_tied and verdict[0] != "error" and bool(by_whole["correct"]["case"])
+        problems = _completeness(ts, repeats)
+        out[case_id] = {
+            "family": ts[0]["family"],
+            "template": ts[0]["template"],
+            "pack": ts[0]["pack"],
+            "expected": ts[0]["expected"],
+            "verdicts": [
+                t["next_action"] if not t["error"] else f"error:{t['error'][:60]}" for t in ts
+            ],
+            "majority": {
+                "next_action": None if action == "error" else action,
+                "outcome": None if pair == "error" else pair[0],
+                "types": [] if pair == "error" else list(pair[1]),
+                "error": by_action["error"] if action == "error" else None,
+                "ties": [
+                    n for n, tied in (("action", action_tied), ("outcome_types", pair_tied)) if tied
+                ],
+            },
+            "whole_verdict": {"count": count, "tied": whole_tied},
+            "correct": {
+                "next_action": ok_action,
+                "outcome": ok_outcome,
+                "types": ok_types,
+                "case": ok_case,
+            },
+            "safe_miss": (not ok_action) and action == ESCALATE,
+            "disagreement": {
+                "action": _disagreement(actions),
+                "correctness": _disagreement([v["right"] for v in verdicts]),
+                "outcome_types": _disagreement(pairs),
+                "errors": round(sum(1 for t in ts if t["error"]) / len(ts), 4),
+            },
+            "complete": not problems,
+            "problems": problems,
+            "finding_codes": by_action["finding_codes"],
+        }
+    return out
+
+
+def instability_2(cases: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    n = len(cases)
+    axes: dict[str, Any] = {}
+    for axis in ("action", "correctness", "outcome_types"):
+        values = [c["disagreement"][axis] for c in cases.values()]
+        k = sum(1 for v in values if v > 0)
+        axes[axis] = {
+            "cases_with_disagreement": k,
+            "cases_with_disagreement_rate": _rate(k, n),
+            "mean": round(sum(values) / n, 4) if n else None,
+        }
+    repeats = sorted({len(c["verdicts"]) for c in cases.values()})
+    fewest = repeats[0] if repeats else 0
+    limit = (
+        "fewer than 2 repeats for some case: disagreement cannot be measured"
+        if fewest < 2
+        else f"{fewest} repeats per case: disagreement below 1/{fewest} cannot be observed, "
+        f"and no disagreement in {fewest} repeats does not show that a case is stable; "
+        f"intervals are over {n} cases"
+    )
+    errored = sum(round(c["disagreement"]["errors"] * len(c["verdicts"])) for c in cases.values())
+    return {
+        "scheme": SCORING_2,
+        "definition": "per case, 1 - (count of the most common value) / repeats, on each axis",
+        **axes,
+        "errors": {"trials_with_error": errored},
+        "repeats_per_case": repeats,
+        "sampling_limit": limit,
+    }
+
+
+def _summarize_2(trials: list[dict[str, Any]], repeats: int | None) -> dict[str, Any]:
+    if repeats is None:  # no frozen schedule given: expect the most repeats any case has
+        counts = Counter(t["case_id"] for t in trials)
+        repeats = max(counts.values()) if counts else 0
+    cases = per_case_2(trials, repeats)
+    summary = _summarize(trials, cases, instability_2)
+    incomplete = sorted(cid for cid, c in cases.items() if not c["complete"])
+    return {
+        "scoring": SCORING_2,
+        "complete": not incomplete,
+        "incomplete_cases": incomplete,
+        **summary,
+    }

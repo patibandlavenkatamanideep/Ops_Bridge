@@ -100,6 +100,13 @@ records are tombstones. An investigation's `collect_context` output records `wit
 adds `source_read_at` and `source_valid_until`. `source_documents.withdrawn_at` (0016) marks
 documents the source no longer holds.
 
+## Request deadlines (migration 0018)
+
+A create carries `X-Request-Deadline` (epoch seconds: now + the connector timeout; through
+Casework MCP the `deadline` tool argument). A provider that advertises `request_deadlines`
+commits nothing after it (the simulator answers 504 with `X-Sim-Not-Committed: true`).
+`attempts.deadline_at` records the deadline each create was sent with.
+
 ## Task connections (`backend/src/opsbridge/services/connections.py`, migration 0017)
 
 `task_connections`: per tenant, versions `1..n` with `connector`, `destination` (exactly what
@@ -112,7 +119,12 @@ unknown field is refused with 422).
 
 ## API (`/api/v1`, OpenAPI at `/api/v1/openapi.json`)
 
-Generated into `frontend/src/api/openapi.json` and `schema.d.ts` (`make openapi`). Errors are
+Generated into `frontend/src/api/openapi.json`, `schema.d.ts` and `schemas.json` (the
+component schemas reduced to the validation keywords) by `make openapi`; CI fails when they
+differ from the backend. The browser checks every typed response against its schema
+(`apiAs` in `frontend/src/api/client.ts`): a response that does not match (a page and a
+server of different versions) is shown as "the app and server versions differ", never
+rendered half-understood; fields a newer server adds are allowed. Errors are
 `{"error": {"code", "message", "correlation_id", "retryable", "details"}}`; status codes
 distinguish 401, 403, 404 (also for other tenants' resources), 409 (conflict, stale version,
 not entitled), 411/413 (body), 422, 429, 503 (dependency). Writes need the CSRF header.
@@ -139,6 +151,6 @@ Outbox events are written in the approval transaction and marked delivered on co
 ## Versioning rules
 
 Changing a canonical record, a mapping semantic or the rules output bumps the relevant
-version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.0.1`; pack and
+version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.1.0`; pack and
 policy versions in their YAML). Benchmark inputs are frozen by digest; changing them needs a
 new benchmark id. Database changes go through Alembic migrations (0001–0004).

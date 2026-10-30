@@ -1,17 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState, type FormEvent } from "react";
-import {
-  ApiError,
-  api,
-  tenantPath,
-  type DecisionResult,
-  type OperationItem,
-  type OperationList,
-  type ProposalItem,
-  type ProposalList,
-} from "../../api/client";
+import { ApiError, apiAs, tenantPath, type DecisionResult, type OperationItem, type OperationList, type ProposalItem, type ProposalList } from "../../api/client";
 import { EmptyState, ErrorState, Loading } from "../../components/States";
 import { statusLabel } from "../../components/StatusBadge";
+import { useAnnouncement } from "../../components/Announcement";
 import { useSession } from "../../session";
 
 const TERMINAL = ["confirmed", "failed", "outcome_unknown", "cancelled_before_dispatch"];
@@ -21,12 +13,12 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
   const qc = useQueryClient();
   const proposals = useQuery<ProposalList, ApiError>({
     queryKey: ["proposals", tenant, caseId],
-    queryFn: ({ signal }) => api<ProposalList>(tenantPath(tenant, `/cases/${caseId}/proposals`), { signal }),
+    queryFn: ({ signal }) => apiAs("ProposalList", tenantPath(tenant, `/cases/${caseId}/proposals`), { signal }),
     enabled: can(tenant, "proposal.read"),
   });
   const ops = useQuery<OperationList, ApiError>({
     queryKey: ["operations", tenant, caseId],
-    queryFn: ({ signal }) => api<OperationList>(tenantPath(tenant, `/cases/${caseId}/operations`), { signal }),
+    queryFn: ({ signal }) => apiAs("OperationList", tenantPath(tenant, `/cases/${caseId}/operations`), { signal }),
     enabled: can(tenant, "operation.read"),
     refetchInterval: (q) => (q.state.data?.items.some((o) => !TERMINAL.includes(o.status)) ? 1500 : false),
   });
@@ -35,9 +27,13 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
   useEffect(() => {
     if (opSignature) qc.invalidateQueries({ queryKey: ["case", tenant, caseId] });
   }, [opSignature, qc, tenant, caseId]);
+  const [notice, announce] = useAnnouncement();
   const create = useMutation<ProposalItem, ApiError>({
-    mutationFn: () => api<ProposalItem>(tenantPath(tenant, `/cases/${caseId}/proposals`), { method: "POST", body: {} }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["proposals", tenant, caseId] }),
+    mutationFn: () => apiAs("ProposalOut", tenantPath(tenant, `/cases/${caseId}/proposals`), { method: "POST", body: {} }),
+    onSuccess: (created) => {
+      void qc.invalidateQueries({ queryKey: ["proposals", tenant, caseId] });
+      announce(`Proposal v${created.version} created; it awaits approval.`);
+    },
   });
   const refresh = () => {
     qc.invalidateQueries({ queryKey: ["proposals", tenant, caseId] });
@@ -64,6 +60,7 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
         </div>
       )}
       {create.isError && <ErrorState error={create.error} />}
+      {notice}
       {items.length === 0 ? (
         <EmptyState title="No proposals yet">
           <p>An investigator turns the validated draft into a versioned proposal for approval.</p>
@@ -71,7 +68,7 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
       ) : (
         <ul className="findings">
           {items.map((p) => (
-            <ProposalCard key={p.id} tenant={tenant} caseId={caseId} p={p} onChange={refresh} />
+            <ProposalCard key={p.id} tenant={tenant} caseId={caseId} p={p} onChange={refresh} onDone={announce} />
           ))}
         </ul>
       )}
@@ -87,7 +84,7 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
       ) : (
         <ul className="findings">
           {ops.data.items.map((o) => (
-            <OperationCard key={o.id} tenant={tenant} caseId={caseId} op={o} onChange={refresh} />
+            <OperationCard key={o.id} tenant={tenant} caseId={caseId} op={o} onChange={refresh} onDone={announce} />
           ))}
         </ul>
       )}
@@ -95,17 +92,22 @@ export function ProposalsPanel({ tenant, caseId, caseStatus }: { tenant: string;
   );
 }
 
-function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId: string; p: ProposalItem;
-  onChange: () => void }) {
+function ProposalCard({ tenant, caseId, p, onChange, onDone }: { tenant: string; caseId: string; p: ProposalItem;
+  onChange: () => void; onDone: (said: string) => void }) {
   const { can } = useSession();
   const [reason, setReason] = useState("");
   const decide = useMutation<DecisionResult, ApiError, "approve" | "reject">({
     mutationFn: (decision) =>
-      api<DecisionResult>(tenantPath(tenant, `/cases/${caseId}/proposals/${p.id}/decision`), {
+      apiAs("DecisionOut", tenantPath(tenant, `/cases/${caseId}/proposals/${p.id}/decision`), {
         method: "POST",
         body: { decision, version: p.version, payload_digest: p.payload_digest, reason: reason || null },
       }),
-    onSuccess: onChange,
+    onSuccess: (_, decision) => {
+      onChange();
+      onDone(decision === "approve"
+        ? `Approved v${p.version}. It is being carried out; follow it in the execution timeline.`
+        : `Rejected v${p.version}.`);
+    },
   });
   // The server says why this viewer cannot decide (policy, scope, expiry); the clock also
   // catches an expiry that passes while the page stays open.
@@ -182,12 +184,15 @@ function ProposalCard({ tenant, caseId, p, onChange }: { tenant: string; caseId:
   );
 }
 
-function OperationCard({ tenant, caseId, op, onChange }: { tenant: string; caseId: string; op: OperationItem;
-  onChange: () => void }) {
+function OperationCard({ tenant, caseId, op, onChange, onDone }: { tenant: string; caseId: string;
+  op: OperationItem; onChange: () => void; onDone: (said: string) => void }) {
   const { can } = useSession();
   const cancel = useMutation<OperationItem, ApiError>({
-    mutationFn: () => api<OperationItem>(tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/cancel`), { method: "POST" }),
-    onSuccess: onChange,
+    mutationFn: () => apiAs("OperationOut", tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/cancel`), { method: "POST" }),
+    onSuccess: () => {
+      onChange();
+      onDone("Cancellation requested. If the task was already sent, it is not undone.");
+    },
   });
   const confirmation = op.confirmation as Record<string, unknown> | null;
   return (
@@ -230,7 +235,8 @@ function OperationCard({ tenant, caseId, op, onChange }: { tenant: string; caseI
         </button>
       )}
       {op.status === "outcome_unknown" && can(tenant, "operation.cancel") && (
-        <ReviewForm tenant={tenant} caseId={caseId} op={op} onDone={onChange} />
+        <ReviewForm tenant={tenant} caseId={caseId} op={op}
+                    onDone={() => { onChange(); onDone("Review recorded."); }} />
       )}
       {cancel.isError && <ErrorState error={cancel.error} />}
     </li>
@@ -243,7 +249,7 @@ function ReviewForm({ tenant, caseId, op, onDone }: { tenant: string; caseId: st
   const [ref, setRef] = useState("");
   const [note, setNote] = useState("");
   const m = useMutation<OperationItem, ApiError>({
-    mutationFn: () => api<OperationItem>(tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/review`), {
+    mutationFn: () => apiAs("OperationOut", tenantPath(tenant, `/cases/${caseId}/operations/${op.id}/review`), {
       method: "POST",
       body: { finding, remote_ref: finding === "exists" ? ref : null, note },
     }),

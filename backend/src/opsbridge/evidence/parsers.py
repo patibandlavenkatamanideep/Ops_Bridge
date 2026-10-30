@@ -21,9 +21,12 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+
+from opsbridge import safejson
 
 from .normalize import normalize_text
 
@@ -36,6 +39,11 @@ MAX_CSV_ROWS = 10_000
 MAX_CSV_COLS = 100
 MAX_PDF_PAGES = 50
 PDF_TIMEOUT_SECONDS = 10.0
+# PDF subprocesses running at once in this process: each may use up to the worker's memory
+# cap (pdf_worker.MEMORY_LIMIT_BYTES) for up to the timeout, so a burst of uploads waits here
+# instead of multiplying that.
+PDF_CONCURRENCY = 2
+_PDF_SLOTS = threading.BoundedSemaphore(PDF_CONCURRENCY)
 _ACTIVE_PDF = re.compile(rb"/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia|XFA)\b")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -147,16 +155,6 @@ def parse(data: bytes, declared_type: str, ocr: OcrSettings | None = None) -> Pa
     return _parse_pdf(data, ocr or OcrSettings())
 
 
-def _depth(value: Any, limit: int, level: int = 0) -> bool:
-    if level > limit:
-        return False
-    if isinstance(value, dict):
-        return all(_depth(v, limit, level + 1) for v in value.values())
-    if isinstance(value, list):
-        return all(_depth(v, limit, level + 1) for v in value)
-    return True
-
-
 def _reject_constants(name: str) -> Any:
     raise ValueError(f"non-standard JSON constant {name}")
 
@@ -164,13 +162,16 @@ def _reject_constants(name: str) -> Any:
 def _parse_json(data: bytes) -> ParsedDocument:
     try:
         # Numbers are parsed as Decimal-compatible strings by later mapping; reject NaN/Infinity.
-        value = json.loads(
-            data.decode("utf-8"), parse_constant=_reject_constants, parse_float=lambda s: _Num(s)
+        value = safejson.loads(
+            data.decode("utf-8"),
+            max_depth=MAX_JSON_DEPTH,
+            parse_constant=_reject_constants,
+            parse_float=lambda s: _Num(s),
         )
+    except safejson.TooDeep:  # checked before decoding: deep input never reaches the decoder
+        return ParsedDocument("application/json", "json/1", "rejected", "JSON nesting too deep")
     except (ValueError, UnicodeDecodeError) as exc:
         return ParsedDocument("application/json", "json/1", "rejected", f"invalid JSON: {exc}")
-    if not _depth(value, MAX_JSON_DEPTH):
-        return ParsedDocument("application/json", "json/1", "rejected", "JSON nesting too deep")
     value = _unwrap(value)
     pretty = json.dumps(value, indent=2, sort_keys=True, ensure_ascii=False)
     text = normalize_text(pretty)
@@ -252,13 +253,14 @@ def _parse_pdf(data: bytes, ocr: OcrSettings) -> ParsedDocument:
     parser = f"pypdf/{pypdf.__version__}"
     flags = ["active_content_present_not_executed"] if _ACTIVE_PDF.search(data) else []
     try:
-        proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
-            [sys.executable, "-m", "opsbridge.evidence.pdf_worker", str(MAX_PDF_PAGES)],
-            input=data,
-            capture_output=True,
-            timeout=PDF_TIMEOUT_SECONDS,
-            check=False,
-        )
+        with _PDF_SLOTS:
+            proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
+                [sys.executable, "-m", "opsbridge.evidence.pdf_worker", str(MAX_PDF_PAGES)],
+                input=data,
+                capture_output=True,
+                timeout=PDF_TIMEOUT_SECONDS,
+                check=False,
+            )
     except subprocess.TimeoutExpired:
         return ParsedDocument(
             "application/pdf", parser, "rejected", "PDF parsing timed out", flags=flags
@@ -356,20 +358,21 @@ def _ocr_pages(
     """OCR the embedded images of the first pages; None if nothing could be read."""
     pages = min(page_count, ocr.max_pages)
     try:
-        proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
-            [
-                sys.executable,
-                "-m",
-                "opsbridge.evidence.pdf_worker",
-                str(MAX_PDF_PAGES),
-                "images",
-                str(pages),
-            ],
-            input=data,
-            capture_output=True,
-            timeout=PDF_TIMEOUT_SECONDS,
-            check=False,
-        )
+        with _PDF_SLOTS:
+            proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
+                [
+                    sys.executable,
+                    "-m",
+                    "opsbridge.evidence.pdf_worker",
+                    str(MAX_PDF_PAGES),
+                    "images",
+                    str(pages),
+                ],
+                input=data,
+                capture_output=True,
+                timeout=PDF_TIMEOUT_SECONDS,
+                check=False,
+            )
         result = json.loads(proc.stdout.decode("utf-8"))
     except (subprocess.TimeoutExpired, ValueError, UnicodeDecodeError):
         return None

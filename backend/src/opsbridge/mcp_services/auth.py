@@ -17,8 +17,11 @@ broadly credentialed service cannot exceed the principal's business authority.
 
 from __future__ import annotations
 
+import hashlib
+import math
 import time
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -31,10 +34,32 @@ from mcp.server.auth.provider import AccessToken
 DELEGATION_HEADER = "x-opsbridge-delegation"
 DELEGATION_ISSUER = "opsbridge-backend"
 MAX_DELEGATION_SECONDS = 300
+# How far an issuer's clock may run ahead of this service's (sign-in allows the same). A
+# token used the moment it is issued can carry an issue time just after this clock's reading;
+# PyJWT allows no difference unless given `leeway`, which would also stretch expiry, so its
+# not-yet-valid checks are replaced by `check_issued` and expiry stays as issued.
+CLOCK_SKEW_SECONDS = 30
 
 
 class DelegationError(Exception):
     pass
+
+
+def check_issued(claims: dict[str, Any]) -> None:
+    """Refuse a token issued, or valid from, later than the allowed clock difference."""
+    limit = time.time() + CLOCK_SKEW_SECONDS
+    for name in ("iat", "nbf"):
+        if name not in claims:
+            continue
+        value = claims[name]
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, int | float)
+            or not math.isfinite(value)
+        ):
+            raise jwt.InvalidTokenError(f"{name} is not a time")
+        if value > limit:
+            raise jwt.ImmatureSignatureError(f"the token is not valid yet ({name})")
 
 
 def load_or_create_key(path: Path) -> Ed25519PrivateKey:
@@ -68,6 +93,8 @@ class Delegation:
     operation_id: uuid.UUID | None
     jti: str
     expires_at: int
+    # The executor's attempt a create belongs to; the casework tool admits it once.
+    attempt_id: uuid.UUID | None = None
 
 
 @dataclass
@@ -84,6 +111,7 @@ class DelegationSigner:
         case_id: uuid.UUID | None = None,
         run_id: uuid.UUID | None = None,
         operation_id: uuid.UUID | None = None,
+        attempt_id: uuid.UUID | None = None,
         ttl_seconds: int = 120,
     ) -> str:
         now = int(time.time())
@@ -98,33 +126,78 @@ class DelegationSigner:
             "exp": now + min(ttl_seconds, MAX_DELEGATION_SECONDS),
             "jti": uuid.uuid4().hex,
         }
-        for k, v in (("case_id", case_id), ("run_id", run_id), ("operation_id", operation_id)):
+        for k, v in (
+            ("case_id", case_id),
+            ("run_id", run_id),
+            ("operation_id", operation_id),
+            ("attempt_id", attempt_id),
+        ):
             if v is not None:
                 claims[k] = str(v)
-        return jwt.encode(claims, self.private_key, algorithm="EdDSA")
+        return jwt.encode(
+            claims,
+            self.private_key,
+            algorithm="EdDSA",
+            headers={"kid": key_id(self.public_key)},  # which key, while keys rotate
+        )
 
     @property
     def public_key(self) -> Ed25519PublicKey:
         return self.private_key.public_key()
 
 
+def key_id(public_key: Ed25519PublicKey) -> str:
+    """A stable name for a delegation key: the start of its public key's SHA-256."""
+    raw = public_key.public_bytes(serialization.Encoding.Raw, serialization.PublicFormat.Raw)
+    return hashlib.sha256(raw).hexdigest()[:16]
+
+
 @dataclass
 class DelegationVerifier:
-    public_key: Ed25519PublicKey
+    """Verifies delegations with PUBLIC keys only. Several keys are accepted while signing
+    keys rotate; a delegation names its key (`kid`), and one without a name is accepted only
+    when a single key is configured (signers from before key ids)."""
+
+    public_key: Ed25519PublicKey | Sequence[Ed25519PublicKey]
     audience: str
+
+    def _key_for(self, token: str) -> Ed25519PublicKey:
+        keys = (
+            [self.public_key]
+            if isinstance(self.public_key, Ed25519PublicKey)
+            else list(self.public_key)
+        )
+        by_id = {key_id(k): k for k in keys}
+        try:
+            kid = jwt.get_unverified_header(token).get("kid")
+        except jwt.PyJWTError as exc:
+            raise DelegationError(f"invalid delegation token: {type(exc).__name__}") from exc
+        if kid is None:
+            if len(keys) != 1:
+                raise DelegationError("delegation names no key, and several keys are accepted")
+            return keys[0]
+        if kid not in by_id:
+            raise DelegationError("unknown delegation key")
+        return by_id[kid]
 
     def verify(self, token: str | None) -> Delegation:
         if not token:
             raise DelegationError("missing delegation token")
+        key = self._key_for(token)
         try:
             c = jwt.decode(
                 token,
-                self.public_key,
+                key,
                 algorithms=["EdDSA"],
                 audience=self.audience,
                 issuer=DELEGATION_ISSUER,
-                options={"require": ["exp", "iat", "sub", "aud", "iss", "jti"]},
+                options={
+                    "require": ["exp", "iat", "sub", "aud", "iss", "jti"],
+                    "verify_iat": False,
+                    "verify_nbf": False,
+                },
             )
+            check_issued(c)
         except jwt.PyJWTError as exc:
             raise DelegationError(f"invalid delegation token: {type(exc).__name__}") from exc
         if c["exp"] - c["iat"] > MAX_DELEGATION_SECONDS:
@@ -140,6 +213,7 @@ class DelegationVerifier:
                 operation_id=uuid.UUID(c["operation_id"]) if c.get("operation_id") else None,
                 jti=c["jti"],
                 expires_at=int(c["exp"]),
+                attempt_id=uuid.UUID(c["attempt_id"]) if c.get("attempt_id") else None,
             )
         except (KeyError, ValueError) as exc:
             raise DelegationError("malformed delegation claims") from exc
@@ -173,8 +247,13 @@ class JwksTokenVerifier:
                 algorithms=["RS256", "ES256", "EdDSA"],
                 audience=self.audience,
                 issuer=self.issuer,
-                options={"require": ["exp", "iat", "iss", "aud"]},
+                options={
+                    "require": ["exp", "iat", "iss", "aud"],
+                    "verify_iat": False,
+                    "verify_nbf": False,
+                },
             )
+            check_issued(c)
         except (jwt.PyJWTError, OSError):
             return None
         client = c.get("azp") or c.get("client_id")

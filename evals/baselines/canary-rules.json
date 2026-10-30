@@ -601,7 +601,7 @@
    ]
   }
  },
- "rules_version": "opsbridge-rules/1.0.1",
+ "rules_version": "opsbridge-rules/1.2.0",
  "schema": "opsbridge-canary/1",
  "splits": [
   "dev",
