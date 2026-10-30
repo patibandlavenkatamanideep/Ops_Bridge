@@ -19,6 +19,7 @@ Nothing here has reached sandbox, staging or pilot.
 | Work branch | `feat/opsbridge-foundation` (PR #17's branch); new commits follow `732e84d` |
 | Baseline gates | `make verify` on the tree of `732e84d`: 15/15 stages (unit 381, integration 222, browser 31); `make verify-strict` fails only on the skipped OCR tests (Tesseract not installed locally; they run in CI and the image) |
 | Closure pass | From `70c2e43` (29 October 2026). `make verify` on the committed tree of `1235494`: 15/15 stages (unit 503, integration 259, browser 33, including both scoring-label tests), on a dev stack restarted on that code with the VM clock in sync. The replay check reproduces held-out 36/40 and security 7/7, both modes, under `investigation/1.1.0`. Hosted CI run 40982031258 green on `1235494` (all four jobs). Later commits change only this record, STATUS and the release workflow's index check (YAML parsed; no gate runs it) |
+| After the closure review | Local branch `feat/after-pr17` from `332c7d0` (30 October), not pushed while PR #17 is under review. `make verify` on the committed tree of `c521435`: 15/15 stages (unit 516, integration 260, browser 34). The replay check covers both frozen plans, and `eval-verify` checks all 34 ledger records. The VM clock was reset first, and the dev stack restarted on that code. Hosted CI runs once the branch is pushed |
 | Environment | macOS host; PostgreSQL 16, Keycloak, SeaweedFS in Podman; no cloud account; no real model or customer system contacted |
 | Review documents | supplied by the owner in the session; not committed (the repository is public) |
 
@@ -28,8 +29,8 @@ Nothing here has reached sandbox, staging or pilot.
 |---|---|---|---|---|---|
 | A01 | Malformed or empty invoice lines became a clean match, and the case could be resolved | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
-| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme; browser tests cover a scoring-1 run and scoring-2 rendering | 4 | See "Package 4, metrics" below | — |
-| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete) | 3 | See "Package 3, transport bounds" below | — |
+| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
+| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
@@ -156,9 +157,26 @@ only): no disagreement on any axis in any recorded split or mode (held-out 0/40,
 0/20, security 0/7, both modes), all complete. The metric was wrong, but it hid nothing in
 these results, because the rules and the mock model are deterministic.
 
-**Not done**: no `opsbridge-bench-v2` is frozen yet. A new benchmark should come with the
-independently labelled corpus of A10; freezing v2 on the public v1 cases would invite
-out-of-sample claims they cannot support.
+**Engineering re-run** (30 October, after the closure review): to bring the committed
+evidence in line with the current code, `opsbridge-bench-v1-rerun` re-runs the public v1
+cases under scoring 2 and `investigation/1.2.0` with the mock model. Held-out is 36/40 and
+the other splits are perfect in both modes, with no disagreement on any axis; the verdicts
+equal v1's (docs/evaluation-results.md).
+- **Labelled as regression evidence.** The plan carries a purpose, shown with every run, and
+  its own acceptance policy reports the held-out gate as not evaluated, because those cases
+  are not held out. Plans now name the policy they are judged by; v1 keeps its own, and
+  verifies and replays unchanged. A policy declared for another benchmark is refused.
+- **Covered in CI.** `eval-replay-check` replays every frozen plan, so `make verify` and CI
+  cover the re-run without changes.
+- **Browser coverage on a committed result.** The intercepted scoring-2 browser test is
+  replaced by tests on the re-run's real held-out record: per-axis disagreement, workflow,
+  purpose, and the gate not decided.
+- **Evidence.** `tests/evaluation/test_plan_acceptance.py` has 6 tests, all of which failed
+  before; `tests/integration/test_evaluation.py` has the re-run API test.
+
+**Not done**: no `opsbridge-bench-v2` is frozen. It should come with the independently
+labelled corpus of A10; freezing v2 on the public v1 cases would invite out-of-sample claims
+they cannot support.
 
 ## Package 2: one admission contract for the executor and Casework MCP (A05)
 
@@ -266,10 +284,31 @@ tracker and GitHub creates with each damage, a read-back and lookup, and a purch
 20 of the new tests failed before; the other three already passed (the empty 204, and creates
 whose body was cut mid-stream and so was not valid JSON either).
 
-**Not covered**: the MCP SDK's HTTP client and the Anthropic SDK read their own responses
-(not routed through this module); a response already held in memory (test transports only)
-is checked after the fact and decoded by httpx. Total source-collection time is bounded per
-request (pages × deadline), not as one budget.
+**Responses the SDKs read themselves** (30 October): the Anthropic SDK and the MCP client
+read through their own `httpx2` clients, out of this module's reach.
+- **Reproduced:** given a 64 MiB reply, the Anthropic SDK read all of it and handed it back as
+  text, and the adapter then failed with an `AttributeError` instead of falling back. The MCP
+  client read all 64 MiB of a JSON reply before failing to parse it.
+- **Fix** (`connectors/sdk_transport.py`): a transport under each client counts bytes as they
+  arrive and stops past the limit, refusing a declared oversize first. It turns the request's
+  read timeout into a total deadline for the whole response. It asks for unencoded replies
+  and refuses a compressed one, which the client above would inflate without a bound.
+  - **Limits:** 8 MiB per model reply, 1 MiB per MCP response.
+  - **Error contract:** errors subclass `httpx2`'s, so they reach the existing handling.
+    The adapter reports the model as unavailable or timed out, and the rules-only path takes
+    over; an MCP create stays ambiguous.
+  - **Non-message replies:** a 200 that is not a message is now "model unavailable".
+- **Evidence:** `tests/test_sdk_transport.py` has 7 tests. Both oversize cases read up to the
+  limit and no further. The adapter tests keep their assertions, and the 18 real-MCP
+  integration tests pass over the bound.
+- **SSE:** MCP's SSE streams are held to the same limits. Each call opens a session shorter
+  than its deadline, so that cuts nothing legitimate.
+- **Not covered:**
+  - the SDKs' streaming APIs (OpsBridge uses none);
+  - responses already held in memory (test transports only), which are checked after the
+    fact and decoded by httpx.
+
+  Total source-collection time is bounded per request (pages × deadline), not as one budget.
 
 **Intermittent timeout test, diagnosed** (closure pass): the test was
 `tests/contracts/test_github_connector.py::test_ambiguous_failures_never_claim_absence[timeout_after]`.
@@ -426,8 +465,8 @@ recorded v1 runs under 1.1.0. Evidence:
   above.
 - `tests/evaluation/test_comparability.py`: plan workflow versions.
 
-Not done: no benchmark has been recorded with 1.2.0; that comes with `opsbridge-bench-v2`
-(A10).
+Recorded since: `opsbridge-bench-v1-rerun` ran every split with 1.2.0 (Package 4, metrics).
+Its security recording's model requests name both reasons where v1's said "()".
 
 ## Package 8, governance and releases (A12)
 
@@ -562,12 +601,17 @@ fields, and a decision on how exports are delivered and kept.
    - release qualification corrected (A12);
    - both scoring schemes covered in the browser (A03).
 
+4. After the closure review (30 October; local branch `feat/after-pr17`, kept off PR #17
+   until it is merged):
+   - the engineering re-run `opsbridge-bench-v1-rerun` was recorded under scoring 2 and
+     `investigation/1.2.0` as regression evidence (A03, A13);
+   - replies read by the Anthropic and MCP SDKs are bounded (A04).
+
    Remaining limits:
-   - the release workflow has not run;
-   - scoring 2 is browser-tested on an intercepted response only;
-   - no benchmark is recorded with `investigation/1.2.0`;
-   - the MCP and Anthropic SDK clients still read their own responses.
-4. Needs the owner:
+   - the release workflow has not run, and can't pass until this code is on `main`;
+   - there is no held-out or out-of-sample result beyond v1;
+   - the SDKs' streaming APIs are unused and unbounded.
+5. Needs the owner:
    - merge PR #17 (A07), apply the `main` ruleset and push the first release tag (A12);
    - a purchasing system or export and authorization (A08);
    - a model budget, credential and independent labellers (A09, A10);
