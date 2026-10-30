@@ -1,9 +1,15 @@
-# OpsBridge release (production review A12). Prepared, not yet used: it runs only when the
-# owner pushes a version tag (v1.2.3) or starts it by hand. It publishes the exact image CI
-# qualified, never a fresh variant: it refuses a commit whose required CI checks did not all
-# succeed, builds from the locks, pushes to GitHub Container Registry, attaches an SBOM and a
-# build-provenance attestation, and verifies the attestation before finishing. Deployments
-# promote the digest it prints, not the tag. Actions are pinned to commits.
+# OpsBridge release (production review A12). Prepared, not yet used: it runs only for a
+# version tag (v1.2.3), pushed by the owner or re-run by hand on that tag. Before building, it
+# refuses a tag that disagrees with any version the packages declare, and a commit that no
+# successful CI run started by a push to main qualified: the run is looked up through the
+# Actions API by workflow file and commit and every required job is checked
+# (scripts/release_check.py), not inferred from check names. It builds the image once, from
+# the locks, and pushes it only under a candidate tag; qualifies that exact digest with the
+# checks of CI's image job (non-root, CLI, receipts, API health, SBOM, critical
+# vulnerabilities); attests its build provenance and verifies the attestation; and only then
+# gives the same digest the version tag, without rebuilding, refusing if the tag resolves to
+# anything else. Deployments promote the digest it prints, not the tag. Actions are pinned to
+# commits.
 name: release
 
 on:
@@ -23,69 +29,98 @@ env:
 
 jobs:
   release:
-    name: build, attest and verify the release image
+    name: qualify, attest and promote the release image
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
-      checks: read # to confirm CI qualified this commit
-      packages: write # push the image
+      actions: read # to find the CI run that qualified this commit
+      packages: write # push the candidate, then the version tag
       id-token: write # sign the provenance attestation
       attestations: write
     steps:
+      - name: Refuse anything but a version tag
+        run: |
+          if [ "${GITHUB_REF_TYPE}" != tag ]; then
+            echo "::error::a release is made from a version tag, not ${GITHUB_REF}"
+            exit 1
+          fi
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Refuse a tag that disagrees with the package versions
+        run: python3 scripts/release_check.py versions --tag "${GITHUB_REF_NAME}"
       - name: Refuse a commit CI did not qualify
         env:
           GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-        run: |
-          required=(
-            "lint, types, unit, canary, receipts, build"
-            "integration (PostgreSQL, Keycloak, MCP) and alert rules"
-            "browser tests against the dev stack"
-            "runtime image (build, smoke test, SBOM, vulnerability scan)"
-          )
-          runs=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/check-runs" --paginate \
-            --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')
-          for name in "${required[@]}"; do
-            if ! grep -qxF "${name}"$'\t'"success" <<<"${runs}"; then
-              echo "::error::CI check '${name}' did not succeed for ${SHA}; not releasing"
-              exit 1
-            fi
-          done
+        run: python3 scripts/release_check.py ci --sha "${GITHUB_SHA}" --repo "${GITHUB_REPOSITORY}"
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - name: Build from the locks and push
+      - name: Build once from the locks; push only as a candidate
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
           file: infra/containers/opsbridge.Dockerfile
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.ref_name }}
-          labels: org.opencontainers.image.revision=${{ github.sha }}
-      - name: Software bill of materials (SPDX)
+          provenance: mode=min
+          tags: ${{ env.IMAGE }}:candidate-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - name: Qualify the candidate digest (the checks of CI's image job)
+        env:
+          CANDIDATE: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+        run: |
+          docker pull "${CANDIDATE}"
+          test "$(docker run --rm "${CANDIDATE}" id -u)" = 10001
+          docker run --rm "${CANDIDATE}" python -m opsbridge.cli --help > /dev/null
+          docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify --summary-only
+          status=0; docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify || status=$?
+          test "$status" = 3
+          docker run -d --name api -p 127.0.0.1:8000:8000 \
+            -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" "${CANDIDATE}"
+          for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
+          docker logs api; exit 1
+      - name: Software bill of materials of the candidate (SPDX)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
           image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           artifact-name: opsbridge-${{ github.ref_name }}.spdx.json
-      - name: Attest build provenance
+      - name: Refuse the candidate if it has critical vulnerabilities with a fix
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          severity: CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+          format: table
+          trivyignores: .trivyignore.yaml
+      - name: Attest build provenance of the qualified digest
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
-      - name: Verify the attestation before calling it released
+      - name: Verify the attestation
         env:
           GH_TOKEN: ${{ github.token }}
           DIGEST: ${{ steps.build.outputs.digest }}
+        run: gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "${GITHUB_REPOSITORY}"
+      - name: Promote the qualified digest to the version tag (no rebuild)
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "${GITHUB_REPOSITORY}"
-          echo "Released ${IMAGE}@${DIGEST} from ${GITHUB_SHA}; promote this digest." >> "${GITHUB_STEP_SUMMARY}"
+          docker buildx imagetools create --tag "${IMAGE}:${GITHUB_REF_NAME}" "${IMAGE}@${DIGEST}"
+          promoted=$(docker buildx imagetools inspect "${IMAGE}:${GITHUB_REF_NAME}" \
+            --format '{{json .Manifest}}' | jq -r .digest)
+          if [ "${promoted}" != "${DIGEST}" ]; then
+            echo "::error::${GITHUB_REF_NAME} resolves to ${promoted}, not the qualified ${DIGEST}"
+            exit 1
+          fi
+          echo "Released ${IMAGE}@${DIGEST} (${GITHUB_REF_NAME}) from ${GITHUB_SHA}; promote this digest." >> "${GITHUB_STEP_SUMMARY}"
