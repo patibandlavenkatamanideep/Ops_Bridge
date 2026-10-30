@@ -29,17 +29,14 @@ def req(
     )
 
 
-def anthropic_factory(handler: Any) -> Any:
-    """Real SDK client whose transport is a local handler (the anthropic SDK uses httpx2)."""
+def anthropic_with(handler: Any) -> dict[str, Any]:
+    """A real SDK client at a test URL whose transport, under the adapter's response bound,
+    is a local handler (the anthropic SDK uses httpx2)."""
 
     def factory(**kwargs: Any) -> anthropic.Anthropic:
-        return anthropic.Anthropic(
-            base_url="http://anthropic.test",
-            http_client=httpx2.Client(transport=httpx2.MockTransport(handler)),
-            **kwargs,
-        )
+        return anthropic.Anthropic(base_url="http://anthropic.test", **kwargs)
 
-    return factory
+    return {"client_factory": factory, "transport": httpx2.MockTransport(handler)}
 
 
 def test_anthropic_request_uses_structured_output_and_maps_usage() -> None:
@@ -63,9 +60,7 @@ def test_anthropic_request_uses_structured_output_and_maps_usage() -> None:
             },
         )
 
-    adapter = AnthropicAdapter(
-        "claude-configured-test", "test-key", client_factory=anthropic_factory(handler)
-    )
+    adapter = AnthropicAdapter("claude-configured-test", "test-key", **anthropic_with(handler))
     resp = adapter.generate(req({"effort": "low"}))
     body = seen["body"]
     assert seen["url"].endswith("/v1/messages") and seen["auth"] == "Bearer test-key"
@@ -91,7 +86,7 @@ def test_anthropic_rejects_unsupported_sampling_parameters_without_calling() -> 
     adapter = AnthropicAdapter(
         "m",
         "k",
-        client_factory=anthropic_factory(lambda r: calls.append(r) or httpx2.Response(500)),
+        **anthropic_with(lambda r: calls.append(r) or httpx2.Response(500)),
     )
     with pytest.raises(UnsupportedParameter, match="temperature"):
         adapter.generate(req({"temperature": 0}))
@@ -102,7 +97,7 @@ def test_anthropic_errors_map_to_contract_categories() -> None:
     a = AnthropicAdapter(
         "m",
         "k",
-        client_factory=anthropic_factory(
+        **anthropic_with(
             lambda r: httpx2.Response(
                 529,
                 json={
@@ -117,7 +112,7 @@ def test_anthropic_errors_map_to_contract_categories() -> None:
     refusal = AnthropicAdapter(
         "m",
         "k",
-        client_factory=anthropic_factory(
+        **anthropic_with(
             lambda r: httpx2.Response(
                 200,
                 json={
