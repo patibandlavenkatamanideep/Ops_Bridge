@@ -34,6 +34,7 @@ interface RunSummary {
   acceptance: Gate[];
   receipts_verified: boolean;
   comparability?: Comparability;
+  purpose?: string | null;
 }
 interface PackCase {
   case_id: string;
@@ -93,6 +94,8 @@ interface RunDetail {
   verification: { ok: boolean; chain: string | null; signatures: string | null };
   comparability?: Comparability;
   scoring_scheme: string | null;
+  purpose?: string | null;
+  workflow_version?: string | null;
   not_evaluated: string[];
 }
 
@@ -154,6 +157,8 @@ function RunList({ tenant }: { tenant: string }) {
                     <Link to={`/t/${tenant}/evaluation/${r.benchmark_id}/${r.run_id}`}>
                       {when(r.run_id)} · {statusLabel(r.kind)}
                     </Link>
+                    <div className="small mono">{r.benchmark_id}</div>
+                    {r.purpose && <div className="small muted">{r.purpose}</div>}
                   </th>
                   <td>{statusLabel(r.split)}</td>
                   <td className="small">{rules ? pct(rules.next_action) : "—"}</td>
@@ -204,6 +209,12 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
       <dl className="facts">
         <dt>Benchmark</dt>
         <dd className="mono">{d.benchmark_id}</dd>
+        {d.purpose && (
+          <>
+            <dt>Purpose</dt>
+            <dd>{d.purpose}</dd>
+          </>
+        )}
         <dt>Frozen manifest</dt>
         <dd className="mono" title={d.manifest_sha256}>{d.manifest_sha256.slice(0, 19)}…</dd>
         <dt>Responses</dt>
@@ -212,6 +223,8 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
         <dd>{d.repeats} per case (verdicts aggregated by majority; repeats are not extra cases)</dd>
         <dt>Scoring</dt>
         <dd className="mono">{d.scoring_scheme ?? "unknown (not a scheme this code implements)"}</dd>
+        <dt>Workflow</dt>
+        <dd className="mono">{d.workflow_version ?? "unknown"}</dd>
         <dt>Network</dt>
         <dd>{d.network}</dd>
         <dt>Code</dt>
