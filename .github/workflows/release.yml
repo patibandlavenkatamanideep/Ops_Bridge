@@ -1,5 +1,6 @@
 # OpsBridge release (production review A12). Prepared, not yet used: it runs only for a
-# version tag (v1.2.3), pushed by the owner or re-run by hand on that tag. Before building, it
+# version tag (v1.2.3, or a pre-release such as v1.2.3-alpha.1, whose image is labelled
+# experimental), pushed by the owner or re-run by hand on that tag. Before building, it
 # refuses a tag that disagrees with any version the packages declare, and a commit that no
 # successful CI run started by a push to main qualified: the run is looked up through the
 # Actions API by workflow file and commit and every required job is checked
@@ -49,7 +50,10 @@ jobs:
         with:
           persist-credentials: false
       - name: Refuse a tag that disagrees with the package versions
-        run: python3 scripts/release_check.py versions --tag "${GITHUB_REF_NAME}"
+        id: tag
+        run: |
+          python3 scripts/release_check.py versions --tag "${GITHUB_REF_NAME}"
+          echo "description=$(python3 scripts/release_check.py describe --tag "${GITHUB_REF_NAME}")" >> "${GITHUB_OUTPUT}"
       - name: Refuse a commit CI did not qualify
         env:
           GH_TOKEN: ${{ github.token }}
@@ -72,6 +76,8 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ github.ref_name }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.description=${{ steps.tag.outputs.description }}
       - name: Qualify the candidate digest (the checks of CI's image job)
         env:
           CANDIDATE: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
@@ -115,6 +121,7 @@ jobs:
       - name: Promote the qualified digest to the version tag (no rebuild)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
+          DESCRIPTION: ${{ steps.tag.outputs.description }}
         run: |
           # imagetools keeps a single index as it is; a bare manifest would be wrapped in a new
           # index with another digest, so refuse before tagging rather than after.
@@ -131,3 +138,4 @@ jobs:
             exit 1
           fi
           echo "Released ${IMAGE}@${DIGEST} (${GITHUB_REF_NAME}) from ${GITHUB_SHA}; promote this digest." >> "${GITHUB_STEP_SUMMARY}"
+          echo "${DESCRIPTION}" >> "${GITHUB_STEP_SUMMARY}"
