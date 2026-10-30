@@ -92,6 +92,7 @@ interface RunDetail {
   acceptance: Gate[];
   verification: { ok: boolean; chain: string | null; signatures: string | null };
   comparability?: Comparability;
+  scoring_scheme: string | null;
   not_evaluated: string[];
 }
 
@@ -209,6 +210,8 @@ function RunView({ tenant, benchmark, runId }: { tenant: string; benchmark: stri
         <dd>{d.response_origin}</dd>
         <dt>Repeats</dt>
         <dd>{d.repeats} per case (verdicts aggregated by majority; repeats are not extra cases)</dd>
+        <dt>Scoring</dt>
+        <dd className="mono">{d.scoring_scheme ?? "unknown (not a scheme this code implements)"}</dd>
         <dt>Network</dt>
         <dd>{d.network}</dd>
         <dt>Code</dt>
