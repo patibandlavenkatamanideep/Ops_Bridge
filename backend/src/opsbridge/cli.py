@@ -689,6 +689,58 @@ def _verify_restore(args: argparse.Namespace) -> int:
     return 0 if report["ok"] else 1
 
 
+def _aware_time(value: str) -> Any:
+    from datetime import datetime
+
+    try:
+        t = datetime.fromisoformat(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"{value!r} is not an ISO 8601 time") from exc
+    if t.tzinfo is None:
+        raise argparse.ArgumentTypeError(f"{value!r} has no time zone")
+    return t
+
+
+def _pilot_report(args: argparse.Namespace) -> int:
+    import uuid
+    from datetime import UTC, datetime
+
+    from opsbridge.persistence.db import Database, make_engine
+    from opsbridge.pilot.collect import collect
+    from opsbridge.pilot.measures import report
+    from opsbridge.pilot.reference import ReferenceError, read_reference
+
+    as_of = args.as_of or datetime.now(UTC)
+    if not args.since < args.until <= as_of:
+        print("Refusing: the window must satisfy since < until <= as-of.")
+        return 2
+    try:
+        reference = read_reference(Path(args.reference))
+    except ReferenceError as exc:
+        print(f"Refusing: the reference file has {len(exc.problems)} problem(s):")
+        for problem in exc.problems:
+            print(f"  {problem}")
+        return 2
+    # The worker role reads every table of the tenant; the report's transaction is read-only.
+    db = Database(make_engine("worker", database=args.database))
+    try:
+        cases = collect(db, uuid.UUID(args.tenant_id), since=args.since, until=args.until)
+    finally:
+        db.engine.dispose()
+    result = report(cases, reference, since=args.since, until=args.until, as_of=as_of)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    scope, accuracy = result["scope"], result["accuracy"]["opsbridge"]
+    blind = accuracy["blind"]["next_action"]
+    print(
+        f"{result['protocol']}: {scope['opsbridge_cases']} OpsBridge and {scope['manual_cases']} "
+        f"manual cases ({len(scope['excluded'])} excluded); blind next action "
+        f"{blind['correct']}/{blind['n']}; wrote {out}"
+    )
+    return 0
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -892,6 +944,18 @@ def main(argv: list[str] | None = None) -> int:
     where.add_argument("--artifact-dir", help="restored local artifact directory (absolute)")
     where.add_argument("--artifact-bucket", help="restored S3 bucket (endpoint from settings)")
     p.set_defaults(func=_verify_restore)
+
+    p = sub.add_parser(
+        "pilot-report", help="pilot measures from the records and the reviewer's reference file"
+    )
+    p.add_argument("--tenant-id", required=True, help="the pilot tenant's id")
+    p.add_argument("--since", required=True, type=_aware_time, help="intake window start")
+    p.add_argument("--until", required=True, type=_aware_time, help="intake window end")
+    p.add_argument("--as-of", type=_aware_time, help="cut-off for decisions (default: now)")
+    p.add_argument("--reference", required=True, help="the reviewer's reference CSV")
+    p.add_argument("--out", required=True, help="where to write the report (JSON)")
+    p.add_argument("--database", help="database name (default: from settings)")
+    p.set_defaults(func=_pilot_report)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)
