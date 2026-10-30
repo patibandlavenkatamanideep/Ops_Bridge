@@ -64,7 +64,13 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 
-WORKFLOW_VERSION = "investigation/1.1.0"
+# The behaviour a run follows, recorded on the run when it is created. 1.2.0: an invoice that
+# could not be read is named with the reason stored on its document version, on every run.
+# 1.1.0 took the reason from the current read's problems only, so a repeated investigation of
+# unchanged bytes said "()"; it is kept to replay recordings made with it (opsbridge-bench-v1).
+WORKFLOW_VERSION = "investigation/1.2.0"
+LEGACY_WORKFLOW_VERSION = "investigation/1.1.0"
+WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, WORKFLOW_VERSION)
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -182,6 +188,13 @@ def run_investigation(
         run = s.get(WorkflowRun, run_id)
         if run is None:
             raise StepFailed("run not found in tenant", retryable=False)
+        if run.workflow_version not in WORKFLOW_VERSIONS:
+            # Created by a newer release: never run it as a version it was not created for.
+            raise StepFailed(
+                f"run is for {run.workflow_version}, which this worker does not implement",
+                retryable=True,
+            )
+        workflow_version = run.workflow_version
         if run.status == "completed":
             existing = s.execute(
                 select(InvestigationVersion.id).where(InvestigationVersion.run_id == run_id)
@@ -235,7 +248,7 @@ def run_investigation(
         3,
         "reconcile_records",
         {"policy": policy_out, "collected": collected},
-        lambda: _reconcile(deps, tenant_id, case_snapshot, policy_out, collected),
+        lambda: _reconcile(deps, tenant_id, case_snapshot, policy_out, collected, workflow_version),
     )
     agent = _agent_runtime(deps, tenant_id, run_id, policy_out)
     explained = _run_step(
@@ -568,6 +581,7 @@ def _reconcile(
     case: dict[str, Any],
     policy_out: dict[str, Any],
     collected: dict[str, Any],
+    workflow_version: str,
 ) -> dict[str, Any]:
     from opsbridge.services.freshness import capture
 
@@ -585,11 +599,16 @@ def _reconcile(
             hours = float(getattr(deps.settings, "source_max_age_hours", 24))
             until = datetime.fromisoformat(read_at) + timedelta(hours=hours)
             state = {**state, "source_read_at": read_at, "source_valid_until": until.isoformat()}
-        return {**_match(s, case, policy_out, collected), "evidence_state": state}
+        match = _match(s, case, policy_out, collected, workflow_version)
+        return {**match, "evidence_state": state}
 
 
 def _match(
-    s: Session, case: dict[str, Any], policy_out: dict[str, Any], collected: dict[str, Any]
+    s: Session,
+    case: dict[str, Any],
+    policy_out: dict[str, Any],
+    collected: dict[str, Any],
+    workflow_version: str,
 ) -> dict[str, Any]:
     findings: list[dict[str, Any]] = []
     uncertainty: list[str] = list(collected.get("problems", []))
@@ -711,17 +730,16 @@ def _match(
         # complete without them: a receipt without its return, an invoice without a line.
         if any(kind == "invoice" for kind, _t, _d in unread):
             reason = "invoice_extraction_needs_review"
-            # A collected invoice keeps the wording of the earlier check (recorded benchmark
-            # runs replay it byte for byte); an uploaded one names its own problem.
-            collected_now = any(
+            about = "; ".join(f"{t}: {d}" for k, t, d in unread if k == "invoice")
+            if workflow_version == LEGACY_WORKFLOW_VERSION and any(
                 d["record_type"] == "invoice" and d["parse_status"] != "parsed"
                 for d in collected.get("documents", [])
-            )
-            about = (
-                "; ".join(p for p in collected.get("problems", []) if p.startswith("invoice"))
-                if collected_now
-                else "; ".join(f"{t}: {d}" for k, t, d in unread if k == "invoice")
-            )
+            ):
+                # 1.1.0, replayed byte for byte: a collected invoice named only the problems
+                # of this run's read, none when its bytes were unchanged.
+                about = "; ".join(
+                    p for p in collected.get("problems", []) if p.startswith("invoice")
+                )
             summary = (
                 f"The invoice document could not be read reliably ({about[:400]}). Its values "
                 "were not used; a person must review or supply a structured copy."
