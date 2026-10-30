@@ -18,6 +18,7 @@ Nothing here has reached sandbox, staging or pilot.
 | Reviewed PR | #17, head `732e84d`, open; 78 files; hosted CI run 40528472529 green |
 | Work branch | `feat/opsbridge-foundation` (PR #17's branch); new commits follow `732e84d` |
 | Baseline gates | `make verify` on the tree of `732e84d`: 15/15 stages (unit 381, integration 222, browser 31); `make verify-strict` fails only on the skipped OCR tests (Tesseract not installed locally; they run in CI and the image) |
+| Closure pass | From `70c2e43` (29 October 2026). `make verify` on the committed tree of `1235494`: 15/15 stages (unit 503, integration 259, browser 33, including both scoring-label tests), on a dev stack restarted on that code with the VM clock in sync. The replay check reproduces held-out 36/40 and security 7/7, both modes, under `investigation/1.1.0`. Hosted CI run 40982031258 green on `1235494` (all four jobs). Later commits change only this record, STATUS and the release workflow's index check (YAML parsed; no gate runs it) |
 | Environment | macOS host; PostgreSQL 16, Keycloak, SeaweedFS in Podman; no cloud account; no real model or customer system contacted |
 | Review documents | supplied by the owner in the session; not committed (the repository is public) |
 
@@ -27,8 +28,8 @@ Nothing here has reached sandbox, staging or pilot.
 |---|---|---|---|---|---|
 | A01 | Malformed or empty invoice lines became a clean match, and the case could be resolved | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
-| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1) | 4 | See "Package 4, metrics" below | — |
-| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama) | 3 | See "Package 3, transport bounds" below | — |
+| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme; browser tests cover a scoring-1 run and scoring-2 rendering | 4 | See "Package 4, metrics" below | — |
+| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
@@ -36,8 +37,8 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (build from locks, SBOM, provenance attestation, verification, promote by digest) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag |
-| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed in part, verified locally: behavioural replay comparison; run order explained, declared and tested to fail closed. Its cause (a finding-text defect) is fixed with the next frozen benchmark | 4 | See "Package 4, behavioural replay" below | — |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag |
+| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned. Profile deletion, identity-provider disable propagation, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
@@ -140,6 +141,16 @@ incompleteness; the frozen v1 plan still verifies; `eval-rescore` reads a record
 without changing it. The existing comparability tests keep their assertions (only the way
 they simulate a changed grader moved to the scheme registry).
 
+**Browser coverage** (closure pass, 29 October): no browser test asserted either scheme's
+labels, and the first gate after A03 ran its browser stage against the stack started before
+it. The run page now names the scheme the API returns (it did not show it). In
+`e2e/phase7.spec.ts`: the committed held-out record shows `opsbridge-scoring/1` and, in both
+modes, its flip-rate figure with the note on what it measured; a scoring-2 run is covered for
+rendering only, because no scoring-2 result is committed: the test serves the real held-out
+response with its instability in the scoring-2 shape (`metrics.instability_2`) and checks
+per-axis disagreement and that the scoring-1 note is absent. Both passed in the browser stage of
+`make verify` at `1235494` (33 browser tests, against a dev stack restarted on that code).
+
 **Derived reading of the recorded v1 runs under scoring 2** (`opsbridge eval-rescore`, prints
 only): no disagreement on any axis in any recorded split or mode (held-out 0/40, validation
 0/20, security 0/7, both modes), all complete. The metric was wrong, but it hid nothing in
@@ -240,18 +251,73 @@ stopping early and reporting a stalled read as unavailable; three unreadable 201
 create classified as ambiguous. The connector cases failed before as described. The 36
 source-contract tests pass unchanged.
 
+**Compressed bodies** (closure pass): reproduced: a gzip or deflate body without its 4-byte
+trailer (the whole document decodes, the checksum never arrives), or with bytes or a second
+gzip member after its end, was accepted, and a damaged stream escaped as `zlib.error`
+outside the error contract. Six damaged 201 replies to a create were returned as tasks. Now
+a compressed body counts only if its stream reached its own end with nothing after it. A
+second member is refused: HTTP servers send one, and accepting more would let bytes after
+the checked end reach the parser. A response with no body bytes (204, 304) has no stream to
+check. Every failure is `CorruptEncoding`, an `httpx.DecodingError`, so a create stays
+ambiguous, a read-back or lookup is unavailable, and a purchasing read is unavailable
+(retryable; nothing is concluded about the record). `tests/test_http_transport.py` now has 36
+tests, 23 of them new: five kinds of damage in both encodings, an empty compressed 204,
+tracker and GitHub creates with each damage, a read-back and lookup, and a purchasing record.
+20 of the new tests failed before; the other three already passed (the empty 204, and creates
+whose body was cut mid-stream and so was not valid JSON either).
+
 **Not covered**: the MCP SDK's HTTP client and the Anthropic SDK read their own responses
 (not routed through this module); a response already held in memory (test transports only)
-is checked after the fact. Total source-collection time is bounded per request (pages ×
-deadline), not as one budget.
+is checked after the fact and decoded by httpx. Total source-collection time is bounded per
+request (pages × deadline), not as one budget.
 
-**Open observation**: `tests/contracts/test_github_connector.py::test_ambiguous_failures_never_claim_absence[timeout_after]`
-(a create whose reply comes after the client's timeout must be ambiguous) failed 3 times in
-73 whole-file runs with the bounded reader: once in a gate run during which the Mac slept,
-twice while the VM clock was being repaired. It never failed in 42 runs without it. Run
-directly, a timed-out create returned a task 1 time in 250 with the reader and 0 in 170
-without (fresh and long-running fake servers). The difference is not significant and no
-mechanism was found; it is recorded rather than dismissed. Watch for it in CI.
+**Intermittent timeout test, diagnosed** (closure pass): the test was
+`tests/contracts/test_github_connector.py::test_ambiguous_failures_never_claim_absence[timeout_after]`.
+It failed 3 times in 73 whole-file runs. Once was in a gate run during which the Mac slept;
+the other two were around the VM clock repairs, which followed the Mac sleeping. Every run
+was then traced, recording:
+- per create: elapsed time, configured deadline, outcome and exception chain;
+- per server request: arrival, fault queue before and after, issues created and response
+  time.
+
+No timing variation alone reproduced it:
+
+| Condition | Runs | Ended in `AmbiguousFailure(ReadTimeout)` | Client elapsed |
+|---|---|---|---|
+| Idle | 100 | 100 | 1.001–1.003 s |
+| Full CPU load (20 busy processes, 10 cores) | 60 | 60 | 1.001–1.003 s |
+| Process frozen (SIGSTOP) for 4.5 s across both deadlines | 30 | 30 | 4.6–5.4 s |
+
+A timer armed late in a stalled uvloop iteration still waited its full 3 s.
+
+**Cause**: the fake delayed its reply with a 3 s timer on uvicorn's event loop, uvloop. On
+macOS uvloop's clock is `CLOCK_MONOTONIC`, which counts the time the host slept; on this Mac
+it ran 730,000 s ahead of `time.monotonic()`. The client's 1 s deadline and its socket timeouts
+run on `mach_absolute_time`, which does not count sleep. When the host slept during the delay,
+the reply arrived within the deadline by the client's clock, and the connector returned the
+issue the fake had really created. The logged failure fits: the fake held issue 1, and the run
+was about 2 s shorter, with no 3 s handler left to wait for. Moving only the server's clock
+forward 5 s reproduced it deterministically: 5 of 5 creates returned the issue after
+0.11–0.13 s.
+
+**Contract**: not violated. The connector received a genuine 201, within its own deadline,
+for an issue that exists, and returned it; it never claimed absence or invented a task. The
+test assumed 3 s on the server's clock is later than 1 s on the client's, and a host sleep
+breaks that.
+
+**Fix** (test fixtures and the simulator only; the invariant is unchanged and the test is
+stricter):
+- The fake commits the issue and holds the reply until the test is done.
+- The test also asserts the remote effect (the issue exists after `500_after` and
+  `timeout_after`, not after `503_before`) and that the cause is a timeout.
+- `test_a_late_reply_stays_late_when_the_server_clock_jumps` failed against the old fake
+  (`DID NOT RAISE`) and passes now.
+- The simulator's `timeout_after_commit` and `delay` faults had the same dependence (a 3 s
+  delay against the integration stack's 2 s deadline). They now wait by `time.monotonic()`;
+  `tests/contracts/test_simulator_faults.py` has 2 tests, both failed before.
+
+With the fixed fake, all 40 traced whole-file runs passed. On Linux (CI and the image) both
+clocks exclude suspend.
 
 ## Package 3, keys and credentials (A06)
 
@@ -325,17 +391,43 @@ were only the explanation's provider label (`model:mock` recorded, `model:replay
 which is provenance and is now compared as model versus template.
 
 **Run order**: replaying the frozen security recording's mock trials alone diverges at
-`fur-security-304` and fails closed; in reversed order all seven cases fail. Cause: read
-problems are listed only on a document's first ingestion in a run, so the invoice-extraction
-finding, and the model request built from it, depend on which trial investigated first. This
-is also a product defect (a re-investigation loses the reason an invoice could not be read),
-listed in docs/STATUS.md. Fixing it changes the recorded requests, so it is planned with the
-next frozen benchmark; the frozen order is declared, and
+`fur-security-304` and fails closed; in reversed order all seven cases fail. Cause: the
+workflow the v1 runs were recorded with, `investigation/1.1.0`, named only the problems found
+by the current run's read, so the invoice-extraction finding, and the model request built
+from it, depended on which trial investigated first. The v1 recordings are replayed with
+that workflow (the frozen plan names none, which means 1.1.0) in their declared order;
 `tests/integration/test_replay_mode_order.py` checks that the frozen order reproduces and
 other orders fail closed rather than differ quietly. Three validation cases recorded fresh
 replay in any order (no such document among them).
 
 **Evidence**: `tests/evaluation/test_reproduce.py` (3 new), `test_replay_mode_order.py` (3).
+
+**The finding-text defect, fixed as a workflow version** (closure pass): under 1.1.0,
+`fur-security-304` (a line amount that disagrees with quantity × price, found when the record
+was mapped) named its reason on the case's first investigation only, and `fur-security-303` (an
+image-only invoice, found by the parser) never: "could not be read reliably ()". The earlier
+STATUS entry described only the first. `investigation/1.2.0` names the reason stored with the
+document's newest version on every run ("invoice INV-9303: no extractable text layer (likely
+a scanned image); OCR is not enabled"). The version is explicit at each level:
+- each run records the workflow it follows (`workflow_runs.workflow_version`, returned by the
+  API) and runs that behaviour; a run for a version the worker does not implement is refused,
+  retryably;
+- a frozen plan records the version its trials run (`workflow_version`; v1 has none, which
+  means 1.1.0), and `verify` refuses a version this code does not implement;
+- benchmark recording and replay use the plan's version, and new results record it.
+
+No recording, cassette or result changed; the replay stage of the gate reproduces the
+recorded v1 runs under 1.1.0. Evidence:
+- `test_reinvestigation_reason.py`: through the API, two investigations of the same
+  unreadable invoice give the same finding, naming the stored reason; failed before.
+- `test_reinvestigation_regression_cases.py`: regression evidence on the public v1 security
+  cases 303 and 304, not a measurement (not recorded, not scored). Under 1.2.0 every
+  investigation names the reason in either mode order; under 1.1.0 the historical behaviour
+  above.
+- `tests/evaluation/test_comparability.py`: plan workflow versions.
+
+Not done: no benchmark has been recorded with 1.2.0; that comes with `opsbridge-bench-v2`
+(A10).
 
 ## Package 8, governance and releases (A12)
 
@@ -345,13 +437,43 @@ replay in any order (no such document among them).
   bypass only through a pull request (break-glass). Required approvals 0 while there is one
   maintainer. The check names were matched against the CI job names. The apply command is in
   docs/deployment.md.
-- `.github/workflows/release.yml`: on a version tag it refuses a commit whose required CI
-  checks did not all succeed, builds from the locks, pushes to GHCR, attaches an SPDX SBOM and
-  a build-provenance attestation, verifies the attestation, and reports the digest to
-  promote. Actions pinned to commits of releases at least two weeks old.
+- `.github/workflows/release.yml`, corrected in the closure pass. Before, it checked CI
+  check runs by name only (any app or workflow can create one with any name), then built a
+  fresh image, so what it published was never an image anything had tested. CI publishes
+  nothing and also runs on pull requests, so it has no digest to promote; the release
+  qualifies the exact image it publishes instead:
+  - it runs for a version tag only;
+  - it refuses a tag that disagrees with any declared version (`pyproject.toml`,
+    `opsbridge.__version__`, `uv.lock`, `package.json`, `package-lock.json`);
+  - it refuses a commit unless a successful run of this repository's `ci.yml`, started by a
+    push to `main`, qualified it with every required job succeeding. The run is looked up
+    through the Actions API by workflow file, event, branch, repository and commit
+    (`scripts/release_check.py`);
+  - it builds once from the locks and pushes only a candidate tag;
+  - it runs CI's image checks on that digest: non-root, CLI, `eval-verify` summary and
+    partial exit, API health, SBOM, and fixable critical vulnerabilities;
+  - it attests and verifies the digest;
+  - only then does it give the same digest the version tag, without rebuilding, refusing if
+    the tag resolves to anything else.
 
-**Evidence**: YAML and JSON parse; the required-check names match CI. The workflow has not
-run (no tag), so its first use is its first test, and no attestation exists yet.
+  Actions are pinned to commits of releases at least two weeks old.
+
+**Evidence**: `tests/test_release_check.py` has 14 tests, covering:
+- a qualifying run;
+- refused look-alikes: another commit, a pull-request event, another branch, a workflow file
+  with the same job names, a fork, another repository, a failed or unfinished run;
+- a failed, missing or other-run job;
+- malformed and mismatched tags;
+- every version declaration read, and one left behind by a bump caught;
+- job names that match `ci.yml`.
+
+Run read-only against this repository, `main`'s head `468dae7` qualifies and the PR head,
+never pushed to `main`, is refused. The five declarations agree on 0.1.0. The ruleset's check
+names match CI. The workflow has not run (no tag), so its first use is its first test, and no
+attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
+single image index as it is. The step therefore refuses, before tagging, a candidate that is
+not an index; the build's provenance attestation makes it one. It checks again after tagging
+that the tag resolves to the qualified digest. The candidate tag stays in the registry.
 
 **Not done**: a staging deployment that promotes the attested digest, rollback rehearsal, and
 a vulnerability policy beyond "fixable critical" (the CI image job's current gate).
@@ -426,12 +548,26 @@ fields, and a decision on how exports are delivered and kept.
 ## Work plan
 
 1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
-   A03, A04, A05, A17; in part A06 (public-only verifiers, registered credentials), A13
-   (behavioural replay, run-order factor), A15 (collection budget), A16 (session pruning);
-   prepared for the owner A12 (ruleset, release workflow).
+   A03, A04, A05, A13, A17; in part A06 (public-only verifiers, registered credentials), A15
+   (collection budget), A16 (session pruning); prepared for the owner A12 (ruleset, release
+   workflow).
 2. Done locally since: A08's first step without access, an export-file source held to the
    `purchasing-source/1` contract with hand-written fixtures (not proof of any real system).
-3. Needs the owner:
+3. Closure pass (29 October), from `70c2e43`:
+   - compressed replies count only when complete (A04);
+   - the intermittent GitHub timeout test was diagnosed (a fixture timed on another clock,
+     not a connector defect) and its fixtures fixed;
+   - the finding-text defect is fixed as `investigation/1.2.0`, with v1 replayed under 1.1.0
+     (A13);
+   - release qualification corrected (A12);
+   - both scoring schemes covered in the browser (A03).
+
+   Remaining limits:
+   - the release workflow has not run;
+   - scoring 2 is browser-tested on an intercepted response only;
+   - no benchmark is recorded with `investigation/1.2.0`;
+   - the MCP and Anthropic SDK clients still read their own responses.
+4. Needs the owner:
    - merge PR #17 (A07), apply the `main` ruleset and push the first release tag (A12);
    - a purchasing system or export and authorization (A08);
    - a model budget, credential and independent labellers (A09, A10);
