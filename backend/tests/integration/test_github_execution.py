@@ -38,6 +38,7 @@ def github(stack) -> Iterator[tuple[FakeGitHub, Any]]:  # type: ignore[no-untype
             yield fake, stack
         finally:
             stack["exec"]["exec"] = original
+            fake.release_held_replies.set()  # before the server stops: it waits for them
 
 
 def test_issue_created_and_read_back(github) -> None:  # type: ignore[no-untyped-def]
