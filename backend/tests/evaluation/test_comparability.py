@@ -8,9 +8,11 @@ from pathlib import Path
 
 import pytest
 
+from opsbridge.canonical import digest
 from opsbridge.config import REPO_ROOT
 from opsbridge.evaluation import manifest
 from opsbridge.services import evaluations
+from opsbridge.workflow.investigation import WORKFLOW_VERSION
 
 PLAN = REPO_ROOT / "evals" / "manifests" / "opsbridge-bench-v1.json"
 
@@ -45,3 +47,18 @@ def test_runs_from_another_plan_or_grader_are_flagged(
     monkeypatch.setitem(manifest.SCHEMES, "opsbridge-scoring/1", changed)
     grader = evaluations._comparability(tmp_path, run)
     assert not grader["comparable"] and "scoring definitions differ" in grader["reasons"][0]
+
+
+def test_a_plan_runs_the_investigation_workflow_it_was_frozen_with() -> None:
+    # v1 was frozen before plans named a workflow; its recordings were made with 1.1.0.
+    frozen = manifest.load(PLAN)
+    assert "workflow_version" not in frozen
+    assert manifest.workflow_version_of(frozen) == "investigation/1.1.0"
+    fresh = manifest.freeze(REPO_ROOT, "opsbridge-bench-test", modes=["rules_only"], repeats=1)
+    assert manifest.workflow_version_of(fresh) == WORKFLOW_VERSION == "investigation/1.2.0"
+    assert manifest.verify(fresh, REPO_ROOT) == []
+    unknown = {k: v for k, v in fresh.items() if k != "manifest_sha256"}
+    unknown["workflow_version"] = "investigation/9.0.0"
+    unknown["manifest_sha256"] = digest(unknown)
+    [problem] = manifest.verify(unknown, REPO_ROOT)
+    assert "investigation/9.0.0" in problem and "cannot be replayed" in problem
