@@ -49,6 +49,16 @@ def org_key(master: str, org: str) -> str:
     return hmac.new(master.encode(), f"opsbridge-sim:{org}".encode(), hashlib.sha256).hexdigest()
 
 
+async def _wait(seconds: float) -> None:
+    """Waits `seconds` by `time.monotonic()`, the clock clients time their deadlines with.
+    The event loop's timer alone is not that clock: uvicorn runs uvloop, whose clock on macOS
+    counts time the host slept, so a fault meant to answer after a client's deadline answered
+    before it after a host sleep."""
+    until = time.monotonic() + seconds
+    while (left := until - time.monotonic()) > 0:
+        await asyncio.sleep(min(left, 0.05))
+
+
 class TaskIn(BaseModel):
     title: str = Field(min_length=1, max_length=300)
     body: str = Field(default="", max_length=20_000)
@@ -109,7 +119,7 @@ def create_simulator(
         if fault is None:
             return None
         if fault.mode == "delay":
-            await asyncio.sleep(fault.delay_ms / 1000)
+            await _wait(fault.delay_ms / 1000)
             return None
         return fault.mode
 
@@ -157,7 +167,7 @@ def create_simulator(
             return JSONResponse({"error": "internal"}, status_code=500)
         if mode == "timeout_after_commit":
             store.log(org, "tasks.create", "timeout_after_commit")
-            await asyncio.sleep(slow_response_seconds)
+            await _wait(slow_response_seconds)
         else:
             store.log(org, "tasks.create", "created" if created else "idempotent_replay")
         return JSONResponse(task, status_code=201 if created else 200)
