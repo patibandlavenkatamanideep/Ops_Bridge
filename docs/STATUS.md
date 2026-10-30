@@ -405,10 +405,12 @@ blockers in `docs/production-readiness.md`):
 2. Done locally since: an export-file source held to `purchasing-source/1` with
    hand-written fixtures (A08's first step; proves no real system); the closure pass of
    2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
-   (dated entries below; on the local branch `feat/after-pr17` until PR #17 is merged).
-   Next: whatever the owner's answers below unblock.
-3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
-   (A12); a purchasing system or export with access (A08); a model budget and independent
+   (dated entries below). PR #17 was merged on 2026-10-30; the later work, including
+   experimental pre-release support, is PR #20. Next: whatever the owner's answers below
+   unblock.
+3. Needs the owner: merge PR #20; apply the `main` ruleset and push `v0.1.0-alpha.1` on the
+   merge commit once its CI run on `main` passes (A12); a purchasing system or export with
+   access (A08); a model budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
    policy (A16).
 
@@ -1132,8 +1134,9 @@ staging, pilot owner).
 ### After the closure review (2026-10-30, production review A03, A04, A13)
 - The review of `332c7d0` recommended merging PR #17, then (among owner steps) an offline
   scoring-2 benchmark with `investigation/1.2.0` and bounds on the SDK response paths. This
-  batch stays on the local branch `feat/after-pr17` so #17 keeps its reviewed head; it goes
-  to a new PR once #17 is merged.
+  batch was kept on a local branch so #17 kept its reviewed head. After the owner merged #17
+  (`4d2f1f6`), it was merged into `feat/opsbridge-foundation`, not rebased, so the re-run's
+  recorded code commit `d2f2c73` stays in history, and opened as PR #20.
 - Engineering re-run `opsbridge-bench-v1-rerun` (framing chosen by the owner): the public v1
   cases under scoring 2 and `investigation/1.2.0`, with the mock model, labelled as
   regression evidence. Its own acceptance policy reports the held-out gate as not evaluated.
@@ -1150,3 +1153,16 @@ staging, pilot owner).
 - Environment: the Mac was swapping heavily (8.5 of 9.2 GB swap, 5.2 GB disk free), which
   slowed every run; the Podman VM clock stalled twice more while the Mac slept and was reset
   from the host before each integration run.
+
+### Experimental release prepared (2026-10-30, production review A12, closure review step 3)
+- CI on `main`'s merge commit `4d2f1f6` passed all four jobs (run 41085903247), and
+  `release_check.py ci` accepts that commit. No ruleset is applied yet.
+- The review asked for an explicitly experimental first release, but the workflow accepted
+  only `vMAJOR.MINOR.PATCH`. It now accepts `vX.Y.Z-alpha.N`, `-beta.N` and `-rc.N`: npm
+  declares the tag's spelling, Python the PEP 440 one. A pre-release image's OCI description,
+  repeated in the run summary, says it is experimental and not qualified for production use.
+  The packages declare `0.1.0a1` / `0.1.0-alpha.1` (0.1.0 was never tagged). Tests:
+  `test_release_check.py` (17; 3 new, 1 extended). docs/deployment.md gives the tag command
+  and the checks of the published digest, attestation and runtime.
+- Not done: no tag pushed and nothing published. That needs the owner's authorization, and
+  the tagged commit must be on `main` with a passing CI run.
