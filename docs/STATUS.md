@@ -404,7 +404,9 @@ blockers in `docs/production-readiness.md`):
    (session pruning); prepared A12 (ruleset, release workflow).
 2. Done locally since: an export-file source held to `purchasing-source/1` with
    hand-written fixtures (A08's first step; proves no real system); the closure pass of
-   2026-10-29 (dated entry below). Next: whatever the owner's answers below unblock.
+   2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
+   (dated entries below; on the local branch `feat/after-pr17` until PR #17 is merged).
+   Next: whatever the owner's answers below unblock.
 3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
    (A12); a purchasing system or export with access (A08); a model budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1126,3 +1128,25 @@ staging, pilot owner).
   the candidate digest it built and promotes that digest without rebuilding. Not run (no tag).
 - Run pages name their scoring scheme; browser tests cover a scoring-1 run and scoring-2
   rendering (the latter on an intercepted response: no scoring-2 result exists).
+
+### After the closure review (2026-10-30, production review A03, A04, A13)
+- The review of `332c7d0` recommended merging PR #17, then (among owner steps) an offline
+  scoring-2 benchmark with `investigation/1.2.0` and bounds on the SDK response paths. This
+  batch stays on the local branch `feat/after-pr17` so #17 keeps its reviewed head; it goes
+  to a new PR once #17 is merged.
+- Engineering re-run `opsbridge-bench-v1-rerun` (framing chosen by the owner): the public v1
+  cases under scoring 2 and `investigation/1.2.0`, with the mock model, labelled as
+  regression evidence. Its own acceptance policy reports the held-out gate as not evaluated.
+  Held-out 36/40 and the other splits perfect in both modes, no disagreement on any axis;
+  eight ledger records; v1 untouched. Plans now name their acceptance policy and purpose;
+  `eval-replay-check` replays every plan. Tests: `test_plan_acceptance.py` (6),
+  `test_evaluation.py`, and browser tests on the re-run's held-out record.
+- SDK responses: the Anthropic SDK and the MCP client read replies through their own
+  `httpx2` clients, unbounded (64 MiB read in full by each). `connectors/sdk_transport.py`
+  bounds them under those clients: 8 MiB per model reply, 1 MiB per MCP response, the
+  request timeout as a total deadline, unencoded replies only. A non-message 200 from the
+  model is now "model unavailable" instead of an AttributeError. Tests: `test_sdk_transport.py`
+  (7); the 18 real-MCP integration tests pass over the bound.
+- Environment: the Mac was swapping heavily (8.5 of 9.2 GB swap, 5.2 GB disk free), which
+  slowed every run; the Podman VM clock stalled twice more while the Mac slept and was reset
+  from the host before each integration run.
