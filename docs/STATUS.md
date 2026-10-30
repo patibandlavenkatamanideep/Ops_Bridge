@@ -410,7 +410,8 @@ blockers in `docs/production-readiness.md`):
    unblock.
 3. Needs the owner: merge PR #20; apply the `main` ruleset and push `v0.1.0-alpha.1` on the
    merge commit once its CI run on `main` passes (A12); a purchasing system or export with
-   access (A08); a model budget and independent
+   access, and an AP or procurement reviewer for the single-source pilot (A08); a model
+   budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
    policy (A16).
 
@@ -1166,3 +1167,22 @@ staging, pilot owner).
   and the checks of the published digest, attestation and runtime.
 - Not done: no tag pushed and nothing published. That needs the owner's authorization, and
   the tagged commit must be on `main` with a passing CI run.
+- PR #20's CI passed all four jobs at `d277433` (run 41087245509).
+
+### Pilot measurement prepared (2026-10-30, production review A08, A14, closure review step 5)
+- The review's step 5 is one pilot on a real purchasing source: an authorized sanitized
+  export and one AP or procurement reviewer, measuring extraction completeness, investigation
+  accuracy, approval corrections and time to resolution against the manual process. Nothing
+  defined or computed those measures, or recorded the reviewer's decisions, so they are now
+  fixed before any data: protocol `opsbridge-pilot/1` in docs/pilot-plan.md.
+- `opsbridge pilot-report` reads one tenant's cases from a window in a read-only transaction
+  under its row-level security, plus the reviewer's reference CSV (read strictly, every
+  problem listed by line). It writes the four measures as JSON:
+  - failures stay in the denominators;
+  - blind decisions (recorded before intake) are reported apart from later ones;
+  - approvals are compared with the investigation's draft;
+  - open cases are counted in the times.
+- Investigations are read as verdicts by one function shared with the benchmark
+  (`evaluation/verdict.py`). `make eval-replay-check` still reproduces both plans case by case.
+- Tests: `tests/pilot/` (19) and `tests/integration/test_pilot_report.py` (2, real cases
+  worked through the API). No pilot has run: there is no export, reviewer or authorization.
