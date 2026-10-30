@@ -35,7 +35,7 @@ from opsbridge.services.cases import CaseCreate, create_case
 from opsbridge.services.investigations import latest_investigation, start_investigation
 from opsbridge.simulator.app import create_simulator
 from opsbridge.simulator.scenarios import Corpus, Scenario, seed_simulator
-from opsbridge.workflow.investigation import run_investigation
+from opsbridge.workflow.investigation import WORKFLOW_VERSION, run_investigation
 from opsbridge.workflow.jobs import ClaimedJob
 from opsbridge.workflow.worker import Worker, build_investigation_deps
 
@@ -104,15 +104,25 @@ def _truncate(engine: Any) -> None:
 
 
 class BenchEnvironment:
-    """One isolated benchmark environment (simulator + eval database + worker)."""
+    """One isolated benchmark environment (simulator + eval database + worker).
+
+    Every trial runs the investigation workflow `workflow_version`: a frozen plan's own (see
+    manifest.workflow_version_of), so recordings replay with the behaviour that made them."""
 
     def __init__(
-        self, settings: Settings, corpus: Corpus, workdir: Path, model_adapter: ModelAdapter | None
+        self,
+        settings: Settings,
+        corpus: Corpus,
+        workdir: Path,
+        model_adapter: ModelAdapter | None,
+        *,
+        workflow_version: str = WORKFLOW_VERSION,
     ) -> None:
         self.base_settings = settings
         self.corpus = corpus
         self.workdir = workdir
         self.model_adapter = model_adapter
+        self.workflow_version = workflow_version
         self.cases: dict[str, uuid.UUID] = {}
         self._stack = ExitStack()
 
@@ -218,6 +228,7 @@ class BenchEnvironment:
                 mode,
                 correlation_id=None,
                 enforce_quota=self.settings.quotas_enabled,
+                workflow_version=self.workflow_version,
             )
             while self.worker.run_once():
                 if len(getattr(adapter, "failures", [])) > failures_before:
@@ -305,7 +316,14 @@ def behaviour_digest(items: list[dict[str, Any]]) -> str:
 
 @contextmanager
 def environment(
-    settings: Settings, corpus: Corpus, workdir: Path, model_adapter: ModelAdapter | None
+    settings: Settings,
+    corpus: Corpus,
+    workdir: Path,
+    model_adapter: ModelAdapter | None,
+    *,
+    workflow_version: str = WORKFLOW_VERSION,
 ) -> Iterator[BenchEnvironment]:
-    with BenchEnvironment(settings, corpus, workdir, model_adapter) as env:
+    with BenchEnvironment(
+        settings, corpus, workdir, model_adapter, workflow_version=workflow_version
+    ) as env:
         yield env
