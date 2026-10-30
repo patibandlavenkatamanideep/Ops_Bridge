@@ -1,9 +1,17 @@
-"""GitHub Issues connector against an independent fake of the documented API (no network)."""
+"""GitHub Issues connector against an independent fake of the documented API (no network).
+
+The fake's `timeout_after` reply is held until the test is done, not delayed by a timer: a
+timer in the server and the client's deadline ran on different clocks (on macOS uvloop's
+counts time the host slept, Python's monotonic clock does not), so a host that slept during
+the delay received the "late" reply within the deadline and the create returned the issue.
+That was the intermittent failure of the timeout test; the connector was right both times.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 
+import httpx
 import pytest
 
 from opsbridge.connectors.github import ConnectorNotAuthorized, GitHubIssuesConnector
@@ -11,6 +19,7 @@ from opsbridge.connectors.tasks import AmbiguousFailure, DefiniteFailure, TaskRe
 
 from ..integration.servers import serve
 from .fake_github import FakeGitHub
+from .jumping_clock import serve_jumping
 
 REPO = "opsbridge-sandbox/followups"
 
@@ -19,7 +28,10 @@ REPO = "opsbridge-sandbox/followups"
 def gh() -> Iterator[tuple[FakeGitHub, str]]:
     fake = FakeGitHub(repo=REPO)
     with serve(fake.app(), health_path="/docs") as base:
-        yield fake, base
+        try:
+            yield fake, base
+        finally:
+            fake.release_held_replies.set()  # before the server stops: it waits for them
 
 
 def conn(
@@ -69,8 +81,26 @@ def test_definite_failures(gh, fault: str, retryable: bool) -> None:  # type: ig
 def test_ambiguous_failures_never_claim_absence(gh, fault: str) -> None:  # type: ignore[no-untyped-def]
     fake, base = gh
     fake.faults.append(fault)
-    with pytest.raises(AmbiguousFailure):
+    with pytest.raises(AmbiguousFailure) as exc:
         conn(base).create(REQ, None, 1.0)
+    # Ambiguous whether or not the issue exists: it does after 500_after and timeout_after.
+    assert len(fake.issues) == (0 if fault == "503_before" else 1)
+    if fault == "timeout_after":
+        assert isinstance(exc.value.__cause__, httpx.TimeoutException)
+
+
+def test_a_late_reply_stays_late_when_the_server_clock_jumps() -> None:
+    fake = FakeGitHub(repo=REPO)
+    with serve_jumping(fake.app()) as (base, loop):
+        try:
+            fake.faults.append("timeout_after")
+            loop.jump_after(0.1, 5.0)  # the host sleeps: 5 s pass for the server, none here
+            with pytest.raises(AmbiguousFailure) as exc:
+                conn(base).create(REQ, None, 1.0)
+            assert isinstance(exc.value.__cause__, httpx.TimeoutException)
+            assert len(fake.issues) == 1
+        finally:
+            fake.release_held_replies.set()
 
 
 def test_bad_credentials_are_definite(gh) -> None:  # type: ignore[no-untyped-def]
