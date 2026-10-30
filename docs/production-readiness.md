@@ -33,8 +33,8 @@ Nothing here has reached sandbox, staging or pilot.
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
-| A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only) | 5 | See "Package 5, export source" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`) | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
@@ -601,6 +601,49 @@ makes both fail.
 from a real export; a real one needs its own sanitized fixtures, a pack mapping for its
 fields, and a decision on how exports are delivered and kept.
 
+## Package 5, pilot measurement (A08, A14; prepared, no pilot run)
+
+**Why.** The closure review's step 5 is one pilot on a real purchasing source, with an
+authorized sanitized export and one AP or procurement reviewer. It measures extraction
+completeness, investigation accuracy, approval corrections and time to resolution against
+the existing manual process. OpsBridge recorded the facts those measures need, but nothing
+defined or computed them. Nothing recorded the reviewer's independent decision or the manual
+process's timings either. Defining a measure after the data arrives would invite choosing
+the one that looks best, so the definitions and the report come first.
+
+**Added.**
+- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"):
+  - sample fixed in advance, with arms alternating in blocked order;
+  - the reviewer's decision recorded before intake, which is the only blind case;
+  - the reference file's columns;
+  - the four measures, with failures in their denominators;
+  - the limits.
+- `opsbridge/pilot/reference.py`: the reference file, read strictly. Every problem is
+  reported with its line, and OpsBridge's own decisions and times can't be entered by hand.
+- `opsbridge/pilot/measures.py`: the four measures.
+  - Blind and not-blind accuracy are reported apart.
+  - A referenced case that was never investigated counts as wrong.
+  - Approval corrections compare what was approved with the investigation's draft.
+  - Open cases are counted in the times.
+- `opsbridge/pilot/collect.py` and `opsbridge pilot-report`: one tenant's cases opened in a
+  window, read under its row-level security in a read-only transaction.
+- `opsbridge/evaluation/verdict.py`: an investigation is read as a verdict by the same
+  function the benchmark scores with. Both frozen plans still replay case by case.
+
+**Evidence.**
+- `tests/pilot/test_reference.py` (14): strict reading, line-numbered problems, manual
+  timings in order.
+- `tests/pilot/test_measures.py` (5): each measure on hand-written facts whose counts can be
+  checked by reading them.
+- `tests/integration/test_pilot_report.py` (2): cases worked through the API (approved as
+  drafted, edited then approved, resolved, rejected and excluded), with another tenant's
+  case absent. The report writes nothing. Its transaction refuses a write, and the test fails
+  when `SET TRANSACTION READ ONLY` is removed.
+
+**Not done.** No pilot: there is no export, reviewer or authorization. The report has run
+only on synthetic cases. One reviewer gives one person's judgement, and blindness is shown
+only by the recorded time.
+
 ## Work plan
 
 1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
@@ -625,7 +668,9 @@ fields, and a decision on how exports are delivered and kept.
      `investigation/1.2.0` as regression evidence (A03, A13);
    - replies read by the Anthropic and MCP SDKs are bounded (A04);
    - an experimental pre-release can be tagged and is labelled as one; the packages declare
-     `0.1.0-alpha.1` (A12).
+     `0.1.0-alpha.1` (A12);
+   - the single-source pilot's measures are defined and computed by `pilot-report`, tested
+     on synthetic cases only (A08, A14).
 
    Remaining limits:
    - the release workflow has not run, and can't pass until this code is on `main`;
@@ -634,7 +679,8 @@ fields, and a decision on how exports are delivered and kept.
 5. Needs the owner:
    - merge PR #20, apply the `main` ruleset and push `v0.1.0-alpha.1` on the merge commit
      once its CI run on `main` passes (A12);
-   - a purchasing system or export and authorization (A08);
+   - a purchasing system or export and authorization, and an AP or procurement reviewer
+     for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
    - a cloud account for staging (A11; also per-role secrets, A06, and load figures, A15);
    - operator sessions (A14);
