@@ -116,6 +116,13 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
+          # imagetools keeps a single index as it is; a bare manifest would be wrapped in a new
+          # index with another digest, so refuse before tagging rather than after.
+          kind=$(docker buildx imagetools inspect --raw "${IMAGE}@${DIGEST}" | jq -r .mediaType)
+          case "${kind}" in
+            application/vnd.oci.image.index.v1+json | application/vnd.docker.distribution.manifest.list.v2+json) ;;
+            *) echo "::error::the candidate is ${kind}, not an index; tagging would change its digest"; exit 1 ;;
+          esac
           docker buildx imagetools create --tag "${IMAGE}:${GITHUB_REF_NAME}" "${IMAGE}@${DIGEST}"
           promoted=$(docker buildx imagetools inspect "${IMAGE}:${GITHUB_REF_NAME}" \
             --format '{{json .Manifest}}' | jq -r .digest)
