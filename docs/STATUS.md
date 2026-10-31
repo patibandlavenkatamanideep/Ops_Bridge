@@ -406,8 +406,8 @@ blockers in `docs/production-readiness.md`):
    hand-written fixtures (A08's first step; proves no real system); the closure pass of
    2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
    (dated entries below). PR #17 was merged on 2026-10-30; the later work, including
-   experimental pre-release support, is PR #20. Next: whatever the owner's answers below
-   unblock.
+   experimental pre-release support, the pilot measurement and the pilot export check, is
+   PR #20. Next: whatever the owner's answers below unblock.
 3. Needs the owner: merge PR #20; apply the `main` ruleset and push `v0.1.0-alpha.1` on the
    merge commit once its CI run on `main` passes (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
@@ -1186,3 +1186,20 @@ staging, pilot owner).
   (`evaluation/verdict.py`). `make eval-replay-check` still reproduces both plans case by case.
 - Tests: `tests/pilot/` (19) and `tests/integration/test_pilot_report.py` (2, real cases
   worked through the API). No pilot has run: there is no export, reviewer or authorization.
+
+### Pilot export check (2026-10-30, production review A08, closure review step 5)
+- An investigation reads an export one record at a time. A defective file or a mapping gap
+  would therefore surface only in the pilot case that needs that record, and count against
+  OpsBridge. `opsbridge export-check --export DIR --pack P` reads every listed record through
+  the pack before the first case, and stores nothing. It lists each problem by collection
+  and key:
+  - unreadable files;
+  - collections the pack doesn't read;
+  - parse and mapping problems;
+  - numbers or listings that disagree with the document;
+  - invoices whose purchase order isn't in the export.
+
+  It exits 1 when anything needs review and 2 when the export or pack can't be opened. The
+  pilot plan opens the first case only once each problem is fixed or accepted.
+- Tests: `tests/pilot/test_export_check.py` (8, hand-written IT-pack exports). Each test
+  fails against a deliberately broken check. No customer export has been read.
