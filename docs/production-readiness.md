@@ -34,7 +34,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`) | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
@@ -629,6 +629,17 @@ the one that looks best, so the definitions and the report come first.
   window, read under its row-level security in a read-only transaction.
 - `opsbridge/evaluation/verdict.py`: an investigation is read as a verdict by the same
   function the benchmark scores with. Both frozen plans still replay case by case.
+- `opsbridge/pilot/export_check.py` and `opsbridge export-check`: before the first case,
+  every record of the export is read through its pack, the way an investigation does, with
+  nothing stored. An investigation reads one record at a time, so without this a defective
+  file or a mapping gap would surface only in the case that needs it, and count against
+  OpsBridge in the pilot. The check reports, by collection and key:
+  - a file that is missing, too large or doesn't match its digest;
+  - a collection the pack doesn't read;
+  - a parse or mapping problem;
+  - an invoice or purchase order whose number isn't its key;
+  - a record listed under a purchase order it isn't for;
+  - an invoice whose purchase order isn't in the export.
 
 **Evidence.**
 - `tests/pilot/test_reference.py` (14): strict reading, line-numbered problems, manual
@@ -639,9 +650,15 @@ the one that looks best, so the definitions and the report come first.
   drafted, edited then approved, resolved, rejected and excluded), with another tenant's
   case absent. The report writes nothing. Its transaction refuses a write, and the test fails
   when `SET TRANSACTION READ ONLY` is removed.
+- `tests/pilot/test_export_check.py` (8): hand-written IT-pack exports. Every unreadable
+  record is listed, not only the first. A consistent export has nothing to review, and its
+  report holds no document content. The command's exit codes are tested too. Each test was
+  checked against a deliberately broken check: removing the number and listing comparison,
+  the purchase-order lookup or the mapping problems, or treating a partial export's missing
+  record as absent, each makes a test fail.
 
-**Not done.** No pilot: there is no export, reviewer or authorization. The report has run
-only on synthetic cases. One reviewer gives one person's judgement, and blindness is shown
+**Not done.** No pilot: there is no export, reviewer or authorization. The report and the
+export check have run only on synthetic data. One reviewer gives one person's judgement, and blindness is shown
 only by the recorded time.
 
 ## Work plan
@@ -670,7 +687,9 @@ only by the recorded time.
    - an experimental pre-release can be tagged and is labelled as one; the packages declare
      `0.1.0-alpha.1` (A12);
    - the single-source pilot's measures are defined and computed by `pilot-report`, tested
-     on synthetic cases only (A08, A14).
+     on synthetic cases only (A08, A14);
+   - `export-check` reads a pilot export through its pack before the first case, so a defect
+     in it is found before it costs a pilot case (A08).
 
    Remaining limits:
    - the release workflow has not run, and can't pass until this code is on `main`;
