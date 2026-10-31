@@ -203,5 +203,18 @@ class ExportSource:
         )
         return Listing(collection, po_number, keys, withdrawn, self.complete, 1)
 
+    def listed(self) -> list[tuple[str, str, str | None]]:
+        """Every current record as (collection, key, PO it is listed under), in manifest
+        order, without reading any file."""
+        return [(e.collection, e.key, e.po_number) for e in self._records.values()]
+
+    def holds(self, collection: str, key: str) -> bool | None:
+        """Whether the export holds this record, as `fetch` would answer without reading it:
+        None when a partial export does not list it, since its existence is then unknown."""
+        ident = (collection, key)
+        if ident in self._records:
+            return True
+        return False if self.complete or ident in self._withdrawn else None
+
     def close(self) -> None:
         pass
