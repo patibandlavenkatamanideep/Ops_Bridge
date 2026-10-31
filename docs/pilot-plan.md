@@ -91,6 +91,11 @@ instead of it.
 **Prerequisites.** Items 1–6 of the prerequisites above, for one export and one pilot
 tenant. The export is held to `purchasing-source/1` (`OPSBRIDGE_PURCHASING_EXPORT_DIR`,
 production-readiness Package 5). Its pack mapping is reviewed before the first case.
+`export-check` (below) reads every record of the export through that pack, the way an
+investigation does, and stores nothing. The first case is opened only when each problem it
+lists has been fixed in the export or the mapping, or accepted by the owner and the reviewer
+as a fact of the source (for example, an invoice whose purchase order the system really
+lacks).
 
 **Procedure.**
 1. The owner and the reviewer fix the sample before any case is opened: the blocked invoices
@@ -142,7 +147,25 @@ counted, never dropped. The arms start their clocks at different points: OpsBrid
 the manual arm when work began. Any waiting before intake is therefore not in the OpsBridge
 figure, and the report must say so wherever the arms are compared.
 
-**Running it.**
+**Running it.** Before the first case, check the export against its pack:
+
+    uv --directory backend run python -m opsbridge.cli export-check \
+      --export <export dir>/<organization> --pack <pack id> --out <check.json>
+
+For each listed record it checks that:
+- the file is present, within the size limit, and matches its digest;
+- the pack reads its collection;
+- it parses and maps without problems;
+- an invoice's or purchase order's number is its key, since a case fetches it by that number;
+- a record read by purchase order is listed under the order it is for;
+- each invoice's purchase order is in the export.
+
+It exits 1 if anything needs review, and 2 if the export or the pack can't be opened
+(`opsbridge/pilot/export_check.py`). The report holds keys, counts and problems, not document
+content. A mapping problem can quote the value that failed, so the report stays with the
+export.
+
+At the cut-off, compute the measures:
 
     uv --directory backend run python -m opsbridge.cli pilot-report --tenant-id <pilot tenant> \
       --since <window start> --until <window end> --as-of <cut-off> \
@@ -162,6 +185,6 @@ the benchmark scores with (`opsbridge/evaluation/verdict.py`).
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 19 tests, and
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 27 tests, and
 `tests/integration/test_pilot_report.py`, 2 tests). No pilot has started: no export,
 reviewer or authorization exists yet.
