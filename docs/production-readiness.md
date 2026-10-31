@@ -19,6 +19,7 @@ Nothing here has reached sandbox, staging or pilot.
 | Work branch | `feat/opsbridge-foundation` (PR #17's branch); new commits follow `732e84d` |
 | Baseline gates | `make verify` on the tree of `732e84d`: 15/15 stages (unit 381, integration 222, browser 31); `make verify-strict` fails only on the skipped OCR tests (Tesseract not installed locally; they run in CI and the image) |
 | Closure pass | From `70c2e43` (29 October 2026). `make verify` on the committed tree of `1235494`: 15/15 stages (unit 503, integration 259, browser 33, including both scoring-label tests), on a dev stack restarted on that code with the VM clock in sync. The replay check reproduces held-out 36/40 and security 7/7, both modes, under `investigation/1.1.0`. Hosted CI run 40982031258 green on `1235494` (all four jobs). Later commits change only this record, STATUS and the release workflow's index check (YAML parsed; no gate runs it) |
+| After the closure review | Local branch `feat/after-pr17` from `332c7d0` (30 October), not pushed while PR #17 is under review. `make verify` on the committed tree of `c521435`: 15/15 stages (unit 516, integration 260, browser 34). The replay check covers both frozen plans, and `eval-verify` checks all 34 ledger records. The VM clock was reset first, and the dev stack restarted on that code. Hosted CI runs once the branch is pushed |
 | Environment | macOS host; PostgreSQL 16, Keycloak, SeaweedFS in Podman; no cloud account; no real model or customer system contacted |
 | Review documents | supplied by the owner in the session; not committed (the repository is public) |
 
@@ -28,16 +29,16 @@ Nothing here has reached sandbox, staging or pilot.
 |---|---|---|---|---|---|
 | A01 | Malformed or empty invoice lines became a clean match, and the case could be resolved | Fixed, verified locally | 1 | See "Package 1" below | — |
 | A02 | Duplicate PO line identifiers silently overwrote one another | Fixed, verified locally | 1 | See "Package 1" below | — |
-| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme; browser tests cover a scoring-1 run and scoring-2 rendering | 4 | See "Package 4, metrics" below | — |
-| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete) | 3 | See "Package 3, transport bounds" below | — |
+| A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
+| A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
-| A07 | Important fixes only in open PR #17 | This branch contains PR #17; the merge is the owner's | 0 | PR #17 green in CI at `732e84d` | Owner merges #17 |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only) | 5 | See "Package 5, export source" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1` |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -156,9 +157,26 @@ only): no disagreement on any axis in any recorded split or mode (held-out 0/40,
 0/20, security 0/7, both modes), all complete. The metric was wrong, but it hid nothing in
 these results, because the rules and the mock model are deterministic.
 
-**Not done**: no `opsbridge-bench-v2` is frozen yet. A new benchmark should come with the
-independently labelled corpus of A10; freezing v2 on the public v1 cases would invite
-out-of-sample claims they cannot support.
+**Engineering re-run** (30 October, after the closure review): to bring the committed
+evidence in line with the current code, `opsbridge-bench-v1-rerun` re-runs the public v1
+cases under scoring 2 and `investigation/1.2.0` with the mock model. Held-out is 36/40 and
+the other splits are perfect in both modes, with no disagreement on any axis; the verdicts
+equal v1's (docs/evaluation-results.md).
+- **Labelled as regression evidence.** The plan carries a purpose, shown with every run, and
+  its own acceptance policy reports the held-out gate as not evaluated, because those cases
+  are not held out. Plans now name the policy they are judged by; v1 keeps its own, and
+  verifies and replays unchanged. A policy declared for another benchmark is refused.
+- **Covered in CI.** `eval-replay-check` replays every frozen plan, so `make verify` and CI
+  cover the re-run without changes.
+- **Browser coverage on a committed result.** The intercepted scoring-2 browser test is
+  replaced by tests on the re-run's real held-out record: per-axis disagreement, workflow,
+  purpose, and the gate not decided.
+- **Evidence.** `tests/evaluation/test_plan_acceptance.py` has 6 tests, all of which failed
+  before; `tests/integration/test_evaluation.py` has the re-run API test.
+
+**Not done**: no `opsbridge-bench-v2` is frozen. It should come with the independently
+labelled corpus of A10; freezing v2 on the public v1 cases would invite out-of-sample claims
+they cannot support.
 
 ## Package 2: one admission contract for the executor and Casework MCP (A05)
 
@@ -266,10 +284,31 @@ tracker and GitHub creates with each damage, a read-back and lookup, and a purch
 20 of the new tests failed before; the other three already passed (the empty 204, and creates
 whose body was cut mid-stream and so was not valid JSON either).
 
-**Not covered**: the MCP SDK's HTTP client and the Anthropic SDK read their own responses
-(not routed through this module); a response already held in memory (test transports only)
-is checked after the fact and decoded by httpx. Total source-collection time is bounded per
-request (pages × deadline), not as one budget.
+**Responses the SDKs read themselves** (30 October): the Anthropic SDK and the MCP client
+read through their own `httpx2` clients, out of this module's reach.
+- **Reproduced:** given a 64 MiB reply, the Anthropic SDK read all of it and handed it back as
+  text, and the adapter then failed with an `AttributeError` instead of falling back. The MCP
+  client read all 64 MiB of a JSON reply before failing to parse it.
+- **Fix** (`connectors/sdk_transport.py`): a transport under each client counts bytes as they
+  arrive and stops past the limit, refusing a declared oversize first. It turns the request's
+  read timeout into a total deadline for the whole response. It asks for unencoded replies
+  and refuses a compressed one, which the client above would inflate without a bound.
+  - **Limits:** 8 MiB per model reply, 1 MiB per MCP response.
+  - **Error contract:** errors subclass `httpx2`'s, so they reach the existing handling.
+    The adapter reports the model as unavailable or timed out, and the rules-only path takes
+    over; an MCP create stays ambiguous.
+  - **Non-message replies:** a 200 that is not a message is now "model unavailable".
+- **Evidence:** `tests/test_sdk_transport.py` has 7 tests. Both oversize cases read up to the
+  limit and no further. The adapter tests keep their assertions, and the 18 real-MCP
+  integration tests pass over the bound.
+- **SSE:** MCP's SSE streams are held to the same limits. Each call opens a session shorter
+  than its deadline, so that cuts nothing legitimate.
+- **Not covered:**
+  - the SDKs' streaming APIs (OpsBridge uses none);
+  - responses already held in memory (test transports only), which are checked after the
+    fact and decoded by httpx.
+
+  Total source-collection time is bounded per request (pages × deadline), not as one budget.
 
 **Intermittent timeout test, diagnosed** (closure pass): the test was
 `tests/contracts/test_github_connector.py::test_ambiguous_failures_never_claim_absence[timeout_after]`.
@@ -426,8 +465,8 @@ recorded v1 runs under 1.1.0. Evidence:
   above.
 - `tests/evaluation/test_comparability.py`: plan workflow versions.
 
-Not done: no benchmark has been recorded with 1.2.0; that comes with `opsbridge-bench-v2`
-(A10).
+Recorded since: `opsbridge-bench-v1-rerun` ran every split with 1.2.0 (Package 4, metrics).
+Its security recording's model requests name both reasons where v1's said "()".
 
 ## Package 8, governance and releases (A12)
 
@@ -458,17 +497,34 @@ Not done: no benchmark has been recorded with 1.2.0; that comes with `opsbridge-
 
   Actions are pinned to commits of releases at least two weeks old.
 
-**Evidence**: `tests/test_release_check.py` has 14 tests, covering:
+**Pre-releases** (30 October, closure review step 3). The first release is to be explicitly
+experimental, but the workflow accepted only `vMAJOR.MINOR.PATCH`, so it could only have
+been published as a plain `v0.1.0`, a tag that reads as an ordinary release. It now also
+accepts `vX.Y.Z-alpha.N`, `-beta.N` and `-rc.N`:
+- npm files must declare the tag's spelling (`0.1.0-alpha.1`) and Python files the PEP 440
+  spelling (`0.1.0a1`); the plain version does not match a pre-release tag, nor the reverse;
+- the image carries an OCI description, and the run summary repeats it: "experimental
+  pre-release (artifact delivery only; not qualified for production use)". It also carries its
+  source repository;
+- the packages now declare `0.1.0a1` and `0.1.0-alpha.1` (0.1.0 was never tagged), and
+  `release_check.py versions --tag v0.1.0-alpha.1` passes on this tree.
+
+docs/deployment.md gives the tag command and the commands that check the published digest,
+attestation and runtime after a release.
+
+**Evidence**: `tests/test_release_check.py` has 17 tests (3 added for pre-releases; one
+extended to refuse other suffixes), covering:
 - a qualifying run;
 - refused look-alikes: another commit, a pull-request event, another branch, a workflow file
   with the same job names, a fork, another repository, a failed or unfinished run;
 - a failed, missing or other-run job;
-- malformed and mismatched tags;
+- malformed and mismatched tags, including `-rc1`, `-experimental.1` and build metadata;
+- pre-release tags, each ecosystem's spelling, and the experimental description;
 - every version declaration read, and one left behind by a bump caught;
 - job names that match `ci.yml`.
 
 Run read-only against this repository, `main`'s head `468dae7` qualifies and the PR head,
-never pushed to `main`, is refused. The five declarations agree on 0.1.0. The ruleset's check
+never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
@@ -545,6 +601,66 @@ makes both fail.
 from a real export; a real one needs its own sanitized fixtures, a pack mapping for its
 fields, and a decision on how exports are delivered and kept.
 
+## Package 5, pilot measurement (A08, A14; prepared, no pilot run)
+
+**Why.** The closure review's step 5 is one pilot on a real purchasing source, with an
+authorized sanitized export and one AP or procurement reviewer. It measures extraction
+completeness, investigation accuracy, approval corrections and time to resolution against
+the existing manual process. OpsBridge recorded the facts those measures need, but nothing
+defined or computed them. Nothing recorded the reviewer's independent decision or the manual
+process's timings either. Defining a measure after the data arrives would invite choosing
+the one that looks best, so the definitions and the report come first.
+
+**Added.**
+- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"):
+  - sample fixed in advance, with arms alternating in blocked order;
+  - the reviewer's decision recorded before intake, which is the only blind case;
+  - the reference file's columns;
+  - the four measures, with failures in their denominators;
+  - the limits.
+- `opsbridge/pilot/reference.py`: the reference file, read strictly. Every problem is
+  reported with its line, and OpsBridge's own decisions and times can't be entered by hand.
+- `opsbridge/pilot/measures.py`: the four measures.
+  - Blind and not-blind accuracy are reported apart.
+  - A referenced case that was never investigated counts as wrong.
+  - Approval corrections compare what was approved with the investigation's draft.
+  - Open cases are counted in the times.
+- `opsbridge/pilot/collect.py` and `opsbridge pilot-report`: one tenant's cases opened in a
+  window, read under its row-level security in a read-only transaction.
+- `opsbridge/evaluation/verdict.py`: an investigation is read as a verdict by the same
+  function the benchmark scores with. Both frozen plans still replay case by case.
+- `opsbridge/pilot/export_check.py` and `opsbridge export-check`: before the first case,
+  every record of the export is read through its pack, the way an investigation does, with
+  nothing stored. An investigation reads one record at a time, so without this a defective
+  file or a mapping gap would surface only in the case that needs it, and count against
+  OpsBridge in the pilot. The check reports, by collection and key:
+  - a file that is missing, too large or doesn't match its digest;
+  - a collection the pack doesn't read;
+  - a parse or mapping problem;
+  - an invoice or purchase order whose number isn't its key;
+  - a record listed under a purchase order it isn't for;
+  - an invoice whose purchase order isn't in the export.
+
+**Evidence.**
+- `tests/pilot/test_reference.py` (14): strict reading, line-numbered problems, manual
+  timings in order.
+- `tests/pilot/test_measures.py` (5): each measure on hand-written facts whose counts can be
+  checked by reading them.
+- `tests/integration/test_pilot_report.py` (2): cases worked through the API (approved as
+  drafted, edited then approved, resolved, rejected and excluded), with another tenant's
+  case absent. The report writes nothing. Its transaction refuses a write, and the test fails
+  when `SET TRANSACTION READ ONLY` is removed.
+- `tests/pilot/test_export_check.py` (8): hand-written IT-pack exports. Every unreadable
+  record is listed, not only the first. A consistent export has nothing to review, and its
+  report holds no document content. The command's exit codes are tested too. Each test was
+  checked against a deliberately broken check: removing the number and listing comparison,
+  the purchase-order lookup or the mapping problems, or treating a partial export's missing
+  record as absent, each makes a test fail.
+
+**Not done.** No pilot: there is no export, reviewer or authorization. The report and the
+export check have run only on synthetic data. One reviewer gives one person's judgement, and blindness is shown
+only by the recorded time.
+
 ## Work plan
 
 1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
@@ -562,14 +678,28 @@ fields, and a decision on how exports are delivered and kept.
    - release qualification corrected (A12);
    - both scoring schemes covered in the browser (A03).
 
+4. After the closure review (30 October; PR #17 merged as `4d2f1f6`, whose CI run on `main`,
+   41085903247, passed all four jobs and which `release_check.py ci` accepts; this work is
+   PR #20):
+   - the engineering re-run `opsbridge-bench-v1-rerun` was recorded under scoring 2 and
+     `investigation/1.2.0` as regression evidence (A03, A13);
+   - replies read by the Anthropic and MCP SDKs are bounded (A04);
+   - an experimental pre-release can be tagged and is labelled as one; the packages declare
+     `0.1.0-alpha.1` (A12);
+   - the single-source pilot's measures are defined and computed by `pilot-report`, tested
+     on synthetic cases only (A08, A14);
+   - `export-check` reads a pilot export through its pack before the first case, so a defect
+     in it is found before it costs a pilot case (A08).
+
    Remaining limits:
-   - the release workflow has not run;
-   - scoring 2 is browser-tested on an intercepted response only;
-   - no benchmark is recorded with `investigation/1.2.0`;
-   - the MCP and Anthropic SDK clients still read their own responses.
-4. Needs the owner:
-   - merge PR #17 (A07), apply the `main` ruleset and push the first release tag (A12);
-   - a purchasing system or export and authorization (A08);
+   - the release workflow has not run, and can't pass until this code is on `main`;
+   - there is no held-out or out-of-sample result beyond v1;
+   - the SDKs' streaming APIs are unused and unbounded.
+5. Needs the owner:
+   - merge PR #20, apply the `main` ruleset and push `v0.1.0-alpha.1` on the merge commit
+     once its CI run on `main` passes (A12);
+   - a purchasing system or export and authorization, and an AP or procurement reviewer
+     for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
    - a cloud account for staging (A11; also per-role secrets, A06, and load figures, A15);
    - operator sessions (A14);

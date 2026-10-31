@@ -1,6 +1,6 @@
 [project]
 name = "opsbridge"
-version = "0.1.0"
+version = "0.1.0a1"
 description = "OpsBridge: evidence-backed investigation of blocked procurement exceptions"
 requires-python = ">=3.12,<3.13"
 license = "MIT"

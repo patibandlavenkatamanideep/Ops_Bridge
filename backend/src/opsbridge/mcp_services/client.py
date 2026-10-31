@@ -16,6 +16,7 @@ from mcp import Client
 from mcp.client.streamable_http import streamable_http_client
 
 from opsbridge import safejson
+from opsbridge.connectors import sdk_transport
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
     ConnectorCapabilities,
@@ -92,6 +93,18 @@ class McpToolClient:
     url: str
     service_token: Callable[[], str]
     timeout_seconds: float = 10.0
+    transport: httpx2.AsyncBaseTransport | None = None  # under the bound (tests: a mock)
+
+    def _http(self, headers: dict[str, str]) -> httpx2.AsyncClient:
+        """The SDK reads responses itself; a transport under its client bounds them."""
+        return httpx2.AsyncClient(
+            headers=headers,
+            timeout=self.timeout_seconds,
+            transport=sdk_transport.AsyncBoundedTransport(
+                self.transport or httpx2.AsyncHTTPTransport(),
+                max_bytes=sdk_transport.MAX_MCP_RESPONSE_BYTES,
+            ),
+        )
 
     def call(self, tool: str, args: dict[str, Any], delegation: str) -> dict[str, Any]:
         async def go() -> dict[str, Any]:
@@ -99,9 +112,8 @@ class McpToolClient:
                 "Authorization": f"Bearer {self.service_token()}",
                 DELEGATION_HEADER: delegation,
             }
-            http = httpx2.AsyncClient(headers=headers, timeout=self.timeout_seconds)
             async with Client(
-                streamable_http_client(self.url, http_client=http),
+                streamable_http_client(self.url, http_client=self._http(headers)),
                 read_timeout_seconds=self.timeout_seconds,
             ) as c:
                 result = await c.call_tool(tool, args)
@@ -126,8 +138,10 @@ class McpToolClient:
             headers = {"Authorization": f"Bearer {self.service_token()}"}
             if delegation:
                 headers[DELEGATION_HEADER] = delegation
-            http = httpx2.AsyncClient(headers=headers, timeout=self.timeout_seconds)
-            async with Client(streamable_http_client(self.url, http_client=http)) as c:
+            async with Client(
+                streamable_http_client(self.url, http_client=self._http(headers)),
+                read_timeout_seconds=self.timeout_seconds,
+            ) as c:
                 return [t.name for t in (await c.list_tools()).tools]
 
         return anyio.run(go)

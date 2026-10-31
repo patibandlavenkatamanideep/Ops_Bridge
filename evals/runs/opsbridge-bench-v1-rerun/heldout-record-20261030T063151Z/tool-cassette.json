@@ -1,0 +1,86 @@
+{
+ "benchmark_id": "opsbridge-bench-v1-rerun",
+ "entries": [
+  {
+   "args": {
+    "query": "delivered"
+   },
+   "args_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "case_id": "fur-heldout-222",
+   "mode": "mock",
+   "outcome": "ok",
+   "repeat": 0,
+   "response": [
+    {
+     "document_id": "35276f8f-5aab-4857-8042-3f3e9d0b604b",
+     "kind": "supplier_message",
+     "locator": "text:lines=1-3",
+     "rank": "0.060793",
+     "sha256": "sha256:630bcee7b3abec2beb158de461ab9e81cbc1416782232e0b7209b0190ef9cba6",
+     "text": "Good morning,\nWe delivered 10 lamps for PO-1222 yesterday, the rest follow.\nPinecrest",
+     "title": "supplier message MSG-F2220",
+     "version_id": "845ab55f-3a46-432c-bd7c-ec5a82ff88e2"
+    }
+   ],
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence",
+   "version": "1"
+  },
+  {
+   "args": {
+    "query": "delivered"
+   },
+   "args_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "case_id": "fur-heldout-222",
+   "mode": "mock",
+   "outcome": "ok",
+   "repeat": 1,
+   "response": [
+    {
+     "document_id": "35276f8f-5aab-4857-8042-3f3e9d0b604b",
+     "kind": "supplier_message",
+     "locator": "text:lines=1-3",
+     "rank": "0.060793",
+     "sha256": "sha256:630bcee7b3abec2beb158de461ab9e81cbc1416782232e0b7209b0190ef9cba6",
+     "text": "Good morning,\nWe delivered 10 lamps for PO-1222 yesterday, the rest follow.\nPinecrest",
+     "title": "supplier message MSG-F2220",
+     "version_id": "845ab55f-3a46-432c-bd7c-ec5a82ff88e2"
+    }
+   ],
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence",
+   "version": "1"
+  },
+  {
+   "args": {
+    "query": "delivered"
+   },
+   "args_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "case_id": "fur-heldout-222",
+   "mode": "mock",
+   "outcome": "ok",
+   "repeat": 2,
+   "response": [
+    {
+     "document_id": "35276f8f-5aab-4857-8042-3f3e9d0b604b",
+     "kind": "supplier_message",
+     "locator": "text:lines=1-3",
+     "rank": "0.060793",
+     "sha256": "sha256:630bcee7b3abec2beb158de461ab9e81cbc1416782232e0b7209b0190ef9cba6",
+     "text": "Good morning,\nWe delivered 10 lamps for PO-1222 yesterday, the rest follow.\nPinecrest",
+     "title": "supplier message MSG-F2220",
+     "version_id": "845ab55f-3a46-432c-bd7c-ec5a82ff88e2"
+    }
+   ],
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence",
+   "version": "1"
+  }
+ ],
+ "response_mode": "live",
+ "schema": "opsbridge-tool-cassette/1",
+ "split": "heldout"
+}

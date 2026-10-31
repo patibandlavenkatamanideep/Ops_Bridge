@@ -404,9 +404,14 @@ blockers in `docs/production-readiness.md`):
    (session pruning); prepared A12 (ruleset, release workflow).
 2. Done locally since: an export-file source held to `purchasing-source/1` with
    hand-written fixtures (A08's first step; proves no real system); the closure pass of
-   2026-10-29 (dated entry below). Next: whatever the owner's answers below unblock.
-3. Needs the owner: merge PR #17 (A07); apply the `main` ruleset and push a release tag
-   (A12); a purchasing system or export with access (A08); a model budget and independent
+   2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
+   (dated entries below). PR #17 was merged on 2026-10-30; the later work, including
+   experimental pre-release support, the pilot measurement and the pilot export check, is
+   PR #20. Next: whatever the owner's answers below unblock.
+3. Needs the owner: merge PR #20; apply the `main` ruleset and push `v0.1.0-alpha.1` on the
+   merge commit once its CI run on `main` passes (A12); a purchasing system or export with
+   access, and an AP or procurement reviewer for the single-source pilot (A08); a model
+   budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
    policy (A16).
 
@@ -1126,3 +1131,75 @@ staging, pilot owner).
   the candidate digest it built and promotes that digest without rebuilding. Not run (no tag).
 - Run pages name their scoring scheme; browser tests cover a scoring-1 run and scoring-2
   rendering (the latter on an intercepted response: no scoring-2 result exists).
+
+### After the closure review (2026-10-30, production review A03, A04, A13)
+- The review of `332c7d0` recommended merging PR #17, then (among owner steps) an offline
+  scoring-2 benchmark with `investigation/1.2.0` and bounds on the SDK response paths. This
+  batch was kept on a local branch so #17 kept its reviewed head. After the owner merged #17
+  (`4d2f1f6`), it was merged into `feat/opsbridge-foundation`, not rebased, so the re-run's
+  recorded code commit `d2f2c73` stays in history, and opened as PR #20.
+- Engineering re-run `opsbridge-bench-v1-rerun` (framing chosen by the owner): the public v1
+  cases under scoring 2 and `investigation/1.2.0`, with the mock model, labelled as
+  regression evidence. Its own acceptance policy reports the held-out gate as not evaluated.
+  Held-out 36/40 and the other splits perfect in both modes, no disagreement on any axis;
+  eight ledger records; v1 untouched. Plans now name their acceptance policy and purpose;
+  `eval-replay-check` replays every plan. Tests: `test_plan_acceptance.py` (6),
+  `test_evaluation.py`, and browser tests on the re-run's held-out record.
+- SDK responses: the Anthropic SDK and the MCP client read replies through their own
+  `httpx2` clients, unbounded (64 MiB read in full by each). `connectors/sdk_transport.py`
+  bounds them under those clients: 8 MiB per model reply, 1 MiB per MCP response, the
+  request timeout as a total deadline, unencoded replies only. A non-message 200 from the
+  model is now "model unavailable" instead of an AttributeError. Tests: `test_sdk_transport.py`
+  (7); the 18 real-MCP integration tests pass over the bound.
+- Environment: the Mac was swapping heavily (8.5 of 9.2 GB swap, 5.2 GB disk free), which
+  slowed every run; the Podman VM clock stalled twice more while the Mac slept and was reset
+  from the host before each integration run.
+
+### Experimental release prepared (2026-10-30, production review A12, closure review step 3)
+- CI on `main`'s merge commit `4d2f1f6` passed all four jobs (run 41085903247), and
+  `release_check.py ci` accepts that commit. No ruleset is applied yet.
+- The review asked for an explicitly experimental first release, but the workflow accepted
+  only `vMAJOR.MINOR.PATCH`. It now accepts `vX.Y.Z-alpha.N`, `-beta.N` and `-rc.N`: npm
+  declares the tag's spelling, Python the PEP 440 one. A pre-release image's OCI description,
+  repeated in the run summary, says it is experimental and not qualified for production use.
+  The packages declare `0.1.0a1` / `0.1.0-alpha.1` (0.1.0 was never tagged). Tests:
+  `test_release_check.py` (17; 3 new, 1 extended). docs/deployment.md gives the tag command
+  and the checks of the published digest, attestation and runtime.
+- Not done: no tag pushed and nothing published. That needs the owner's authorization, and
+  the tagged commit must be on `main` with a passing CI run.
+- PR #20's CI passed all four jobs at `d277433` (run 41087245509).
+
+### Pilot measurement prepared (2026-10-30, production review A08, A14, closure review step 5)
+- The review's step 5 is one pilot on a real purchasing source: an authorized sanitized
+  export and one AP or procurement reviewer, measuring extraction completeness, investigation
+  accuracy, approval corrections and time to resolution against the manual process. Nothing
+  defined or computed those measures, or recorded the reviewer's decisions, so they are now
+  fixed before any data: protocol `opsbridge-pilot/1` in docs/pilot-plan.md.
+- `opsbridge pilot-report` reads one tenant's cases from a window in a read-only transaction
+  under its row-level security, plus the reviewer's reference CSV (read strictly, every
+  problem listed by line). It writes the four measures as JSON:
+  - failures stay in the denominators;
+  - blind decisions (recorded before intake) are reported apart from later ones;
+  - approvals are compared with the investigation's draft;
+  - open cases are counted in the times.
+- Investigations are read as verdicts by one function shared with the benchmark
+  (`evaluation/verdict.py`). `make eval-replay-check` still reproduces both plans case by case.
+- Tests: `tests/pilot/` (19) and `tests/integration/test_pilot_report.py` (2, real cases
+  worked through the API). No pilot has run: there is no export, reviewer or authorization.
+
+### Pilot export check (2026-10-30, production review A08, closure review step 5)
+- An investigation reads an export one record at a time. A defective file or a mapping gap
+  would therefore surface only in the pilot case that needs that record, and count against
+  OpsBridge. `opsbridge export-check --export DIR --pack P` reads every listed record through
+  the pack before the first case, and stores nothing. It lists each problem by collection
+  and key:
+  - unreadable files;
+  - collections the pack doesn't read;
+  - parse and mapping problems;
+  - numbers or listings that disagree with the document;
+  - invoices whose purchase order isn't in the export.
+
+  It exits 1 when anything needs review and 2 when the export or pack can't be opened. The
+  pilot plan opens the first case only once each problem is fixed or accepted.
+- Tests: `tests/pilot/test_export_check.py` (8, hand-written IT-pack exports). Each test
+  fails against a deliberately broken check. No customer export has been read.
