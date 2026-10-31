@@ -62,6 +62,12 @@ FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
 `opsbridge-pilot/1`, docs/pilot-plan.md) from one tenant's cases opened in the window and the
 reviewer's reference CSV. It reads in a read-only transaction under that tenant's row-level
 security, and refuses a reference file with any problem, listing each one by line.
+`export-check --export DIR --pack P [--out FILE]` reads every record of one organization's
+export through pack P, the way an investigation does, and stores nothing. It lists each
+problem by collection and key: an unreadable file, a collection the pack doesn't read, a
+mapping problem, a number or listing that disagrees with the document, or an invoice whose
+purchase order isn't in the export. It exits 1 when there is anything to review, and 2 when
+the export or pack can't be opened.
 
 Linux with Docker (ubuntu-24.04) is exercised by hosted CI, which runs `setup`, `lint`,
 `typecheck`, `test`, `eval-canary`, `build`, `infra-up`, `migrate`, `seed-demo`,
