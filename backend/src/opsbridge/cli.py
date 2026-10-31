@@ -741,6 +741,40 @@ def _pilot_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _export_check(args: argparse.Namespace) -> int:
+    from opsbridge.config import get_settings
+    from opsbridge.connectors.exports import ExportSource
+    from opsbridge.connectors.source_contract import SourceRecordInvalid, SourceUnavailable
+    from opsbridge.evidence.parsers import OcrSettings
+    from opsbridge.packs import PackRegistry
+    from opsbridge.pilot.export_check import check_export
+
+    settings = get_settings()
+    try:
+        pack = PackRegistry(settings.packs_dir).get(args.pack)
+    except (OSError, ValueError) as exc:
+        print(f"Refusing: pack {args.pack!r} cannot be loaded: {exc}")
+        return 2
+    try:
+        source = ExportSource(Path(args.export))
+    except (SourceRecordInvalid, SourceUnavailable) as exc:
+        print(f"Refusing: {exc}")
+        return 2
+    result = check_export(source, pack, OcrSettings.from_settings(settings))
+    if args.out:
+        out = Path(args.out)
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+    problems = result["problems"]
+    print(
+        f"{args.export}: {result['records']} records checked with {result['pack']}; "
+        f"{len(problems)} problem(s) to review before the first case"
+    )
+    for p in problems:
+        print(f"  {p['collection']} {p['key']}: {p['problem']}")
+    return 1 if problems else 0
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -956,6 +990,14 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True, help="where to write the report (JSON)")
     p.add_argument("--database", help="database name (default: from settings)")
     p.set_defaults(func=_pilot_report)
+
+    p = sub.add_parser(
+        "export-check", help="read every record of an export through its pack, storing nothing"
+    )
+    p.add_argument("--export", required=True, help="the organization's export directory")
+    p.add_argument("--pack", required=True, help="the pack that maps its records")
+    p.add_argument("--out", help="where to write the report (JSON)")
+    p.set_defaults(func=_export_check)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)
