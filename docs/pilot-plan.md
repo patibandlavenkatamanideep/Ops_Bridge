@@ -88,6 +88,12 @@ synthetic data, before any pilot data existed. They are not changed once a pilot
 change after that is a new protocol version, and it is reported beside the original, never
 instead of it.
 
+One correction was made before any pilot data, sample or agreement existed (1 November
+2026). An OpsBridge row named its case by case number, but intake assigns that number after
+a blind decision is recorded. The reviewer would have typed it in later, and a wrong number
+would have scored the decision against another case. A row now names the invoice instead.
+The measures did not change.
+
 **Prerequisites.** Items 1–6 of the prerequisites above, for one export and one pilot
 tenant. The export is held to `purchasing-source/1` (`OPSBRIDGE_PURCHASING_EXPORT_DIR`,
 production-readiness Package 5). Its pack mapping is reviewed before the first case.
@@ -105,7 +111,9 @@ lacks).
 2. For each sampled invoice, the reviewer records an independent decision in the reference
    file **before its case is opened in OpsBridge**. A decision is blind only if it was
    recorded before intake. A later decision is reported separately and is not part of the
-   headline accuracy, because the reviewer may have seen OpsBridge's output.
+   headline accuracy, because the reviewer may have seen OpsBridge's output. An `opsbridge`
+   row names the invoice as it will be entered at intake, since the case and its number
+   don't exist yet.
 3. `opsbridge` cases are opened in the pilot tenant and worked and approved as usual.
 4. `manual` invoices are worked with the existing process. Their start, decision and
    resolution times come from that process's own records where they exist. What the process
@@ -118,7 +126,8 @@ lacks).
 | Column | Meaning |
 |---|---|
 | `arm` | `opsbridge` or `manual` |
-| `case` | The OpsBridge case number, or for `manual` a pseudonymous reference (never an invoice number or a supplier's name) |
+| `case` | `manual` only: a pseudonymous reference (never an invoice number or a supplier's name). Empty for `opsbridge`: intake assigns the case number after the decision |
+| `invoice`, `supplier` | `opsbridge` only: the invoice number and the supplier id exactly as they will be entered at intake (`supplier` blank when none is). Intake compares them trimmed, upper-cased and with inner spaces collapsed, allows one case per invoice and supplier in a tenant, and so finds exactly one case for the row. A row that matches no case is listed by line |
 | `reviewed_at` | When the reviewer recorded the decision (ISO 8601 with a time zone) |
 | `outcome` | `matched`, `discrepancies_found`, `needs_information` or `manual_review` |
 | `types` | Discrepancy types, separated by `;`: `missing_receipt`, `quantity_mismatch`, `price_mismatch` |
@@ -127,9 +136,11 @@ lacks).
 | `started_at`, `decided_at`, `resolved_at` | `manual` only: work began (required), the follow-up was decided, the invoice was resolved; blank if not reached |
 | `excluded` | A reason to leave the invoice out of every measure (for example, outside the agreed scope) |
 
-The file is read strictly. A misspelled value, a time without a time zone, a repeated case,
-or an OpsBridge timing entered by hand is refused, with its line, and nothing is measured.
-OpsBridge's decisions and times come only from its records.
+The file is read strictly. A misspelled value, a time without a time zone, a repeated invoice
+or case, an invoice number on a `manual` row, or an OpsBridge case number or timing entered
+by hand is refused, with its line, and nothing is measured. OpsBridge's decisions and times
+come only from its records. The report names cases by number and rows by line, never by
+invoice.
 
 **Measures.** The unit is the case. Excluded invoices are in no measure. An OpsBridge case
 without a reference row is in every measure except accuracy. Failures stay in their
@@ -185,6 +196,6 @@ the benchmark scores with (`opsbridge/evaluation/verdict.py`).
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 27 tests, and
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 32 tests, and
 `tests/integration/test_pilot_report.py`, 2 tests). No pilot has started: no export,
 reviewer or authorization exists yet.
