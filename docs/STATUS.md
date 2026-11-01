@@ -1203,3 +1203,16 @@ staging, pilot owner).
   pilot plan opens the first case only once each problem is fixed or accepted.
 - Tests: `tests/pilot/test_export_check.py` (8, hand-written IT-pack exports). Each test
   fails against a deliberately broken check. No customer export has been read.
+
+### Pilot reference rows name the invoice (2026-11-01, production review A08, A14)
+- Defect in protocol `opsbridge-pilot/1`, found before any pilot data, sample or agreement
+  existed. An OpsBridge row named its case by case number. Intake assigns that number, and a
+  blind decision is recorded before intake, so the reviewer would have typed it in later. A
+  wrong number would have scored the decision against another case, and the report caught
+  only numbers that matched no case.
+- An OpsBridge row now names its invoice and supplier as intake identifies a case, and
+  intake allows one case per invoice and supplier in a tenant. A `manual` row may not carry
+  an invoice number. The report names cases by number and rows by line, never by invoice.
+  The measures did not change.
+- Tests: `tests/pilot/` (32) and `tests/integration/test_pilot_report.py` (2). Matching on the
+  number alone, or reading the invoice without intake's normalization, each makes a test fail.
