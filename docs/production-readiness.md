@@ -641,14 +641,28 @@ the one that looks best, so the definitions and the report come first.
   - a record listed under a purchase order it isn't for;
   - an invoice whose purchase order isn't in the export.
 
+**Corrected before any pilot (1 November).** The reference file named an OpsBridge row's case
+by case number. Intake assigns that number, and a blind decision is recorded before intake.
+So the reviewer would have typed the number in afterwards, and a wrong one would have scored
+the decision against another case: the report caught only numbers that matched no case. An
+OpsBridge row now names its invoice, number and supplier, exactly as intake identifies a
+case. Intake allows one case per invoice and supplier in a tenant, so a row finds at most
+one case.
+- A `manual` row may not carry an invoice number, so its pseudonym rule is now checked.
+- The report names cases by number and rows by line, never by invoice.
+- The measures did not change, and no pilot data, sample or agreement existed.
+
 **Evidence.**
-- `tests/pilot/test_reference.py` (14): strict reading, line-numbered problems, manual
-  timings in order.
-- `tests/pilot/test_measures.py` (5): each measure on hand-written facts whose counts can be
-  checked by reading them.
+- `tests/pilot/test_reference.py` (18): strict reading, line-numbered problems, manual
+  timings in order, the invoice normalized as intake normalizes it, and a pseudonymous
+  manual row.
+- `tests/pilot/test_measures.py` (6): each measure on hand-written facts whose counts can be
+  checked by reading them; a row matches a case only when number and supplier both agree.
+  Matching on the number alone, or reading the invoice without intake's normalization, each
+  makes a test fail.
 - `tests/integration/test_pilot_report.py` (2): cases worked through the API (approved as
   drafted, edited then approved, resolved, rejected and excluded), with another tenant's
-  case absent. The report writes nothing. Its transaction refuses a write, and the test fails
+  case absent. The rows name invoices, one typed in lower case, and the report names none. The report writes nothing. Its transaction refuses a write, and the test fails
   when `SET TRANSACTION READ ONLY` is removed.
 - `tests/pilot/test_export_check.py` (8): hand-written IT-pack exports. Every unreadable
   record is listed, not only the first. A consistent export has nothing to review, and its
@@ -658,8 +672,8 @@ the one that looks best, so the definitions and the report come first.
   record as absent, each makes a test fail.
 
 **Not done.** No pilot: there is no export, reviewer or authorization. The report and the
-export check have run only on synthetic data. One reviewer gives one person's judgement, and blindness is shown
-only by the recorded time.
+export check have run only on synthetic data. One reviewer gives one person's judgement,
+and blindness is shown only by the recorded time.
 
 ## Work plan
 
@@ -689,7 +703,9 @@ only by the recorded time.
    - the single-source pilot's measures are defined and computed by `pilot-report`, tested
      on synthetic cases only (A08, A14);
    - `export-check` reads a pilot export through its pack before the first case, so a defect
-     in it is found before it costs a pilot case (A08).
+     in it is found before it costs a pilot case (A08);
+   - before any pilot, reference rows name the invoice rather than the case number, which
+     doesn't exist yet when a blind decision is recorded (A08, A14).
 
    Remaining limits:
    - the release workflow has not run, and can't pass until this code is on `main`;
