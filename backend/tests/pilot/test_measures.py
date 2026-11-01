@@ -4,11 +4,14 @@ reference rows written out by hand so every count below can be checked by readin
 Each measure keeps its failures in its denominator: a referenced case OpsBridge never
 investigated counts as wrong, a case still open at the cut-off is reported as open (not
 dropped from the times), and a reviewer decision recorded after the case reached OpsBridge is
-reported apart from the blind ones, since the reviewer may have seen its output.
+reported apart from the blind ones, since the reviewer may have seen its output. A row finds
+its case by the invoice, as intake identified it, because a blind decision is recorded before
+the case and its number exist.
 """
 
 from __future__ import annotations
 
+import json
 from collections import Counter
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -37,8 +40,10 @@ def at(hours: float) -> datetime:
 
 
 def facts(case: str, **changes: object) -> CaseFacts:
+    """CASE-A's invoice is INV-A, from no named supplier, unless changed."""
     base: dict[str, object] = {
         "case_number": case,
+        "invoice": (f"INV-{case.removeprefix('CASE-')}", None),
         "created_at": T0,
         "first_investigated_at": at(0.1),
         "verdict": FOLLOW_UP,
@@ -53,11 +58,13 @@ def facts(case: str, **changes: object) -> CaseFacts:
     return CaseFacts(**(base | changes))  # type: ignore[arg-type]
 
 
-def ref(arm: str, case: str, line: int, **changes: object) -> ReferenceRow:
+def ref(arm: str, key: str, line: int, **changes: object) -> ReferenceRow:
+    """key: the invoice number of an opsbridge row, the pseudonym of a manual one."""
     base: dict[str, object] = {
         "line": line,
         "arm": arm,
-        "case": case,
+        "case": "" if arm == "opsbridge" else key,
+        "invoice": (key, None) if arm == "opsbridge" else None,
         "reviewed_at": at(-1),
         "reference": FOLLOW_UP,
         "process": None,
@@ -106,11 +113,11 @@ CASES = [
     ),
 ]
 REFERENCE = [
-    ref("opsbridge", "CASE-A", 2),
-    ref("opsbridge", "CASE-B", 3, reviewed_at=at(2), reference=QUERY),
-    ref("opsbridge", "CASE-D", 4, reference=None, reviewed_at=None, excluded="credit note"),
-    ref("opsbridge", "CASE-E", 5),
-    ref("opsbridge", "CASE-9999", 6),
+    ref("opsbridge", "INV-A", 2),
+    ref("opsbridge", "INV-B", 3, reviewed_at=at(2), reference=QUERY),
+    ref("opsbridge", "INV-D", 4, reference=None, reviewed_at=None, excluded="credit note"),
+    ref("opsbridge", "INV-E", 5),
+    ref("opsbridge", "INV-9999", 6),
     ref(
         "manual", "M-1", 7, reference=MATCHED, process=MATCHED,
         started_at=at(-1), decided_at=at(1), resolved_at=at(5),
@@ -127,9 +134,26 @@ def run(as_of: datetime = at(24)) -> dict[str, Any]:
 def test_scope_names_what_was_left_out_and_why() -> None:
     scope = run()["scope"]
     assert scope["opsbridge_cases"] == 4 and scope["manual_cases"] == 3
-    assert scope["excluded"] == [{"arm": "opsbridge", "case": "CASE-D", "reason": "credit note"}]
+    assert scope["excluded"] == [
+        {"arm": "opsbridge", "line": 4, "case": "CASE-D", "reason": "credit note"}
+    ]
     assert scope["unreferenced"] == ["CASE-C"]  # measured, but not for accuracy
-    assert scope["unknown_references"] == [{"line": 6, "case": "CASE-9999"}]
+    assert scope["unknown_references"] == [{"line": 6}]
+    # Cases are named by number; the report names no invoice.
+    assert "INV-" not in json.dumps(run())
+
+
+def test_a_row_finds_its_case_by_the_invoice_as_intake_identified_it() -> None:
+    # Intake keeps an invoice from a named supplier apart from the same number without one,
+    # so a row matches only when both agree; a row that matches nothing is listed by line.
+    cases = [facts("CASE-F", invoice=("INV-F", "SUP-1")), facts("CASE-G", verdict=QUERY)]
+    rows = [ref("opsbridge", "INV-F", 2), ref("opsbridge", "INV-G", 3, reference=QUERY)]
+    result = report(cases, rows, since=at(-24), until=at(1), as_of=at(24))
+    assert result["scope"]["unreferenced"] == ["CASE-F"]
+    assert result["scope"]["unknown_references"] == [{"line": 2}]
+    assert result["accuracy"]["opsbridge"]["blind"]["case"] | {"wilson95": None} == {
+        "correct": 1, "n": 1, "rate": 1.0, "wilson95": None,
+    }  # fmt: skip
 
 
 def test_extraction_completeness_counts_every_case_and_field() -> None:
