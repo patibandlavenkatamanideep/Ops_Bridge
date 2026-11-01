@@ -99,6 +99,7 @@ def _facts(s: Session, case: Case) -> CaseFacts:
     ).scalar_one()
     return CaseFacts(
         case_number=case.case_number,
+        invoice=(case.invoice_number, case.supplier_id) if case.invoice_number else None,
         created_at=case.created_at,
         first_investigated_at=first.created_at if first else None,
         verdict=verdict_of(first.outcome, first.findings, first.recommendation) if first else None,
