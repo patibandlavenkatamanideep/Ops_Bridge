@@ -7,6 +7,10 @@ their denominators: a referenced case OpsBridge never investigated counts as wro
 case not decided or resolved by the cut-off is reported as open, never dropped from the
 times. A reviewer decision is blind only when it was recorded before the case reached
 OpsBridge; later ones are reported apart, since the reviewer may have seen its output.
+
+A reference row finds its case by the invoice, as intake identified it (number and supplier),
+because a blind decision is recorded before the case and its number exist. The report names
+cases by number and rows by line, never by invoice.
 """
 
 from __future__ import annotations
@@ -42,6 +46,7 @@ class CaseFacts:
     """What OpsBridge recorded about one pilot case."""
 
     case_number: str
+    invoice: tuple[str, str | None] | None  # (number, supplier) as intake identified it
     created_at: datetime
     first_investigated_at: datetime | None
     verdict: Verdict | None  # of the first investigation: what the investigator saw first
@@ -97,18 +102,27 @@ def report(
     as_of: datetime,
 ) -> dict[str, Any]:
     """The measures over the cases OpsBridge recorded in the window and the reviewer's rows."""
-    by_case = {c.case_number: c for c in cases}
-    ops_rows = {r.case: r for r in reference if r.arm == "opsbridge"}
+    by_invoice = {c.invoice: c for c in cases if c.invoice is not None}
+    ops_rows = {r.invoice: r for r in reference if r.arm == "opsbridge" and r.invoice is not None}
     excluded = [r for r in reference if r.excluded]
-    left_out = {r.case for r in excluded if r.arm == "opsbridge"}
-    scope = sorted((c for c in cases if c.case_number not in left_out), key=lambda c: c.case_number)
+    left_out = {r.invoice for r in excluded if r.arm == "opsbridge"}
+    scope = sorted((c for c in cases if c.invoice not in left_out), key=lambda c: c.case_number)
     manual = [r for r in reference if r.arm == "manual" and not r.excluded]
+
+    def row_of(c: CaseFacts) -> ReferenceRow | None:
+        return ops_rows.get(c.invoice) if c.invoice is not None else None
+
+    def case_of(r: ReferenceRow) -> str | None:
+        if r.arm == "manual":
+            return r.case
+        found = by_invoice.get(r.invoice) if r.invoice is not None else None
+        return found.case_number if found else None
 
     # (case, the reviewer's verdict, whether it was recorded before the case reached OpsBridge)
     referenced = [
         (c, row.reference, row.reviewed_at is not None and row.reviewed_at < c.created_at)
         for c in scope
-        if (row := ops_rows.get(c.case_number)) is not None and row.reference is not None
+        if (row := row_of(c)) is not None and row.reference is not None
     ]
     disagreements = [
         {
@@ -146,12 +160,15 @@ def report(
         "scope": {
             "opsbridge_cases": len(scope),
             "manual_cases": len(manual),
-            "excluded": [{"arm": r.arm, "case": r.case, "reason": r.excluded} for r in excluded],
-            "unreferenced": [c.case_number for c in scope if c.case_number not in ops_rows],
+            "excluded": [
+                {"arm": r.arm, "line": r.line, "case": case_of(r), "reason": r.excluded}
+                for r in excluded
+            ],
+            "unreferenced": [c.case_number for c in scope if row_of(c) is None],
             "unknown_references": [
-                {"line": r.line, "case": r.case}
+                {"line": r.line}
                 for r in ops_rows.values()
-                if r.case not in by_case and not r.excluded
+                if r.invoice not in by_invoice and not r.excluded
             ],
         },
         "extraction": {
