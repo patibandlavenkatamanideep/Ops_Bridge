@@ -40,9 +40,9 @@ from opsbridge.workflow.jobs import ClaimedJob
 from opsbridge.workflow.worker import Worker, build_investigation_deps
 
 from .local_server import serve
+from .verdict import verdict_of
 
 EVAL_DB = "opsbridge_eval"
-DISCREPANCY_TYPES = ("missing_receipt", "quantity_mismatch", "price_mismatch")
 ESCALATE = "escalate:assign_case"
 INVESTIGATOR = {"furniture": "furn-investigator", "it_hardware": "it-investigator"}
 TENANT = {"furniture": "demo-furniture", "it_hardware": "demo-it"}
@@ -278,13 +278,9 @@ class BenchEnvironment:
             return t
         iv = view.version
         rec = iv.recommendation or {}
-        t.outcome = iv.outcome
-        t.types = sorted(
-            {f["finding_type"] for f in iv.findings if f["finding_type"] in DISCREPANCY_TYPES}
-        )
-        t.next_action = (
-            f"{rec['decision']}:{rec['action_type']}" if rec.get("action_type") else "none"
-        )
+        verdict = verdict_of(iv.outcome, iv.findings, rec)
+        t.outcome, t.next_action = verdict.outcome, verdict.next_action
+        t.types = list(verdict.types)
         t.finding_codes = [f["reason_code"] for f in iv.findings]
         t.explanation_origin = iv.explanation_origin
         t.citations = len(view.citations)

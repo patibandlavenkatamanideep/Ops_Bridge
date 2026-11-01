@@ -1,8 +1,9 @@
 """Frozen benchmark manifest: what a comparison is allowed to depend on, by digest.
 
 `freeze` records the corpus splits (with case ids), document rendering, policies, prompt
-templates, scoring definitions, modes, repeat schedule, acceptance policy and the
-investigation workflow version its trials run. `verify` re-hashes them before a benchmark
+templates, scoring definitions, modes, repeat schedule, the acceptance policy its runs are
+judged by, the investigation workflow version its trials run and, optionally, what the plan
+is for. `verify` re-hashes them before a benchmark
 run; any drift stops the run, because results produced from changed inputs are not
 comparable with the frozen plan. Code is deliberately not frozen (validation-driven fixes are
 allowed); the code version of each run is recorded with its results instead. Behaviour that
@@ -94,6 +95,34 @@ def scheme_of(scoring: Any) -> str | None:
     return next((name for name, body in SCHEMES.items() if body == scoring), None)
 
 
+# Plans frozen before plans named their policy (opsbridge-bench-v1) are judged by this one.
+DEFAULT_ACCEPTANCE_POLICY = "evals/acceptance-policy.json"
+
+
+def acceptance_policy_of(manifest: dict[str, Any]) -> str:
+    """The acceptance policy a plan's runs are judged by (a repository-relative path)."""
+    return str(manifest.get("acceptance_policy", DEFAULT_ACCEPTANCE_POLICY))
+
+
+def load_acceptance_policy(manifest: dict[str, Any], root: Path) -> dict[str, Any]:
+    """The plan's acceptance policy; refused if it was declared for another benchmark, whose
+    gates (a held-out gate above all) would not mean the same thing for this plan."""
+    policy: dict[str, Any] = json.loads(
+        (root / acceptance_policy_of(manifest)).read_text(encoding="utf-8")
+    )
+    if policy.get("benchmark_id") != manifest.get("benchmark_id"):
+        raise ValueError(
+            f"{acceptance_policy_of(manifest)} was declared for {policy.get('benchmark_id')}, "
+            f"not {manifest.get('benchmark_id')}"
+        )
+    return policy
+
+
+def frozen_plans(root: Path) -> list[str]:
+    """Benchmark ids with a frozen plan in the repository."""
+    return sorted(p.stem for p in (root / "evals" / "manifests").glob("*.json"))
+
+
 def workflow_version_of(manifest: dict[str, Any]) -> str:
     """The investigation workflow a plan's trials run. Plans frozen before plans named one
     (opsbridge-bench-v1) were recorded with investigation/1.1.0."""
@@ -158,8 +187,8 @@ def code_version(root: Path) -> dict[str, Any]:
     return {"commit": _git_head(root), "uncommitted_changes": dirty}
 
 
-def inputs(root: Path) -> dict[str, Any]:
-    """The frozen inputs, recomputed from disk."""
+def inputs(root: Path, acceptance_policy: str = DEFAULT_ACCEPTANCE_POLICY) -> dict[str, Any]:
+    """The frozen inputs, recomputed from disk, with the plan's own acceptance policy."""
     corpora: dict[str, Any] = {}
     for split in SPLITS:
         path = root / "fixtures" / "scenarios" / f"{split}.yaml"
@@ -186,7 +215,7 @@ def inputs(root: Path) -> dict[str, Any]:
             # Rendering is part of the inputs: it turns scenarios into the external documents.
             root / "backend" / "src" / "opsbridge" / "simulator" / "scenarios.py",
             root / "backend" / "src" / "opsbridge" / "simulator" / "minipdf.py",
-            root / "evals" / "acceptance-policy.json",
+            root / acceptance_policy,
         ]
     )
     return {
@@ -203,6 +232,8 @@ def freeze(
     modes: list[str],
     repeats: int,
     scheme: str = CURRENT_SCHEME,
+    acceptance_policy: str = DEFAULT_ACCEPTANCE_POLICY,
+    purpose: str | None = None,
 ) -> dict[str, Any]:
     body: dict[str, Any] = {
         "schema": SCHEMA,
@@ -213,7 +244,9 @@ def freeze(
         "repeats": repeats,
         "scoring": SCHEMES[scheme],
         "workflow_version": WORKFLOW_VERSION,
-        **inputs(root),
+        "acceptance_policy": acceptance_policy,
+        **({"purpose": purpose} if purpose else {}),
+        **inputs(root, acceptance_policy),
     }
     body["manifest_sha256"] = digest({k: v for k, v in body.items() if k != "manifest_sha256"})
     return body
@@ -236,7 +269,7 @@ def verify(manifest: dict[str, Any], root: Path) -> list[str]:
     if digest(body) != manifest.get("manifest_sha256"):
         problems.append("the manifest file itself was edited after freezing")
     try:
-        now = inputs(root)
+        now = inputs(root, acceptance_policy_of(manifest))
     except (OSError, ValueError) as exc:
         return [*problems, f"frozen inputs unreadable: {exc}"]
     for split, frozen in manifest.get("splits", {}).items():

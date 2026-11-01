@@ -50,15 +50,34 @@ changes repository administration. To apply (repository owner):
 
     gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/main-ruleset.json
 
-**Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI passed
-(`git tag v0.2.0 <commit> && git push origin v0.2.0`). The workflow refuses a commit whose four
-required checks did not all succeed, builds the image from the locks, pushes it to
-`ghcr.io/<owner>/opsbridge:<tag>`, attaches an SPDX SBOM and a build-provenance attestation,
-and verifies the attestation (`gh attestation verify`) before reporting the digest. Deploy
-and roll back by **digest**, never by tag. A schema migration must work with the previous
-release's code until that release is retired (add first, remove later), so rolling back the
-image does not need a down-migration. Not yet run: no tag exists, so its first use is its
-first test.
+**Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI run (started
+by the push to `main`) passed, with the version every package declares:
+
+    git tag v0.1.0-alpha.1 <commit> && git push origin v0.1.0-alpha.1
+
+The workflow refuses a tag that disagrees with any declared version and a commit whose CI run
+did not pass every required job. It then builds the image once from the locks and pushes it
+only as `candidate-<commit>`. It qualifies that digest with CI's image checks, records an SPDX
+SBOM, attests the digest's build provenance and verifies the attestation. Only then does it
+give the same digest the version tag, and it reports the digest in the run summary.
+
+**Pre-releases.** A tag `vX.Y.Z-alpha.N`, `-beta.N` or `-rc.N` is a pre-release. npm declares
+it as tagged (`0.1.0-alpha.1`); Python declares the PEP 440 spelling (`0.1.0a1`). Its image
+description, and the run summary, say it is an experimental pre-release: it establishes that
+the artifact is delivered, not that it is fit for production. The packages currently declare
+`0.1.0-alpha.1`, the first release, which has not been made.
+
+**After a release, check what was published** (the package must be readable to you):
+
+    docker buildx imagetools inspect ghcr.io/patibandlavenkatamanideep/opsbridge:<tag>   # digest = run summary's
+    gh attestation verify oci://ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> --repo patibandlavenkatamanideep/Ops_Bridge
+    docker run --rm ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> id -u          # 10001
+    docker run --rm ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> python -m opsbridge.cli eval-verify --summary-only
+
+Deploy and roll back by **digest**, never by tag. A schema migration must work with the
+previous release's code until that release is retired (add first, remove later), so rolling
+back the image does not need a down-migration. Not yet run: no tag exists, so its first use is
+its first test.
 
 ## Staging plan (AWS, not provisioned)
 

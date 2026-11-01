@@ -51,6 +51,14 @@ export async function createOrOpenCase(page: Page, invoice: string, tenant = "de
   await expect(page.getByRole("heading", { level: 1 })).toContainText(invoice);
 }
 
+/**
+ * The link to a benchmark's held-out record run on the evaluation list. Several benchmarks
+ * re-run the same split, so rows are told apart by the benchmark in the link, not by text.
+ */
+export function heldOutRecordLink(page: Page, benchmark = "opsbridge-bench-v1") {
+  return page.locator(`a[href*="/evaluation/${benchmark}/heldout-record-"]`);
+}
+
 /** Open an existing case from the queue by searching for it (robust to queue pagination). */
 export async function openCase(page: Page, invoice: string, tenant = "demo-furniture"): Promise<void> {
   await page.goto(`/t/${tenant}/cases`);

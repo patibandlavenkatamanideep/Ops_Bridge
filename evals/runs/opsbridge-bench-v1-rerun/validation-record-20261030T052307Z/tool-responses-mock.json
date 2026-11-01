@@ -1,0 +1,61 @@
+{
+ "calls": [
+  {
+   "case_id": "fur-validation-111",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 0,
+   "response_sha256": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 1,
+   "response_sha256": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "fur-validation-111",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 2,
+   "response_sha256": "sha256:4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "it-validation-107",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 0,
+   "response_sha256": "sha256:7c849b737578cef11eaf0f124a56c41529f4a0e6e627ee4f0076b6de6dc89426",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "it-validation-107",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 1,
+   "response_sha256": "sha256:7c849b737578cef11eaf0f124a56c41529f4a0e6e627ee4f0076b6de6dc89426",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "it-validation-107",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 2,
+   "response_sha256": "sha256:7c849b737578cef11eaf0f124a56c41529f4a0e6e627ee4f0076b6de6dc89426",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  }
+ ],
+ "manifest_sha256": "sha256:baea0a67b0ebc2542b4b30cfd0b933ffbd9cca668d7092b5fa8b2b04f1cc86de",
+ "response_mode": "live",
+ "schema": "evalseal.agent-tool-responses/1"
+}

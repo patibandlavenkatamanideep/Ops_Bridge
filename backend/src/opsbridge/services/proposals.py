@@ -464,6 +464,16 @@ def _params_for(action: str, raw: dict[str, Any]) -> dict[str, Any]:
         ) from exc
 
 
+def drafted_parameters(action: str, draft: dict[str, Any]) -> dict[str, Any]:
+    """The parameters a proposal made from `draft` without changes would carry (the pilot
+    report compares what was approved with them). A draft that is not valid on its own, so
+    that a proposal could only be made from it with changes, gives its raw parameters."""
+    try:
+        return _params_for(action, _draft_params(action, draft))
+    except Conflict:
+        return _draft_params(action, draft)
+
+
 def _check_params_policy(action: str, params: dict[str, Any], policy: ReconciliationPolicy) -> None:
     if action not in policy.allowed_actions:
         raise Conflict("action_not_allowed", f"Policy {policy.ref} does not allow {action}.")

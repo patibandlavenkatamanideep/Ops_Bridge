@@ -1,0 +1,34 @@
+{
+ "calls": [
+  {
+   "case_id": "fur-heldout-222",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 0,
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "fur-heldout-222",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 1,
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  },
+  {
+   "case_id": "fur-heldout-222",
+   "input_sha256": "sha256:79d9fc217e76e04498e50d1dd4f2c810468e84beeac6eb4834613f64d2bf8eab",
+   "outcome": "ok",
+   "repeat": 2,
+   "response_sha256": "sha256:8892d2c0cd40483ccdb85228d24cf8039257159ee014d4043ea4a74955616e09",
+   "seq": 1,
+   "tool": "search_case_evidence"
+  }
+ ],
+ "manifest_sha256": "sha256:baea0a67b0ebc2542b4b30cfd0b933ffbd9cca668d7092b5fa8b2b04f1cc86de",
+ "response_mode": "live",
+ "schema": "evalseal.agent-tool-responses/1"
+}

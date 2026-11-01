@@ -22,7 +22,7 @@ from typing import Any
 import httpx
 
 from opsbridge import safejson
-from opsbridge.connectors import http_transport
+from opsbridge.connectors import http_transport, sdk_transport
 
 from .contracts import (
     Capabilities,
@@ -181,9 +181,14 @@ class AnthropicAdapter:
     name = "anthropic"
 
     def __init__(
-        self, model: str, api_key: str, client_factory: Callable[..., Any] | None = None
+        self,
+        model: str,
+        api_key: str,
+        client_factory: Callable[..., Any] | None = None,
+        transport: Any = None,  # an httpx2 transport under the bound (tests: a mock)
     ) -> None:
         import anthropic
+        import httpx2
 
         if not model:
             raise ModelUnavailable("no Anthropic model id configured (OPSBRIDGE_ANTHROPIC_MODEL)")
@@ -198,7 +203,17 @@ class AnthropicAdapter:
             "propagation": False,
             "traces": {"enabled": True, "content_mode": "metadata_only"},
         }
-        self._client: Any = factory(api_key=api_key, max_retries=0, open_telemetry=telemetry)
+        # The SDK reads replies itself: a transport under its client bounds them
+        # (sdk_transport), keeping the SDK's own client defaults otherwise.
+        http_client = anthropic.DefaultHttpxClient(
+            transport=sdk_transport.BoundedTransport(
+                transport or httpx2.HTTPTransport(),
+                max_bytes=sdk_transport.MAX_MODEL_REPLY_BYTES,
+            )
+        )
+        self._client: Any = factory(
+            api_key=api_key, max_retries=0, open_telemetry=telemetry, http_client=http_client
+        )
         self.capabilities = Capabilities(
             provider="anthropic",
             structured_output="native_schema",
@@ -240,6 +255,9 @@ class AnthropicAdapter:
         except anthropic.APIStatusError as exc:
             raise ModelUnavailable(f"Anthropic returned HTTP {exc.status_code}") from exc
         latency = int((time.monotonic() - start) * 1000)
+        if not isinstance(getattr(msg, "content", None), list):
+            # A 200 that is not a message (the SDK hands back unparseable bodies as text).
+            raise ModelUnavailable("Anthropic reply is not a message")
         text = "".join(
             getattr(b, "text", "") for b in msg.content if getattr(b, "type", "") == "text"
         )

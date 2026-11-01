@@ -263,7 +263,13 @@ def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> Non
     runs = get(st, "furn-investigator", "/api/v1/tenants/demo-furniture/evaluations").json()[
         "items"
     ]
-    held = next(r for r in runs if r["split"] == "heldout" and r["kind"] == "record")
+    held = next(
+        r
+        for r in runs
+        if r["benchmark_id"] == "opsbridge-bench-v1"
+        and r["split"] == "heldout"
+        and r["kind"] == "record"
+    )
     url = f"/api/v1/tenants/demo-furniture/evaluations/{held['benchmark_id']}/{held['run_id']}"
     detail = get(st, "furn-investigator", url).json()
     # every committed run was graded under the current frozen plan and scoring
@@ -271,7 +277,10 @@ def test_evaluation_api_shows_own_pack_cases_and_validates_run_ids(stack) -> Non
     assert detail["comparability"] == {"comparable": True, "reasons": [], "note": None}
     # v1 is graded under its frozen scoring 1, and says what that scoring's instability was
     assert detail["scoring_scheme"] == "opsbridge-scoring/1"
-    assert {r["scoring_scheme"] for r in runs} == {"opsbridge-scoring/1"}
+    assert detail["workflow_version"] == "investigation/1.1.0" and detail["purpose"] is None
+    assert {r["scoring_scheme"] for r in runs if r["benchmark_id"] == "opsbridge-bench-v1"} == {
+        "opsbridge-scoring/1"
+    }
     note = detail["modes"]["rules_only"]["instability_note"]
     assert "whether the next action was correct, not in the action itself" in note
     cases = detail["modes"]["rules_only"]["pack_cases"]
@@ -328,3 +337,29 @@ def test_tier_quotas_do_not_throttle_the_benchmark_harness(
         ]
     assert [t.error for t in trials] == [None] * 6
     assert all(t.explanation_origin == "model:mock" for t in trials if t.mode == "mock")
+
+
+def test_the_engineering_rerun_is_labelled_and_decides_no_heldout_gate(stack) -> None:  # type: ignore[no-untyped-def]
+    from .stack import get
+
+    st = stack
+    base = "/api/v1/tenants/demo-furniture/evaluations"
+    runs = [
+        r
+        for r in get(st, "furn-investigator", base).json()["items"]
+        if r["benchmark_id"] == "opsbridge-bench-v1-rerun"
+    ]
+    assert sorted(r["split"] for r in runs) == ["dev", "heldout", "security", "validation"]
+    assert all(r["scoring_scheme"] == "opsbridge-scoring/2" for r in runs)
+    assert all("not held-out or out-of-sample evidence" in (r["purpose"] or "") for r in runs)
+    assert all(r["comparability"]["comparable"] for r in runs)
+    held = next(r for r in runs if r["split"] == "heldout")
+    detail = get(st, "furn-investigator", f"{base}/{held['benchmark_id']}/{held['run_id']}").json()
+    assert detail["workflow_version"] == "investigation/1.2.0"
+    assert [(g["mode"], g["status"]) for g in detail["acceptance"]] == [
+        ("rules_only", "not_evaluated"),
+        ("mock", "not_evaluated"),
+    ]
+    assert all("not held out" in g["reason"] for g in detail["acceptance"])
+    assert detail["modes"]["rules_only"]["instability_note"] is None  # scoring 2 needs none
+    assert detail["modes"]["rules_only"]["next_action"]["correct"] == 36

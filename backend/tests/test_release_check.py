@@ -108,8 +108,59 @@ def test_the_tag_must_name_the_version_every_package_declares() -> None:
         "backend/pyproject.toml declares version 1.2.3, the tag says 1.2.4",
         "frontend/package.json declares version 1.2.3, the tag says 1.2.4",
     ]
-    for tag in ("1.2.3", "v1.2", "v01.2.3", "v1.2.3-rc1", "main"):
-        assert rc.version_problems(tag, declared) == [f"tag {tag!r} is not vMAJOR.MINOR.PATCH"]
+    for tag in ("1.2.3", "v1.2", "v01.2.3", "v1.2.3-rc1", "v1.2.3-experimental.1", "v1.2.3-alpha",
+                "v1.2.3-alpha.01", "v1.2.3+build.1", "main"):  # fmt: skip
+        assert rc.version_problems(tag, declared) == [
+            f"tag {tag!r} is not vMAJOR.MINOR.PATCH or vMAJOR.MINOR.PATCH-(alpha|beta|rc).N"
+        ]
+
+
+def declaring(python: str, npm: str) -> dict[str, str]:
+    """Every declaration, with Python's spelling of the version and npm's."""
+    return {
+        "backend/pyproject.toml": python,
+        "backend/src/opsbridge/__init__.py": python,
+        "backend/uv.lock": python,
+        "frontend/package.json": npm,
+        "frontend/package-lock.json": npm,
+        "frontend/package-lock.json (root package)": npm,
+    }
+
+
+def test_a_prerelease_tag_names_each_ecosystems_spelling_of_the_version() -> None:
+    # Before: only vMAJOR.MINOR.PATCH was accepted, so an experimental release could only be
+    # published under a tag that reads as an ordinary release. npm keeps the tag's semver
+    # spelling; Python packages declare the normalized PEP 440 one.
+    assert rc.version_problems("v0.1.0-alpha.1", declaring("0.1.0a1", "0.1.0-alpha.1")) == []
+    assert rc.version_problems("v0.1.0-beta.2", declaring("0.1.0b2", "0.1.0-beta.2")) == []
+    assert rc.version_problems("v0.1.0-rc.3", declaring("0.1.0rc3", "0.1.0-rc.3")) == []
+
+
+def test_a_prerelease_must_be_declared_and_spelled_for_its_ecosystem() -> None:
+    swapped = declaring("0.1.0a1", "0.1.0-alpha.1") | {
+        "backend/pyproject.toml": "0.1.0-alpha.1",
+        "frontend/package.json": "0.1.0a1",
+    }
+    assert rc.version_problems("v0.1.0-alpha.1", swapped) == [
+        "backend/pyproject.toml declares version 0.1.0-alpha.1, the tag says 0.1.0a1",
+        "frontend/package.json declares version 0.1.0a1, the tag says 0.1.0-alpha.1",
+    ]
+    # Packages still declaring the plain version do not match a pre-release tag, nor the reverse.
+    assert len(rc.version_problems("v0.1.0-alpha.1", declaring("0.1.0", "0.1.0"))) == 6
+    assert len(rc.version_problems("v0.1.0", declaring("0.1.0a1", "0.1.0-alpha.1"))) == 6
+
+
+def test_a_prerelease_image_says_it_is_experimental() -> None:
+    assert rc.describe("v0.1.0-alpha.1") == (
+        "OpsBridge v0.1.0-alpha.1: experimental pre-release"
+        " (artifact delivery only; not qualified for production use)"
+    )
+    assert rc.describe("v1.2.3") == "OpsBridge v1.2.3"
+    # The workflow passes labels one per line; a description must stay on its line.
+    assert "\n" not in rc.describe("v0.1.0-rc.1")
+    release = (REPO_ROOT / ".github/workflows/release.yml").read_text()
+    assert "release_check.py describe --tag" in release
+    assert "org.opencontainers.image.description=${{ steps.tag.outputs.description }}" in release
 
 
 def test_every_declaration_in_the_repository_is_read(tmp_path: Path) -> None:
@@ -122,7 +173,8 @@ def test_every_declaration_in_the_repository_is_read(tmp_path: Path) -> None:
         "frontend/package-lock.json",
         "frontend/package-lock.json (root package)",
     }
-    assert len(set(current.values())) == 1, current  # they agree today
+    tag = "v" + current["frontend/package.json"]  # npm spells the version as the tag does
+    assert rc.version_problems(tag, current) == [], current  # they agree today
     # One file left behind by a version bump is caught.
     for path in ("backend/pyproject.toml", "backend/src/opsbridge/__init__.py", "backend/uv.lock",
                  "frontend/package.json", "frontend/package-lock.json"):  # fmt: skip
@@ -130,7 +182,6 @@ def test_every_declaration_in_the_repository_is_read(tmp_path: Path) -> None:
         shutil.copy(REPO_ROOT / path, tmp_path / path)
     package = json.loads((tmp_path / "frontend/package.json").read_text())
     (tmp_path / "frontend/package.json").write_text(json.dumps(package | {"version": "9.9.9"}))
-    tag = "v" + current["backend/pyproject.toml"]
     assert rc.version_problems(tag, rc.package_versions(tmp_path)) == [
         f"frontend/package.json declares version 9.9.9, the tag says {tag[1:]}"
     ]

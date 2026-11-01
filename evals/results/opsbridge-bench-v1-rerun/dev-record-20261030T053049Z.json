@@ -1,0 +1,4003 @@
+{
+ "acceptance": [
+  {
+   "gate": "heldout_next_action",
+   "mode": "rules_only",
+   "reason": "split dev",
+   "status": "not_evaluated"
+  },
+  {
+   "gate": "heldout_next_action",
+   "mode": "mock",
+   "reason": "split dev",
+   "status": "not_evaluated"
+  }
+ ],
+ "benchmark_id": "opsbridge-bench-v1-rerun",
+ "code_version": {
+  "commit": "d2f2c7313b559586ebb0c40d2a14f2e5de2d2ba1",
+  "uncommitted_changes": false
+ },
+ "kind": "record",
+ "manifest_sha256": "sha256:873bc56780fa191e6ba656f6c29829c4828d05be8b84628d07004f4f95824018",
+ "modes": {
+  "mock": {
+   "agent": {
+    "citations": 237,
+    "citations_valid": 237,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "model:mock": 111
+    },
+    "input_tokens": 0,
+    "model_calls": 231,
+    "model_calls_rejected": 3,
+    "output_tokens": 0,
+    "proposals_rejected": 3,
+    "proposals_validated": 111,
+    "tool_calls": 9
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 11,
+     "n": 11,
+     "rate": 1.0,
+     "wilson95": [
+      0.7412,
+      1.0
+     ]
+    },
+    "manual_review": {
+     "correct": 6,
+     "n": 6,
+     "rate": 1.0,
+     "wilson95": [
+      0.6097,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 16,
+     "n": 16,
+     "rate": 1.0,
+     "wilson95": [
+      0.8064,
+      1.0
+     ]
+    },
+    "needs_information": {
+     "correct": 4,
+     "n": 4,
+     "rate": 1.0,
+     "wilson95": [
+      0.5101,
+      1.0
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 4
+    },
+    "price_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 4
+    },
+    "quantity_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 9
+    }
+   },
+   "case": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "cases": {
+    "fur-dev-001": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "2 of 20 not received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-002": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "all equal",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-003": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "10 received cumulatively, 12 billed",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-004": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-005": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 16 received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-RETURN",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-006": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "reversed return ignored",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-RETURN",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-007": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "boundary passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-008": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "percent boundary passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-009": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "one minor unit outside",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-010": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+60 per unit",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-011": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "net price equal",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-012": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "missing receipt is not non-delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MISSING-GR",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-013": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "a supplier claim does not establish delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MISSING-GR",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "supplier_claim_unverified"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-014": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "quantity route has priority",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-015": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "line 1 receipt unavailable",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-016": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "no double allocation",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [
+      "receipt_quantity_already_allocated"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-017": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-018": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-019": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unit unknown",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "unit_unknown"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-020": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no currency conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "currency_unsupported"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-021": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no silent cross-supplier join",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "supplier_match_uncertain"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-022": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "configured conversion",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-UNITS",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-023": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "receiving record controls by policy",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-CONFLICT",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "conflict_resolved_by_precedence"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-024": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "extraction not authoritative",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-DOC-DEFECT",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-025": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "charges excluded and disclosed",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "charges_not_evaluated"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-001": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-QTY",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-002": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-QTY",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-003": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "both-rules policy",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-004": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "boundary",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-005": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "over_only",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-006": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "IT-MISSING",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-007": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "undefined precedence escalates",
+      "outcome": "manual_review",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-CONFLICT",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "source_precedence_undefined"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-008": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-UNITS",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-009": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-QTY",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-010": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 8",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-QTY",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-011": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "exact item-code line match is disclosed",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-LINES",
+     "finding_codes": [
+      "po_line_matched_by_item_code",
+      "po_line_matched_by_item_code"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-012": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "percent tolerance undefined at zero price",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-REVIEW",
+     "finding_codes": [
+      "percent_tolerance_zero_price"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    }
+   },
+   "complete": true,
+   "incomplete_cases": [],
+   "instability": {
+    "action": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "correctness": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "definition": "per case, 1 - (count of the most common value) / repeats, on each axis",
+    "errors": {
+     "trials_with_error": 0
+    },
+    "outcome_types": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "repeats_per_case": [
+     3
+    ],
+    "sampling_limit": "3 repeats per case: disagreement below 1/3 cannot be observed, and no disagreement in 3 repeats does not show that a case is stable; intervals are over 37 cases",
+    "scheme": "opsbridge-scoring/2"
+   },
+   "latency_ms": {
+    "median": 220,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 553
+   },
+   "misses": {},
+   "n_cases": 37,
+   "n_trials": 111,
+   "next_action": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "outcome": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "safe_misses": 0,
+   "scoring": "opsbridge-scoring/2",
+   "trial_errors": 0,
+   "types": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "unsafe_misses": 0
+  },
+  "rules_only": {
+   "agent": {
+    "citations": 237,
+    "citations_valid": 237,
+    "cost_usd": "0 (mock or replay; no paid calls)",
+    "explanation_origins": {
+     "template": 111
+    },
+    "input_tokens": 0,
+    "model_calls": 0,
+    "model_calls_rejected": 0,
+    "output_tokens": 0,
+    "proposals_rejected": 0,
+    "proposals_validated": 111,
+    "tool_calls": 0
+   },
+   "by_expected_outcome": {
+    "discrepancies_found": {
+     "correct": 11,
+     "n": 11,
+     "rate": 1.0,
+     "wilson95": [
+      0.7412,
+      1.0
+     ]
+    },
+    "manual_review": {
+     "correct": 6,
+     "n": 6,
+     "rate": 1.0,
+     "wilson95": [
+      0.6097,
+      1.0
+     ]
+    },
+    "matched": {
+     "correct": 16,
+     "n": 16,
+     "rate": 1.0,
+     "wilson95": [
+      0.8064,
+      1.0
+     ]
+    },
+    "needs_information": {
+     "correct": 4,
+     "n": 4,
+     "rate": 1.0,
+     "wilson95": [
+      0.5101,
+      1.0
+     ]
+    }
+   },
+   "by_type": {
+    "missing_receipt": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 4
+    },
+    "price_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 4
+    },
+    "quantity_mismatch": {
+     "fn": 0,
+     "fp": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "tp": 9
+    }
+   },
+   "case": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "cases": {
+    "fur-dev-001": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "2 of 20 not received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-002": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "all equal",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-003": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "10 received cumulatively, 12 billed",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-004": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-SHORT",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-005": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 16 received",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-QTY-RETURN",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-006": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "reversed return ignored",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-QTY-RETURN",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-007": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "boundary passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-008": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "percent boundary passes",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-009": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "one minor unit outside",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-010": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "+60 per unit",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-011": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "net price equal",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-012": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "missing receipt is not non-delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MISSING-GR",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-013": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "a supplier claim does not establish delivery",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MISSING-GR",
+     "finding_codes": [
+      "receiving_record_unavailable",
+      "supplier_claim_unverified"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-014": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "quantity route has priority",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch",
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-015": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "line 1 receipt unavailable",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-016": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "no double allocation",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [
+      "receipt_quantity_already_allocated"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-017": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-018": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-ALLOC",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "northgate-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-019": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "unit unknown",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "unit_unknown"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-020": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no currency conversion",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "currency_unsupported"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-021": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "no silent cross-supplier join",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-REVIEW",
+     "finding_codes": [
+      "supplier_match_uncertain"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-022": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "configured conversion",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-UNITS",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "birch-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-023": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "receiving record controls by policy",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "FUR-CONFLICT",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "conflict_resolved_by_precedence"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-024": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "extraction not authoritative",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "FUR-DOC-DEFECT",
+     "finding_codes": [
+      "invoice_extraction_needs_review"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "fur-dev-025": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "charges excluded and disclosed",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "FUR-MIXED",
+     "finding_codes": [
+      "charges_not_evaluated"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "furniture",
+     "problems": [],
+     "safe_miss": false,
+     "template": "acme-pdf-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-001": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-QTY",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-002": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-QTY",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-003": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_supplier_message_draft",
+      "note": "both-rules policy",
+      "outcome": "discrepancies_found",
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [
+      "price_above_po_beyond_tolerance"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_supplier_message_draft",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "price_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft",
+      "propose_action:create_supplier_message_draft"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-004": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "boundary",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-005": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "over_only",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-PRICE",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-006": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "request_information:create_follow_up_task",
+      "note": "",
+      "outcome": "needs_information",
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "family": "IT-MISSING",
+     "finding_codes": [
+      "receiving_record_unavailable"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "request_information:create_follow_up_task",
+      "outcome": "needs_information",
+      "ties": [],
+      "types": [
+       "missing_receipt"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task",
+      "request_information:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-007": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "undefined precedence escalates",
+      "outcome": "manual_review",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-CONFLICT",
+     "finding_codes": [
+      "invoiced_exceeds_received",
+      "source_precedence_undefined"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-008": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-UNITS",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-009": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-QTY",
+     "finding_codes": [],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-010": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "propose_action:create_follow_up_task",
+      "note": "net 8",
+      "outcome": "discrepancies_found",
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "family": "IT-QTY",
+     "finding_codes": [
+      "invoiced_exceeds_received"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "propose_action:create_follow_up_task",
+      "outcome": "discrepancies_found",
+      "ties": [],
+      "types": [
+       "quantity_mismatch"
+      ]
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task",
+      "propose_action:create_follow_up_task"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-011": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "no_discrepancy:record_review_note",
+      "note": "exact item-code line match is disclosed",
+      "outcome": "matched",
+      "types": []
+     },
+     "family": "IT-LINES",
+     "finding_codes": [
+      "po_line_matched_by_item_code",
+      "po_line_matched_by_item_code"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "no_discrepancy:record_review_note",
+      "outcome": "matched",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "para-json-v1",
+     "verdicts": [
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note",
+      "no_discrepancy:record_review_note"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    },
+    "it-dev-012": {
+     "complete": true,
+     "correct": {
+      "case": true,
+      "next_action": true,
+      "outcome": true,
+      "types": true
+     },
+     "disagreement": {
+      "action": 0.0,
+      "correctness": 0.0,
+      "errors": 0.0,
+      "outcome_types": 0.0
+     },
+     "expected": {
+      "next_action": "escalate:assign_case",
+      "note": "percent tolerance undefined at zero price",
+      "outcome": "manual_review",
+      "types": []
+     },
+     "family": "IT-REVIEW",
+     "finding_codes": [
+      "percent_tolerance_zero_price"
+     ],
+     "majority": {
+      "error": null,
+      "next_action": "escalate:assign_case",
+      "outcome": "manual_review",
+      "ties": [],
+      "types": []
+     },
+     "pack": "it_hardware",
+     "problems": [],
+     "safe_miss": false,
+     "template": "lumen-json-v1",
+     "verdicts": [
+      "escalate:assign_case",
+      "escalate:assign_case",
+      "escalate:assign_case"
+     ],
+     "whole_verdict": {
+      "count": 3,
+      "tied": false
+     }
+    }
+   },
+   "complete": true,
+   "incomplete_cases": [],
+   "instability": {
+    "action": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "correctness": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "definition": "per case, 1 - (count of the most common value) / repeats, on each axis",
+    "errors": {
+     "trials_with_error": 0
+    },
+    "outcome_types": {
+     "cases_with_disagreement": 0,
+     "cases_with_disagreement_rate": {
+      "correct": 0,
+      "n": 37,
+      "rate": 0.0,
+      "wilson95": [
+       0.0,
+       0.0941
+      ]
+     },
+     "mean": 0.0
+    },
+    "repeats_per_case": [
+     3
+    ],
+    "sampling_limit": "3 repeats per case: disagreement below 1/3 cannot be observed, and no disagreement in 3 repeats does not show that a case is stable; intervals are over 37 cases",
+    "scheme": "opsbridge-scoring/2"
+   },
+   "latency_ms": {
+    "median": 188,
+    "note": "wall time per investigation run on the local machine",
+    "p95": 251
+   },
+   "misses": {},
+   "n_cases": 37,
+   "n_trials": 111,
+   "next_action": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "outcome": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "safe_misses": 0,
+   "scoring": "opsbridge-scoring/2",
+   "trial_errors": 0,
+   "types": {
+    "correct": 37,
+    "n": 37,
+    "rate": 1.0,
+    "wilson95": [
+     0.9059,
+     1.0
+    ]
+   },
+   "unsafe_misses": 0
+  }
+ },
+ "network": "Python-level egress limited to loopback during the run",
+ "paired_rules_vs_mock": {
+  "both_correct": 37,
+  "exact_mcnemar_p": null,
+  "improved": [],
+  "n_cases": 37,
+  "neither_correct": 0,
+  "note": "no discordant cases: the comparison cannot distinguish the modes on this split",
+  "regressed": []
+ },
+ "purpose": "Regression re-run of the public v1 cases with the current code (scoring 2, investigation/1.2.0); not held-out or out-of-sample evidence.",
+ "receipts": {
+  "mock": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:3675120884da3cc1c8ebd7179dff33a156abdc80fe05e79d615ca4e8c2771381",
+   "run_dir": "evals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z"
+  },
+  "rules_only": {
+   "ledger": "evals/ledger/opsbridge-bench.jsonl",
+   "record_hash": "sha256:cd4595d3117996b3a98f3693df2a7a4cb0ea98b64aa589bde30bfc3235ead607",
+   "run_dir": "evals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z"
+  }
+ },
+ "repeats": 3,
+ "response_origin": "mocked (deterministic mock model); no real model evaluated",
+ "run_id": "dev-record-20261030T053049Z",
+ "schema": "opsbridge-eval-results/1",
+ "split": "dev",
+ "verification": {
+  "artifacts": [
+   {
+    "index": 0,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 1,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/cassettes/opsbridge-bench-v1/validation.json matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: backend/src/opsbridge/agents/prompts.py matches \nthe sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022235Z/tool-responses-\nmock.json matches the sealed digest\n"
+   },
+   {
+    "index": 2,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-rules_on\nly.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nrules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 3,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/model-cassette.\njson matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/trials-mock.jso\nnl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/validation-record-20261015T022504Z/tool-responses-\nmock.json matches the sealed digest\n"
+   },
+   {
+    "index": 4,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 5,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022529Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 6,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 7,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 8,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 9,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   },
+   {
+    "index": 10,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 11,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T022826Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   },
+   {
+    "index": 12,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 13,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T022852Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 14,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 15,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261015T174055Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   },
+   {
+    "index": 16,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 17,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261015T174129Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 18,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 19,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261019T173251Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   },
+   {
+    "index": 20,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 21,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261019T173319Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 22,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/trials-rules_only.\njsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/tool-responses-rul\nes_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 23,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/model-cassette.jso\nn matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/prompts.json \nmatches the sealed digest\nok           opsbridge_tool_cassette: \nevals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z/tool-cassette.json\nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/trials-mock.jsonl \nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/heldout-replay-20261022T012711Z/tool-responses-moc\nk.json matches the sealed digest\n"
+   },
+   {
+    "index": 24,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/trials-rules_only\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/tool-responses-ru\nles_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 25,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: evals/acceptance-policy.json matches \nthe sealed digest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1.json matches\nthe sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1/security-record-20261015T022617Z/model-cassette.js\non matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/trials-mock.jsonl\nmatches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1/security-replay-20261022T012742Z/tool-responses-mo\nck.json matches the sealed digest\n"
+   },
+   {
+    "index": 26,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/prompts.jso\nn matches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/trials-rule\ns_only.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/tool-acl.js\non matches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/tool-respon\nses-rules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 27,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/model-casse\ntte.json matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/prompts.jso\nn matches the sealed digest\nok           opsbridge_tool_cassette: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/tool-casset\nte.json matches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/trials-mock\n.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/tool-acl.js\non matches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/security-record-20261030T052249Z/tool-respon\nses-mock.json matches the sealed digest\n"
+   },
+   {
+    "index": 28,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/prompts.j\nson matches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/trials-ru\nles_only.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/tool-acl.\njson matches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/tool-resp\nonses-rules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 29,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/model-cas\nsette.json matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/prompts.j\nson matches the sealed digest\nok           opsbridge_tool_cassette: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/tool-cass\nette.json matches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/trials-mo\nck.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/tool-acl.\njson matches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/validation-record-20261030T052307Z/tool-resp\nonses-mock.json matches the sealed digest\n"
+   },
+   {
+    "index": 30,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/prompts.json \nmatches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/trials-rules_onl\ny.jsonl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/tool-responses-r\nules_only.json matches the sealed digest\n"
+   },
+   {
+    "index": 31,
+    "ok": true,
+    "output": "Chain intact: 32 record(s).\nok           opsbridge_acceptance_policy: \nevals/acceptance-policies/opsbridge-bench-v1-rerun.json matches the sealed \ndigest\nok           opsbridge_manifest: evals/manifests/opsbridge-bench-v1-rerun.json \nmatches the sealed digest\nok           opsbridge_model_cassette: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/model-cassette.j\nson matches the sealed digest\nok           opsbridge_policy_furniture-ap-v1: \npacks/furniture/policies/furniture-ap-v1.yaml matches the sealed digest\nok           opsbridge_policy_furniture-ap-v2: \npacks/furniture/policies/furniture-ap-v2.yaml matches the sealed digest\nok           opsbridge_policy_it-procurement-v1: \npacks/it_hardware/policies/it-procurement-v1.yaml matches the sealed digest\nok           opsbridge_prompts: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/prompts.json \nmatches the sealed digest\nok           opsbridge_tool_cassette: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/tool-cassette.js\non matches the sealed digest\nok           opsbridge_trials: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/trials-mock.json\nl matches the sealed digest\nok           tool_acl: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/tool-acl.json \nmatches the sealed digest\nok           tool_responses: \nevals/runs/opsbridge-bench-v1-rerun/dev-record-20261030T053049Z/tool-responses-m\nock.json matches the sealed digest\n"
+   }
+  ],
+  "chain": {
+   "message": "Chain intact: 32 record(s).",
+   "ok": true
+  },
+  "ok": true,
+  "signatures": {
+   "message": "32 signature(s) valid; records 0-31 of 32 are signed.",
+   "ok": true
+  }
+ },
+ "workflow_version": "investigation/1.2.0"
+}

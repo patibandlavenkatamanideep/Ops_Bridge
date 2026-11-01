@@ -143,6 +143,36 @@ file reports `missing` and fails verification. A signature by the local key show
 are unchanged since sealing; it does not show when runs happened, that inputs were true, or
 that no other runs were made.
 
+## Engineering re-run `opsbridge-bench-v1-rerun` (30 October 2026; regression evidence)
+
+The same public v1 cases, recorded again with the current code so the committed evidence
+matches what the code now does: scoring 2 (disagreement per axis) and workflow
+`investigation/1.2.0` (the stored reason an invoice could not be read, on every run). Frozen
+in `evals/manifests/opsbridge-bench-v1-rerun.json` from commit `1d9d95a`, and recorded from a
+clean `d2f2c73` with the deterministic mock model; `opsbridge-bench-v1` and its results are
+unchanged.
+
+**It is not held-out or out-of-sample evidence.** The cases have been public and replayed
+repeatedly since 15 October. Its acceptance policy
+(`evals/acceptance-policies/opsbridge-bench-v1-rerun.json`) therefore reports the held-out
+gate as not evaluated, with that reason, in both modes; the rate is still shown.
+`opsbridge-bench-v2` stays reserved for the independently labelled corpus
+(docs/evaluation-plan-v2.md).
+
+| Split | Rules only, next action | Mock model, next action | Misses (safe / unsafe) | Disagreement (any axis) |
+|---|---|---|---|---|
+| Held-out | 36/40 | 36/40 | 4 / 0 each | none |
+| Validation | 20/20 | 20/20 | 0 / 0 | none |
+| Security | 7/7 | 7/7 | 0 / 0 | none |
+| Dev | 37/37 | 37/37 | 0 / 0 | none |
+
+The verdicts equal v1's. What changed is the evidence. In v1's recorded model requests, all
+six mock investigations of security cases 303 and 304 said the invoice "could not be read
+reliably ()". In the re-run, all six name the stored reason: no extractable text layer, or a
+line amount that disagrees with quantity × price. The trials also record finding and citation digests, so replay compares
+them. Eight records were sealed (ledger records 26–33, signed with the existing key). `make
+eval-replay-check` replays every frozen plan and reproduces both, case by case.
+
 ## Limits
 
 - Corpus: 104 synthetic cases (target ~120 not reached); labels written by the same agent
