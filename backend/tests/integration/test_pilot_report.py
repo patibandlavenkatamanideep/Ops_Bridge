@@ -3,8 +3,10 @@
 Cases are worked through the API as a pilot would work them: a follow-up approved as
 drafted, a supplier query approved after its body was edited, a matched invoice resolved,
 and a follow-up rejected. The reviewer's reference file gives one blind decision, one
-recorded after intake that disagrees, and a manual-arm case. The report reads only the
-pilot tenant's cases in the window, in a read-only transaction, and writes nothing.
+recorded after intake that disagrees, and a manual-arm case. Each OpsBridge row names its
+invoice, since a blind decision is recorded before the case and its number exist. The report
+reads only the pilot tenant's cases in the window, in a read-only transaction, writes nothing,
+and names cases by number, never by invoice.
 """
 
 from __future__ import annotations
@@ -122,7 +124,7 @@ def test_the_report_measures_worked_cases_against_the_reference(
         [
             {  # recorded before the case reached OpsBridge: blind, and it agrees
                 "arm": "opsbridge",
-                "case": numbers["drafted"],
+                "invoice": "INV-9001",
                 "reviewed_at": before.isoformat(),
                 "outcome": "discrepancies_found",
                 "types": "quantity_mismatch",
@@ -130,7 +132,7 @@ def test_the_report_measures_worked_cases_against_the_reference(
             },
             {  # recorded afterwards, and the reviewer would have escalated
                 "arm": "opsbridge",
-                "case": numbers["edited"],
+                "invoice": "inv-9009",  # as typed; intake normalizes it the same way
                 "reviewed_at": datetime.now(UTC).isoformat(),
                 "outcome": "discrepancies_found",
                 "types": "price_mismatch",
@@ -138,7 +140,7 @@ def test_the_report_measures_worked_cases_against_the_reference(
             },
             {
                 "arm": "opsbridge",
-                "case": numbers["rejected"],
+                "invoice": "INV-9003",
                 "excluded": "duplicate of a paid invoice",
             },
             {
@@ -168,6 +170,7 @@ def test_the_report_measures_worked_cases_against_the_reference(
     )  # fmt: skip
     assert audit_rows(migrator_engine) == audit_before  # the report wrote nothing
     report = json.loads(out.read_text())
+    assert "INV-9" not in out.read_text()
 
     assert report["protocol"] == "opsbridge-pilot/1"
     scope = report["scope"]
