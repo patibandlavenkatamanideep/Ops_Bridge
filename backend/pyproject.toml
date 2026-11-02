@@ -18,7 +18,7 @@ dependencies = [
     "httpx==0.28.1",
     "python-multipart==0.0.32",
     "pyyaml>=6.0.2",
-    "pypdf==6.20.1",
+    "pypdf==6.21.4",
     "mcp==2.3.0",
     "anthropic==2.1.0",
     "pyjwt[crypto]==2.15.1",
