@@ -45,6 +45,10 @@ services:
       OPSBRIDGE_DEMO_USER_PASSWORD: ${OPSBRIDGE_DEMO_USER_PASSWORD:?}
     ports:
       - "127.0.0.1:8081:8080"
+    # Back-channel logout calls the API on this host. Podman maps the name itself; Docker on
+    # Linux needs it here.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ../identity/realm-opsbridge.json:/opt/keycloak/data/import/realm-opsbridge.json:ro
     depends_on:
