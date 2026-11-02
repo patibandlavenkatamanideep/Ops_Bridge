@@ -783,6 +783,24 @@ def _shown(text: str) -> str:
     return "".join(c if c.isprintable() else repr(c)[1:-1] for c in text)
 
 
+def _end_sessions(args: argparse.Namespace) -> int:
+    """End a person's live sessions now, as a back-channel logout naming only them would.
+    For when the identity provider signed them out but could not reach the API (Keycloak
+    does not retry); docs/operations.md."""
+    from opsbridge.auth.sessions import revoke_idp_sessions
+    from opsbridge.config import get_settings
+    from opsbridge.persistence.db import Database, make_engine
+
+    settings = get_settings()
+    db = Database(make_engine("app", database=args.database))
+    try:
+        ended = revoke_idp_sessions(db, issuer=settings.oidc_issuer, subject=args.subject, sid=None)
+    finally:
+        db.engine.dispose()
+    print(_shown(f"ended {ended} live session(s) of {args.subject!r} ({settings.oidc_issuer})"))
+    return 0
+
+
 def _mcp(args: argparse.Namespace, which: str) -> int:
     import uuid
 
@@ -1006,6 +1024,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--pack", required=True, help="the pack that maps its records")
     p.add_argument("--out", help="where to write the report (JSON)")
     p.set_defaults(func=_export_check)
+
+    p = sub.add_parser(
+        "end-sessions", help="end a person's live sessions now (back-channel logout missed)"
+    )
+    p.add_argument("--subject", required=True, help="the person's id at the identity provider")
+    p.add_argument("--database", help="database name (default: from settings)")
+    p.set_defaults(func=_end_sessions)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)
