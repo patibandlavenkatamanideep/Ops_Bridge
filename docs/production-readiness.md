@@ -731,9 +731,10 @@ one case.
 - The measures did not change, and no pilot data, sample or agreement existed.
 
 **Evidence.**
-- `tests/pilot/test_reference.py` (18): strict reading, line-numbered problems, manual
+- `tests/pilot/test_reference.py` (19): strict reading, line-numbered problems, manual
   timings in order, the invoice normalized as intake normalizes it, and a pseudonymous
-  manual row.
+  manual row. `pilot-check-reference` reads the file the same way without a database, so the
+  operator finds a problem while the row is fresh (added 2 November).
 - `tests/pilot/test_measures.py` (6): each measure on hand-written facts whose counts can be
   checked by reading them; a row matches a case only when number and supplier both agree.
   Matching on the number alone, or reading the invoice without intake's normalization, each
