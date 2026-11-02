@@ -98,11 +98,11 @@ jobs:
           image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           artifact-name: opsbridge-${{ github.ref_name }}.spdx.json
-      - name: Refuse the candidate if it has critical vulnerabilities with a fix
+      - name: Refuse the candidate if it has critical or high vulnerabilities with a fix
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
           format: table
