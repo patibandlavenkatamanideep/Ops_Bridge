@@ -32,7 +32,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets. Not done: per-role database and secret access, a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
@@ -387,9 +387,24 @@ derivation passed before and after) and `test_credential_registry.py` (5; 4 fail
 The existing connection tests needed the registration in their settings; their assertions
 are unchanged.
 
+**Parser subprocesses** (2 November, before the pilot reads real invoice files):
+- Reproduced: the PDF worker inherited the service's whole environment, and tesseract was
+  given it explicitly (`{**os.environ, …}`). In a deployment that environment holds the
+  database URL, the delegation private key and the model and tracker tokens, so a flaw in
+  pypdf, Pillow or tesseract, reached through a hostile file, would have found them. The
+  worker also ran as `python -m` from the caller's working directory, which Python puts first
+  on the import path. It imported a `base64.py` or `json.py` from there, so `export-check` run
+  from inside an export would have executed one planted in it.
+- Fix: both get only `LANG`, `LC_ALL`, `LC_CTYPE`, `PATH` and `TESSDATA_PREFIX` (tesseract
+  also `OMP_THREAD_LIMIT=1`), and the worker runs in Python's isolated mode (`-I`).
+- Evidence: `tests/evidence/test_parser_isolation.py` (3, all failed before). Removing any
+  one of the three protections fails its test. In the app image, as uid 10001 on a read-only
+  root, tesseract 5.3.0 still read the scanned fixture under the restricted environment.
+
 **Not done** (staging, A11): per-role database credentials and secret mounts (the compose
 development volume still holds both delegation keys; the containers share one environment
-block), and a parser sandbox with no secrets or network beyond the Linux memory cap.
+block), and a parser sandbox: beyond the Linux memory cap and the restricted environment, the
+parsers still share the service's network and the files it can read, mounted keys included.
 
 ## Package 8, evidence packaging (A17)
 
