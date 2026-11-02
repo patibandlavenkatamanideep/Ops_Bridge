@@ -92,7 +92,9 @@ Internet ─▶ ALB (HTTPS, ACM certificate, optional AWS WAF) ─▶ ECS Fargat
 private subnets: ECS services worker (1–2), records-mcp, casework-mcp (Service Connect, no public route)
                  RDS PostgreSQL 16 (pgvector available; encrypted with KMS; automated backups)
                  S3 bucket for artifacts (SSE-KMS, versioning, Block Public Access) — S3ArtifactStore
-identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer
+identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer;
+          back-channel logout to https://<api>/auth/backchannel-logout, reachable from the IdP
+          (without it, someone signed out at the IdP keeps OpsBridge for up to 8 hours)
 telemetry: ADOT collector sidecar → CloudWatch / X-Ray (OTLP); Amazon Managed Prometheus
            scraping api /metrics and worker :9101 inside the VPC; CloudWatch Logs
 dashboards: infra/observability/grafana/dashboards imported into Amazon Managed Grafana (or
@@ -184,7 +186,8 @@ standard AWS chain), never from settings.
 
 **Database roles.** Run the SQL in `infra/compose/postgres/10-opsbridge-roles.sh` and
 `20-opsbridge-databases.sh` once with the master user (roles are NOSUPERUSER NOBYPASSRLS;
-`opsbridge_ops_reader` and `opsbridge_session_pruner` are NOLOGIN), then migrations as
+`opsbridge_ops_reader`, `opsbridge_session_pruner` and `opsbridge_session_revoker` are
+NOLOGIN), then migrations as
 `opsbridge_migrator`.
 
 **Rollout and rollback.** Build the image in CI from the locks, tag it with the commit SHA,
