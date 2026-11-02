@@ -44,6 +44,11 @@ PDF_TIMEOUT_SECONDS = 10.0
 # instead of multiplying that.
 PDF_CONCURRENCY = 2
 _PDF_SLOTS = threading.BoundedSemaphore(PDF_CONCURRENCY)
+# Parser subprocesses read untrusted files, so they get only these variables of this
+# process's environment: a flaw in pypdf, Pillow or tesseract finds none of the deployment's
+# secrets there (database URL, signing keys, model and tracker tokens). The PDF worker also
+# runs isolated (-I), so it imports nothing from the directory it was started in.
+PARSER_ENVIRONMENT = ("LANG", "LC_ALL", "LC_CTYPE", "PATH", "TESSDATA_PREFIX")
 _ACTIVE_PDF = re.compile(rb"/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia|XFA)\b")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 
@@ -255,11 +260,12 @@ def _parse_pdf(data: bytes, ocr: OcrSettings) -> ParsedDocument:
     try:
         with _PDF_SLOTS:
             proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
-                [sys.executable, "-m", "opsbridge.evidence.pdf_worker", str(MAX_PDF_PAGES)],
+                [sys.executable, "-I", "-m", "opsbridge.evidence.pdf_worker", str(MAX_PDF_PAGES)],
                 input=data,
                 capture_output=True,
                 timeout=PDF_TIMEOUT_SECONDS,
                 check=False,
+                env=_parser_env(),
             )
     except subprocess.TimeoutExpired:
         return ParsedDocument(
@@ -362,6 +368,7 @@ def _ocr_pages(
             proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
                 [
                     sys.executable,
+                    "-I",
                     "-m",
                     "opsbridge.evidence.pdf_worker",
                     str(MAX_PDF_PAGES),
@@ -372,6 +379,7 @@ def _ocr_pages(
                 capture_output=True,
                 timeout=PDF_TIMEOUT_SECONDS,
                 check=False,
+                env=_parser_env(),
             )
         result = json.loads(proc.stdout.decode("utf-8"))
     except (subprocess.TimeoutExpired, ValueError, UnicodeDecodeError):
@@ -433,8 +441,13 @@ def ocr_image(image_bytes: bytes, timeout: float = 15.0, language: str = "eng") 
                 text=True,
                 timeout=timeout,
                 check=False,
-                env={**os.environ, "OMP_THREAD_LIMIT": "1"},
+                env=_parser_env(OMP_THREAD_LIMIT="1"),
             )
         except subprocess.TimeoutExpired:
             return None
         return out.stdout if out.returncode == 0 else None
+
+
+def _parser_env(**extra: str) -> dict[str, str]:
+    kept = {name: os.environ[name] for name in PARSER_ENVIRONMENT if name in os.environ}
+    return {**kept, **extra}

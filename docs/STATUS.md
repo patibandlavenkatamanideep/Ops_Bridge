@@ -405,11 +405,12 @@ blockers in `docs/production-readiness.md`):
 2. Done locally since: an export-file source held to `purchasing-source/1` with
    hand-written fixtures (A08's first step; proves no real system); the closure pass of
    2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
-   (dated entries below). PR #17 was merged on 2026-10-30; the later work, including
-   experimental pre-release support, the pilot measurement and the pilot export check, is
-   PR #20. Next: whatever the owner's answers below unblock.
-3. Needs the owner: merge PR #20; apply the `main` ruleset and push `v0.1.0-alpha.1` on the
-   merge commit once its CI run on `main` passes (A12); a purchasing system or export with
+   (dated entries below). PR #17 was merged on 2026-10-30. The later work, including
+   experimental pre-release support, the pilot measurement and the pilot export check, was
+   merged on 2026-11-01 as PR #20 (`b63c5fc`), where the release preconditions pass. Next:
+   whatever the owner's answers below unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `b63c5fc`
+   (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1216,3 +1217,28 @@ staging, pilot owner).
   The measures did not change.
 - Tests: `tests/pilot/` (32) and `tests/integration/test_pilot_report.py` (2). Matching on the
   number alone, or reading the invoice without intake's normalization, each makes a test fail.
+
+### PR #20 merged; release preconditions pass (2026-11-01, production review A12)
+- PR #20 was merged as `b63c5fc`. Its CI run on `main` (41277454673) passed all four jobs.
+- The release workflow's preconditions pass on that commit:
+  - `release_check.py versions --tag v0.1.0-alpha.1`: the tag matches every declared version;
+  - `describe`: the image would be labelled an experimental pre-release;
+  - `ci`: a push run on `main` qualified exactly this commit, every required job succeeding.
+- Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's, so
+  the release workflow still has not run.
+
+### Parser subprocesses get no secrets (2026-11-02, production review A06)
+- Found before the pilot reads real invoice files:
+  - the PDF worker inherited the service's whole environment, and tesseract was given it
+    explicitly. In a deployment that holds the database URL, the delegation private key and
+    the model and tracker tokens, all within reach of a flaw in pypdf, Pillow or tesseract;
+  - the worker ran as `python -m` from the caller's working directory and imported a
+    `base64.py` or `json.py` planted there, so `export-check` run from inside an export would
+    have executed it.
+- Both now get only `LANG`, `LC_ALL`, `LC_CTYPE`, `PATH` and `TESSDATA_PREFIX` (tesseract also
+  `OMP_THREAD_LIMIT=1`), and the worker runs in Python's isolated mode (`-I`).
+- Tests: `tests/evidence/test_parser_isolation.py` (3, all failed before; removing any one
+  protection fails its test). Unit 554 and integration 262 pass locally. In the app image, as
+  uid 10001 on a read-only root, tesseract 5.3.0 still read the scanned fixture.
+- Not done: the parsers still share the service's network and the files it can read, mounted
+  keys included. That sandbox needs the staging environment (A11).

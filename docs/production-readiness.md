@@ -32,13 +32,13 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials. Not done: per-role database and secret access, parser sandbox (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets. Not done: per-role database and secret access, a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1` |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `b63c5fc`, where the release preconditions pass |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -387,9 +387,24 @@ derivation passed before and after) and `test_credential_registry.py` (5; 4 fail
 The existing connection tests needed the registration in their settings; their assertions
 are unchanged.
 
+**Parser subprocesses** (2 November, before the pilot reads real invoice files):
+- Reproduced: the PDF worker inherited the service's whole environment, and tesseract was
+  given it explicitly (`{**os.environ, …}`). In a deployment that environment holds the
+  database URL, the delegation private key and the model and tracker tokens, so a flaw in
+  pypdf, Pillow or tesseract, reached through a hostile file, would have found them. The
+  worker also ran as `python -m` from the caller's working directory, which Python puts first
+  on the import path. It imported a `base64.py` or `json.py` from there, so `export-check` run
+  from inside an export would have executed one planted in it.
+- Fix: both get only `LANG`, `LC_ALL`, `LC_CTYPE`, `PATH` and `TESSDATA_PREFIX` (tesseract
+  also `OMP_THREAD_LIMIT=1`), and the worker runs in Python's isolated mode (`-I`).
+- Evidence: `tests/evidence/test_parser_isolation.py` (3, all failed before). Removing any
+  one of the three protections fails its test. In the app image, as uid 10001 on a read-only
+  root, tesseract 5.3.0 still read the scanned fixture under the restricted environment.
+
 **Not done** (staging, A11): per-role database credentials and secret mounts (the compose
 development volume still holds both delegation keys; the containers share one environment
-block), and a parser sandbox with no secrets or network beyond the Linux memory cap.
+block), and a parser sandbox: beyond the Linux memory cap and the restricted environment, the
+parsers still share the service's network and the files it can read, mounted keys included.
 
 ## Package 8, evidence packaging (A17)
 
@@ -524,7 +539,9 @@ extended to refuse other suffixes), covering:
 - job names that match `ci.yml`.
 
 Run read-only against this repository, `main`'s head `468dae7` qualifies and the PR head,
-never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. The ruleset's check
+never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. On 1 November,
+`main`'s head `b63c5fc` (PR #20; CI run 41277454673) passed all three checks for
+`v0.1.0-alpha.1`: the versions, the experimental description and CI. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
@@ -693,8 +710,9 @@ and blindness is shown only by the recorded time.
    - both scoring schemes covered in the browser (A03).
 
 4. After the closure review (30 October; PR #17 merged as `4d2f1f6`, whose CI run on `main`,
-   41085903247, passed all four jobs and which `release_check.py ci` accepts; this work is
-   PR #20):
+   41085903247, passed all four jobs and which `release_check.py ci` accepts; this work was
+   merged on 1 November as PR #20, `b63c5fc`, whose CI run on `main`, 41277454673, passed
+   all four jobs and which `release_check.py ci` accepts):
    - the engineering re-run `opsbridge-bench-v1-rerun` was recorded under scoring 2 and
      `investigation/1.2.0` as regression evidence (A03, A13);
    - replies read by the Anthropic and MCP SDKs are bounded (A04);
@@ -708,12 +726,11 @@ and blindness is shown only by the recorded time.
      doesn't exist yet when a blind decision is recorded (A08, A14).
 
    Remaining limits:
-   - the release workflow has not run, and can't pass until this code is on `main`;
+   - the release workflow has not run, though its preconditions pass on `b63c5fc`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - merge PR #20, apply the `main` ruleset and push `v0.1.0-alpha.1` on the merge commit
-     once its CI run on `main` passes (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `b63c5fc` (A12);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
