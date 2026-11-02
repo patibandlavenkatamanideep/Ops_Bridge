@@ -134,7 +134,7 @@ spend ceiling).
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
 every PR head and every commit on `main` with the same jobs, including the runtime image
 built from the locks with base images pinned by digest, its SBOM (SPDX, a workflow artifact)
-and a vulnerability scan that fails on fixable critical findings. Nothing is published:
+and a vulnerability scan that fails on fixable critical or high findings. Nothing is published:
 pushing an image to a registry, signing it and recording provenance belong to a release
 workflow that the owner authorizes, and the image promoted to staging must be the one whose
 digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
