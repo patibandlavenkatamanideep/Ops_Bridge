@@ -122,7 +122,7 @@ the sizes above are conventional starting points, not measurements.
 definitions): PostgreSQL passwords for migrator, app, worker and mcp roles (plus the master
 user, kept out of the application); OIDC client secret; worker client secret; session secret
 (≥ 32 chars); delegation Ed25519 private key (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`, PEM; used directly and
-never written to disk; given to the API and worker only, which sign) and its public key for
+never written to disk; given to the worker only, which signs) and its public key for
 the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
 `OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH`; a deployed verifier refuses to start without one and
 never loads the private key; list old and new keys together while rotating, then drop the old
@@ -143,11 +143,13 @@ require the four CI jobs and one review before merging, disallow force-pushes. D
 
 **Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
 simulator is allowed) and `OPSBRIDGE_ENV=production` refuse to start unless: HTTPS public URL
-and issuer, no localhost issuer, simulator fault controls off, session secret of at least 32
-characters, an S3 artifact bucket with server-side encryption requested (`AES256` or
-`aws:kms`), quotas on, the rate limit shared across instances, and `trusted_proxies` naming the
-load balancer. `production` also refuses demo user credentials and, because no production
-purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
+and issuer, no localhost issuer, simulator fault controls off, an S3 artifact bucket with
+server-side encryption requested (`AES256` or `aws:kms`), quotas on, the rate limit shared
+across instances, and `trusted_proxies` naming the load balancer. The API also refuses a
+session secret under 32 characters; only the API holds it, since each task gets only its own
+secrets, as the compose file shows. `production` also refuses demo user credentials and,
+because no production purchasing-source adapter exists yet, refuses to start at all: the
+staging plan uses
 `staging`. These are settings checks: they do not show that the bucket actually encrypts or
 that the CIDRs are really the load balancer's. Cookies are `Secure` in both. A deployment
 keeps the default per-user limit (`OPSBRIDGE_RATE_LIMIT_PER_MINUTE`, 240) unless it has
