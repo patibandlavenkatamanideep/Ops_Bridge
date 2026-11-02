@@ -681,12 +681,18 @@ one case.
   drafted, edited then approved, resolved, rejected and excluded), with another tenant's
   case absent. The rows name invoices, one typed in lower case, and the report names none. The report writes nothing. Its transaction refuses a write, and the test fails
   when `SET TRANSACTION READ ONLY` is removed.
-- `tests/pilot/test_export_check.py` (8): hand-written IT-pack exports. Every unreadable
+- `tests/pilot/test_export_check.py` (9): hand-written IT-pack exports. Every unreadable
   record is listed, not only the first. A consistent export has nothing to review, and its
   report holds no document content. The command's exit codes are tested too. Each test was
   checked against a deliberately broken check: removing the number and listing comparison,
   the purchase-order lookup or the mapping problems, or treating a partial export's missing
   record as absent, each makes a test fail.
+- Added 2 November: a problem can quote a document's own value, and `export-check` printed
+  it raw. An invoice number holding `ESC [2K` erased its own problem line on the operator's
+  terminal, and one holding `ESC ]0;…` retitled the window. The command now spells out
+  control and format characters (`\x1b`, `‮`) in what it prints; the JSON report was
+  already escaped. Without the fix, the new test fails, and it also fails when only ASCII
+  control characters are escaped, which lets a bidirectional override through.
 
 **Not done.** No pilot: there is no export, reviewer or authorization. The report and the
 export check have run only on synthetic data. One reviewer gives one person's judgement,
