@@ -136,9 +136,17 @@ lacks).
 | `started_at`, `decided_at`, `resolved_at` | `manual` only: work began (required), the follow-up was decided, the invoice was resolved; blank if not reached |
 | `excluded` | A reason to leave the invoice out of every measure (for example, outside the agreed scope) |
 
+Its first line is exactly:
+
+    arm,case,invoice,supplier,reviewed_at,outcome,types,next_action,process_outcome,process_types,process_next_action,started_at,decided_at,resolved_at,excluded
+
 The file is read strictly. A misspelled value, a time without a time zone, a repeated invoice
 or case, an invoice number on a `manual` row, or an OpsBridge case number or timing entered
-by hand is refused, with its line, and nothing is measured. OpsBridge's decisions and times
+by hand is refused, with its line, and nothing is measured. So that a problem is found while
+the row is fresh rather than at the cut-off, the operator checks the file as it grows:
+`opsbridge pilot-check-reference --reference <reference.csv>` reads it exactly as
+`pilot-report` will, needs no database, and exits 2 with each problem by line. It cannot tell
+whether an invoice will match a case; only intake and the report can. OpsBridge's decisions and times
 come only from its records. The report names cases by number and rows by line, never by
 invoice.
 
@@ -197,6 +205,6 @@ the benchmark scores with (`opsbridge/evaluation/verdict.py`).
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 33 tests, and
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 34 tests, and
 `tests/integration/test_pilot_report.py`, 2 tests). No pilot has started: no export,
 reviewer or authorization exists yet.
