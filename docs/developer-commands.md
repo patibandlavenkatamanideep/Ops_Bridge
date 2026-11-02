@@ -64,6 +64,8 @@ FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
 `opsbridge-pilot/1`, docs/pilot-plan.md) from one tenant's cases opened in the window and the
 reviewer's reference CSV. It reads in a read-only transaction under that tenant's row-level
 security, and refuses a reference file with any problem, listing each one by line.
+`pilot-check-reference --reference FILE` reads the reference file the same way without a
+database, so the operator can check it while the pilot runs (exit 2 with problems by line).
 `export-check --export DIR --pack P [--out FILE]` reads every record of one organization's
 export through pack P, the way an investigation does, and stores nothing. It lists each
 problem by collection and key: an unreadable file, a collection the pack doesn't read, a
