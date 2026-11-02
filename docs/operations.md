@@ -80,7 +80,8 @@ In Keycloak, Users → the person:
    revokes the sessions opened from them at once. The API logs `back-channel logout ended N
    session(s)`.
 3. If that line is missing (the API was down or unreachable from Keycloak, which does not
-   retry), end the sessions directly:
+   retry, or more than 1200 logouts came from Keycloak's address within a minute, the
+   per-address rate limit), end the sessions directly:
    `opsbridge end-sessions --subject <the person's Keycloak user id>`. Otherwise they end at
    their idle or absolute limit (30 minutes, 8 hours).
 4. Their memberships stay until an organization administrator removes them (Settings →
