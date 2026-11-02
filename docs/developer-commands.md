@@ -18,7 +18,7 @@ eval "$(scripts/container-env.sh)"   # selects Docker, or the Podman machine soc
 | `infra-up` | `docker compose --env-file .env -f infra/compose/docker-compose.yml up -d --build --wait postgres keycloak seaweedfs`, then `docker compose … exec -T postgres bash /docker-entrypoint-initdb.d/20-opsbridge-databases.sh` (idempotent; creates missing databases) | macOS + Podman 5.7.1 |
 | `migrate` | `uv --directory backend run --frozen alembic upgrade head` (and `-x db=opsbridge_test`, `-x db=opsbridge_eval`) | macOS |
 | `seed-demo` | `uv --directory backend run --frozen python -m opsbridge.cli seed-demo` | macOS |
-| `identity-sync` | `python3 scripts/identity_sync.py` (adds realm users missing from a running local Keycloak; existing users untouched) | macOS + Podman 5.7.1 |
+| `identity-sync` | `python3 scripts/identity_sync.py` (adds realm users missing from a running local Keycloak, existing users untouched; sets each client's back-channel logout attributes to the realm file's) | macOS + Podman 5.7.1 |
 | `dev` | `infra-up`, `migrate`, then `uv --directory backend run --frozen python scripts/devstack.py` (upserts `fixtures/scenarios/dev.yaml` into the simulator before starting it; `--seed-records`, used by `make demo`, loads every corpus) | macOS; Linux in hosted CI |
 | `lint` | `ruff check src tests && ruff format --check src tests` (in backend via uv run) and `npm run lint` (frontend) | macOS |
 | `typecheck` | `mypy src` (backend) and `npm run typecheck` (frontend) | macOS |
@@ -55,7 +55,9 @@ docs/evaluation-plan.md):
 Operations commands: `probe URL` (container health probe), `init-keys` (create the delegation
 key once), `verify-restore --database D --artifact-dir /abs/path` or `--artifact-bucket B` (restore
 checks; refuses the live databases and relative paths; the bucket uses the configured S3
-endpoint, region and prefix).
+endpoint, region and prefix), `end-sessions --subject S [--database D]` (ends a person's live
+sessions now, when the identity provider signed them out but its back-channel logout did not
+reach the API; docs/operations.md).
 
 Pilot command: `pilot-report --tenant-id T --since S --until U [--as-of C] --reference
 FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
