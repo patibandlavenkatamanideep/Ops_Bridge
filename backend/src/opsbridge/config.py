@@ -217,8 +217,8 @@ class Settings(BaseSettings):
             problems.append(f"the local development identity provider is not allowed in {env}")
         if self.simulator_fault_controls:
             problems.append(f"simulator fault-injection controls must be disabled in {env}")
-        if len(self.session_secret.get_secret_value()) < 32:
-            problems.append(f"session_secret must be at least 32 characters in {env}")
+        # The session secret is the API's alone, so the API checks it (api/app.py): a worker or
+        # MCP service is given only its own secrets (production review A06).
         if not self.artifact_s3_bucket:
             problems.append(f"the local artifact store is not allowed in {env}; set a bucket")
         elif self.artifact_s3_sse not in ("AES256", "aws:kms"):
