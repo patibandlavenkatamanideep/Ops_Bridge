@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `16951dc`, where the release preconditions pass |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on PR #25's merge commit once its CI run on `main` passes (`16951dc` qualifies but ships pypdf 6.20.1, with ten fixable HIGH findings) |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -526,7 +526,7 @@ Its security recording's model requests name both reasons where v1's said "()".
     (`scripts/release_check.py`);
   - it builds once from the locks and pushes only a candidate tag;
   - it runs CI's image checks on that digest: non-root, CLI, `eval-verify` summary and
-    partial exit, API health, SBOM, and fixable critical vulnerabilities;
+    partial exit, API health, SBOM, and fixable critical or high vulnerabilities;
   - it attests and verifies the digest;
   - only then does it give the same digest the version tag, without rebuilding, refusing if
     the tag resolves to anything else.
@@ -563,16 +563,28 @@ Run read-only against this repository, `main`'s head `468dae7` qualifies and the
 never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. On 1 November,
 `main`'s head `b63c5fc` (PR #20; CI run 41277454673) passed all three checks for
 `v0.1.0-alpha.1`: the versions, the experimental description and CI. On 2 November, so did
-`16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets, so
-the first tag belongs there. The ruleset's check
+`16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets. It
+still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so the first tag
+belongs on PR #25's merge commit instead, once its CI run on `main` passes. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
 not an index; the build's provenance attestation makes it one. It checks again after tagging
 that the tag resolves to the qualified digest. The candidate tag stays in the registry.
 
-**Not done**: a staging deployment that promotes the attested digest, rollback rehearsal, and
-a vulnerability policy beyond "fixable critical" (the CI image job's current gate).
+**Vulnerability gate** (2 November). CI and the release stopped only fixable CRITICAL
+findings. A report-only HIGH scan of the image (run 41418268617) found twelve, all fixable:
+- pypdf 6.20.1: ten denial-of-service findings, fixed by 6.21.4, which is now locked. Pilot
+  PDFs go through it; the worker's timeout and memory cap bounded these but did not remove
+  them.
+- OpenSSL 3.0.22-1~deb12u1 in the base image: CVE-2026-84782, fixed by 3.0.22-1~deb12u2,
+  which is now pinned in the image.
+
+Both CI and the release now refuse fixable CRITICAL or HIGH findings. With pypdf 6.21.4, the
+unit, integration and canary gates pass, and both frozen plans still replay case by case.
+
+**Not done**: a staging deployment that promotes the attested digest, and rollback rehearsal.
+MEDIUM findings and unfixed ones are reported nowhere.
 
 ## Package 3, collection budget (A15, in part)
 
@@ -784,12 +796,12 @@ and blindness is shown only by the recorded time.
      #24), and a sign-out at the identity provider ends OpsBridge's sessions at once (A16).
 
    Remaining limits:
-   - the release workflow has not run, though its preconditions pass on `16951dc`;
+   - the release workflow has not run; its first tag waits for PR #25's merge commit;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`, which carries the
-     parser environment restriction (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge commit once its CI
+     run on `main` passes; it carries the fixed pypdf and OpenSSL (A12);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
