@@ -408,8 +408,9 @@ blockers in `docs/production-readiness.md`):
    (dated entries below). PR #17 was merged on 2026-10-30. The later work, including
    experimental pre-release support, the pilot measurement and the pilot export check, was
    merged on 2026-11-01 as PR #20 (`b63c5fc`). The parser environment restriction was
-   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass. Next:
-   whatever the owner's answers below unblock.
+   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass; the
+   export-check output escaping as PR #24. Since then: back-channel logout (A16, dated entry
+   below). Next: whatever the owner's answers below unblock.
 3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`
    (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
@@ -1262,3 +1263,23 @@ staging, pilot owner).
   pass on it for `v0.1.0-alpha.1`.
 - The first tag belongs on `16951dc`, not `b63c5fc`: an image built from `b63c5fc` would
   hand the service's secrets to its parsers.
+
+### A sign-out at the identity provider ends OpsBridge's sessions (2026-11-02, production review A16)
+- Reproduced against the local Keycloak 26.8.1: after an administrator signed a person out at
+  Keycloak, their OpsBridge session still answered ten seconds later, and would have lasted up
+  to 30 minutes idle or 8 hours. Disabling an account ends no session even in Keycloak.
+- OpenID Connect Back-Channel Logout:
+  - each session records the provider's session id;
+  - `/auth/backchannel-logout` verifies the logout token (provider's published key,
+    asymmetric algorithm, issuer, client, `iat`/`exp`/`jti`, the event, no nonce);
+  - it revokes the sessions named through `ops.revoke_idp_sessions` (migration 0022, owned by
+    the NOLOGIN role `opsbridge_session_revoker`, which reads no tokens).
+- Keycloak configuration: the realm file, `make identity-sync` for an existing Keycloak, and
+  `extra_hosts` for Docker on Linux. An unreachable API breaks no sign-out at Keycloak.
+  `opsbridge end-sessions --subject S` covers a missed logout (Keycloak does not retry).
+  docs/operations.md has the runbook: disable, then sign out.
+- Tests: `tests/auth/test_backchannel.py` (24) and `tests/integration/test_backchannel_logout.py`
+  (8; two against Keycloak, one failed before). Four deliberate breaks each fail a test.
+  Unit 579, integration 269 and the canary (64/64) pass locally.
+- Not done: profile deletion, backups and object versions (the deprovisioning policy); `jti`
+  is not stored, so a replayed token can end sessions again until its `exp`.
