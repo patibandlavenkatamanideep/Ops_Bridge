@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `b63c5fc`, where the release preconditions pass |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `16951dc`, where the release preconditions pass |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -541,7 +541,9 @@ extended to refuse other suffixes), covering:
 Run read-only against this repository, `main`'s head `468dae7` qualifies and the PR head,
 never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. On 1 November,
 `main`'s head `b63c5fc` (PR #20; CI run 41277454673) passed all three checks for
-`v0.1.0-alpha.1`: the versions, the experimental description and CI. The ruleset's check
+`v0.1.0-alpha.1`: the versions, the experimental description and CI. On 2 November, so did
+`16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets, so
+the first tag belongs there. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
@@ -729,14 +731,17 @@ and blindness is shown only by the recorded time.
    - `export-check` reads a pilot export through its pack before the first case, so a defect
      in it is found before it costs a pilot case (A08);
    - before any pilot, reference rows name the invoice rather than the case number, which
-     doesn't exist yet when a blind decision is recorded (A08, A14).
+     doesn't exist yet when a blind decision is recorded (A08, A14);
+   - since then: parser subprocesses get none of the service's secrets (A06; PR #23, merged
+     as `16951dc`), and `export-check` spells out control characters in what it prints (A08).
 
    Remaining limits:
-   - the release workflow has not run, though its preconditions pass on `b63c5fc`;
+   - the release workflow has not run, though its preconditions pass on `16951dc`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `b63c5fc` (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`, which carries the
+     parser environment restriction (A12);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
