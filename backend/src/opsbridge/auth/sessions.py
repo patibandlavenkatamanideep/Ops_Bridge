@@ -46,9 +46,14 @@ class SessionInfo:
 
 
 def create_session(
-    db: Database, settings: Settings, user_id: uuid.UUID, id_token: str | None
+    db: Database,
+    settings: Settings,
+    user_id: uuid.UUID,
+    id_token: str | None,
+    idp_session_id: str | None = None,
 ) -> str:
-    """Create a session and return the raw cookie token (never stored)."""
+    """Create a session and return the raw cookie token (never stored). `idp_session_id` is
+    the identity provider's session (`sid`) it was opened from, for back-channel logout."""
     token = secrets.token_urlsafe(32)
     h = hash_token(token)
     now = datetime.now(UTC)
@@ -59,6 +64,7 @@ def create_session(
                 user_id=user_id,
                 csrf_token=secrets.token_urlsafe(32),
                 id_token=id_token,
+                idp_session_id=idp_session_id,
                 last_seen_at=now,
                 expires_at=now + timedelta(hours=settings.session_absolute_hours),
                 idle_expires_at=now + timedelta(minutes=settings.session_idle_minutes),
@@ -109,6 +115,26 @@ def prune_sessions(db: Database, keep: timedelta) -> int:
     (migration 0021): sessions are otherwise visible only to their own holder."""
     with db.session(DbContext()) as s:
         n = s.execute(text("SELECT ops.prune_sessions(:keep)"), {"keep": keep}).scalar_one()
+    return int(n)
+
+
+def revoke_idp_sessions(db: Database, *, issuer: str, subject: str | None, sid: str | None) -> int:
+    """Revoke the live sessions opened from an identity-provider session that has ended
+    (back-channel logout) and return how many. A person the provider names but OpsBridge has
+    never seen has none. Runs through `ops.revoke_idp_sessions` (migration 0022): a logout
+    names no cookie, and sessions are otherwise visible only to their own."""
+    user_id: uuid.UUID | None = None
+    if subject is not None:
+        with db.session(DbContext(oidc_issuer=issuer, oidc_subject=subject)) as s:
+            user_id = s.execute(
+                select(User.id).where(User.issuer == issuer, User.subject == subject)
+            ).scalar_one_or_none()
+        if user_id is None:
+            return 0
+    with db.session(DbContext()) as s:
+        n = s.execute(
+            text("SELECT ops.revoke_idp_sessions(:user, :sid)"), {"user": user_id, "sid": sid}
+        ).scalar_one()
     return int(n)
 
 
