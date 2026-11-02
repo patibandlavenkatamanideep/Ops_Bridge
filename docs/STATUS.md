@@ -1226,3 +1226,19 @@ staging, pilot owner).
   - `ci`: a push run on `main` qualified exactly this commit, every required job succeeding.
 - Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's, so
   the release workflow still has not run.
+
+### Parser subprocesses get no secrets (2026-11-02, production review A06)
+- Found before the pilot reads real invoice files:
+  - the PDF worker inherited the service's whole environment, and tesseract was given it
+    explicitly. In a deployment that holds the database URL, the delegation private key and
+    the model and tracker tokens, all within reach of a flaw in pypdf, Pillow or tesseract;
+  - the worker ran as `python -m` from the caller's working directory and imported a
+    `base64.py` or `json.py` planted there, so `export-check` run from inside an export would
+    have executed it.
+- Both now get only `LANG`, `LC_ALL`, `LC_CTYPE`, `PATH` and `TESSDATA_PREFIX` (tesseract also
+  `OMP_THREAD_LIMIT=1`), and the worker runs in Python's isolated mode (`-I`).
+- Tests: `tests/evidence/test_parser_isolation.py` (3, all failed before; removing any one
+  protection fails its test). Unit 554 and integration 262 pass locally. In the app image, as
+  uid 10001 on a read-only root, tesseract 5.3.0 still read the scanned fixture.
+- Not done: the parsers still share the service's network and the files it can read, mounted
+  keys included. That sandbox needs the staging environment (A11).
