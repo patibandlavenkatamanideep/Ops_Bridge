@@ -1316,3 +1316,12 @@ staging, pilot owner).
   way without a database, so a problem is found while the row is fresh. It exits 2 with each
   problem by line. docs/pilot-plan.md now gives the exact header line.
 - Tests: `tests/pilot/test_reference.py` (19; the new one failed before). Pilot tests 34.
+
+### A page whose session ended says so (2026-11-02, production review A16)
+- After a session ended (idle, absolute limit, signed out elsewhere, or by the identity
+  provider), an open page kept its cached session for up to a minute and showed error panels
+  on every request. Now any 401 makes the page check the session again, and it says "Your
+  session has ended" and offers sign-in. Someone never signed in sees plain sign-in.
+- Tests: `frontend/src/App.test.tsx` (2; the ended-session test failed before). Removing the
+  guard that skips the session check's own 401 makes the page refetch until it runs out of
+  memory. Frontend tests 14.
