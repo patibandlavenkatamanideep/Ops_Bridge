@@ -151,3 +151,22 @@ def test_an_invoice_or_case_appears_once_and_the_columns_are_exact(tmp_path: Pat
     with pytest.raises(ReferenceError) as caught:
         read_reference(write(tmp_path, {"arm": "opsbridge"}, columns=renamed))
     assert caught.value.problems[0].startswith("line 1: columns must be")
+
+
+def test_the_file_can_be_checked_while_the_pilot_runs_without_the_database(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """pilot-report reads the file only at the cut-off, weeks after a row was written; the
+    operator can check it as it grows, the same strict way, with nothing else needed."""
+    from opsbridge import cli
+
+    good = write(tmp_path, OPSBRIDGE, MANUAL)
+    assert cli.main(["pilot-check-reference", "--reference", str(good)]) == 0
+    assert "2 rows (1 opsbridge, 1 manual)" in capsys.readouterr().out
+
+    late = {**OPSBRIDGE, "reviewed_at": "2026-11-02T09:00:00"}  # no time zone
+    bad = write(tmp_path, late, {**MANUAL, "outcome": "fine"})
+    assert cli.main(["pilot-check-reference", "--reference", str(bad)]) == 2
+    printed = capsys.readouterr().out
+    assert "2 problem(s)" in printed
+    assert "line 2: reviewed_at" in printed and "line 3: outcome 'fine'" in printed
