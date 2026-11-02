@@ -2,6 +2,27 @@
 # Named volumes persist data; `make down` never removes them.
 name: opsbridge
 
+# Configuration every application container shares. It holds no secret: each service adds only
+# the secrets its own process uses (production review A06; backend/tests/test_compose_secrets.py).
+x-app-env: &app-env
+  OPSBRIDGE_ENV: development
+  OPSBRIDGE_OCR_ENABLED: ${OPSBRIDGE_OCR_ENABLED:-false}
+  OPSBRIDGE_DB_HOST: postgres
+  OPSBRIDGE_DB_PORT: "5432"
+  # Its own database: the containers keep artifacts in their volume, so sharing `make dev`'s
+  # database would leave rows whose files are in another store (found by the restore drill).
+  OPSBRIDGE_DB_NAME: opsbridge_demo
+  # Browsers and token issuers use the public URL; containers use the backchannel.
+  OPSBRIDGE_OIDC_ISSUER: http://localhost:8081/realms/opsbridge
+  OPSBRIDGE_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/opsbridge
+  OPSBRIDGE_PUBLIC_URL: http://localhost:8000
+  OPSBRIDGE_CORS_ORIGINS: '["http://localhost:8000"]'
+  OPSBRIDGE_SIMULATOR_URL: http://simulator:8090
+  OPSBRIDGE_SIMULATOR_FAULT_CONTROLS: "true"
+  OPSBRIDGE_RECORDS_MCP_URL: http://records-mcp:8101/mcp
+  OPSBRIDGE_CASEWORK_MCP_URL: http://casework-mcp:8102/mcp
+  OPSBRIDGE_TOOL_TRANSPORT: mcp
+
 services:
   postgres:
     build:
@@ -93,32 +114,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: &app-env
-      OPSBRIDGE_ENV: development
-      OPSBRIDGE_OCR_ENABLED: ${OPSBRIDGE_OCR_ENABLED:-false}
-      OPSBRIDGE_DB_HOST: postgres
-      OPSBRIDGE_DB_PORT: "5432"
-      # Its own database: the containers keep artifacts in their volume, so sharing `make dev`'s
-      # database would leave rows whose files are in another store (found by the restore drill).
-      OPSBRIDGE_DB_NAME: opsbridge_demo
+    environment:
+      <<: *app-env
       OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
-      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
-      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
-      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
-      # Browsers and token issuers use the public URL; containers use the backchannel.
-      OPSBRIDGE_OIDC_ISSUER: http://localhost:8081/realms/opsbridge
-      OPSBRIDGE_OIDC_DISCOVERY_URL: http://keycloak:8080/realms/opsbridge
-      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
-      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
-      OPSBRIDGE_SESSION_SECRET: ${OPSBRIDGE_SESSION_SECRET:?}
-      OPSBRIDGE_PUBLIC_URL: http://localhost:8000
-      OPSBRIDGE_CORS_ORIGINS: '["http://localhost:8000"]'
-      OPSBRIDGE_SIMULATOR_URL: http://simulator:8090
-      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
-      OPSBRIDGE_SIMULATOR_FAULT_CONTROLS: "true"
-      OPSBRIDGE_RECORDS_MCP_URL: http://records-mcp:8101/mcp
-      OPSBRIDGE_CASEWORK_MCP_URL: http://casework-mcp:8102/mcp
-      OPSBRIDGE_TOOL_TRANSPORT: mcp
     command: ["sh", "-c", "alembic upgrade head && python -m opsbridge.cli seed-demo && python -m opsbridge.cli init-keys"]
     volumes: [opsbridge_appdata:/app/var]
     depends_on:
@@ -133,7 +131,13 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      OPSBRIDGE_DB_APP_PASSWORD: ${OPSBRIDGE_DB_APP_PASSWORD:?}
+      OPSBRIDGE_OIDC_CLIENT_SECRET: ${OPSBRIDGE_OIDC_CLIENT_SECRET:?}
+      OPSBRIDGE_SESSION_SECRET: ${OPSBRIDGE_SESSION_SECRET:?}
+      # Task-connection checks reach the simulator's tracker for the organization.
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
     ports: ["127.0.0.1:8000:8000"]
     volumes: [opsbridge_appdata:/app/var]
     depends_on:
@@ -152,7 +156,12 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      OPSBRIDGE_DB_WORKER_PASSWORD: ${OPSBRIDGE_DB_WORKER_PASSWORD:?}
+      # For access tokens to the MCP services; delegations are signed with the key file.
+      OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
     command: ["python", "-m", "opsbridge.cli", "worker"]
     volumes: [opsbridge_appdata:/app/var]
     depends_on:
@@ -176,6 +185,7 @@ services:
     profiles: [app]
     environment:
       <<: *app-env
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
       # Verifies delegations with the public key only (the signing key stays with API/worker
       # in staging; this development volume still holds both).
       OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
@@ -199,6 +209,9 @@ services:
     profiles: [app]
     environment:
       <<: *app-env
+      OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
+      # Executes approved simulator tasks in the tenant's organization.
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
       # Verifies delegations with the public key only (the signing key stays with API/worker
       # in staging; this development volume still holds both).
       OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
@@ -221,7 +234,9 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     profiles: [app]
-    environment: *app-env
+    environment:
+      <<: *app-env
+      OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
     command: ["sh", "-c", "python -m opsbridge.cli simulator-seed /app/fixtures/scenarios/dev.yaml && python -m opsbridge.cli simulator --host 0.0.0.0 --port 8090"]
     volumes: [opsbridge_simdata:/app/var]
     healthcheck:
