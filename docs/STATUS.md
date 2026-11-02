@@ -1242,3 +1242,15 @@ staging, pilot owner).
   uid 10001 on a read-only root, tesseract 5.3.0 still read the scanned fixture.
 - Not done: the parsers still share the service's network and the files it can read, mounted
   keys included. That sandbox needs the staging environment (A11).
+
+### Export check output can't drive the terminal (2026-11-02, production review A08)
+- A problem can quote a document's own value, and `export-check` printed it raw. In a
+  hand-written export, an invoice number holding `ESC [2K` erased its own problem line on the
+  operator's terminal, and `ESC ]0;…` retitled the window, so a hostile export could hide
+  exactly what the check exists to show.
+- The command now spells out control and format characters (`\x1b`, `‮`) in what it
+  prints. The JSON report was already escaped. Other commands print only repository data or
+  values quoted with `repr`.
+- Tests: `tests/pilot/test_export_check.py` (9). The new test fails without the fix, and
+  also when only ASCII control characters are escaped, which lets a bidirectional override
+  through. Unit 555 pass locally.
