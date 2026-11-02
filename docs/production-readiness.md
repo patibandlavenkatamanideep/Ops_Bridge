@@ -645,6 +645,12 @@ the deprovisioning policy; what to delete afterwards does.
   ends only the OpsBridge session opened from it. Recording no session id, dropping the
   fallback for sessions recorded without one, accepting a nonce, or removing the refetch limit
   each fails a test. 0022 was downgraded and upgraded on the test database.
+- In the browser (added the same day): a page open when its session ended kept its cached
+  session for up to a minute and showed error panels. Now any 401 makes the page check the
+  session again, and it says "Your session has ended" and offers sign-in.
+  `frontend/src/App.test.tsx` (2): the ended session fails without the re-check. Without the
+  guard that skips the session check's own 401, the page refetches until it runs out of
+  memory.
 
 **Not done**: deleting user profiles when an account leaves; backups and object versions.
 These need the owner's deprovisioning policy. Identity providers without back-channel logout
