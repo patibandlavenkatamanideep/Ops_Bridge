@@ -741,6 +741,31 @@ def _pilot_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pilot_check_reference(args: argparse.Namespace) -> int:
+    """Read the reference file as pilot-report will, without a database, so a problem is
+    found while the row is fresh rather than at the cut-off."""
+    from collections import Counter
+
+    from opsbridge.pilot.reference import ReferenceError, read_reference
+
+    try:
+        rows = read_reference(Path(args.reference))
+    except OSError as exc:
+        print(_shown(f"Refusing: {exc}"))
+        return 2
+    except ReferenceError as exc:
+        print(f"{args.reference}: {len(exc.problems)} problem(s); pilot-report would refuse it:")
+        for problem in exc.problems:
+            print(_shown(f"  {problem}"))
+        return 2
+    arms = Counter(r.arm for r in rows)
+    print(
+        f"{args.reference}: {len(rows)} rows ({arms['opsbridge']} opsbridge, "
+        f"{arms['manual']} manual); read as pilot-report will read it"
+    )
+    return 0
+
+
 def _export_check(args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
     from opsbridge.connectors.exports import ExportSource
@@ -1016,6 +1041,12 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--out", required=True, help="where to write the report (JSON)")
     p.add_argument("--database", help="database name (default: from settings)")
     p.set_defaults(func=_pilot_report)
+
+    p = sub.add_parser(
+        "pilot-check-reference", help="read the reference file as pilot-report will, no database"
+    )
+    p.add_argument("--reference", required=True, help="the reviewer's reference CSV")
+    p.set_defaults(func=_pilot_check_reference)
 
     p = sub.add_parser(
         "export-check", help="read every record of an export through its pack, storing nothing"
