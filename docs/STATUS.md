@@ -1283,3 +1283,18 @@ staging, pilot owner).
   Unit 579, integration 269 and the canary (64/64) pass locally.
 - Not done: profile deletion, backups and object versions (the deprovisioning policy); `jti`
   is not stored, so a replayed token can end sessions again until its `exp`.
+
+### Each container is given only its own secrets (2026-11-02, production review A06)
+- One shared compose environment block gave every application container every secret. The
+  simulator and both MCP services held the migrator's database password, and the API's and
+  worker's client secrets. Each container now gets only what its process reads; only the
+  one-off bootstrap holds the migrator's password.
+- The session-secret rule moved to the API's startup: in staging it would have refused a
+  worker or MCP service that holds no session secret.
+- Tests: `tests/test_compose_secrets.py` (7; 6 failed before) and 3 added to
+  `tests/test_deployment_settings.py` (failed before). Unit 589 pass locally.
+- With the split secrets, the rebuilt containers demo signed in through Keycloak, ran an
+  investigation (worker, records service, simulator), executed an approved follow-up task
+  (casework service) and ended the session on a Keycloak sign-out.
+- Not done: the signing key still shares the development volume with the MCP services
+  (secret mounts per role, staging).
