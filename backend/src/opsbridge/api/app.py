@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from opsbridge import __version__
-from opsbridge.config import Settings, get_settings
+from opsbridge.config import ConfigurationError, Settings, get_settings
 from opsbridge.persistence.db import Database, get_database
 
 from . import errors
@@ -26,6 +26,9 @@ def create_app(
     settings: Settings | None = None, db: Database | None = None, static_dir: Path | None = None
 ) -> FastAPI:
     settings = settings or get_settings()
+    if settings.deployed and len(settings.session_secret.get_secret_value()) < 32:
+        # Signs the transient login state; only the API holds it (config._deployment_guards).
+        raise ConfigurationError(f"session_secret must be at least 32 characters in {settings.env}")
     app = FastAPI(
         title="OpsBridge API",
         version=__version__,

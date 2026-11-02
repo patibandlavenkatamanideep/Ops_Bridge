@@ -26,8 +26,12 @@ RUN uv sync --frozen --no-dev
 FROM docker.io/library/python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
 # Optional local OCR for PDFs without a text layer (off unless OPSBRIDGE_OCR_ENABLED=true):
 # Debian's tesseract with English data, pinned. OCR text is never authoritative.
+# OpenSSL is raised past the base image's to the version fixing CVE-2026-84782 (HIGH; the CI
+# gate stops fixable HIGH findings). A later base image that already has a newer one makes this
+# pin a refused downgrade: drop the pin then.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tesseract-ocr=5.3.0-2 tesseract-ocr-eng=1:4.1.0-2 \
+      libssl3=3.0.22-1~deb12u2 openssl=3.0.22-1~deb12u2 \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 opsbridge \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --shell /usr/sbin/nologin opsbridge

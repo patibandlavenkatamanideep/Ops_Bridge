@@ -62,3 +62,19 @@ def test_production_refuses_synthetic_sources_and_demo_users() -> None:
         settings(env="production")
     with pytest.raises(ConfigurationError, match="demo user"):
         settings(env="production", demo_user_password="demo")
+
+
+def test_a_deployed_process_that_holds_no_session_secret_still_starts() -> None:
+    """Each container is given only its own secrets (production review A06); the worker and
+    the MCP services never use the session secret, so its rule cannot stop them."""
+    s = settings(env="staging", session_secret="")
+    assert s.deployed
+
+
+@pytest.mark.parametrize("secret", ["", "s" * 31])
+def test_a_deployed_api_refuses_a_short_session_secret(secret: str) -> None:
+    from opsbridge.api.app import create_app
+
+    s = settings(env="staging", session_secret=secret)  # loads: other processes need none
+    with pytest.raises(ConfigurationError, match="session_secret must be at least 32"):
+        create_app(settings=s)

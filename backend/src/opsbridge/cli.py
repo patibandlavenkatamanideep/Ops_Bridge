@@ -741,6 +741,31 @@ def _pilot_report(args: argparse.Namespace) -> int:
     return 0
 
 
+def _pilot_check_reference(args: argparse.Namespace) -> int:
+    """Read the reference file as pilot-report will, without a database, so a problem is
+    found while the row is fresh rather than at the cut-off."""
+    from collections import Counter
+
+    from opsbridge.pilot.reference import ReferenceError, read_reference
+
+    try:
+        rows = read_reference(Path(args.reference))
+    except OSError as exc:
+        print(_shown(f"Refusing: {exc}"))
+        return 2
+    except ReferenceError as exc:
+        print(f"{args.reference}: {len(exc.problems)} problem(s); pilot-report would refuse it:")
+        for problem in exc.problems:
+            print(_shown(f"  {problem}"))
+        return 2
+    arms = Counter(r.arm for r in rows)
+    print(
+        f"{args.reference}: {len(rows)} rows ({arms['opsbridge']} opsbridge, "
+        f"{arms['manual']} manual); read as pilot-report will read it"
+    )
+    return 0
+
+
 def _export_check(args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
     from opsbridge.connectors.exports import ExportSource
@@ -781,6 +806,24 @@ def _shown(text: str) -> str:
     are spelled out rather than sent: a document cannot erase, retitle or reorder what the
     operator reads."""
     return "".join(c if c.isprintable() else repr(c)[1:-1] for c in text)
+
+
+def _end_sessions(args: argparse.Namespace) -> int:
+    """End a person's live sessions now, as a back-channel logout naming only them would.
+    For when the identity provider signed them out but could not reach the API (Keycloak
+    does not retry); docs/operations.md."""
+    from opsbridge.auth.sessions import revoke_idp_sessions
+    from opsbridge.config import get_settings
+    from opsbridge.persistence.db import Database, make_engine
+
+    settings = get_settings()
+    db = Database(make_engine("app", database=args.database))
+    try:
+        ended = revoke_idp_sessions(db, issuer=settings.oidc_issuer, subject=args.subject, sid=None)
+    finally:
+        db.engine.dispose()
+    print(_shown(f"ended {ended} live session(s) of {args.subject!r} ({settings.oidc_issuer})"))
+    return 0
 
 
 def _mcp(args: argparse.Namespace, which: str) -> int:
@@ -1000,12 +1043,25 @@ def main(argv: list[str] | None = None) -> int:
     p.set_defaults(func=_pilot_report)
 
     p = sub.add_parser(
+        "pilot-check-reference", help="read the reference file as pilot-report will, no database"
+    )
+    p.add_argument("--reference", required=True, help="the reviewer's reference CSV")
+    p.set_defaults(func=_pilot_check_reference)
+
+    p = sub.add_parser(
         "export-check", help="read every record of an export through its pack, storing nothing"
     )
     p.add_argument("--export", required=True, help="the organization's export directory")
     p.add_argument("--pack", required=True, help="the pack that maps its records")
     p.add_argument("--out", help="where to write the report (JSON)")
     p.set_defaults(func=_export_check)
+
+    p = sub.add_parser(
+        "end-sessions", help="end a person's live sessions now (back-channel logout missed)"
+    )
+    p.add_argument("--subject", required=True, help="the person's id at the identity provider")
+    p.add_argument("--database", help="database name (default: from settings)")
+    p.set_defaults(func=_end_sessions)
 
     args = parser.parse_args(argv)
     result: int = args.func(args)

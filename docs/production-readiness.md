@@ -32,19 +32,19 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets. Not done: per-role database and secret access, a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets; each container is given only its own secrets. Not done: secret mounts per role (the signing key shares a volume with the MCP services), a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `16951dc`, where the release preconditions pass |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on PR #25's merge commit once its CI run on `main` passes (`16951dc` qualifies but ships pypdf 6.20.1, with ten fixable HIGH findings) |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
-| A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned. Profile deletion, identity-provider disable propagation, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
+| A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
-| A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-10-28 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
+| A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-02 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
 22 October) and X1–X7 (found along the way). A01–A18 do not replace them; where they overlap
@@ -401,10 +401,31 @@ are unchanged.
   one of the three protections fails its test. In the app image, as uid 10001 on a read-only
   root, tesseract 5.3.0 still read the scanned fixture under the restricted environment.
 
-**Not done** (staging, A11): per-role database credentials and secret mounts (the compose
-development volume still holds both delegation keys; the containers share one environment
-block), and a parser sandbox: beyond the Linux memory cap and the restricted environment, the
-parsers still share the service's network and the files it can read, mounted keys included.
+**Secrets per container** (2 November):
+- Reproduced: one shared environment block gave every application container every secret.
+  The simulator and both MCP services held the migrator's database password, which owns
+  every table, as well as the API's session and client secrets and the worker's client
+  secret.
+- Each container now gets only what its process reads: its own database role, plus the
+  API's OIDC client and session secrets, the worker's client secret, and the simulator secret
+  where simulator records or tasks are reached. Only the one-off bootstrap holds the
+  migrator's password.
+- The session-secret rule moved from the settings every process loads to the API's startup:
+  it is the API's alone, and in staging it would have refused a worker that holds none.
+- Evidence: `tests/test_compose_secrets.py` (7; 6 failed before) and
+  `tests/test_deployment_settings.py` (3 added, failed before). The containers demo, run with
+  the split secrets, did all of this:
+  - signed in through Keycloak;
+  - ran an investigation through the worker, the records service and the simulator
+    (`discrepancies_found`);
+  - executed an approved follow-up task through the casework service (`confirmed`);
+  - ended the session when Keycloak signed the person out.
+
+**Not done** (staging, A11): secret mounts per role. The compose development volume still
+holds the delegation signing key, which only the worker uses, where the MCP services can read
+it. Also not done: a parser sandbox. Beyond the Linux memory cap and the restricted
+environment, the parsers still share the service's network and the files it can read,
+mounted keys included.
 
 ## Package 8, evidence packaging (A17)
 
@@ -505,7 +526,7 @@ Its security recording's model requests name both reasons where v1's said "()".
     (`scripts/release_check.py`);
   - it builds once from the locks and pushes only a candidate tag;
   - it runs CI's image checks on that digest: non-root, CLI, `eval-verify` summary and
-    partial exit, API health, SBOM, and fixable critical vulnerabilities;
+    partial exit, API health, SBOM, and fixable critical or high vulnerabilities;
   - it attests and verifies the digest;
   - only then does it give the same digest the version tag, without rebuilding, refusing if
     the tag resolves to anything else.
@@ -542,16 +563,28 @@ Run read-only against this repository, `main`'s head `468dae7` qualifies and the
 never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. On 1 November,
 `main`'s head `b63c5fc` (PR #20; CI run 41277454673) passed all three checks for
 `v0.1.0-alpha.1`: the versions, the experimental description and CI. On 2 November, so did
-`16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets, so
-the first tag belongs there. The ruleset's check
+`16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets. It
+still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so the first tag
+belongs on PR #25's merge commit instead, once its CI run on `main` passes. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
 not an index; the build's provenance attestation makes it one. It checks again after tagging
 that the tag resolves to the qualified digest. The candidate tag stays in the registry.
 
-**Not done**: a staging deployment that promotes the attested digest, rollback rehearsal, and
-a vulnerability policy beyond "fixable critical" (the CI image job's current gate).
+**Vulnerability gate** (2 November). CI and the release stopped only fixable CRITICAL
+findings. A report-only HIGH scan of the image (run 41418268617) found twelve, all fixable:
+- pypdf 6.20.1: ten denial-of-service findings, fixed by 6.21.4, which is now locked. Pilot
+  PDFs go through it; the worker's timeout and memory cap bounded these but did not remove
+  them.
+- OpenSSL 3.0.22-1~deb12u1 in the base image: CVE-2026-84782, fixed by 3.0.22-1~deb12u2,
+  which is now pinned in the image.
+
+Both CI and the release now refuse fixable CRITICAL or HIGH findings. With pypdf 6.21.4, the
+unit, integration and canary gates pass, and both frozen plans still replay case by case.
+
+**Not done**: a staging deployment that promotes the attested digest, and rollback rehearsal.
+MEDIUM findings and unfixed ones are reported nowhere.
 
 ## Package 3, collection budget (A15, in part)
 
@@ -587,10 +620,42 @@ stay; expired, idle and revoked sessions three days old go. On the development d
 worker's first run deleted 2,030 ended sessions accumulated from two weeks of browser-test
 sign-ins, each holding an ID token.
 
-**Not done**: deleting user profiles when an account leaves; propagating an identity-provider
-disable to sessions that are still valid (sessions are checked locally up to their idle and
-absolute limits, 30 minutes and 8 hours); backups and object versions. These need the owner's
-deprovisioning policy.
+**Back-channel logout** (2 November). Ending a removed person's live sessions does not depend on
+the deprovisioning policy; what to delete afterwards does.
+- Reproduced against the local Keycloak 26.8.1: an administrator signed `furn-auditor` out at
+  Keycloak, and their OpsBridge session still answered 200 ten seconds later; it would have
+  lasted up to its idle or absolute limit (30 minutes, 8 hours). Disabling the account sends
+  nothing and ends no session even in Keycloak; signing the person out sends one logout token
+  per session (RS256, `typ: logout+jwt`, `sub`, `sid`, `jti`, `iat`, `exp`, the event).
+- Fix: each session records the identity provider's session id from the verified ID token.
+  `/auth/backchannel-logout` (OpenID Connect Back-Channel Logout 1.0) accepts a logout token
+  only when it is signed by a key the provider publishes, with an asymmetric algorithm, for
+  this issuer and client, is current, and carries the event and no nonce. It then revokes the
+  live sessions it names through `ops.revoke_idp_sessions` (migration 0022: SECURITY DEFINER,
+  owned by the NOLOGIN role `opsbridge_session_revoker`, which reads no tokens and may set only
+  `revoked_at`; the API alone may call it). Sessions recorded before 0022 have no session id
+  and end with any logout of their person. A token naming an unknown key fetches the keys
+  again, at most once a minute. The realm file, `make identity-sync` and the compose file
+  configure the local Keycloak; an unreachable API breaks neither kind of sign-out at Keycloak
+  (checked). `opsbridge end-sessions` ends a person's sessions when a logout did not arrive,
+  since Keycloak does not retry. docs/operations.md has the runbook.
+- Evidence: `tests/auth/test_backchannel.py` (24: the accepted token and each refusal) and
+  `tests/integration/test_backchannel_logout.py` (8). Against Keycloak, a sign-out ends the
+  person's sessions and no one else's (failed before), and ending one of two Keycloak sessions
+  ends only the OpsBridge session opened from it. Recording no session id, dropping the
+  fallback for sessions recorded without one, accepting a nonce, or removing the refetch limit
+  each fails a test. 0022 was downgraded and upgraded on the test database.
+- In the browser (added the same day): a page open when its session ended kept its cached
+  session for up to a minute and showed error panels. Now any 401 makes the page check the
+  session again, and it says "Your session has ended" and offers sign-in.
+  `frontend/src/App.test.tsx` (2): the ended session fails without the re-check. Without the
+  guard that skips the session check's own 401, the page refetches until it runs out of
+  memory.
+
+**Not done**: deleting user profiles when an account leaves; backups and object versions.
+These need the owner's deprovisioning policy. Identity providers without back-channel logout
+keep only the idle and absolute limits, and a replayed logout token can end sessions again
+until its `exp` (`jti` is not stored).
 
 ## Package 5, export source (A08's first step, not proof of any real system)
 
@@ -672,9 +737,10 @@ one case.
 - The measures did not change, and no pilot data, sample or agreement existed.
 
 **Evidence.**
-- `tests/pilot/test_reference.py` (18): strict reading, line-numbered problems, manual
+- `tests/pilot/test_reference.py` (19): strict reading, line-numbered problems, manual
   timings in order, the invoice normalized as intake normalizes it, and a pseudonymous
-  manual row.
+  manual row. `pilot-check-reference` reads the file the same way without a database, so the
+  operator finds a problem while the row is fresh (added 2 November).
 - `tests/pilot/test_measures.py` (6): each measure on hand-written facts whose counts can be
   checked by reading them; a row matches a case only when number and supplier both agree.
   Matching on the number alone, or reading the invoice without intake's normalization, each
@@ -733,15 +799,16 @@ and blindness is shown only by the recorded time.
    - before any pilot, reference rows name the invoice rather than the case number, which
      doesn't exist yet when a blind decision is recorded (A08, A14);
    - since then: parser subprocesses get none of the service's secrets (A06; PR #23, merged
-     as `16951dc`), and `export-check` spells out control characters in what it prints (A08).
+     as `16951dc`), `export-check` spells out control characters in what it prints (A08; PR
+     #24), and a sign-out at the identity provider ends OpsBridge's sessions at once (A16).
 
    Remaining limits:
-   - the release workflow has not run, though its preconditions pass on `16951dc`;
+   - the release workflow has not run; its first tag waits for PR #25's merge commit;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`, which carries the
-     parser environment restriction (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge commit once its CI
+     run on `main` passes; it carries the fixed pypdf and OpenSSL (A12);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);

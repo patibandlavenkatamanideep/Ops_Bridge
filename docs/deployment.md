@@ -92,7 +92,9 @@ Internet ─▶ ALB (HTTPS, ACM certificate, optional AWS WAF) ─▶ ECS Fargat
 private subnets: ECS services worker (1–2), records-mcp, casework-mcp (Service Connect, no public route)
                  RDS PostgreSQL 16 (pgvector available; encrypted with KMS; automated backups)
                  S3 bucket for artifacts (SSE-KMS, versioning, Block Public Access) — S3ArtifactStore
-identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer
+identity: customer IdP (OIDC) or Keycloak on ECS with its own RDS database, HTTPS issuer;
+          back-channel logout to https://<api>/auth/backchannel-logout, reachable from the IdP
+          (without it, someone signed out at the IdP keeps OpsBridge for up to 8 hours)
 telemetry: ADOT collector sidecar → CloudWatch / X-Ray (OTLP); Amazon Managed Prometheus
            scraping api /metrics and worker :9101 inside the VPC; CloudWatch Logs
 dashboards: infra/observability/grafana/dashboards imported into Amazon Managed Grafana (or
@@ -120,7 +122,7 @@ the sizes above are conventional starting points, not measurements.
 definitions): PostgreSQL passwords for migrator, app, worker and mcp roles (plus the master
 user, kept out of the application); OIDC client secret; worker client secret; session secret
 (≥ 32 chars); delegation Ed25519 private key (`OPSBRIDGE_DELEGATION_PRIVATE_KEY`, PEM; used directly and
-never written to disk; given to the API and worker only, which sign) and its public key for
+never written to disk; given to the worker only, which signs) and its public key for
 the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
 `OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH`; a deployed verifier refuses to start without one and
 never loads the private key; list old and new keys together while rotating, then drop the old
@@ -132,7 +134,7 @@ spend ceiling).
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
 every PR head and every commit on `main` with the same jobs, including the runtime image
 built from the locks with base images pinned by digest, its SBOM (SPDX, a workflow artifact)
-and a vulnerability scan that fails on fixable critical findings. Nothing is published:
+and a vulnerability scan that fails on fixable critical or high findings. Nothing is published:
 pushing an image to a registry, signing it and recording provenance belong to a release
 workflow that the owner authorizes, and the image promoted to staging must be the one whose
 digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
@@ -141,11 +143,13 @@ require the four CI jobs and one review before merging, disallow force-pushes. D
 
 **Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
 simulator is allowed) and `OPSBRIDGE_ENV=production` refuse to start unless: HTTPS public URL
-and issuer, no localhost issuer, simulator fault controls off, session secret of at least 32
-characters, an S3 artifact bucket with server-side encryption requested (`AES256` or
-`aws:kms`), quotas on, the rate limit shared across instances, and `trusted_proxies` naming the
-load balancer. `production` also refuses demo user credentials and, because no production
-purchasing-source adapter exists yet, refuses to start at all: the staging plan uses
+and issuer, no localhost issuer, simulator fault controls off, an S3 artifact bucket with
+server-side encryption requested (`AES256` or `aws:kms`), quotas on, the rate limit shared
+across instances, and `trusted_proxies` naming the load balancer. The API also refuses a
+session secret under 32 characters; only the API holds it, since each task gets only its own
+secrets, as the compose file shows. `production` also refuses demo user credentials and,
+because no production purchasing-source adapter exists yet, refuses to start at all: the
+staging plan uses
 `staging`. These are settings checks: they do not show that the bucket actually encrypts or
 that the CIDRs are really the load balancer's. Cookies are `Secure` in both. A deployment
 keeps the default per-user limit (`OPSBRIDGE_RATE_LIMIT_PER_MINUTE`, 240) unless it has
@@ -184,7 +188,8 @@ standard AWS chain), never from settings.
 
 **Database roles.** Run the SQL in `infra/compose/postgres/10-opsbridge-roles.sh` and
 `20-opsbridge-databases.sh` once with the master user (roles are NOSUPERUSER NOBYPASSRLS;
-`opsbridge_ops_reader` and `opsbridge_session_pruner` are NOLOGIN), then migrations as
+`opsbridge_ops_reader`, `opsbridge_session_pruner` and `opsbridge_session_revoker` are
+NOLOGIN), then migrations as
 `opsbridge_migrator`.
 
 **Rollout and rollback.** Build the image in CI from the locks, tag it with the commit SHA,

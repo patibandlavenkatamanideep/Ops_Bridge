@@ -408,10 +408,11 @@ blockers in `docs/production-readiness.md`):
    (dated entries below). PR #17 was merged on 2026-10-30. The later work, including
    experimental pre-release support, the pilot measurement and the pilot export check, was
    merged on 2026-11-01 as PR #20 (`b63c5fc`). The parser environment restriction was
-   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass. Next:
-   whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`
-   (A12); a purchasing system or export with
+   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass; the
+   export-check output escaping as PR #24. Since then: back-channel logout (A16, dated entry
+   below). Next: whatever the owner's answers below unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge
+   commit once its CI run on `main` passes (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1262,3 +1263,65 @@ staging, pilot owner).
   pass on it for `v0.1.0-alpha.1`.
 - The first tag belongs on `16951dc`, not `b63c5fc`: an image built from `b63c5fc` would
   hand the service's secrets to its parsers.
+
+### A sign-out at the identity provider ends OpsBridge's sessions (2026-11-02, production review A16)
+- Reproduced against the local Keycloak 26.8.1: after an administrator signed a person out at
+  Keycloak, their OpsBridge session still answered ten seconds later, and would have lasted up
+  to 30 minutes idle or 8 hours. Disabling an account ends no session even in Keycloak.
+- OpenID Connect Back-Channel Logout:
+  - each session records the provider's session id;
+  - `/auth/backchannel-logout` verifies the logout token (provider's published key,
+    asymmetric algorithm, issuer, client, `iat`/`exp`/`jti`, the event, no nonce);
+  - it revokes the sessions named through `ops.revoke_idp_sessions` (migration 0022, owned by
+    the NOLOGIN role `opsbridge_session_revoker`, which reads no tokens).
+- Keycloak configuration: the realm file, `make identity-sync` for an existing Keycloak, and
+  `extra_hosts` for Docker on Linux. An unreachable API breaks no sign-out at Keycloak.
+  `opsbridge end-sessions --subject S` covers a missed logout (Keycloak does not retry).
+  docs/operations.md has the runbook: disable, then sign out.
+- Tests: `tests/auth/test_backchannel.py` (24) and `tests/integration/test_backchannel_logout.py`
+  (8; two against Keycloak, one failed before). Four deliberate breaks each fail a test.
+  Unit 579, integration 269 and the canary (64/64) pass locally.
+- Not done: profile deletion, backups and object versions (the deprovisioning policy); `jti`
+  is not stored, so a replayed token can end sessions again until its `exp`.
+
+### Each container is given only its own secrets (2026-11-02, production review A06)
+- One shared compose environment block gave every application container every secret. The
+  simulator and both MCP services held the migrator's database password, and the API's and
+  worker's client secrets. Each container now gets only what its process reads; only the
+  one-off bootstrap holds the migrator's password.
+- The session-secret rule moved to the API's startup: in staging it would have refused a
+  worker or MCP service that holds no session secret.
+- Tests: `tests/test_compose_secrets.py` (7; 6 failed before) and 3 added to
+  `tests/test_deployment_settings.py` (failed before). Unit 589 pass locally.
+- With the split secrets, the rebuilt containers demo signed in through Keycloak, ran an
+  investigation (worker, records service, simulator), executed an approved follow-up task
+  (casework service) and ended the session on a Keycloak sign-out.
+- Not done: the signing key still shares the development volume with the MCP services
+  (secret mounts per role, staging).
+
+### The image gate stops fixable HIGH findings (2026-11-02, production review A12)
+- CI and the release stopped only fixable CRITICAL findings. A report-only HIGH scan (run
+  41418268617) found twelve, all fixable:
+  - pypdf 6.20.1 had ten denial-of-service findings; 6.21.4 is now locked;
+  - the base image's OpenSSL had CVE-2026-84782; 3.0.22-1~deb12u2 is now pinned in the image.
+- CI and the release now refuse fixable CRITICAL or HIGH findings.
+- Checks with pypdf 6.21.4: unit 589, integration 270 and the canary (64/64) pass locally, and
+  both frozen plans replay case by case.
+- The first tag moves again: `16951dc` ships pypdf 6.20.1, so `v0.1.0-alpha.1` belongs on
+  PR #25's merge commit once its CI run on `main` passes.
+
+### The pilot reference file can be checked while the pilot runs (2026-11-02, production review A08)
+- `pilot-report` reads the reviewer's reference file only at the cut-off, weeks after a row
+  was written. `opsbridge pilot-check-reference --reference FILE` reads it the same strict
+  way without a database, so a problem is found while the row is fresh. It exits 2 with each
+  problem by line. docs/pilot-plan.md now gives the exact header line.
+- Tests: `tests/pilot/test_reference.py` (19; the new one failed before). Pilot tests 34.
+
+### A page whose session ended says so (2026-11-02, production review A16)
+- After a session ended (idle, absolute limit, signed out elsewhere, or by the identity
+  provider), an open page kept its cached session for up to a minute and showed error panels
+  on every request. Now any 401 makes the page check the session again, and it says "Your
+  session has ended" and offers sign-in. Someone never signed in sees plain sign-in.
+- Tests: `frontend/src/App.test.tsx` (2; the ended-session test failed before). Removing the
+  guard that skips the session check's own 401 makes the page refetch until it runs out of
+  memory. Frontend tests 14.

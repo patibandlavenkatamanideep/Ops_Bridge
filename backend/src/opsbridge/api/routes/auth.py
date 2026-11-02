@@ -1,20 +1,34 @@
-"""OIDC Authorization Code + PKCE login, logout, and the current-user endpoint."""
+"""OIDC Authorization Code + PKCE login, logout (here and from the identity provider), and the
+current-user endpoint."""
 
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 from urllib.parse import urlencode
 
 from authlib.integrations.starlette_client import OAuth, OAuthError
 from fastapi import APIRouter, Request
-from fastapi.responses import RedirectResponse
+from fastapi.responses import JSONResponse, RedirectResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.concurrency import run_in_threadpool
 
+from opsbridge.auth.backchannel import (
+    MAX_CLAIM_CHARS,
+    LogoutTokenInvalid,
+    UnknownSigningKey,
+    verify_logout_token,
+)
 from opsbridge.auth.permissions import TIERS, permissions_for
-from opsbridge.auth.sessions import COOKIE_NAME, create_session, revoke_session, upsert_login_user
+from opsbridge.auth.sessions import (
+    COOKIE_NAME,
+    create_session,
+    revoke_idp_sessions,
+    revoke_session,
+    upsert_login_user,
+)
 from opsbridge.config import Settings
 from opsbridge.persistence.db import DbContext
 from opsbridge.persistence.models import Membership, Tenant
@@ -26,6 +40,9 @@ log = logging.getLogger("opsbridge.auth")
 router = APIRouter()
 
 LOGIN_NEXT_KEY = "opsbridge_next"
+# A logout token naming a key not yet fetched makes OpsBridge fetch the provider's keys again
+# (it may have rotated them), but no more often than this, whatever is sent.
+JWKS_REFETCH_SECONDS = 60.0
 
 
 def build_oauth(settings: Settings) -> OAuth:
@@ -94,8 +111,14 @@ async def callback(request: Request, state: State) -> Any:
         email=str(email)[:320] if email else None,
         email_verified=claims.get("email_verified") is True,  # only an explicit claim counts
     )
+    sid = claims.get("sid")
     raw = await run_in_threadpool(
-        create_session, state.db, settings, user_id, token.get("id_token")
+        create_session,
+        state.db,
+        settings,
+        user_id,
+        token.get("id_token"),
+        sid if isinstance(sid, str) and 0 < len(sid) <= MAX_CLAIM_CHARS else None,
     )
     target = _safe_next(request.session.pop(LOGIN_NEXT_KEY, "/"))
     response = RedirectResponse(url=target, status_code=303)
@@ -135,11 +158,52 @@ async def logout(request: Request, info: CurrentSession, state: State) -> Any:
             )
     except Exception:  # IdP unreachable: local session is already revoked
         logout_url = None
-    from fastapi.responses import JSONResponse
-
     response = JSONResponse({"logout_url": logout_url})
     response.delete_cookie(COOKIE_NAME, path="/")
     return response
+
+
+@router.post("/auth/backchannel-logout", include_in_schema=False)
+async def backchannel_logout(request: Request, state: State) -> Any:
+    """OpenID Connect Back-Channel Logout: the identity provider says one of its sessions has
+    ended, and the OpsBridge sessions opened from it end too (opsbridge/auth/backchannel.py).
+    Called by the provider, not a browser: no cookie, so no CSRF token."""
+    settings = state.settings
+    no_store = {"Cache-Control": "no-store"}
+    client = request.app.state.oauth.opsbridge
+    raw = (await request.form()).get("logout_token")
+
+    def verify(jwks: dict[str, Any]) -> Any:
+        if not isinstance(raw, str):
+            raise LogoutTokenInvalid("no logout token")
+        return verify_logout_token(
+            raw, jwks, issuer=settings.oidc_issuer, audience=settings.oidc_client_id
+        )
+
+    try:
+        try:
+            claims = verify(await client.fetch_jwk_set())
+        except UnknownSigningKey:
+            last = getattr(request.app.state, "jwks_refetched_at", None)
+            if last is not None and time.monotonic() - last < JWKS_REFETCH_SECONDS:
+                raise
+            request.app.state.jwks_refetched_at = time.monotonic()
+            claims = verify(await client.fetch_jwk_set(force=True))
+    except LogoutTokenInvalid as exc:
+        log.info("back-channel logout refused: %s", exc)
+        return JSONResponse({"error": "invalid_request"}, status_code=400, headers=no_store)
+    except Exception as exc:  # the provider's keys could not be fetched
+        log.warning("back-channel logout: provider keys unavailable: %s", type(exc).__name__)
+        return JSONResponse({"error": "temporarily_unavailable"}, status_code=503, headers=no_store)
+    ended = await run_in_threadpool(
+        revoke_idp_sessions,
+        state.db,
+        issuer=settings.oidc_issuer,
+        subject=claims.subject,
+        sid=claims.sid,
+    )
+    log.info("back-channel logout ended %d session(s)", ended)
+    return Response(status_code=200, headers=no_store)
 
 
 class MembershipOut(BaseModel):

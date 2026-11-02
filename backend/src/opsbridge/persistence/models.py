@@ -187,6 +187,8 @@ class UserSession(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), index=True)
     csrf_token: Mapped[str] = mapped_column(String(64))
     id_token: Mapped[str | None] = mapped_column(Text)
+    # The identity provider's session (`sid`) it was opened from, for back-channel logout.
+    idp_session_id: Mapped[str | None] = mapped_column(String(255), index=True)
     created_at: Mapped[datetime] = created()
     last_seen_at: Mapped[datetime] = mapped_column(server_default=func.now())
     expires_at: Mapped[datetime]

@@ -70,6 +70,29 @@ reason, recorded in the audit log (`task_connection.changed` / `task_connection.
   is not used again; operations whose write may have landed go to review
   (`connector_unavailable`). Make a new version when ready.
 
+## Removing someone's access
+
+In Keycloak, Users → the person:
+1. Disable the account. New sign-ins stop. Disabling alone ends no session, in Keycloak or in
+   OpsBridge (checked against Keycloak 26.8.1).
+2. Sessions → Sign out (or `POST /admin/realms/<realm>/users/<id>/logout`). Keycloak sends a
+   logout token for each of the person's sessions to `/auth/backchannel-logout`, and OpsBridge
+   revokes the sessions opened from them at once. The API logs `back-channel logout ended N
+   session(s)`.
+3. If that line is missing (the API was down or unreachable from Keycloak, which does not
+   retry, or more than 1200 logouts came from Keycloak's address within a minute, the
+   per-address rate limit), end the sessions directly:
+   `opsbridge end-sessions --subject <the person's Keycloak user id>`. Otherwise they end at
+   their idle or absolute limit (30 minutes, 8 hours).
+4. Their memberships stay until an organization administrator removes them (Settings →
+   Members). With the account disabled and its sessions ended, they grant nothing.
+
+The identity provider must reach the API: the client's back-channel logout URL is
+`<public URL>/auth/backchannel-logout`. Locally it is `http://host.docker.internal:8000/…`
+(set by the realm file; `make identity-sync` sets it on an existing Keycloak). On Linux the
+API must listen on an address the containers reach. Deleting a person's profile is not
+built: it waits on the deprovisioning policy (production review A16).
+
 ## Out-of-date investigations
 
 An investigation's result may be acted on (proposal, approval, dispatch, resolution) for
@@ -183,7 +206,8 @@ Optional local OCR reads such pages so the reviewer sees their text and candidat
 forward-only in practice: each has a `downgrade()`, but downgrades are not exercised against
 production-like data. Release order: migrate, then deploy code that needs the new schema;
 keep schema changes backward compatible for one release so the previous image can still run.
-New cluster-level roles (0004 needs `opsbridge_ops_reader`, 0021 `opsbridge_session_pruner`) come from
+New cluster-level roles (0004 needs `opsbridge_ops_reader`, 0021 `opsbridge_session_pruner`,
+0022 `opsbridge_session_revoker`) come from
 `infra/compose/postgres/20-opsbridge-databases.sh` (idempotent; `make infra-up` runs it).
 
 ## Backup and restore
