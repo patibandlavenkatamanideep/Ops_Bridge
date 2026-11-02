@@ -167,22 +167,14 @@ jobs:
           image: opsbridge/app:ci
           format: spdx-json
           artifact-name: opsbridge-image.spdx.json
-      - name: Fail on critical vulnerabilities that have a fix
+      # Production review A12: the gate was fixable CRITICAL only. HIGH was measured first (run
+      # 41418268617: pypdf, openssl), fixed, and then added to the gate.
+      - name: Fail on critical or high vulnerabilities that have a fix
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: opsbridge/app:ci
-          severity: CRITICAL
+          severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: "1"
-          format: table
-          trivyignores: .trivyignore.yaml
-      # Measured before it becomes a gate (production review A12): what a HIGH gate would stop.
-      - name: Report high vulnerabilities that have a fix
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
-        with:
-          image-ref: opsbridge/app:ci
-          severity: HIGH
-          ignore-unfixed: true
-          exit-code: "0"
           format: table
           trivyignores: .trivyignore.yaml
