@@ -411,8 +411,8 @@ blockers in `docs/production-readiness.md`):
    merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass; the
    export-check output escaping as PR #24. Since then: back-channel logout (A16, dated entry
    below). Next: whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`
-   (A12); a purchasing system or export with
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge
+   commit once its CI run on `main` passes (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1298,3 +1298,14 @@ staging, pilot owner).
   (casework service) and ended the session on a Keycloak sign-out.
 - Not done: the signing key still shares the development volume with the MCP services
   (secret mounts per role, staging).
+
+### The image gate stops fixable HIGH findings (2026-11-02, production review A12)
+- CI and the release stopped only fixable CRITICAL findings. A report-only HIGH scan (run
+  41418268617) found twelve, all fixable:
+  - pypdf 6.20.1 had ten denial-of-service findings; 6.21.4 is now locked;
+  - the base image's OpenSSL had CVE-2026-84782; 3.0.22-1~deb12u2 is now pinned in the image.
+- CI and the release now refuse fixable CRITICAL or HIGH findings.
+- Checks with pypdf 6.21.4: unit 589, integration 270 and the canary (64/64) pass locally, and
+  both frozen plans replay case by case.
+- The first tag moves again: `16951dc` ships pypdf 6.20.1, so `v0.1.0-alpha.1` belongs on
+  PR #25's merge commit once its CI run on `main` passes.
