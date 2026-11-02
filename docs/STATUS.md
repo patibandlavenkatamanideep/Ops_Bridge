@@ -407,9 +407,10 @@ blockers in `docs/production-readiness.md`):
    2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
    (dated entries below). PR #17 was merged on 2026-10-30. The later work, including
    experimental pre-release support, the pilot measurement and the pilot export check, was
-   merged on 2026-11-01 as PR #20 (`b63c5fc`), where the release preconditions pass. Next:
+   merged on 2026-11-01 as PR #20 (`b63c5fc`). The parser environment restriction was
+   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass. Next:
    whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `b63c5fc`
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`
    (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1254,3 +1255,10 @@ staging, pilot owner).
 - Tests: `tests/pilot/test_export_check.py` (9). The new test fails without the fix, and
   also when only ASCII control characters are escaped, which lets a bidirectional override
   through. Unit 555 pass locally.
+
+### PR #23 merged; the first tag moves to `16951dc` (2026-11-02, production review A12)
+- PR #23 (parser subprocesses get no secrets) was merged as `16951dc`. Its CI run on `main`
+  (41409288359) passed all four jobs, and `release_check.py versions`, `describe` and `ci`
+  pass on it for `v0.1.0-alpha.1`.
+- The first tag belongs on `16951dc`, not `b63c5fc`: an image built from `b63c5fc` would
+  hand the service's secrets to its parsers.
