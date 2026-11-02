@@ -223,3 +223,20 @@ def test_the_command_exits_by_whether_anything_needs_review(
     assert run(tmp_path / "broken") == 2
     assert not (tmp_path / "broken.json").exists()
     assert "Refusing" in capsys.readouterr().out
+
+
+def test_a_document_cannot_hide_or_reorder_its_problem_on_the_terminal(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A problem can quote a document's own value. Sent raw, an escape sequence in it could
+    erase the problem's line or retitle the window, and a bidirectional override could
+    reorder what the operator reads."""
+    invoice = copy.deepcopy(INVOICE)
+    invoice["invoiceId"] = "INV-7001\x1b[2K\x1b]0;retitled\x07‮"
+    records = consistent()
+    records[1] = ("invoices", "INV-7001", "PO-2001", body(invoice))
+    root = write_export(tmp_path / "export", records)
+    assert cli.main(["export-check", "--export", str(root), "--pack", "it_hardware"]) == 1
+    printed = capsys.readouterr().out
+    assert [c for c in printed if not (c.isprintable() or c == "\n")] == []
+    assert "INV-7001\\x1b[2K\\x1b]0;RETITLED\\x07\\u202e" in printed
