@@ -42,7 +42,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
-| A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned. Profile deletion, identity-provider disable propagation, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
+| A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-10-28 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
@@ -587,10 +587,36 @@ stay; expired, idle and revoked sessions three days old go. On the development d
 worker's first run deleted 2,030 ended sessions accumulated from two weeks of browser-test
 sign-ins, each holding an ID token.
 
-**Not done**: deleting user profiles when an account leaves; propagating an identity-provider
-disable to sessions that are still valid (sessions are checked locally up to their idle and
-absolute limits, 30 minutes and 8 hours); backups and object versions. These need the owner's
-deprovisioning policy.
+**Back-channel logout** (2 November). Ending a removed person's live sessions does not depend on
+the deprovisioning policy; what to delete afterwards does.
+- Reproduced against the local Keycloak 26.8.1: an administrator signed `furn-auditor` out at
+  Keycloak, and their OpsBridge session still answered 200 ten seconds later; it would have
+  lasted up to its idle or absolute limit (30 minutes, 8 hours). Disabling the account sends
+  nothing and ends no session even in Keycloak; signing the person out sends one logout token
+  per session (RS256, `typ: logout+jwt`, `sub`, `sid`, `jti`, `iat`, `exp`, the event).
+- Fix: each session records the identity provider's session id from the verified ID token.
+  `/auth/backchannel-logout` (OpenID Connect Back-Channel Logout 1.0) accepts a logout token
+  only when it is signed by a key the provider publishes, with an asymmetric algorithm, for
+  this issuer and client, is current, and carries the event and no nonce. It then revokes the
+  live sessions it names through `ops.revoke_idp_sessions` (migration 0022: SECURITY DEFINER,
+  owned by the NOLOGIN role `opsbridge_session_revoker`, which reads no tokens and may set only
+  `revoked_at`; the API alone may call it). Sessions recorded before 0022 have no session id
+  and end with any logout of their person. A token naming an unknown key fetches the keys
+  again, at most once a minute. The realm file, `make identity-sync` and the compose file
+  configure the local Keycloak; an unreachable API breaks neither kind of sign-out at Keycloak
+  (checked). `opsbridge end-sessions` ends a person's sessions when a logout did not arrive,
+  since Keycloak does not retry. docs/operations.md has the runbook.
+- Evidence: `tests/auth/test_backchannel.py` (24: the accepted token and each refusal) and
+  `tests/integration/test_backchannel_logout.py` (8). Against Keycloak, a sign-out ends the
+  person's sessions and no one else's (failed before), and ending one of two Keycloak sessions
+  ends only the OpsBridge session opened from it. Recording no session id, dropping the
+  fallback for sessions recorded without one, accepting a nonce, or removing the refetch limit
+  each fails a test. 0022 was downgraded and upgraded on the test database.
+
+**Not done**: deleting user profiles when an account leaves; backups and object versions.
+These need the owner's deprovisioning policy. Identity providers without back-channel logout
+keep only the idle and absolute limits, and a replayed logout token can end sessions again
+until its `exp` (`jti` is not stored).
 
 ## Package 5, export source (A08's first step, not proof of any real system)
 
@@ -733,7 +759,8 @@ and blindness is shown only by the recorded time.
    - before any pilot, reference rows name the invoice rather than the case number, which
      doesn't exist yet when a blind decision is recorded (A08, A14);
    - since then: parser subprocesses get none of the service's secrets (A06; PR #23, merged
-     as `16951dc`), and `export-check` spells out control characters in what it prints (A08).
+     as `16951dc`), `export-check` spells out control characters in what it prints (A08; PR
+     #24), and a sign-out at the identity provider ends OpsBridge's sessions at once (A16).
 
    Remaining limits:
    - the release workflow has not run, though its preconditions pass on `16951dc`;
