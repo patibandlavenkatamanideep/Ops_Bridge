@@ -758,7 +758,7 @@ def _export_check(args: argparse.Namespace) -> int:
     try:
         source = ExportSource(Path(args.export))
     except (SourceRecordInvalid, SourceUnavailable) as exc:
-        print(f"Refusing: {exc}")
+        print(_shown(f"Refusing: {exc}"))
         return 2
     result = check_export(source, pack, OcrSettings.from_settings(settings))
     if args.out:
@@ -771,8 +771,16 @@ def _export_check(args: argparse.Namespace) -> int:
         f"{len(problems)} problem(s) to review before the first case"
     )
     for p in problems:
-        print(f"  {p['collection']} {p['key']}: {p['problem']}")
+        print(_shown(f"  {p['collection']} {p['key']}: {p['problem']}"))
     return 1 if problems else 0
+
+
+def _shown(text: str) -> str:
+    """Text from an export as the terminal should show it. A problem can quote a document's
+    own value, so control and format characters (escape sequences, bidirectional overrides)
+    are spelled out rather than sent: a document cannot erase, retitle or reorder what the
+    operator reads."""
+    return "".join(c if c.isprintable() else repr(c)[1:-1] for c in text)
 
 
 def _mcp(args: argparse.Namespace, which: str) -> int:
