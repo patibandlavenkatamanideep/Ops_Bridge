@@ -174,7 +174,8 @@ For each listed record it checks that:
 It exits 1 if anything needs review, and 2 if the export or the pack can't be opened
 (`opsbridge/pilot/export_check.py`). The report holds keys, counts and problems, not document
 content. A mapping problem can quote the value that failed, so the report stays with the
-export.
+export. On the terminal, such a value is printed with control and format characters spelled
+out (`\x1b`, `‮`), so an export can't erase or reorder its own problems there.
 
 At the cut-off, compute the measures:
 
@@ -196,6 +197,6 @@ the benchmark scores with (`opsbridge/evaluation/verdict.py`).
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 32 tests, and
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 33 tests, and
 `tests/integration/test_pilot_report.py`, 2 tests). No pilot has started: no export,
 reviewer or authorization exists yet.

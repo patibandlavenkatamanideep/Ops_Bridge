@@ -407,9 +407,10 @@ blockers in `docs/production-readiness.md`):
    2026-10-29 and, after its review, the engineering re-run and the SDK response bounds
    (dated entries below). PR #17 was merged on 2026-10-30. The later work, including
    experimental pre-release support, the pilot measurement and the pilot export check, was
-   merged on 2026-11-01 as PR #20 (`b63c5fc`), where the release preconditions pass. Next:
+   merged on 2026-11-01 as PR #20 (`b63c5fc`). The parser environment restriction was
+   merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass. Next:
    whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `b63c5fc`
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `16951dc`
    (A12); a purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1242,3 +1243,22 @@ staging, pilot owner).
   uid 10001 on a read-only root, tesseract 5.3.0 still read the scanned fixture.
 - Not done: the parsers still share the service's network and the files it can read, mounted
   keys included. That sandbox needs the staging environment (A11).
+
+### Export check output can't drive the terminal (2026-11-02, production review A08)
+- A problem can quote a document's own value, and `export-check` printed it raw. In a
+  hand-written export, an invoice number holding `ESC [2K` erased its own problem line on the
+  operator's terminal, and `ESC ]0;…` retitled the window, so a hostile export could hide
+  exactly what the check exists to show.
+- The command now spells out control and format characters (`\x1b`, `‮`) in what it
+  prints. The JSON report was already escaped. Other commands print only repository data or
+  values quoted with `repr`.
+- Tests: `tests/pilot/test_export_check.py` (9). The new test fails without the fix, and
+  also when only ASCII control characters are escaped, which lets a bidirectional override
+  through. Unit 555 pass locally.
+
+### PR #23 merged; the first tag moves to `16951dc` (2026-11-02, production review A12)
+- PR #23 (parser subprocesses get no secrets) was merged as `16951dc`. Its CI run on `main`
+  (41409288359) passed all four jobs, and `release_check.py versions`, `describe` and `ci`
+  pass on it for `v0.1.0-alpha.1`.
+- The first tag belongs on `16951dc`, not `b63c5fc`: an image built from `b63c5fc` would
+  hand the service's secrets to its parsers.
