@@ -1309,3 +1309,10 @@ staging, pilot owner).
   both frozen plans replay case by case.
 - The first tag moves again: `16951dc` ships pypdf 6.20.1, so `v0.1.0-alpha.1` belongs on
   PR #25's merge commit once its CI run on `main` passes.
+
+### The pilot reference file can be checked while the pilot runs (2026-11-02, production review A08)
+- `pilot-report` reads the reviewer's reference file only at the cut-off, weeks after a row
+  was written. `opsbridge pilot-check-reference --reference FILE` reads it the same strict
+  way without a database, so a problem is found while the row is fresh. It exits 2 with each
+  problem by line. docs/pilot-plan.md now gives the exact header line.
+- Tests: `tests/pilot/test_reference.py` (19; the new one failed before). Pilot tests 34.
