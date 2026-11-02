@@ -51,7 +51,8 @@ export function App() {
   const me = useMe();
   if (me.isPending) return <Loading label="Checking your session" />;
   if (me.isError) {
-    if (me.error.status === 401) return <SignIn />;
+    // A session seen earlier on this page has ended (queryClient.ts re-checks it on any 401).
+    if (me.error.status === 401) return <SignIn expired={me.data !== undefined} />;
     return <ErrorState error={me.error} onRetry={() => me.refetch()} />;
   }
   return (
