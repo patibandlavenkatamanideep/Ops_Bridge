@@ -32,7 +32,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets. Not done: per-role database and secret access, a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secrets |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets; each container is given only its own secrets. Not done: secret mounts per role (the signing key shares a volume with the MCP services), a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
@@ -44,7 +44,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
-| A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-10-28 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
+| A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-02 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
 22 October) and X1–X7 (found along the way). A01–A18 do not replace them; where they overlap
@@ -401,10 +401,31 @@ are unchanged.
   one of the three protections fails its test. In the app image, as uid 10001 on a read-only
   root, tesseract 5.3.0 still read the scanned fixture under the restricted environment.
 
-**Not done** (staging, A11): per-role database credentials and secret mounts (the compose
-development volume still holds both delegation keys; the containers share one environment
-block), and a parser sandbox: beyond the Linux memory cap and the restricted environment, the
-parsers still share the service's network and the files it can read, mounted keys included.
+**Secrets per container** (2 November):
+- Reproduced: one shared environment block gave every application container every secret.
+  The simulator and both MCP services held the migrator's database password, which owns
+  every table, as well as the API's session and client secrets and the worker's client
+  secret.
+- Each container now gets only what its process reads: its own database role, plus the
+  API's OIDC client and session secrets, the worker's client secret, and the simulator secret
+  where simulator records or tasks are reached. Only the one-off bootstrap holds the
+  migrator's password.
+- The session-secret rule moved from the settings every process loads to the API's startup:
+  it is the API's alone, and in staging it would have refused a worker that holds none.
+- Evidence: `tests/test_compose_secrets.py` (7; 6 failed before) and
+  `tests/test_deployment_settings.py` (3 added, failed before). The containers demo, run with
+  the split secrets, did all of this:
+  - signed in through Keycloak;
+  - ran an investigation through the worker, the records service and the simulator
+    (`discrepancies_found`);
+  - executed an approved follow-up task through the casework service (`confirmed`);
+  - ended the session when Keycloak signed the person out.
+
+**Not done** (staging, A11): secret mounts per role. The compose development volume still
+holds the delegation signing key, which only the worker uses, where the MCP services can read
+it. Also not done: a parser sandbox. Beyond the Linux memory cap and the restricted
+environment, the parsers still share the service's network and the files it can read,
+mounted keys included.
 
 ## Package 8, evidence packaging (A17)
 
