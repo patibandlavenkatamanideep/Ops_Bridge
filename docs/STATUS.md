@@ -411,9 +411,10 @@ blockers in `docs/production-readiness.md`):
    merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass; the
    export-check output escaping as PR #24. PR #25 (back-channel logout, per-container
    secrets, the HIGH image gate, the reference check, the session-ended page) was merged on
-   2026-11-02 as `23b2f84`, where the release preconditions pass. Next: whatever the owner's
-   answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `23b2f84` (A12); a
+   2026-11-02 as `23b2f84`, where the release preconditions pass. The evidence bundle was
+   merged on 2026-11-03 as PR #27 (`77a515b`), where they pass too. Next: whatever the
+   owner's answers below unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `77a515b` (A12); a
    purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1348,3 +1349,12 @@ staging, pilot owner).
 - Tests: `tests/evaluation/test_evidence_bundle.py` (8). Unit 598 pass locally. In the image:
   chain intact, 34 signatures valid, 34 records ok.
 - Not done: the bundle is a 90-day workflow artifact, not a permanent release asset.
+
+### PR #27 merged; the first tag goes on `77a515b` (2026-11-03, production review A12, A17)
+- PR #27 was merged as `77a515b`. Its CI run on `main` (41568201604) passed all four jobs.
+- `release_check.py versions` and `ci` pass on it for `v0.1.0-alpha.1`. Its release workflow
+  also builds, verifies and attests the evidence bundle, so the first tag is proposed there
+  rather than on `23b2f84`, which qualifies but releases without a bundle.
+- The image job's bundle round trip on `main` built the same SHA-256 as on macOS and in the
+  local image (`2f52004e…`): chain intact, 34 signatures valid.
+- Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's.
