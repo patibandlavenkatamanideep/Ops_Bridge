@@ -1334,3 +1334,17 @@ staging, pilot owner).
 - `release_check.py versions`, `describe` and `ci` pass on it for `v0.1.0-alpha.1`, and its
   release workflow refuses fixable CRITICAL or HIGH findings.
 - Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's.
+
+### A reproducible evidence bundle (2026-11-02, production review A17)
+- The image carries the signed ledger but not the files it binds, so in a deployment
+  `eval-verify` could check only the chain and signatures. `opsbridge eval-bundle` packs the
+  ledger, its signatures and public key and the 127 bound files into one reproducible
+  archive. Built on macOS and in the Linux image, it had the same SHA-256.
+- `eval-verify --bundle FILE` refuses unsafe members, files that differ from the manifest,
+  and a bundle for another ledger, then verifies every record's artifacts from it alone.
+- The release builds the bundle in the candidate image, verifies the candidate with it
+  before attesting or tagging anything, keeps it with the run and attests it. CI's image job
+  runs the same round trip.
+- Tests: `tests/evaluation/test_evidence_bundle.py` (8). Unit 598 pass locally. In the image:
+  chain intact, 34 signatures valid, 34 records ok.
+- Not done: the bundle is a 90-day workflow artifact, not a permanent release asset.
