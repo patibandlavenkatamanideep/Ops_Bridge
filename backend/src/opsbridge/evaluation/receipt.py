@@ -199,10 +199,13 @@ def run_mode(
     return trials, sealed
 
 
-def verify(ledger: Path, public_key: str, *, artifacts: bool = True) -> dict[str, Any]:
+def verify(
+    ledger: Path, public_key: str, *, artifacts: bool = True, cwd: Path | None = None
+) -> dict[str, Any]:
     """Chain + signatures through the public API; artifacts through the documented CLI
     (`evalseal verify --ledger … --artifacts --index i`) for every record, unless
-    `artifacts` is False (an installation without the evidence bundle)."""
+    `artifacts` is False (an installation without the evidence bundle). Bound paths resolve
+    against `cwd` (default: the current directory), such as an unpacked evidence bundle."""
     chain_ok, chain_msg = verify_chain(ledger)
     sig_ok, sig_msg = verify_signatures(ledger, expected_public_key=public_key)
     beside = Path(sys.executable).parent / "evalseal"
@@ -219,6 +222,7 @@ def verify(ledger: Path, public_key: str, *, artifacts: bool = True) -> dict[str
             text=True,
             timeout=120,
             check=False,
+            cwd=cwd,
         )
         text = out.stdout + out.stderr
         # The CLI exits non-zero only for `changed`; a missing or unverifiable bound file
