@@ -32,7 +32,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets; each container is given only its own secrets. Not done: secret mounts per role (the signing key shares a volume with the MCP services), a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role, a parser sandbox without network or file access (staging work) | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
@@ -421,9 +421,30 @@ are unchanged.
   - executed an approved follow-up task through the casework service (`confirmed`);
   - ended the session when Keycloak signed the person out.
 
-**Not done** (staging, A11): secret mounts per role. The compose development volume still
-holds the delegation signing key, which only the worker uses, where the MCP services can read
-it. Also not done: a parser sandbox. Beyond the Linux memory cap and the restricted
+**Key volumes** (3 November):
+- Reproduced: every application container except the simulator mounted `opsbridge_appdata`,
+  where `init-keys` wrote the delegation signing key. Either MCP service, which only
+  verifies, could read it and sign a delegation for any tenant, principal and tool.
+- Fix: the key has its own volume. Bootstrap mounts it to create the key; the worker, the one
+  signer, mounts it read-only. Bootstrap copies the public key to a second volume, which the
+  MCP services mount read-only and which is all they mount. The image makes the new mount
+  point, owned by the service user. Docker gives a new volume the owner of the image's
+  directory, or root's where the image has none.
+- Evidence: `tests/test_compose_secrets.py` has 9 new cases; 6 failed against the shared
+  volume. The mount-point case failed once the compose file named the new mount and before
+  the image made it. CI's image job checks under Docker that each mount point is writable.
+  Podman gives a new volume the container's user, so a local run does not show the fault.
+  The containers demo was run on the local image with only the new directory added:
+  - Of the running services, only the worker had the private key. The MCP services had only
+    the public key, the same as the worker's.
+  - An investigation ran through the records service (`discrepancies_found`).
+  - An approved task ran through the casework service (`confirmed`).
+  - A Keycloak sign-out ended the session.
+- A stack created earlier keeps the old key in `opsbridge_appdata`, where the API can read
+  it. Nothing trusts it now, and docs/deployment.md gives the command that removes it.
+
+**Not done** (staging, A11): keys from a secret store, mounted per role; the compose stack
+separates them with volumes on one host. Also not done: a parser sandbox. Beyond the Linux memory cap and the restricted
 environment, the parsers still share the service's network and the files it can read,
 mounted keys included.
 
@@ -830,7 +851,9 @@ and blindness is shown only by the recorded time.
      #24), a sign-out at the identity provider ends OpsBridge's sessions at once (A16; PR #25,
      merged as `23b2f84`), and a release builds, verifies and attests a reproducible
      evidence bundle (A17; PR #27, merged on 3 November as `77a515b`, whose CI run on `main`,
-     41568201604, passed all four jobs and which `release_check.py ci` accepts).
+     41568201604, passed all four jobs and which `release_check.py ci` accepts). After
+     that, the compose stack mounts the delegation signing key only in bootstrap and the
+     worker (A06).
 
    Remaining limits:
    - the release workflow has not run; its preconditions pass on `77a515b`;
