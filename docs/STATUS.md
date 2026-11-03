@@ -1358,3 +1358,21 @@ staging, pilot owner).
 - The image job's bundle round trip on `main` built the same SHA-256 as on macOS and in the
   local image (`2f52004e…`): chain intact, 34 signatures valid.
 - Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's.
+
+### The delegation signing key is mounted only where it is used (2026-11-03, production review A06)
+- Every application container except the simulator mounted `opsbridge_appdata`, which held
+  the delegation signing key, so either MCP service could sign the delegations it only
+  verifies.
+- The key now has its own volume, mounted by bootstrap (which creates it) and, read-only, by
+  the worker. Bootstrap copies the public key to a second volume that the MCP services mount
+  read-only, and they mount nothing else. Only the API and the worker keep the artifact
+  volume. The image makes the new mount point, owned by the service user.
+- Tests: `tests/test_compose_secrets.py` (9 added; 6 failed before, and the mount-point case
+  failed until the image made the directory). CI's image job checks under Docker that every
+  mount point is writable; Podman gives a new volume the container's user and cannot show it.
+- Containers demo with the split: the private key only in the worker, and the MCP services
+  holding only the matching public key. An investigation ran through the records service, an
+  approved task through the casework service, and a Keycloak sign-out ended the session.
+- A stack created earlier keeps the old shared key in `opsbridge_appdata`. Nothing trusts it
+  now; docs/deployment.md gives the command that removes it.
+- Not done: keys from a secret store, mounted per role in staging (A11).
