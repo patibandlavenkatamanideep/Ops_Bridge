@@ -38,12 +38,12 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `23b2f84` (PR #25), where all three release checks pass and the release refuses fixable HIGH findings |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `77a515b` (PR #27), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
-| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; image check and bundle round trip in CI | 8 | See "Package 8, evidence packaging" below | — |
+| A17 | Image lacks the evaluation evidence the repository verifies | Done, verified in CI: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; the image check and bundle round trip pass on `main` at `77a515b` | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-02 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
@@ -444,13 +444,15 @@ ledger check and exits 0 when it holds; a tampered ledger still fails.
 **Evidence**: `tests/evaluation/test_evidence_packaging.py` (3), using an installation laid
 out like the image (evals/ without runs/): partial and explicit by default (failed before:
 exit 1 with FAILED records), summary-only passes, a tampered ledger fails. In the repository
-`eval-verify` still checks all 26 records' artifacts (gate stage unchanged). The CI image job
-runs both commands inside the built image; the first hosted run of that check is pending.
+`eval-verify` still checks all 26 records' artifacts (34 now; gate stage unchanged). The CI
+image job runs both commands inside the built image, for every pull request and every commit
+to `main`.
 
 **Evidence bundle** (2 November):
 - `opsbridge eval-bundle` packs the ledger, its signatures, its public key and the 127 files
   its 34 records bind into one archive, with a manifest of their SHA-256. The archive is
-  reproducible: built on macOS and inside the Linux image it had the same SHA-256.
+  reproducible: built on macOS, inside the Linux image and on the hosted runner (for PR #27
+  and on `main` at `77a515b`, run 41568201604) it had the same SHA-256, `2f52004e…`.
 - `eval-verify --bundle FILE` refuses a bundle in any of these cases:
   - an unsafe member: absolute, `..` or a link;
   - a file that differs from the manifest;
@@ -587,7 +589,10 @@ never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. 
 `16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets. It
 still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so the first tag
 belongs on PR #25's merge commit instead. That is `23b2f84`: its CI run on `main`
-(41485053120) passed all four jobs, and all three checks pass on it. The ruleset's check
+(41485053120) passed all four jobs, and all three checks pass on it. On 3 November so did
+PR #27's merge commit `77a515b` (CI run 41568201604), whose release also builds, verifies
+and attests the evidence bundle (Package 8, evidence packaging); the first tag belongs
+there. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
@@ -822,15 +827,18 @@ and blindness is shown only by the recorded time.
      doesn't exist yet when a blind decision is recorded (A08, A14);
    - since then: parser subprocesses get none of the service's secrets (A06; PR #23, merged
      as `16951dc`), `export-check` spells out control characters in what it prints (A08; PR
-     #24), and a sign-out at the identity provider ends OpsBridge's sessions at once (A16).
+     #24), a sign-out at the identity provider ends OpsBridge's sessions at once (A16; PR #25,
+     merged as `23b2f84`), and a release builds, verifies and attests a reproducible
+     evidence bundle (A17; PR #27, merged on 3 November as `77a515b`, whose CI run on `main`,
+     41568201604, passed all four jobs and which `release_check.py ci` accepts).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `23b2f84`;
+   - the release workflow has not run; its preconditions pass on `77a515b`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `23b2f84` (PR #25), which carries
-     the fixed pypdf and OpenSSL and the HIGH gate (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `77a515b` (PR #27), which carries
+     the fixed pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12, A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
