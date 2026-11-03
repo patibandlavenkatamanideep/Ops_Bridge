@@ -19,13 +19,28 @@ One image (`infra/containers/opsbridge.Dockerfile`, built from `backend/uv.lock`
 runs every role as uid 10001. The build context is an allow-list (`.dockerignore`): `.env`,
 keys, `var/` and virtual environments never enter the image. Compose profile `app`:
 
-- `bootstrap` (one-shot): `alembic upgrade head`, `seed-demo`, `init-keys`; every other
-  service waits for it, so the delegation key is created once.
+- `bootstrap` (one-shot): `alembic upgrade head`, `seed-demo`, `init-keys`, then a copy of
+  the delegation public key for the MCP services; every other service waits for it, so the
+  delegation key is created once.
 - `api` (publishes 127.0.0.1:8000, serves the built UI), `worker`, `records-mcp`,
   `casework-mcp`, `simulator` — health checks via `opsbridge probe` (`/readyz`, worker
   `:9101/readyz`, TCP for MCP).
-- Volumes: `opsbridge_appdata` (artifacts and keys, shared by API, worker and MCP),
-  `opsbridge_simdata`, `opsbridge_pgdata`. `make down` stops containers and keeps volumes.
+- Volumes, each mounted only where its process uses it (`tests/test_compose_secrets.py`):
+  - `opsbridge_appdata`: artifacts; API and worker.
+  - `opsbridge_delegation_signing`: the delegation signing key; bootstrap creates it, and the
+    worker, the one signer, reads it read-only.
+  - `opsbridge_delegation_public`: its public key; the MCP services read it read-only and
+    mount nothing else.
+  - `opsbridge_simdata`, `opsbridge_pgdata`.
+
+  `make down` stops containers and keeps volumes. A stack created before 3 November 2026
+  keeps the old shared key in `opsbridge_appdata`. Nothing trusts it now, and this removes it:
+
+  ```sh
+  docker compose --env-file .env -f infra/compose/docker-compose.yml --profile app \
+    run --rm --no-deps api \
+    rm /app/var/keys/delegation_ed25519.pem /app/var/keys/delegation_ed25519.pub.pem
+  ```
 - OIDC: browsers use `http://localhost:8081` (Keycloak `KC_HOSTNAME`); containers fetch
   metadata, tokens and keys over `http://keycloak:8080` (`OPSBRIDGE_OIDC_DISCOVERY_URL`,
   dynamic backchannel) while validating the public issuer.
