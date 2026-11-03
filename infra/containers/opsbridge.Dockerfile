@@ -40,8 +40,9 @@ COPY packs /app/packs
 COPY fixtures /app/fixtures
 COPY evals /app/evals
 COPY --from=ui /app/frontend/dist /app/frontend/dist
-# Only /app/var (mounted volume) is writable by the service user.
-RUN mkdir -p /app/var/artifacts /app/var/keys && chown -R 10001:10001 /app/var && chmod 0700 /app/var/keys
+# Only the volumes mounted under /app/var are writable by the service user. Each mount point
+# is made here, since a new volume takes the owner of the directory it is first mounted on.
+RUN mkdir -p /app/var/artifacts /app/var/keys /app/var/delegation-public && chown -R 10001:10001 /app/var && chmod 0700 /app/var/keys
 ENV PATH=/app/backend/.venv/bin:$PATH PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \
     OPSBRIDGE_WORKER_HTTP_HOST=0.0.0.0
 USER 10001:10001
