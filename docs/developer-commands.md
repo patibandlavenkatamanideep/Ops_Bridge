@@ -48,7 +48,8 @@ docs/evaluation-plan.md):
 | `eval-freeze --benchmark ID` | Writes `evals/manifests/ID.json` (digests of splits, rendering, policies, prompts, scoring, modes, repeats). Refuses to overwrite: a changed plan needs a new id. |
 | `eval-bench --split S` | Records a run of split S (rules_only and mock) through the stack into `opsbridge_eval`, seals EvalSeal records, writes `evals/results/ID/<run>.json`. Refuses to start if frozen inputs drifted; refuses a second held-out recording. |
 | `eval-bench --split S --replay [--from-run DIR]` | Strict offline replay of a recorded run; fails closed (exit 3) on a missing or diverged response or blocked egress. |
-| `eval-verify` | Ledger chain, signatures (committed public key) and every bound artifact; missing files fail. |
+| `eval-verify` | Ledger chain, signatures (committed public key) and every bound artifact; missing files fail. `--bundle FILE` verifies every record's artifacts from an evidence bundle instead (an installation without the repository). |
+| `eval-bundle --out FILE` | Packs the ledger, its signatures and public key and every file it binds into a reproducible archive with a SHA-256 manifest; the release builds, verifies and attests one. |
 | `eval-rules --corpus FILE` | Fast DB-free rules-only check (development only). |
 | `eval-canary [--update-baseline]` | Regression check against the pinned canary baseline; updating it is a reviewed change. |
 

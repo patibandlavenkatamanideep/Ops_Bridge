@@ -38,12 +38,12 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on PR #25's merge commit once its CI run on `main` passes (`16951dc` qualifies but ships pypdf 6.20.1, with ten fixable HIGH findings) |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `23b2f84` (PR #25), where all three release checks pass and the release refuses fixable HIGH findings |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
-| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
+| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; image check and bundle round trip in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-02 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
@@ -447,8 +447,29 @@ exit 1 with FAILED records), summary-only passes, a tampered ledger fails. In th
 `eval-verify` still checks all 26 records' artifacts (gate stage unchanged). The CI image job
 runs both commands inside the built image; the first hosted run of that check is pending.
 
-**Not done**: a separately versioned, checksummed evidence bundle (for example a release
-asset) that a deployment could fetch and verify. Today the bundle lives in the repository.
+**Evidence bundle** (2 November):
+- `opsbridge eval-bundle` packs the ledger, its signatures, its public key and the 127 files
+  its 34 records bind into one archive, with a manifest of their SHA-256. The archive is
+  reproducible: built on macOS and inside the Linux image it had the same SHA-256.
+- `eval-verify --bundle FILE` refuses a bundle in any of these cases:
+  - an unsafe member: absolute, `..` or a link;
+  - a file that differs from the manifest;
+  - a ledger, signatures or key other than the installation's own.
+
+  It then verifies every record's artifacts from the bundle alone.
+- The release builds the bundle in the candidate image from the tagged checkout, and
+  verifies the candidate with it before anything is attested or tagged. It keeps the bundle
+  with the run, attests it, and gives its SHA-256 in the run summary. CI's image job runs the
+  same round trip.
+- Evidence: `tests/evaluation/test_evidence_bundle.py` (8). Skipping the manifest digests or
+  the ledger comparison each fails a test. If the manifest is rewritten to match a changed
+  file, the ledger's own digest still catches the change. Run locally in the image: chain
+  intact, 34 signatures valid, 34 records ok.
+
+**Not done**: the bundle is a workflow artifact, kept for the repository's artifact
+retention (90 days by default), not a permanent release asset. Keep the copy deployed with
+each image, or publish it as a release asset (needs `contents: write` and the owner's
+decision).
 
 ## Package 4, behavioural replay (A13)
 
@@ -565,7 +586,8 @@ never pushed to `main`, is refused. The five declarations agreed on 0.1.0 then. 
 `v0.1.0-alpha.1`: the versions, the experimental description and CI. On 2 November, so did
 `16951dc` (PR #23; CI run 41409288359), which also gives parser subprocesses no secrets. It
 still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so the first tag
-belongs on PR #25's merge commit instead, once its CI run on `main` passes. The ruleset's check
+belongs on PR #25's merge commit instead. That is `23b2f84`: its CI run on `main`
+(41485053120) passed all four jobs, and all three checks pass on it. The ruleset's check
 names match CI. The workflow has not run (no tag), so its first use is its first test, and no
 attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
 single image index as it is. The step therefore refuses, before tagging, a candidate that is
@@ -803,12 +825,12 @@ and blindness is shown only by the recorded time.
      #24), and a sign-out at the identity provider ends OpsBridge's sessions at once (A16).
 
    Remaining limits:
-   - the release workflow has not run; its first tag waits for PR #25's merge commit;
+   - the release workflow has not run; its preconditions pass on `23b2f84`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge commit once its CI
-     run on `main` passes; it carries the fixed pypdf and OpenSSL (A12);
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `23b2f84` (PR #25), which carries
+     the fixed pypdf and OpenSSL and the HIGH gate (A12);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);

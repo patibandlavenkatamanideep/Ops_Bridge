@@ -161,6 +161,15 @@ jobs:
             -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" opsbridge/app:ci
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
+      - name: Evidence bundle round trip (the release's steps)
+        run: |
+          # Built in the image from this checkout's evals/, then verified by an image that has
+          # only the ledger: every record's artifacts from the bundle alone (A17).
+          mkdir -m 0777 dist
+          docker run --rm -v "$PWD/evals:/app/evals:ro" -v "$PWD/dist:/out" opsbridge/app:ci \
+            python -m opsbridge.cli eval-bundle --out /out/opsbridge-evidence.tar.gz
+          docker run --rm -v "$PWD/dist:/out:ro" opsbridge/app:ci \
+            python -m opsbridge.cli eval-verify --bundle /out/opsbridge-evidence.tar.gz
       - name: Software bill of materials (SPDX)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:

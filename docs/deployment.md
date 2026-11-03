@@ -73,6 +73,13 @@ the artifact is delivered, not that it is fit for production. The packages curre
     gh attestation verify oci://ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> --repo patibandlavenkatamanideep/Ops_Bridge
     docker run --rm ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> id -u          # 10001
     docker run --rm ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> python -m opsbridge.cli eval-verify --summary-only
+    gh run download <release run id> -n opsbridge-evidence-<tag>                         # sha256 = run summary's
+    gh attestation verify opsbridge-evidence-<tag>.tar.gz --repo patibandlavenkatamanideep/Ops_Bridge
+    docker run --rm -v "$PWD:/out:ro" ghcr.io/patibandlavenkatamanideep/opsbridge@<digest> \
+      python -m opsbridge.cli eval-verify --bundle /out/opsbridge-evidence-<tag>.tar.gz     # every record's artifacts
+
+The evidence bundle is kept with the release run for the repository's artifact retention
+(90 days by default); keep the copy that goes with each deployed image.
 
 Deploy and roll back by **digest**, never by tag. A schema migration must work with the
 previous release's code until that release is retired (add first, remove later), so rolling
