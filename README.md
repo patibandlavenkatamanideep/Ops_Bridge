@@ -52,8 +52,8 @@ only after a different person approves the exact version they reviewed.
 | Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A14, A15, A16; prepared for the owner A12; the rest need access or decisions. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
-| Hosted CI | **Passing** on `main` at `16951dc` (run 41409288359) and on PR #25 (run 41415492532): lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, SBOM and vulnerability scan |
-| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` goes on PR #25's merge commit once CI on `main` passes; the owner pushes it |
+| Hosted CI | **Passing** on `main` at `23b2f84` (run 41485053120): lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, SBOM and vulnerability scan |
+| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `23b2f84`; the owner pushes it |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Operator pilot measured | **No** — protocol, measures (`pilot-report`) and the export check are ready; no export, reviewer or authorization yet |
 
