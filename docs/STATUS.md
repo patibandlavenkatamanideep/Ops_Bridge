@@ -409,10 +409,12 @@ blockers in `docs/production-readiness.md`):
    experimental pre-release support, the pilot measurement and the pilot export check, was
    merged on 2026-11-01 as PR #20 (`b63c5fc`). The parser environment restriction was
    merged on 2026-11-02 as PR #23 (`16951dc`), where the release preconditions pass; the
-   export-check output escaping as PR #24. Since then: back-channel logout (A16, dated entry
-   below). Next: whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on PR #25's merge
-   commit once its CI run on `main` passes (A12); a purchasing system or export with
+   export-check output escaping as PR #24. PR #25 (back-channel logout, per-container
+   secrets, the HIGH image gate, the reference check, the session-ended page) was merged on
+   2026-11-02 as `23b2f84`, where the release preconditions pass. Next: whatever the owner's
+   answers below unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `23b2f84` (A12); a
+   purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
    labellers (A09, A10); a cloud account (A11); operator sessions (A14); a deprovisioning
@@ -1325,3 +1327,10 @@ staging, pilot owner).
 - Tests: `frontend/src/App.test.tsx` (2; the ended-session test failed before). Removing the
   guard that skips the session check's own 401 makes the page refetch until it runs out of
   memory. Frontend tests 14.
+
+### PR #25 merged; the first tag goes on `23b2f84` (2026-11-02, production review A12)
+- PR #25 was merged as `23b2f84`. Its CI run on `main` (41485053120) passed all four jobs,
+  under the HIGH image gate.
+- `release_check.py versions`, `describe` and `ci` pass on it for `v0.1.0-alpha.1`, and its
+  release workflow refuses fixable CRITICAL or HIGH findings.
+- Not done: the `main` ruleset is not applied and no tag exists. Both are the owner's.
