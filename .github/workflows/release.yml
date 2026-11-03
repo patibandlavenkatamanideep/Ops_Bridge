@@ -92,6 +92,31 @@ jobs:
             -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" "${CANDIDATE}"
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
+      - name: Build the evidence bundle in the candidate, and verify the candidate with it
+        id: bundle
+        env:
+          CANDIDATE: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+        run: |
+          # The image carries the ledger but not the files it binds; the bundle carries both, so
+          # a deployment verifies every record without the repository (production review A17).
+          mkdir -m 0777 dist
+          name="opsbridge-evidence-${GITHUB_REF_NAME}.tar.gz"
+          docker run --rm -v "$PWD/evals:/app/evals:ro" -v "$PWD/dist:/out" "${CANDIDATE}" \
+            python -m opsbridge.cli eval-bundle --out "/out/${name}"
+          docker run --rm -v "$PWD/dist:/out:ro" "${CANDIDATE}" \
+            python -m opsbridge.cli eval-verify --bundle "/out/${name}"
+          echo "path=dist/${name}" >> "${GITHUB_OUTPUT}"
+          echo "sha256=$(sha256sum "dist/${name}" | cut -d' ' -f1)" >> "${GITHUB_OUTPUT}"
+      - name: Keep the evidence bundle with the release run
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: opsbridge-evidence-${{ github.ref_name }}
+          path: ${{ steps.bundle.outputs.path }}
+          if-no-files-found: error
+      - name: Attest provenance of the evidence bundle
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.bundle.outputs.path }}
       - name: Software bill of materials of the candidate (SPDX)
         uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
         with:
@@ -122,6 +147,7 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           DESCRIPTION: ${{ steps.tag.outputs.description }}
+          BUNDLE_SHA256: ${{ steps.bundle.outputs.sha256 }}
         run: |
           # imagetools keeps a single index as it is; a bare manifest would be wrapped in a new
           # index with another digest, so refuse before tagging rather than after.
@@ -139,3 +165,4 @@ jobs:
           fi
           echo "Released ${IMAGE}@${DIGEST} (${GITHUB_REF_NAME}) from ${GITHUB_SHA}; promote this digest." >> "${GITHUB_STEP_SUMMARY}"
           echo "${DESCRIPTION}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Evidence bundle opsbridge-evidence-${GITHUB_REF_NAME}.tar.gz (run artifact, attested): sha256 ${BUNDLE_SHA256}" >> "${GITHUB_STEP_SUMMARY}"
