@@ -43,7 +43,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
-| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository; image check in CI | 8 | See "Package 8, evidence packaging" below | — |
+| A17 | Image lacks the evaluation evidence the repository verifies | Decided and tested locally: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; image check and bundle round trip in CI | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-02 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
@@ -447,8 +447,29 @@ exit 1 with FAILED records), summary-only passes, a tampered ledger fails. In th
 `eval-verify` still checks all 26 records' artifacts (gate stage unchanged). The CI image job
 runs both commands inside the built image; the first hosted run of that check is pending.
 
-**Not done**: a separately versioned, checksummed evidence bundle (for example a release
-asset) that a deployment could fetch and verify. Today the bundle lives in the repository.
+**Evidence bundle** (2 November):
+- `opsbridge eval-bundle` packs the ledger, its signatures, its public key and the 127 files
+  its 34 records bind into one archive, with a manifest of their SHA-256. The archive is
+  reproducible: built on macOS and inside the Linux image it had the same SHA-256.
+- `eval-verify --bundle FILE` refuses a bundle in any of these cases:
+  - an unsafe member: absolute, `..` or a link;
+  - a file that differs from the manifest;
+  - a ledger, signatures or key other than the installation's own.
+
+  It then verifies every record's artifacts from the bundle alone.
+- The release builds the bundle in the candidate image from the tagged checkout, and
+  verifies the candidate with it before anything is attested or tagged. It keeps the bundle
+  with the run, attests it, and gives its SHA-256 in the run summary. CI's image job runs the
+  same round trip.
+- Evidence: `tests/evaluation/test_evidence_bundle.py` (8). Skipping the manifest digests or
+  the ledger comparison each fails a test. If the manifest is rewritten to match a changed
+  file, the ledger's own digest still catches the change. Run locally in the image: chain
+  intact, 34 signatures valid, 34 records ok.
+
+**Not done**: the bundle is a workflow artifact, kept for the repository's artifact
+retention (90 days by default), not a permanent release asset. Keep the copy deployed with
+each image, or publish it as a release asset (needs `contents: write` and the owner's
+decision).
 
 ## Package 4, behavioural replay (A13)
 
