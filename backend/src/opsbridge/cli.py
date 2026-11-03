@@ -581,17 +581,27 @@ def _eval_verify(args: argparse.Namespace) -> int:
     import os
 
     from opsbridge import config
+    from opsbridge.evaluation import bundle as evidence
     from opsbridge.evaluation import receipt
 
+    given = Path(args.bundle).resolve() if args.bundle else None
     os.chdir(config.REPO_ROOT)
-    ledger = Path("evals/ledger/opsbridge-bench.jsonl")
-    bundle = Path("evals/runs").is_dir()
-    check_artifacts = bundle and not args.summary_only
-    report = receipt.verify(
-        ledger,
-        Path("evals/keys/opsbridge-eval.pub").read_text().strip(),
-        artifacts=check_artifacts,
-    )
+    if given is not None:
+        try:
+            report = evidence.verify_bundle(given, config.REPO_ROOT)
+        except evidence.BundleInvalid as exc:
+            print(f"Refusing the bundle: {exc}")
+            return 1
+        check_artifacts = bundle = True
+    else:
+        ledger = Path("evals/ledger/opsbridge-bench.jsonl")
+        bundle = Path("evals/runs").is_dir()
+        check_artifacts = bundle and not args.summary_only
+        report = receipt.verify(
+            ledger,
+            Path("evals/keys/opsbridge-eval.pub").read_text().strip(),
+            artifacts=check_artifacts,
+        )
     print(f"chain: {report['chain']['message']}")
     print(f"signatures: {report['signatures']['message']}")
     for r in report["artifacts"]:
@@ -605,12 +615,24 @@ def _eval_verify(args: argparse.Namespace) -> int:
     where = (
         "the evaluation evidence bundle (evals/runs: cassettes and bound trial files) is not "
         "in this installation; verify it from the repository at the recorded commit "
-        "(make eval-verify)"
+        "(make eval-verify), or from an evidence bundle (eval-verify --bundle FILE)"
         if not bundle
         else "skipped (--summary-only)"
     )
     print(f"artifacts: not checked: {where}")
     return 0 if args.summary_only else 3
+
+
+def _eval_bundle(args: argparse.Namespace) -> int:
+    """Pack the ledger, its public key and every file it binds into a reproducible bundle."""
+    from opsbridge import config
+    from opsbridge.evaluation.bundle import LEDGER, bound_paths, write_bundle
+
+    out = Path(args.out).resolve()
+    digest = write_bundle(config.REPO_ROOT, out)
+    n = len(bound_paths((config.REPO_ROOT / LEDGER).read_text(encoding="utf-8")))
+    print(f"{out}: the ledger, its public key and {n} bound files; sha256 {digest}")
+    return 0
 
 
 def _probe(args: argparse.Namespace) -> int:
@@ -1014,7 +1036,16 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="ledger chain and signatures only (an installation without evals/runs)",
     )
+    p.add_argument(
+        "--bundle", help="verify every record's artifacts from this evidence bundle (eval-bundle)"
+    )
     p.set_defaults(func=_eval_verify)
+
+    p = sub.add_parser(
+        "eval-bundle", help="pack the ledger and every file it binds into a reproducible bundle"
+    )
+    p.add_argument("--out", required=True, help="where to write the bundle (.tar.gz)")
+    p.set_defaults(func=_eval_bundle)
 
     p = sub.add_parser("probe", help="health probe for containers (http://127.0.0.1… or tcp://…)")
     p.add_argument("url")
