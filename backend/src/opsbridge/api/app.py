@@ -14,6 +14,7 @@ from starlette.middleware.sessions import SessionMiddleware
 
 from opsbridge import __version__
 from opsbridge.config import ConfigurationError, Settings, get_settings
+from opsbridge.evidence.parsers import require_sandbox
 from opsbridge.persistence.db import Database, get_database
 
 from . import errors
@@ -29,6 +30,7 @@ def create_app(
     if settings.deployed and len(settings.session_secret.get_secret_value()) < 32:
         # Signs the transient login state; only the API holds it (config._deployment_guards).
         raise ConfigurationError(f"session_secret must be at least 32 characters in {settings.env}")
+    require_sandbox(settings)  # before any upload is parsed (evidence/sandbox.py)
     app = FastAPI(
         title="OpsBridge API",
         version=__version__,
