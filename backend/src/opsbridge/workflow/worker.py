@@ -26,6 +26,7 @@ from opsbridge.connectors.exports import ExportSource
 from opsbridge.connectors.purchasing import PurchasingClient
 from opsbridge.connectors.source_contract import PurchasingSource
 from opsbridge.connectors.tasks import ConnectorUnavailable, SimTaskConnector, TaskConnector
+from opsbridge.evidence.parsers import require_sandbox
 from opsbridge.evidence.storage import artifact_store
 from opsbridge.packs import PackRegistry
 from opsbridge.persistence.db import Database, DbContext, get_database
@@ -272,6 +273,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
 
 def make_worker(settings: Settings | None = None, db: Database | None = None) -> Worker:
     settings = settings or get_settings()
+    require_sandbox(settings)  # before any document is parsed (evidence/sandbox.py)
     db = db or get_database("worker")
     worker = Worker(db=db, settings=settings)
     deps = build_investigation_deps(settings, db)
