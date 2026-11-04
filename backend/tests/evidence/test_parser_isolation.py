@@ -4,10 +4,8 @@ started (production review A06)."""
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -81,16 +79,18 @@ def test_the_pdf_worker_is_given_none_of_the_secrets(
 def test_tesseract_is_given_none_of_the_secrets(
     secrets: None, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A stand-in tesseract that prints the environment it was given."""
+    """A stand-in tesseract that prints the environment it was given. It is a shell script:
+    started confined (test_parser_sandbox.py), it may execute only system programs."""
     fake = tmp_path / "tesseract"
-    fake.write_text(
-        f"#!{sys.executable} -I\nimport json, os\nprint(json.dumps(dict(os.environ)))\n"
-    )
+    fake.write_text("#!/bin/sh\nenv\n")
     fake.chmod(0o755)
     monkeypatch.setenv("PATH", f"{tmp_path}{os.pathsep}{os.environ['PATH']}")
     seen = ocr_image(b"not read by the stand-in")
     assert seen is not None
-    given = json.loads(seen)
+    given = dict(line.split("=", 1) for line in seen.splitlines() if "=" in line)
+    given.pop("PWD", None)  # the shell sets PWD, SHLVL and _ itself
+    given.pop("SHLVL", None)
+    given.pop("_", None)
     assert given.pop("OMP_THREAD_LIMIT") == "1"
     given.pop("__CF_USER_TEXT_ENCODING", None)  # macOS adds it to every process it starts
     assert set(given) <= set(parsers.PARSER_ENVIRONMENT)
