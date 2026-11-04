@@ -161,6 +161,13 @@ jobs:
             -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" opsbridge/app:ci
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
+      - name: Every volume mount point is writable by the service user
+        run: |
+          # Docker gives a new volume the owner of the image directory it is mounted on, and
+          # root's where the image has none (backend/tests/test_compose_secrets.py).
+          for dir in /app/var /app/var/artifacts /app/var/keys /app/var/delegation-public; do
+            docker run --rm -v "$dir" opsbridge/app:ci touch "$dir/probe"
+          done
       - name: Evidence bundle round trip (the release's steps)
         run: |
           # Built in the image from this checkout's evals/, then verified by an image that has

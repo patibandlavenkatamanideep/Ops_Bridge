@@ -105,7 +105,9 @@ services:
   # Replaces `make dev` (same ports); stop host processes first. The API serves the built UI
   # on http://localhost:8000. Simulator and MCP services are reachable only on this network.
   # Every app container: read-only root filesystem, /tmp tmpfs, no capabilities, no
-  # privilege escalation; only the /app/var volume is writable.
+  # privilege escalation; only its volumes under /app/var are writable. The delegation
+  # signing key has its own volume, mounted only by bootstrap (which creates it) and the
+  # worker (the one signer); the MCP services mount only its public key, read-only (A06).
   bootstrap:
     image: opsbridge/app:local
     build: {context: ../.., dockerfile: infra/containers/opsbridge.Dockerfile}
@@ -117,8 +119,10 @@ services:
     environment:
       <<: *app-env
       OPSBRIDGE_DB_MIGRATOR_PASSWORD: ${OPSBRIDGE_DB_MIGRATOR_PASSWORD:?}
-    command: ["sh", "-c", "alembic upgrade head && python -m opsbridge.cli seed-demo && python -m opsbridge.cli init-keys"]
-    volumes: [opsbridge_appdata:/app/var]
+    command: ["sh", "-c", "alembic upgrade head && python -m opsbridge.cli seed-demo && python -m opsbridge.cli init-keys && cp /app/var/keys/delegation_ed25519.pub.pem /app/var/delegation-public/"]
+    volumes:
+      - opsbridge_delegation_signing:/app/var/keys
+      - opsbridge_delegation_public:/app/var/delegation-public
     depends_on:
       postgres: {condition: service_healthy}
       keycloak: {condition: service_healthy}
@@ -163,7 +167,9 @@ services:
       OPSBRIDGE_WORKER_CLIENT_SECRET: ${OPSBRIDGE_WORKER_CLIENT_SECRET:?}
       OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
     command: ["python", "-m", "opsbridge.cli", "worker"]
-    volumes: [opsbridge_appdata:/app/var]
+    volumes:
+      - opsbridge_appdata:/app/var
+      - opsbridge_delegation_signing:/app/var/keys:ro
     depends_on:
       bootstrap: {condition: service_completed_successfully}
       records-mcp: {condition: service_healthy}
@@ -186,11 +192,10 @@ services:
     environment:
       <<: *app-env
       OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
-      # Verifies delegations with the public key only (the signing key stays with API/worker
-      # in staging; this development volume still holds both).
-      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
+      # Verifies delegations with the public key only; the signing key is not mounted here.
+      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/delegation-public/delegation_ed25519.pub.pem
     command: ["python", "-m", "opsbridge.cli", "mcp-records", "--host", "0.0.0.0", "--port", "8101"]
-    volumes: [opsbridge_appdata:/app/var]
+    volumes: [opsbridge_delegation_public:/app/var/delegation-public:ro]
     depends_on:
       bootstrap: {condition: service_completed_successfully}
     healthcheck:
@@ -212,11 +217,10 @@ services:
       OPSBRIDGE_DB_MCP_PASSWORD: ${OPSBRIDGE_DB_MCP_PASSWORD:?}
       # Executes approved simulator tasks in the tenant's organization.
       OPSBRIDGE_SIM_MASTER_SECRET: ${OPSBRIDGE_SIM_MASTER_SECRET:?}
-      # Verifies delegations with the public key only (the signing key stays with API/worker
-      # in staging; this development volume still holds both).
-      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/keys/delegation_ed25519.pub.pem
+      # Verifies delegations with the public key only; the signing key is not mounted here.
+      OPSBRIDGE_DELEGATION_PUBLIC_KEY_PATH: /app/var/delegation-public/delegation_ed25519.pub.pem
     command: ["python", "-m", "opsbridge.cli", "mcp-casework", "--host", "0.0.0.0", "--port", "8102"]
-    volumes: [opsbridge_appdata:/app/var]
+    volumes: [opsbridge_delegation_public:/app/var/delegation-public:ro]
     depends_on:
       bootstrap: {condition: service_completed_successfully}
       simulator: {condition: service_healthy}
@@ -328,5 +332,7 @@ volumes:
   opsbridge_alertmanager:
   opsbridge_grafana:
   opsbridge_appdata:
+  opsbridge_delegation_signing:
+  opsbridge_delegation_public:
   opsbridge_simdata:
   opsbridge_s3data:
