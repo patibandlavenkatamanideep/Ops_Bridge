@@ -1,11 +1,14 @@
 """Isolated PDF text extraction. Reads PDF bytes on stdin, writes JSON on stdout.
 
 Run as a subprocess so the parent can enforce a hard timeout and kill it; pypdf never
-executes embedded content, but malformed files can be slow to parse.
+executes embedded content, but malformed files can be slow to parse. Before it reads the file
+it confines itself (sandbox.py): it may then read only its own code and system libraries,
+and reach no TCP port. `pdf_worker POLICY MAX_PAGES`: under POLICY `required` it refuses the
+file where the confinement does not hold; under `best_effort` it parses unconfined there.
 
-`pdf_worker MAX_PAGES images N` instead returns the embedded images of the first N pages as
-grayscale PNGs (base64) for the optional OCR path. Images are decoded here, inside the
-subprocess, with a pixel limit, so a hostile image cannot stall or exhaust the parent.
+`pdf_worker POLICY MAX_PAGES images N` instead returns the embedded images of the first N
+pages as grayscale PNGs (base64) for the optional OCR path. Images are decoded here, inside
+the subprocess, with a pixel limit, so a hostile image cannot stall or exhaust the parent.
 """
 
 from __future__ import annotations
@@ -15,6 +18,8 @@ import io
 import json
 import sys
 import warnings
+
+from opsbridge.evidence import sandbox
 
 MAX_IMAGE_PIXELS = 40_000_000  # about 300 dpi for an A3 page
 MAX_IMAGES_PER_PAGE = 4
@@ -79,10 +84,27 @@ def _decode(reader: object, pages: int) -> tuple[list[list[object]], list[str]]:
 
 def main() -> int:
     _limit_memory()
+    policy = sys.argv[1] if len(sys.argv) > 1 else "required"
+    max_pages = int(sys.argv[2]) if len(sys.argv) > 2 else 50
+    entry = sandbox.enter(policy, sandbox.worker_paths())
+    if entry.refusal:
+        # Nothing of the file has been read.
+        sys.stdout.write(
+            json.dumps(
+                {
+                    "status": "rejected",
+                    "detail": entry.refusal,
+                    "page_count": 0,
+                    "pages": [],
+                    "images": 0,
+                    "sandbox": entry.sandbox,
+                }
+            )
+        )
+        return 0
     data = sys.stdin.buffer.read()
-    max_pages = int(sys.argv[1]) if len(sys.argv) > 1 else 50
-    if len(sys.argv) > 3 and sys.argv[2] == "images":
-        return _images(data, max_pages, int(sys.argv[3]))
+    if len(sys.argv) > 4 and sys.argv[3] == "images":
+        return _images(data, max_pages, int(sys.argv[4]), entry.sandbox)
     try:
         from pypdf import PdfReader
 
@@ -134,11 +156,11 @@ def main() -> int:
             "pages": [],
             "images": 0,
         }
-    sys.stdout.write(json.dumps(out))
+    sys.stdout.write(json.dumps({**out, "sandbox": entry.sandbox}))
     return 0
 
 
-def _images(data: bytes, max_pages: int, ocr_pages: int) -> int:
+def _images(data: bytes, max_pages: int, ocr_pages: int, confinement: str) -> int:
     try:
         from pypdf import PdfReader
 
@@ -150,7 +172,7 @@ def _images(data: bytes, max_pages: int, ocr_pages: int) -> int:
             out = {"status": "ok", "images": found, "problems": problems}
     except Exception as exc:  # malformed PDFs raise many exception types
         out = {"status": "rejected", "images": [], "problems": [type(exc).__name__]}
-    sys.stdout.write(json.dumps(out))
+    sys.stdout.write(json.dumps({**out, "sandbox": confinement}))
     return 0
 
 
