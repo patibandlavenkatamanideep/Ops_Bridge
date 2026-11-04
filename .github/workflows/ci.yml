@@ -54,6 +54,7 @@ jobs:
       - run: make test
         env:
           OPSBRIDGE_REQUIRE_OCR: "1" # the real-engine OCR test must run, not skip
+          OPSBRIDGE_REQUIRE_SANDBOX: "1" # and the confined-parser tests (Landlock) too
       - run: make eval-canary
       - name: Verify sealed evaluation receipts
         run: uv --directory backend run --frozen python -m opsbridge.cli eval-verify
@@ -161,6 +162,14 @@ jobs:
             -e OPSBRIDGE_SESSION_SECRET="$(openssl rand -hex 32)" opsbridge/app:ci
           for _ in $(seq 1 30); do curl -fsS http://127.0.0.1:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
+      - name: Parser subprocesses are confined in the image (Landlock)
+        run: |
+          # As compose runs it: read-only root, /tmp tmpfs, no capabilities, Docker's default
+          # seccomp profile. A probe confined as the PDF worker is may read no file outside its
+          # code and connect to no TCP port (backend/src/opsbridge/evidence/sandbox.py).
+          docker run --rm --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true opsbridge/app:ci \
+            python -m opsbridge.cli parser-sandbox-check
       - name: Every volume mount point is writable by the service user
         run: |
           # Docker gives a new volume the owner of the image directory it is mounted on, and
