@@ -476,6 +476,8 @@ class FieldCorrection(Base):
     field_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
     previous_value: Mapped[str | None] = mapped_column(Text)
     new_value: Mapped[str | None] = mapped_column(Text)
+    # The field's status just before this correction; NULL on corrections before 0023.
+    previous_status: Mapped[str | None] = mapped_column(String(24))
     reason: Mapped[str] = mapped_column(Text)
     author_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = created()
