@@ -50,6 +50,41 @@ Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 
 22 October) and X1–X7 (found along the way). A01–A18 do not replace them; where they overlap
 the earlier entry is referenced.
 
+## Review of 5 November 2026 (N01–N09)
+
+A later review of `main` at `79992cd` listed concrete defects N01–N09. They are tracked here
+apart from A01–A18, which keep their history. No earlier finding was reopened: none of their
+invariants failed. Each finding was reproduced at the head before it was changed, and its
+regression failed for the stated reason before the fix.
+
+| Item | Value |
+|---|---|
+| Reviewed `main` | `79992cd` (5 November 2026), CI run 41980269125 green; Python `0.1.0a1`, frontend `0.1.0-alpha.1`, unpublished |
+| Work | `feat/opsbridge-foundation`, from `79992cd` (working tree clean); PR #36 |
+| Ruleset | Live ruleset 26598146 on `main`, active: pull requests only, the four CI jobs required on an up-to-date branch, review threads resolved, no force push or deletion, administrators bypass only by merging a pull request, **0 approvals**. It is not enforced independent review |
+| Gates run here | Unit, integration (PostgreSQL 16, Keycloak and MCP in Podman), canary, receipts, replay check, lint and types. **Not here:** the image build (about 3 GB of disk free), Landlock and seccomp (macOS), OCR (no tesseract), browser tests (not run this session). Those run in hosted CI and are named, not counted as passed |
+| Review documents | `PRODUCTION_REVIEW.md` and its file inventory were not supplied. The findings are taken from the brief, which does not define N09 |
+
+| # | Finding | Reproduced at `79992cd` | Changed | Invariant now | Evidence | Remaining |
+|---|---|---|---|---|---|---|
+| N01 | Duplicate JSON members | Yes: an invoice line with `quantity` 999999 and then 10 mapped as 10 and **matched** end to end | `safejson.py` | An object naming a member twice (as decoded, NFC) is refused whole; no record is built | `test_safejson.py`, `evidence/test_duplicate_json_members.py`, listing, manifest and model-output tests, `test_an_invoice_giving_a_quantity_twice_neither_matches_nor_resolves`; canary 64/64, 34 receipts verify, replay reproduces | OpsBridge's own recorded files are read with `json`; a scan found no duplicate in them |
+| N02 | Request body limits trusted the framing | Yes: an HTTP/2-framed 5,000-byte body was read whole against a 1,000-byte limit; chunked bodies got 411; a trickled body was accepted | `api/body_limits.py` (new), `middleware.py`, `app.py`, `errors.py`, `config.py` | Received bytes are counted whatever the framing and refused at the chunk that passes the limit; the body has a time budget (408); chunked bodies within the limit are accepted | `tests/test_request_body_limits.py` (12, incl. a uvicorn socket: the 413 arrives while the client is still sending), `test_hardening.py` | The edge proxy's own limits, at staging |
+| N03 | Source clock and freshness | Yes: an export dated a year ahead gave a completed, actionable result; one 2 minutes ahead was recorded as read in the future | `connectors/exports.py`, `workflow/investigation.py`, `services/freshness.py`, `workflow/worker.py`, `config.py` | An export more than `source_clock_skew_seconds` ahead is refused; times are RFC 3339 with a zone; the data's age is the earlier of the source's time and the host's; the window is never later than the stored time allows | `contracts/test_export_source.py` (injected clock), `workflow/test_source_window.py`, `test_an_export_dated_ahead_of_the_clock_is_not_read` | A live source asserts no time; none needed a migration (JSONB) |
+| N04 | Evidence bundle extraction unbounded | Yes: a member given twice, a manifest not first, a broken checksum and data after the end were accepted; no cap on expansion or any file | `evaluation/bundle.py` | One bounded pass: strict manifest first, canonical listed regular files given once, per-file, header and expansion limits, checksum read to the end, nothing extracted on refusal | `evaluation/test_evidence_bundle.py` (26, reduced limits, small archives); the reproducible round trip still verifies | Limits sized from the current bundle |
+| N05 | Pilot report not historical | Yes: an approval made after the cut-off counted as approved as drafted, and as a decision reached | `pilot/cohort.py` (new), `pilot/collect.py`, `pilot/measures.py`, `pilot/reference.py`, `cli.py`, `persistence/db.py`, migration 0023, `docs/pilot-plan.md` | Protocol `opsbridge-pilot/2`: a frozen cohort; only what existed at the cut-off, in one read-only, repeatable-read snapshot; every enrolled invoice accounted for; incomplete when a decision is missing; coverage apart from accuracy; provenance in the report | `tests/pilot/` (48), `integration/test_pilot_report.py` (4: later events change nothing; a concurrent commit is unseen and is seen under read committed, a mutation that fails the test), `test_migration_0023.py` | No pilot data, cohort or reviewer; no `/1` result existed to show beside `/2` |
+| N06 | Credential ownership incomplete | Yes: a staging connection without a reference received the deployment token; `a-b` and `a_b` both read one secret | `services/connections.py`, `config.py`, `api/routes/admin.py` | Deployed, each GitHub connection names a credential registered to its tenant and repository; colliding references are refused; a tenant is shown only the repositories it can use | `tests/test_connection_credentials.py`, `integration/test_credential_registry.py` | Per-tenant secrets at staging; a revoked credential is never reused, so its possible writes go to a person |
+| N07 | Total deadlines not truthful | Yes: trickled headers held a 0.6 s purchasing read for 7.4 s and a 0.5 s model request for 7.4 s; an MCP call to a silent server took 10.3 s against 0.3 s; late-ending replies were accepted | `connectors/http_transport.py`, `connectors/sdk_transport.py`, the connectors, `agents/adapters.py`, `mcp_services/client.py` | Every socket wait is capped at the time left of one deadline; the deadline is checked after the headers and at the end; an MCP call ends within its total | `test_http_transport.py`, `test_sdk_transport.py` (fake clocks and a scripted server, wall time); full integration | Name resolution is not capped; connectors no longer use environment proxies |
+| N08 | Offline replay egress | Yes: a client made before the guard reached a loopback proxy, which received the CONNECT; proxy variables stayed set; live modes were not refused | `evaluation/egress.py`, `evaluation/bench.py`, `cli.py`, `evaluation/canary.py`, `evaluation/local_server.py` | Proxy variables are removed and their ports refused while the guard holds; only registered loopback ports; live modes refused before a run | `evaluation/test_offline_proxy_guards.py`; replay check reproduces every recorded run | A Python-level guard, not a sandbox |
+| N09 | Not defined in the supplied brief | Not reproduced | Nothing | — | — | The owner to name it |
+
+Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-2026-109518,
+fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
+2.6.2 beside OpenSSL, and the image job passed on it (run 42082021608).
+
+Phases D–G need what only the owner can give: a source, export and reviewer; a cloud
+account and spend ceiling; a model budget; operator sessions. Nothing was assumed for them
+(see "Needs the owner" in the work plan).
+
 ## Package 1: canonical business-input integrity (A01, A02)
 
 Every regression below failed on `732e84d` for the stated reason before the fix.
