@@ -83,6 +83,11 @@ Also from the brief's Phase G, done locally:
 - docs/account-lifecycle.md (A16's mechanics, and the owner's six decisions).
 - `tests/test_docs_consistency.py` (named commands, settings and release commits exist and
   agree; it found `make eval-verify` missing).
+- From Phase E, in the repository only:
+  - the release accepts only its own workflow's attestation of the tag, from a GitHub-hosted
+    runner;
+  - rulesets that make release tags immutable and administrator-created are prepared for the
+    owner, not applied.
 
 Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-2026-109518,
 fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
