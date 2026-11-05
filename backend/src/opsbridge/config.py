@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal, InvalidOperation
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 from urllib.parse import quote, urlparse
 
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -19,6 +20,15 @@ ModelMode = Literal["mock", "anthropic", "ollama", "rules_only"]
 
 class ConfigurationError(RuntimeError):
     pass
+
+
+CREDENTIAL_REF_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+CONNECTION_SECRET_PREFIX = "OPSBRIDGE_CONNECTION_SECRET_"
+
+
+def connection_secret_name(ref: str) -> str:
+    """The environment variable holding a credential reference's secret (`-` read as `_`)."""
+    return CONNECTION_SECRET_PREFIX + ref.upper().replace("-", "_")
 
 
 class ConnectionCredential(BaseModel):
@@ -149,7 +159,9 @@ class Settings(BaseSettings):
     ollama_model: str | None = None
 
     github_sandbox_repo: str | None = None
-    github_token: SecretStr | None = None  # used by GitHub connections without a credential ref
+    # Serves GitHub connections without a credential reference, in development only: in
+    # staging and production each connection names a registered credential (review N06).
+    github_token: SecretStr | None = None
     # Credential references a tenant may choose, each registered to a tenant and destination
     # (JSON in OPSBRIDGE_CONNECTION_CREDENTIALS); the secret is OPSBRIDGE_CONNECTION_SECRET_<REF>.
     connection_credentials: dict[str, ConnectionCredential] = Field(default_factory=dict)
@@ -209,6 +221,26 @@ class Settings(BaseSettings):
             if not value.is_finite() or value < 0:
                 raise ValueError(f"{name} must be a finite, non-negative amount, got {raw!r}")
         return self
+
+    @field_validator("connection_credentials")
+    @classmethod
+    def _one_secret_per_reference(
+        cls, value: dict[str, ConnectionCredential]
+    ) -> dict[str, ConnectionCredential]:
+        """Two references reading one secret would let two registrations share it."""
+        readers: dict[str, str] = {}
+        for ref in value:
+            if not CREDENTIAL_REF_RE.match(ref):
+                raise ValueError(
+                    f"credential reference {ref!r} is not lower-case letters, digits, '-' and '_'"
+                )
+            name = connection_secret_name(ref)
+            if name in readers:
+                raise ValueError(
+                    f"credential references {readers[name]!r} and {ref!r} both read {name}"
+                )
+            readers[name] = ref
+        return value
 
     @model_validator(mode="after")
     def _deployment_guards(self) -> Settings:
