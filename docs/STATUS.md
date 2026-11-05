@@ -1503,3 +1503,22 @@ staging, pilot owner).
   0023 now.
 - Not done (the owner's): a source, export, cohort and reviewer (Phase D); a cloud account
   (E); a model budget (F); operator sessions (G).
+
+### Maintenance-function arguments, the lifecycle record, and drift checks (2026-11-05, review G)
+- `ops.prune_sessions(keep)` runs as the pruning role, which may delete any tenant's sessions,
+  and trusted its argument. Python checked the setting, but `ops.prune_sessions('-100 years')`
+  deleted live sessions. Migration 0024 makes it refuse a NULL or negative period (SQLSTATE
+  22023); owner and grants are unchanged, and the round trip was rehearsed on the test
+  database. The other `ops.*` functions take no duration.
+- docs/account-lifecycle.md says what removing a person does today, each step with its code
+  or test, and lists the six decisions the owner must make (A16). Its first draft said no
+  command ends a person's sessions; `opsbridge end-sessions` does, and the draft was corrected.
+  docs/privacy-and-retention.md now says what ends a session once an account is disabled.
+- `tests/test_docs_consistency.py` checks that every `make` target and CLI command a document
+  names exists, that every `OPSBRIDGE_` variable is read by the code, and that the README's CI
+  commit agrees with the tag's commit and the readiness record's. It found `make eval-verify`
+  named and missing; the target was added. The CLI's parser is now `build_parser()`.
+- Lint caught an f-string in migration 0024 after it was pushed; its bodies are now written
+  out in full.
+- The OpenAPI document regenerated from the code is identical to the committed one, so no API
+  contract changed in this review's work.
