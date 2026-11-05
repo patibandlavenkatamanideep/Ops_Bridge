@@ -105,6 +105,22 @@ class Database:
         finally:
             session.close()
 
+    @contextmanager
+    def snapshot(self, ctx: DbContext | None = None) -> Iterator[Session]:
+        """A read-only session in one repeatable-read transaction: every query sees the
+        database as of the first, and none can write. The isolation is chosen before the
+        transaction begins (the context is the first statement in it); it ends rolled back,
+        and the connection returns to the pool with its usual characteristics."""
+        with self.engine.connect().execution_options(
+            isolation_level="REPEATABLE READ", postgresql_readonly=True
+        ) as conn:
+            session = Session(bind=conn, expire_on_commit=False)
+            session.info[_CONTEXT_KEY] = ctx or DbContext()
+            try:
+                yield session
+            finally:
+                session.close()
+
     def set_context(self, session: Session, ctx: DbContext) -> None:
         """Change context for the NEXT transaction (call after commit)."""
         session.info[_CONTEXT_KEY] = ctx
