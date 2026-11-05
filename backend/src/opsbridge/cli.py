@@ -754,43 +754,82 @@ def _aware_time(value: str) -> Any:
 
 
 def _pilot_report(args: argparse.Namespace) -> int:
+    """The pilot measures at the cut-off (protocol opsbridge-pilot/2). Exit 0 when the report
+    is complete, 1 when it was written but is incomplete (an enrolled invoice has no reviewer
+    decision recorded by the cut-off), 2 when nothing could be measured."""
+    import hashlib
     import uuid
     from datetime import UTC, datetime
 
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.evaluation.manifest import code_version
     from opsbridge.persistence.db import Database, make_engine
+    from opsbridge.pilot.cohort import CohortError, read_cohort
     from opsbridge.pilot.collect import collect
-    from opsbridge.pilot.measures import report
+    from opsbridge.pilot.measures import CohortMismatch, check_window, report
     from opsbridge.pilot.reference import ReferenceError, read_reference
 
-    as_of = args.as_of or datetime.now(UTC)
-    if not args.since < args.until <= as_of:
-        print("Refusing: the window must satisfy since < until <= as-of.")
+    try:
+        check_window(args.since, args.until, args.as_of)
+    except ValueError as exc:
+        print(f"Refusing: {exc}.")
         return 2
     try:
+        cohort = read_cohort(Path(args.cohort))
         reference = read_reference(Path(args.reference))
-    except ReferenceError as exc:
-        print(f"Refusing: the reference file has {len(exc.problems)} problem(s):")
+    except (CohortError, ReferenceError) as exc:
+        print(f"Refusing: {exc}:")
         for problem in exc.problems:
-            print(f"  {problem}")
+            print(_shown(f"  {problem}"))
         return 2
     # The worker role reads every table of the tenant; the report's transaction is read-only.
     db = Database(make_engine("worker", database=args.database))
     try:
-        cases = collect(db, uuid.UUID(args.tenant_id), since=args.since, until=args.until)
+        collected = collect(
+            db, uuid.UUID(args.tenant_id), since=args.since, until=args.until, as_of=args.as_of
+        )
+    except ValueError as exc:
+        print(f"Refusing: {exc}.")
+        return 2
     finally:
         db.engine.dispose()
-    result = report(cases, reference, since=args.since, until=args.until, as_of=as_of)
+    provenance = {
+        "code": code_version(REPO_ROOT),
+        "reference_sha256": hashlib.sha256(Path(args.reference).read_bytes()).hexdigest(),
+        "database": collected.snapshot.as_dict(),
+        "generated_at": datetime.now(UTC).isoformat(),
+    }
+    try:
+        result = report(
+            collected.cases,
+            reference,
+            cohort,
+            since=args.since,
+            until=args.until,
+            as_of=args.as_of,
+            provenance=provenance,
+        )
+    except CohortMismatch as exc:
+        print(f"Refusing: {exc}:")
+        for problem in exc.problems:
+            print(f"  {problem}")
+        return 2
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-    scope, accuracy = result["scope"], result["accuracy"]["opsbridge"]
-    blind = accuracy["blind"]["next_action"]
+    coverage, headline = result["coverage"], result["headline"]
     print(
-        f"{result['protocol']}: {scope['opsbridge_cases']} OpsBridge and {scope['manual_cases']} "
-        f"manual cases ({len(scope['excluded'])} excluded); blind next action "
-        f"{blind['correct']}/{blind['n']}; wrote {out}"
+        f"{result['protocol']}: {coverage['opsbridge']['enrolled']} OpsBridge and "
+        f"{coverage['manual']['enrolled']} manual invoices enrolled; blind next action "
+        f"{headline['correct']}/{headline['n']}"
+        + (
+            ""
+            if result["complete"]
+            else " (INCOMPLETE: " + "; ".join(result["incomplete_because"]) + ")"
+        )
+        + f"; wrote {out}"
     )
-    return 0
+    return 0 if result["complete"] else 1
 
 
 def _pilot_check_reference(args: argparse.Namespace) -> int:
@@ -815,6 +854,21 @@ def _pilot_check_reference(args: argparse.Namespace) -> int:
         f"{args.reference}: {len(rows)} rows ({arms['opsbridge']} opsbridge, "
         f"{arms['manual']} manual); read as pilot-report will read it"
     )
+    if args.cohort:
+        from opsbridge.pilot.cohort import CohortError, key_of, read_cohort
+
+        try:
+            cohort = read_cohort(Path(args.cohort))
+        except (OSError, CohortError) as exc:
+            print(_shown(f"Refusing: the cohort: {exc}"))
+            return 2
+        enrolled = {m.key for m in cohort.members}
+        strays = [r.line for r in rows if key_of(r.arm, r.case, r.invoice) not in enrolled]
+        if strays:
+            print(f"lines {', '.join(map(str, strays))} name no invoice in the cohort")
+            return 2
+        waiting = len(enrolled) - len(rows)
+        print(f"cohort {cohort.sha256[:12]}: {len(enrolled)} enrolled, {waiting} without a row yet")
     return 0
 
 
@@ -1102,7 +1156,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--tenant-id", required=True, help="the pilot tenant's id")
     p.add_argument("--since", required=True, type=_aware_time, help="intake window start")
     p.add_argument("--until", required=True, type=_aware_time, help="intake window end")
-    p.add_argument("--as-of", type=_aware_time, help="cut-off for decisions (default: now)")
+    p.add_argument(
+        "--as-of",
+        required=True,
+        type=_aware_time,
+        help="the agreed cut-off, on the database's clock: only what existed then is measured",
+    )
+    p.add_argument("--cohort", required=True, help="the enrolment list frozen before intake")
     p.add_argument("--reference", required=True, help="the reviewer's reference CSV")
     p.add_argument("--out", required=True, help="where to write the report (JSON)")
     p.add_argument("--database", help="database name (default: from settings)")
@@ -1112,6 +1172,7 @@ def main(argv: list[str] | None = None) -> int:
         "pilot-check-reference", help="read the reference file as pilot-report will, no database"
     )
     p.add_argument("--reference", required=True, help="the reviewer's reference CSV")
+    p.add_argument("--cohort", help="the frozen enrolment list: also check rows belong to it")
     p.set_defaults(func=_pilot_check_reference)
 
     p = sub.add_parser(
