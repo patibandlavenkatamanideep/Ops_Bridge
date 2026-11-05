@@ -488,6 +488,7 @@ def correct_field(
             field_id=fld.id,
             previous_value=current,
             new_value=new_value,
+            previous_status=fld.status,  # what a report of an earlier cut-off saw
             reason=reason,
             author_id=p.user_id,
         )
