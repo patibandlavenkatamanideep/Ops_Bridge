@@ -181,20 +181,21 @@ in as the same demo users many times a minute.
 **Parser sandbox** (production review A06). The API and the worker parse untrusted files in
 subprocesses that confine themselves with Landlock (`opsbridge/evidence/sandbox.py`). A
 confined parser reads only its own code and the system libraries (tesseract also the one page
-it reads), writes nothing, and connects to no TCP port. Deployed, `OPSBRIDGE_PARSER_SANDBOX`
-is `required` unless set otherwise:
-- the API and the worker refuse to start unless a confined probe could neither read a planted
-  file nor connect to a listening port;
+it reads), writes nothing, and connects to no TCP port. A seccomp filter then refuses it any
+new socket, so no UDP (DNS) or Unix socket either, and any io_uring. Deployed,
+`OPSBRIDGE_PARSER_SANDBOX` is `required` unless set otherwise:
+- the API and the worker refuse to start unless a confined probe could read no planted file
+  and reach no TCP, UDP or Unix socket;
 - a parser refuses any file it cannot be confined for, before reading it.
 
-This needs Linux 6.7 or later (Landlock ABI 4, for the TCP rules) with Landlock enabled, and
-a seccomp profile that allows its three system calls; Docker's and Podman's defaults do. Run
+This needs Linux 6.7 or later (Landlock ABI 4, for the TCP rules) with Landlock enabled, on
+x86_64 or arm64, and a seccomp profile that lets a process add its own filter and use
+Landlock's three system calls; Docker's and Podman's defaults do. Run
 `opsbridge parser-sandbox-check` in the image on the platform, as the task will run, before
 relying on it: Fargate's kernel is the platform's choice, not ours. Where it does not hold,
 run the API and worker on instances whose kernel offers it, or set
-`OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses unconfined, and accepts that a parser
-flaw reaches the task's files and network. Not covered either way: UDP (so DNS), and Unix
-sockets with a path.
+`OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses with whatever layers hold (none, where
+neither does), and accepts that a parser flaw may reach the task's files and network.
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
