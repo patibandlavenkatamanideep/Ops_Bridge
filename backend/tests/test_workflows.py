@@ -3,10 +3,13 @@
 The release workflow has never run: its first tag is its first test. These read the workflow
 files the way Actions will and catch, before that, what would otherwise fail a release
 halfway: a step output read but never written, an action not pinned to a commit, or a check
-of CI's image job that the release does not repeat on the digest it publishes."""
+of CI's image job that the release does not repeat on the digest it publishes. The ruleset on
+`main` (applied 5 November 2026) names CI's jobs: one it names wrongly never reports, and then
+nothing merges."""
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -88,3 +91,15 @@ def test_the_release_repeats_every_check_of_ci_image_job_on_its_candidate() -> N
     ]
     assert gates[0]["severity"] == gates[1]["severity"] == "CRITICAL,HIGH"
     assert gates[0]["ignore-unfixed"] == gates[1]["ignore-unfixed"]
+
+
+def test_the_main_ruleset_requires_every_ci_job_by_the_name_it_reports() -> None:
+    """A required check that no job reports blocks every merge into main; a job the ruleset
+    leaves out can fail and still be merged."""
+    ruleset = json.loads((REPO_ROOT / "infra/github/main-ruleset.json").read_text("utf-8"))
+    (checks,) = [r["parameters"] for r in ruleset["rules"] if r["type"] == "required_status_checks"]
+    required = [check["context"] for check in checks["required_status_checks"]]
+    jobs = load(REPO_ROOT / ".github/workflows/ci.yml")["jobs"]
+    assert sorted(required) == sorted(job.get("name", key) for key, job in jobs.items())
+    assert checks["strict_required_status_checks_policy"] is True
+    assert ruleset["conditions"]["ref_name"]["include"] == ["~DEFAULT_BRANCH"]
