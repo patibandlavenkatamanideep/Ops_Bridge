@@ -84,7 +84,7 @@ class GitHubIssuesConnector:
         self._client = httpx.Client(
             base_url=base_url.rstrip("/"),
             follow_redirects=False,
-            transport=transport,
+            transport=transport or http_transport.deadline_transport(),
             headers={
                 "Authorization": f"Bearer {token}",
                 "Accept": "application/vnd.github+json",
