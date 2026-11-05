@@ -77,6 +77,13 @@ regression failed for the stated reason before the fix.
 | N08 | Offline replay egress | Yes: a client made before the guard reached a loopback proxy, which received the CONNECT; proxy variables stayed set; live modes were not refused | `evaluation/egress.py`, `evaluation/bench.py`, `cli.py`, `evaluation/canary.py`, `evaluation/local_server.py` | Proxy variables are removed and their ports refused while the guard holds; only registered loopback ports; live modes refused before a run | `evaluation/test_offline_proxy_guards.py`; replay check reproduces every recorded run | A Python-level guard, not a sandbox |
 | N09 | Not defined in the supplied brief | Not reproduced | Nothing | — | — | The owner to name it |
 
+Also from the brief's Phase G, done locally:
+- `ops.prune_sessions` validates its own period (migration 0024); `'-100 years'` deleted live
+  sessions before.
+- docs/account-lifecycle.md (A16's mechanics, and the owner's six decisions).
+- `tests/test_docs_consistency.py` (named commands, settings and release commits exist and
+  agree; it found `make eval-verify` missing).
+
 Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-2026-109518,
 fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
 2.6.2 beside OpenSSL, and the image job passed on it (run 42082021608).
