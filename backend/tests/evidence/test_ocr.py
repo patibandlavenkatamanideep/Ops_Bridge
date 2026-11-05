@@ -43,7 +43,9 @@ def fake_tesseract(monkeypatch: pytest.MonkeyPatch) -> list[bytes]:
     )
     monkeypatch.setattr(parsers, "tesseract_version", lambda: "tesseract test-double")
 
-    def ocr(image: bytes, timeout: float = 15.0, language: str = "eng") -> str:
+    def ocr(
+        image: bytes, timeout: float = 15.0, language: str = "eng", sandbox_policy: str = ""
+    ) -> str:
         seen.append(image)
         return TRANSCRIPT
 

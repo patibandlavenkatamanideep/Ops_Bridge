@@ -171,6 +171,18 @@ figure, and the report must say so wherever the arms are compared.
     uv --directory backend run python -m opsbridge.cli export-check \
       --export <export dir>/<organization> --pack <pack id> --out <check.json>
 
+Run it where the parsers are confined, since it reads the export's own files. On macOS they
+are not (Landlock is Linux's), so run it in the image there, offline and with the sandbox
+required:
+
+    docker run --rm --read-only --tmpfs /tmp --cap-drop ALL \
+      --security-opt no-new-privileges:true --network none \
+      -e OPSBRIDGE_PARSER_SANDBOX=required -v <export dir>:/export:ro opsbridge/app:local \
+      python -m opsbridge.cli export-check --export /export/<organization> --pack <pack id>
+
+For the report, add a directory the image's user (uid 10001) can write to, for example
+`-v <out dir>:/out` and `--out /out/check.json`.
+
 For each listed record it checks that:
 - the file is present, within the size limit, and matches its digest;
 - the pack reads its collection;

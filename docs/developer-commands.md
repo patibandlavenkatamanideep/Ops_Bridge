@@ -58,7 +58,10 @@ key once), `verify-restore --database D --artifact-dir /abs/path` or `--artifact
 checks; refuses the live databases and relative paths; the bucket uses the configured S3
 endpoint, region and prefix), `end-sessions --subject S [--database D]` (ends a person's live
 sessions now, when the identity provider signed them out but its back-channel logout did not
-reach the API; docs/operations.md).
+reach the API; docs/operations.md), `parser-sandbox-check` (whether parser subprocesses are
+confined here: a probe confined as the PDF worker is tries to read a planted file and connect
+to a listening port; exit 0 when both are refused, 1 with the reason otherwise;
+docs/deployment.md).
 
 Pilot command: `pilot-report --tenant-id T --since S --until U [--as-of C] --reference
 FILE --out FILE [--database D]`. It computes the four pilot measures (protocol

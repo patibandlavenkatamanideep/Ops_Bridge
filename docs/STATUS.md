@@ -412,9 +412,11 @@ blockers in `docs/production-readiness.md`):
    export-check output escaping as PR #24. PR #25 (back-channel logout, per-container
    secrets, the HIGH image gate, the reference check, the session-ended page) was merged on
    2026-11-02 as `23b2f84`, where the release preconditions pass. The evidence bundle was
-   merged on 2026-11-03 as PR #27 (`77a515b`), where they pass too. Next: whatever the
-   owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `77a515b` (A12); a
+   merged on 2026-11-03 as PR #27 (`77a515b`), where they pass too, and the split key
+   volumes on 2026-11-04 as PR #28 (`87d4665`), where they pass as well. Since then: parser
+   subprocesses are confined with Landlock (A06). Next: whatever the owner's answers below
+   unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `87d4665` (A12); a
    purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1376,3 +1378,32 @@ staging, pilot owner).
 - A stack created earlier keeps the old shared key in `opsbridge_appdata`. Nothing trusts it
   now; docs/deployment.md gives the command that removes it.
 - Not done: keys from a secret store, mounted per role in staging (A11).
+
+### PR #28 merged (2026-11-04, production review A06, A12)
+- PR #28 (the split key volumes) was merged as `87d4665`. Its CI run on `main` (41889856619)
+  passed all four jobs, and `release_check.py versions` and `ci` pass on it for
+  `v0.1.0-alpha.1`. It is now the proposed commit for the first tag.
+
+### Parser subprocesses are confined with Landlock (2026-11-04, production review A06)
+- With the environment restricted, a flaw in pypdf, Pillow or tesseract reached through a
+  hostile file still found every file the service can read (the worker's signing key, other
+  tenants' artifacts) and its network (the database, the MCP services).
+- The PDF worker now confines itself with Landlock before it reads the file: it reads only its
+  own code and the system libraries, writes nothing, and connects to no TCP port. Tesseract
+  starts through a launcher that confines it to the system files and its one page.
+- `OPSBRIDGE_PARSER_SANDBOX` is `required` when deployed. A parser then refuses a file it
+  cannot be confined for, and the API and worker refuse to start unless a confined probe could
+  neither read a planted file nor connect to a listening port. Development is best effort;
+  macOS has no Landlock, and the Linux containers are confined anyway.
+- `opsbridge parser-sandbox-check` proves it on a host or image; CI's image job and the release
+  run it in the image as compose runs it.
+- Tests: `tests/evidence/test_parser_sandbox.py` (8), required to run in CI. Removing the
+  worker's confinement, the TCP rules, the launcher's confinement or either startup check each
+  fails a test. Locally: unit 612 and integration 270 on macOS; the evidence tests (61) in the
+  hardened app container under Landlock ABI 7, including the real OCR test, now confined.
+- Hosted CI (run 41932656486): the runner offers Landlock ABI 8, the confined tests ran there
+  (616 unit tests; only the macOS-only case skipped), and the image check held under Docker.
+- docs/pilot-plan.md now runs `export-check` in the image, offline and with the sandbox
+  required, since on macOS the parsers would read the export unconfined.
+- Not done: UDP (so DNS), Unix sockets with a path and system calls are not restricted, and
+  the staging platform's kernel is still to be checked (docs/deployment.md).

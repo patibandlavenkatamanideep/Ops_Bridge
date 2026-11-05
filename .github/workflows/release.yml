@@ -6,11 +6,11 @@
 # Actions API by workflow file and commit and every required job is checked
 # (scripts/release_check.py), not inferred from check names. It builds the image once, from
 # the locks, and pushes it only under a candidate tag; qualifies that exact digest with the
-# checks of CI's image job (non-root, CLI, receipts, API health, SBOM, critical
-# vulnerabilities); attests its build provenance and verifies the attestation; and only then
-# gives the same digest the version tag, without rebuilding, refusing if the tag resolves to
-# anything else. Deployments promote the digest it prints, not the tag. Actions are pinned to
-# commits.
+# checks of CI's image job (non-root, CLI, parser sandbox, receipts, API health, SBOM,
+# critical vulnerabilities); attests its build provenance and verifies the attestation; and
+# only then gives the same digest the version tag, without rebuilding, refusing if the tag
+# resolves to anything else. Deployments promote the digest it prints, not the tag. Actions
+# are pinned to commits.
 name: release
 
 on:
@@ -85,6 +85,9 @@ jobs:
           docker pull "${CANDIDATE}"
           test "$(docker run --rm "${CANDIDATE}" id -u)" = 10001
           docker run --rm "${CANDIDATE}" python -m opsbridge.cli --help > /dev/null
+          docker run --rm --read-only --tmpfs /tmp --cap-drop ALL \
+            --security-opt no-new-privileges:true "${CANDIDATE}" \
+            python -m opsbridge.cli parser-sandbox-check
           docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify --summary-only
           status=0; docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify || status=$?
           test "$status" = 3

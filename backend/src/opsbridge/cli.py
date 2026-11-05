@@ -680,6 +680,22 @@ def _init_keys(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _parser_sandbox_check(_args: argparse.Namespace) -> int:
+    """Whether parser subprocesses here are confined (evidence/sandbox.py): a probe confined as
+    the PDF worker is tries to read a file and connect to a port of this process's."""
+    from opsbridge.evidence import sandbox
+
+    problem = sandbox.self_test()
+    if problem is not None:
+        print(f"parser sandbox does not hold: {problem}")
+        return 1
+    print(
+        f"parser sandbox holds: {sandbox.Confinement(abi=sandbox.abi()).describe()}; a confined "
+        "probe could neither read a file outside its code nor connect over TCP"
+    )
+    return 0
+
+
 def _verify_restore(args: argparse.Namespace) -> int:
     from opsbridge.config import get_settings
     from opsbridge.evidence.storage import ArtifactStore, LocalArtifactStore, S3ArtifactStore
@@ -1053,6 +1069,11 @@ def main(argv: list[str] | None = None) -> int:
 
     p = sub.add_parser("init-keys", help="create the delegation signing key if absent")
     p.set_defaults(func=_init_keys)
+
+    p = sub.add_parser(
+        "parser-sandbox-check", help="show that parser subprocesses here are confined (Landlock)"
+    )
+    p.set_defaults(func=_parser_sandbox_check)
 
     p = sub.add_parser("verify-restore", help="application-level checks on a restored database")
     p.add_argument("--database", required=True)

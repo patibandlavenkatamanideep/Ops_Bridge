@@ -105,6 +105,10 @@ class Settings(BaseSettings):
     ocr_max_pages: int = 3
     ocr_page_timeout_seconds: float = 15.0
     ocr_language: str = "eng"
+    # Parser subprocesses confine themselves with Landlock (evidence/sandbox.py). `required`
+    # refuses to parse, and a deployed service to start, where the confinement does not hold;
+    # `best_effort` parses unconfined there. Unset: required when deployed, else best effort.
+    parser_sandbox: Literal["required", "best_effort"] | None = None
     metrics_token: SecretStr | None = None  # bearer token for /metrics when set
     worker_http_host: str = "127.0.0.1"
     worker_http_port: int = 9101  # worker /healthz, /readyz, /metrics (0 disables)
@@ -246,6 +250,12 @@ class Settings(BaseSettings):
     @property
     def deployed(self) -> bool:
         return self.env in ("staging", "production")
+
+    @property
+    def parser_sandbox_policy(self) -> Literal["required", "best_effort"]:
+        if self.parser_sandbox is not None:
+            return self.parser_sandbox
+        return "required" if self.deployed else "best_effort"
 
     @property
     def secure_cookies(self) -> bool:

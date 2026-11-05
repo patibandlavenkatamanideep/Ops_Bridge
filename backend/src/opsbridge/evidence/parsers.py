@@ -24,11 +24,17 @@ import tempfile
 import threading
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from opsbridge import safejson
+from opsbridge.config import ConfigurationError
 
+from . import sandbox
 from .normalize import normalize_text
+from .sandbox import SandboxPolicy
+
+if TYPE_CHECKING:
+    from opsbridge.config import Settings
 
 ParseStatus = Literal["parsed", "needs_review", "unsupported", "rejected"]
 
@@ -47,7 +53,8 @@ _PDF_SLOTS = threading.BoundedSemaphore(PDF_CONCURRENCY)
 # Parser subprocesses read untrusted files, so they get only these variables of this
 # process's environment: a flaw in pypdf, Pillow or tesseract finds none of the deployment's
 # secrets there (database URL, signing keys, model and tracker tokens). The PDF worker also
-# runs isolated (-I), so it imports nothing from the directory it was started in.
+# runs isolated (-I), so it imports nothing from the directory it was started in. Both also
+# confine themselves before reading the file (sandbox.py): no other files, no TCP.
 PARSER_ENVIRONMENT = ("LANG", "LC_ALL", "LC_CTYPE", "PATH", "TESSDATA_PREFIX")
 _ACTIVE_PDF = re.compile(rb"/(JavaScript|JS|Launch|EmbeddedFile|OpenAction|AA|RichMedia|XFA)\b")
 _SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
@@ -69,12 +76,14 @@ class TextLine:
 
 @dataclass(frozen=True)
 class OcrSettings:
-    """The optional local OCR path for PDFs without a text layer (off unless enabled)."""
+    """The optional local OCR path for PDFs without a text layer (off unless enabled), and
+    the sandbox policy every PDF and OCR subprocess runs under (sandbox.py)."""
 
     enabled: bool = False
     max_pages: int = 3
     page_timeout_seconds: float = 15.0
     language: str = "eng"
+    sandbox: SandboxPolicy = "best_effort"
 
     @classmethod
     def from_settings(cls, settings: Any) -> OcrSettings:
@@ -85,6 +94,7 @@ class OcrSettings:
             max_pages=int(settings.ocr_max_pages),
             page_timeout_seconds=float(settings.ocr_page_timeout_seconds),
             language=str(settings.ocr_language),
+            sandbox=settings.parser_sandbox_policy,
         )
 
 
@@ -260,7 +270,14 @@ def _parse_pdf(data: bytes, ocr: OcrSettings) -> ParsedDocument:
     try:
         with _PDF_SLOTS:
             proc = subprocess.run(  # noqa: S603 - fixed argv: this interpreter + our worker module
-                [sys.executable, "-I", "-m", "opsbridge.evidence.pdf_worker", str(MAX_PDF_PAGES)],
+                [
+                    sys.executable,
+                    "-I",
+                    "-m",
+                    "opsbridge.evidence.pdf_worker",
+                    ocr.sandbox,
+                    str(MAX_PDF_PAGES),
+                ],
                 input=data,
                 capture_output=True,
                 timeout=PDF_TIMEOUT_SECONDS,
@@ -371,6 +388,7 @@ def _ocr_pages(
                     "-I",
                     "-m",
                     "opsbridge.evidence.pdf_worker",
+                    ocr.sandbox,
                     str(MAX_PDF_PAGES),
                     "images",
                     str(pages),
@@ -389,7 +407,7 @@ def _ocr_pages(
     engine = tesseract_version()
     by_page: dict[int, list[str]] = {}
     for page_no, b64 in result["images"]:
-        text = ocr_image(base64.b64decode(b64), ocr.page_timeout_seconds, ocr.language)
+        text = ocr_image(base64.b64decode(b64), ocr.page_timeout_seconds, ocr.language, ocr.sandbox)
         if text and text.strip():
             by_page.setdefault(int(page_no), []).append(text)
     if not by_page:
@@ -424,7 +442,12 @@ def _ocr_pages(
     )
 
 
-def ocr_image(image_bytes: bytes, timeout: float = 15.0, language: str = "eng") -> str | None:
+def ocr_image(
+    image_bytes: bytes,
+    timeout: float = 15.0,
+    language: str = "eng",
+    sandbox_policy: SandboxPolicy = "best_effort",
+) -> str | None:
     """OCR of one PNG image via the tesseract CLI. Output is never authoritative."""
     binary = shutil.which("tesseract")
     if binary is None or not _LANGUAGE.match(language):
@@ -432,11 +455,30 @@ def ocr_image(image_bytes: bytes, timeout: float = 15.0, language: str = "eng") 
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "page.png"
         src.write_bytes(image_bytes)
+        data = (
+            [f"--read={os.environ['TESSDATA_PREFIX']}"] if "TESSDATA_PREFIX" in os.environ else []
+        )
         try:
-            # Fixed argument vector: the resolved tesseract binary, our own temp file and a
-            # validated language code; one thread so a page cannot take every core.
+            # Fixed argument vector: tesseract started confined (sandbox.py) to the system
+            # files and this page, with our own temp file and a validated language code; one
+            # thread so a page cannot take every core.
             out = subprocess.run(  # noqa: S603
-                [binary, str(src), "stdout", "-l", language],
+                [
+                    sys.executable,
+                    "-I",
+                    "-m",
+                    "opsbridge.evidence.sandbox",
+                    "exec",
+                    sandbox_policy,
+                    f"--read={tmp}",
+                    *data,
+                    "--",
+                    binary,
+                    str(src),
+                    "stdout",
+                    "-l",
+                    language,
+                ],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -446,6 +488,21 @@ def ocr_image(image_bytes: bytes, timeout: float = 15.0, language: str = "eng") 
         except subprocess.TimeoutExpired:
             return None
         return out.stdout if out.returncode == 0 else None
+
+
+def require_sandbox(settings: Settings) -> None:
+    """Called once by a deployed service at startup, before it parses anything. Under the
+    `required` policy it refuses to start unless a probe confined as the PDF worker is could
+    neither read a file outside its code nor connect over TCP (sandbox.self_test)."""
+    if settings.parser_sandbox_policy != "required":
+        return
+    problem = sandbox.self_test()
+    if problem is not None:
+        raise ConfigurationError(
+            f"the parser sandbox is required in {settings.env}: {problem}. Run on Linux 6.7 or "
+            "later with Landlock enabled, or set OPSBRIDGE_PARSER_SANDBOX=best_effort to parse "
+            "untrusted files unconfined (docs/deployment.md)"
+        )
 
 
 def _parser_env(**extra: str) -> dict[str, str]:

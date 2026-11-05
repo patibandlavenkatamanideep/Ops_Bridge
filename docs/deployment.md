@@ -178,6 +178,24 @@ keeps the default per-user limit (`OPSBRIDGE_RATE_LIMIT_PER_MINUTE`, 240) unless
 reason to change it; the development `.env` raises it to 1200 because the browser tests sign
 in as the same demo users many times a minute.
 
+**Parser sandbox** (production review A06). The API and the worker parse untrusted files in
+subprocesses that confine themselves with Landlock (`opsbridge/evidence/sandbox.py`). A
+confined parser reads only its own code and the system libraries (tesseract also the one page
+it reads), writes nothing, and connects to no TCP port. Deployed, `OPSBRIDGE_PARSER_SANDBOX`
+is `required` unless set otherwise:
+- the API and the worker refuse to start unless a confined probe could neither read a planted
+  file nor connect to a listening port;
+- a parser refuses any file it cannot be confined for, before reading it.
+
+This needs Linux 6.7 or later (Landlock ABI 4, for the TCP rules) with Landlock enabled, and
+a seccomp profile that allows its three system calls; Docker's and Podman's defaults do. Run
+`opsbridge parser-sandbox-check` in the image on the platform, as the task will run, before
+relying on it: Fargate's kernel is the platform's choice, not ours. Where it does not hold,
+run the API and worker on instances whose kernel offers it, or set
+`OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses unconfined, and accepts that a parser
+flaw reaches the task's files and network. Not covered either way: UDP (so DNS), and Unix
+sockets with a path.
+
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
 retention; ALB hours and LCUs; NAT gateway hours and data processing (avoid if no egress is
@@ -228,4 +246,4 @@ repeat the routing drill there (locally they reach only the alert sink);
 add the WAF/rate-limit edge (application rate limits are shared across API tasks through
 PostgreSQL but are not a DDoS defence); set `OPSBRIDGE_TRUSTED_PROXIES` to the ALB's subnet
 CIDRs, or every client is counted under the ALB's address; run the restore drill
-there with synthetic data.
+there with synthetic data; run `parser-sandbox-check` in the task (above).
