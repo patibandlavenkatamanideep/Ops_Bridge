@@ -205,6 +205,22 @@ def test_a_listing_nested_beyond_any_record_is_refused() -> None:
         stub(handle).list_for_po("receipts", PO)
 
 
+@pytest.mark.parametrize(
+    "content",
+    [
+        b'{"items": [{"key": "GR-1"}, {"key": "GR-2"}], "items": [], "next_cursor": null}',
+        b'{"items": [{"key": "GR-1", "deleted": true, "deleted": false}], "next_cursor": null}',
+    ],
+    ids=["the item list twice", "deleted twice"],
+)
+def test_a_listing_naming_a_member_twice_is_refused(content: bytes) -> None:
+    """Read as its last value, the first listing was complete and empty: two receipts the
+    source listed were missing, and their absence counted as a fact (review N01)."""
+    handle = lambda request: httpx.Response(200, content=content)  # noqa: E731
+    with pytest.raises(SourceRecordInvalid, match="malformed list response"):
+        stub(handle).list_for_po("receipts", PO)
+
+
 def test_a_timeout_is_unavailable_not_absent() -> None:
     def handle(request: httpx.Request) -> httpx.Response:
         raise httpx.ReadTimeout("no answer", request=request)
