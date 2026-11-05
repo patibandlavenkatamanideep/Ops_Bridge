@@ -209,7 +209,7 @@ def _eval_bench(args: argparse.Namespace) -> int:
     from opsbridge.config import REPO_ROOT, get_settings
     from opsbridge.evaluation import manifest as mf
     from opsbridge.evaluation import metrics, receipt
-    from opsbridge.evaluation.bench import environment
+    from opsbridge.evaluation.bench import LiveModeRefused, environment, offline_modes
     from opsbridge.evaluation.cassette import RecordingAdapter, ReplayAdapter, ReplayFailure
     from opsbridge.evaluation.egress import EgressBlocked, loopback_only
     from opsbridge.simulator.scenarios import load_corpus
@@ -230,7 +230,11 @@ def _eval_bench(args: argparse.Namespace) -> int:
         return 2
     split = frozen["splits"][args.split]
     corpus = load_corpus(Path(split["path"]))
-    modes = args.modes.split(",") if args.modes else list(frozen["modes"])
+    try:  # before anything is written: no live model, no live fallback
+        modes = offline_modes(args.modes.split(",") if args.modes else frozen["modes"])
+    except LiveModeRefused as exc:
+        print(f"Refusing to run: {exc}")
+        return 2
     repeats = int(frozen["repeats"])  # fixed schedule from the frozen plan
     runs_root = Path(f"evals/runs/{args.benchmark}")
     recorded = sorted(runs_root.glob(f"{args.split}-record-*/model-cassette.json"))
@@ -306,13 +310,14 @@ def _eval_bench(args: argparse.Namespace) -> int:
 
     try:
         with (
-            loopback_only(),
+            loopback_only(ports=set()) as guard,
             environment(
                 get_settings(),
                 corpus,
                 REPO_ROOT / "var" / "eval" / run_id,
                 cast(ModelAdapter, adapter),
                 workflow_version=mf.workflow_version_of(frozen),
+                allow_port=guard.allow,
             ) as env,
         ):
             for mode in modes:
@@ -433,7 +438,7 @@ def _replay_plan(benchmark: str, splits: list[str]) -> bool:
     from opsbridge.config import REPO_ROOT, get_settings
     from opsbridge.evaluation import manifest as mf
     from opsbridge.evaluation import metrics
-    from opsbridge.evaluation.bench import environment
+    from opsbridge.evaluation.bench import LiveModeRefused, environment, offline_modes
     from opsbridge.evaluation.cassette import ReplayAdapter, ReplayFailure
     from opsbridge.evaluation.egress import EgressBlocked, loopback_only
     from opsbridge.evaluation.reproduce import differences, recorded_results, trial_differences
@@ -465,17 +470,24 @@ def _replay_plan(benchmark: str, splits: list[str]) -> bool:
         replayed: dict[str, Any] = {}
         replayed_trials: dict[str, list[dict[str, Any]]] = {}
         try:
+            modes = offline_modes(m for m in frozen["modes"] if m in expected["modes"])
+        except LiveModeRefused as exc:
+            print(f"{split_name}: refusing: {exc}")
+            failed = True
+            continue
+        try:
             with (
-                loopback_only(),
+                loopback_only(ports=set()) as guard,
                 environment(
                     get_settings(),
                     corpus,
                     REPO_ROOT / "var" / "eval" / check_id,
                     cast(ModelAdapter, adapter),
                     workflow_version=mf.workflow_version_of(frozen),
+                    allow_port=guard.allow,
                 ) as env,
             ):
-                for mode in [m for m in frozen["modes"] if m in expected["modes"]]:
+                for mode in modes:
                     trials = []
                     for scenario in corpus.scenarios:
                         for repeat in range(repeats):
