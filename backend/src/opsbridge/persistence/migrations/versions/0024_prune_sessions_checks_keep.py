@@ -24,16 +24,10 @@ down_revision: str | None = "0023"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-DELETE = """
-    DELETE FROM user_sessions
-    WHERE least(coalesce(revoked_at, 'infinity'::timestamptz), expires_at, idle_expires_at)
-          < now() - keep
-"""
-
 
 def upgrade() -> None:
     op.execute(
-        f"""
+        """
         CREATE OR REPLACE FUNCTION ops.prune_sessions(keep interval)
         RETURNS integer
         LANGUAGE plpgsql VOLATILE SECURITY DEFINER
@@ -46,7 +40,12 @@ def upgrade() -> None:
             RAISE EXCEPTION 'ops.prune_sessions: keep must be a non-negative interval, got %', keep
               USING ERRCODE = '22023';
           END IF;
-          WITH gone AS ({DELETE} RETURNING 1)
+          WITH gone AS (
+            DELETE FROM user_sessions
+            WHERE least(coalesce(revoked_at, 'infinity'::timestamptz), expires_at, idle_expires_at)
+                  < now() - keep
+            RETURNING 1
+          )
           SELECT count(*)::integer INTO removed FROM gone;
           RETURN removed;
         END
@@ -57,13 +56,18 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.execute(
-        f"""
+        """
         CREATE OR REPLACE FUNCTION ops.prune_sessions(keep interval)
         RETURNS integer
         LANGUAGE sql VOLATILE SECURITY DEFINER
         SET search_path = public, pg_temp
         AS $$
-          WITH gone AS ({DELETE} RETURNING 1)
+          WITH gone AS (
+            DELETE FROM user_sessions
+            WHERE least(coalesce(revoked_at, 'infinity'::timestamptz), expires_at, idle_expires_at)
+                  < now() - keep
+            RETURNING 1
+          )
           SELECT count(*)::integer FROM gone
         $$
         """
