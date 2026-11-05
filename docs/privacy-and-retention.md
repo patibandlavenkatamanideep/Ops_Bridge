@@ -105,14 +105,19 @@ through the same scrubber.
 
 ## Uploads
 
-Uploads are untrusted input: size-capped (`max_upload_bytes`, checked against the declared
-`Content-Length` before buffering; chunked bodies without a length are refused with 411),
-content sniffed against the declared type (HTML disguised as PDF or text is rejected),
-filenames reduced to a safe basename, no URL fetching, and parsing through the same bounded
-parsers and pack mappings as source records. Instructions inside documents are data
-(`test_injected_document_instructions_cannot_change_authority`). Evidence:
-`test_upload_*` and `test_chunked_body_without_length_is_refused_before_buffering` in
-`test_hardening.py`; browser: `e2e/phase6.spec.ts`.
+Uploads are untrusted input. They are:
+- size-capped: `max_upload_bytes` for the file, and `max_request_bytes` for the request, whose
+  bytes are counted as they arrive, whatever the framing, and refused at the chunk that passes
+  the limit (review N02);
+- content-sniffed against the declared type (HTML disguised as PDF or text is rejected);
+- given a safe basename, with no URL fetching;
+- parsed through the same bounded parsers and pack mappings as source records, refused whole
+  when their JSON names a member twice (N01).
+
+Instructions inside documents are data
+(`test_injected_document_instructions_cannot_change_authority`). Evidence: `test_upload_*`
+and `test_a_chunked_body_is_accepted_within_the_limit_and_refused_past_it` in
+`test_hardening.py`, `tests/test_request_body_limits.py`; browser: `e2e/phase6.spec.ts`.
 
 ## Not provided
 
