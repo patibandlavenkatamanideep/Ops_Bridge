@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `185c4c7` (PR #29), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `79992cd` (PR #30), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -593,12 +593,15 @@ Its security recording's model requests name both reasons where v1's said "()".
 
 ## Package 8, governance and releases (A12)
 
-**Prepared** (nothing applied; repository administration and publishing are the owner's):
+**Prepared** (repository administration and publishing are the owner's; the owner applied
+the ruleset on 5 November):
 - `infra/github/main-ruleset.json`: pull requests only, the four CI jobs required on the
   latest commit, review threads resolved, no force push or deletion; administrators may
   bypass only through a pull request (break-glass). Required approvals 0 while there is one
-  maintainer. The check names were matched against the CI job names. The apply command is in
-  docs/deployment.md.
+  maintainer. Applied as ruleset 26598146; read back through the API it matches the file,
+  apart from defaults GitHub adds (every merge method allowed). `tests/test_workflows.py`
+  checks that it requires exactly CI's job names, strictly, on the default branch. How to
+  read and replace it is in docs/deployment.md.
 - `.github/workflows/release.yml`, corrected in the closure pass. Before, it checked CI
   check runs by name only (any app or workflow can create one with any name), then built a
   fresh image, so what it published was never an image anything had tested. CI publishes
@@ -655,13 +658,15 @@ still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so t
 belongs on PR #25's merge commit instead. That is `23b2f84`: its CI run on `main`
 (41485053120) passed all four jobs, and all three checks pass on it. On 3 November so did
 PR #27's merge commit `77a515b` (CI run 41568201604), whose release also builds, verifies
-and attests the evidence bundle (Package 8, evidence packaging); the first tag belongs
-there. The ruleset's check
-names match CI. The workflow has not run (no tag), so its first use is its first test, and no
-attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
-single image index as it is. The step therefore refuses, before tagging, a candidate that is
-not an index; the build's provenance attestation makes it one. It checks again after tagging
-that the tag resolves to the qualified digest. The candidate tag stays in the registry.
+and attests the evidence bundle (Package 8, evidence packaging). Each merge since has
+qualified too, the latest on 5 November: `79992cd` (PR #30; CI run 41980269125), which also
+confines parser subprocesses. The first tag belongs there. The ruleset's check names match
+CI, and a test keeps them matched. The workflow has not run (no tag), so its first use is
+its first test, and no attestation exists yet. The promotion relies on `docker buildx
+imagetools create` keeping a single image index as it is. The step therefore refuses, before
+tagging, a candidate that is not an index; the build's provenance attestation makes it one.
+It checks again after tagging that the tag resolves to the qualified digest. The candidate
+tag stays in the registry.
 
 **Vulnerability gate** (2 November). CI and the release stopped only fixable CRITICAL
 findings. A report-only HIGH scan of the image (run 41418268617) found twelve, all fixable:
@@ -902,16 +907,18 @@ and blindness is shown only by the recorded time.
      merged on 5 November as `185c4c7`, whose CI run on `main`, 41942800839, passed all four
      jobs and which `release_check.py ci` accepts). After that, confined parsers can open
      no socket (A06), and `tests/test_workflows.py` checks the workflows before they run:
-     it found that the release did not repeat CI's mount-point check, now added (A12).
+     it found that the release did not repeat CI's mount-point check, now added (A12; PR
+     #30, merged on 5 November as `79992cd`, whose CI run on `main`, 41980269125, passed all
+     four jobs and which `release_check.py ci` accepts). The owner then applied the `main`
+     ruleset, and a test ties its required checks to CI's job names (A12).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `185c4c7`;
+   - the release workflow has not run; its preconditions pass on `79992cd`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `main`'s head, `185c4c7` (PR #29),
-     which carries the fixed pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12,
-     A17);
+   - push `v0.1.0-alpha.1` on `main`'s head, `79992cd` (PR #30), which carries the fixed
+     pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12, A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
