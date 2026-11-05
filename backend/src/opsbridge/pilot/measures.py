@@ -1,23 +1,36 @@
-"""The four pilot measures (protocol opsbridge-pilot/1, defined in docs/pilot-plan.md before
+"""The four pilot measures (protocol opsbridge-pilot/2, defined in docs/pilot-plan.md before
 any pilot data exists).
 
-The unit is the case: one blocked invoice. A case the reviewer excluded is in no measure; a
-case in scope without a reference row is in every measure except accuracy. Failures stay in
-their denominators: a referenced case OpsBridge never investigated counts as wrong, and a
-case not decided or resolved by the cut-off is reported as open, never dropped from the
-times. A reviewer decision is blind only when it was recorded before the case reached
-OpsBridge; later ones are reported apart, since the reviewer may have seen its output.
+The unit is the enrolled invoice: a member of the cohort, frozen before any case was opened
+(pilot/cohort.py). Every member is accounted for at the cut-off, in its arm: excluded by the
+reviewer, never opened as a case in the window, opened but not investigated, or investigated
+(OpsBridge); outside the window, not started, or started (manual). An excluded member is in no
+measure. Failures stay in their denominators: a member never opened or never investigated
+counts as wrong, and a case not decided or resolved by the cut-off is reported as open, never
+dropped from the times.
 
-A reference row finds its case by the invoice, as intake identified it (number and supplier),
-because a blind decision is recorded before the case and its number exist. The report names
-cases by number and rows by line, never by invoice.
+A reviewer decision is blind only when it was recorded before the case reached OpsBridge;
+later ones are reported apart, since the reviewer may have seen its output. A decision recorded
+after the cut-off, like a missing one, did not exist at the cut-off: the member has no
+reference, and the report says it is incomplete rather than leave the member out of a
+denominator (review N05). Operational coverage is reported apart from accuracy, and accuracy
+both over every enrolled member and over the ones investigated, which is a selected subset and
+is labelled so.
+
+A reference row finds its member by the invoice, as intake identified it (number and
+supplier), because a blind decision is recorded before the case and its number exist. The
+report names cases by number and rows by line, never by invoice.
+
+Opsbridge-pilot/2 replaces /1 before any pilot data existed (docs/pilot-plan.md): /1 took its
+denominators from the cases opened and the rows written, so an enrolled invoice never opened,
+or a decision never recorded, was in none of them.
 """
 
 from __future__ import annotations
 
 import math
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from statistics import median
 from typing import Any
@@ -25,38 +38,57 @@ from typing import Any
 from evalseal import wilson_ci
 
 from opsbridge.evaluation.verdict import Verdict
+from opsbridge.pilot.cohort import Cohort, Member, key_of
 from opsbridge.pilot.reference import ReferenceRow
 
-PROTOCOL = "opsbridge-pilot/1"
+PROTOCOL = "opsbridge-pilot/2"
+REPLACES = "opsbridge-pilot/1"
 AXES = ("next_action", "outcome", "types", "case")
 
 
 @dataclass(frozen=True)
 class ProposalChain:
-    """One proposal and its edited versions."""
+    """One proposal and its edited versions, as they stood at the cut-off."""
 
     drafted: dict[str, Any]  # the parameters the investigation's draft gave
-    status: str  # of the last version: approved | rejected | expired | superseded | ...
+    status: str  # of the last version then: approved | rejected | expired | superseded | ...
     final: dict[str, Any]  # the parameters of the last version
     versions: int
 
 
 @dataclass(frozen=True)
 class CaseFacts:
-    """What OpsBridge recorded about one pilot case."""
+    """What OpsBridge had recorded about one pilot case by the cut-off."""
 
     case_number: str
     invoice: tuple[str, str | None] | None  # (number, supplier) as intake identified it
     created_at: datetime
     first_investigated_at: datetime | None
     verdict: Verdict | None  # of the first investigation: what the investigator saw first
-    evidence_readiness: str  # of the first investigation, or the case's when there is none
+    evidence_readiness: str  # of the first investigation, or not_investigated
     documents: Counter[str]  # parse status of each document version read
     fields: Counter[str]  # status of each extracted field
     field_corrections: int
     chains: list[ProposalChain]
     first_approved_at: datetime | None
     resolved_at: datetime | None
+    explanation_origin: str | None = field(default=None)  # of the first investigation
+
+
+class CohortMismatch(ValueError):
+    """Reference rows that name no enrolled invoice: the sample was not the one frozen."""
+
+    def __init__(self, problems: list[str]) -> None:
+        super().__init__(f"{len(problems)} reference row(s) outside the cohort")
+        self.problems = problems
+
+
+def check_window(since: datetime, until: datetime, as_of: datetime) -> None:
+    for name, t in (("since", since), ("until", until), ("as_of", as_of)):
+        if t.tzinfo is None or t.utcoffset() is None:
+            raise ValueError(f"{name} has no time zone")
+    if not since < until <= as_of:
+        raise ValueError("the window must satisfy since < until <= as_of")
 
 
 def _rate(k: int, n: int) -> dict[str, Any]:
@@ -93,52 +125,134 @@ def _decided(c: CaseFacts) -> datetime | None:
     return min((t for t in (c.first_approved_at, c.resolved_at) if t is not None), default=None)
 
 
+@dataclass(frozen=True)
+class _Enrolled:
+    member: Member
+    row: ReferenceRow | None
+    reference: str  # excluded | missing | after_cut_off | recorded (manual) | blind | not_blind
+    case: CaseFacts | None = None  # opsbridge
+
+    @property
+    def verdict(self) -> Verdict | None:
+        return self.case.verdict if self.case else None
+
+
+def _reference_state(row: ReferenceRow | None, as_of: datetime) -> str:
+    if row is None:
+        return "missing"
+    if row.excluded:
+        return "excluded"
+    if row.reviewed_at is None or row.reviewed_at > as_of:
+        return "after_cut_off"
+    return "recorded"
+
+
 def report(
     cases: list[CaseFacts],
     reference: list[ReferenceRow],
+    cohort: Cohort,
     *,
     since: datetime,
     until: datetime,
     as_of: datetime,
+    provenance: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """The measures over the cases OpsBridge recorded in the window and the reviewer's rows."""
+    """The measures over the cohort at the cut-off, from OpsBridge's facts (read as they stood
+    then, pilot/collect.py) and the reviewer's rows."""
+    check_window(since, until, as_of)
+    members = {m.key: m for m in cohort.members}
+    rows: dict[tuple[str, ...], ReferenceRow] = {}
+    strays = []
+    for r in reference:
+        k = key_of(r.arm, r.case, r.invoice)
+        if k in members:
+            rows[k] = r
+        else:
+            strays.append(f"reference line {r.line}: names no invoice in the cohort")
+    if strays:
+        raise CohortMismatch(strays)
     by_invoice = {c.invoice: c for c in cases if c.invoice is not None}
-    ops_rows = {r.invoice: r for r in reference if r.arm == "opsbridge" and r.invoice is not None}
-    excluded = [r for r in reference if r.excluded]
-    left_out = {r.invoice for r in excluded if r.arm == "opsbridge"}
-    scope = sorted((c for c in cases if c.invoice not in left_out), key=lambda c: c.case_number)
-    manual = [r for r in reference if r.arm == "manual" and not r.excluded]
+    enrolled_invoices = {m.invoice for m in cohort.members if m.arm == "opsbridge"}
 
-    def row_of(c: CaseFacts) -> ReferenceRow | None:
-        return ops_rows.get(c.invoice) if c.invoice is not None else None
+    ops: list[_Enrolled] = []
+    manual: list[_Enrolled] = []
+    for m in cohort.members:
+        row = rows.get(m.key)
+        state = _reference_state(row, as_of)
+        if m.arm == "opsbridge":
+            case = by_invoice.get(m.invoice) if m.invoice is not None else None
+            if state == "recorded":
+                assert row is not None and row.reviewed_at is not None
+                state = (
+                    "blind" if case is None or row.reviewed_at < case.created_at else "not_blind"
+                )
+            ops.append(_Enrolled(m, row, state, case))
+        else:
+            manual.append(_Enrolled(m, row, state))
 
-    def case_of(r: ReferenceRow) -> str | None:
-        if r.arm == "manual":
-            return r.case
-        found = by_invoice.get(r.invoice) if r.invoice is not None else None
-        return found.case_number if found else None
+    # --- OpsBridge arm -------------------------------------------------------------------
+    measured = [e for e in ops if e.reference != "excluded"]
+    with_case = [e for e in measured if e.case is not None]
+    scope = [e.case for e in with_case if e.case is not None]
+    investigated = [e for e in with_case if e.verdict is not None]
+    blind = [e for e in measured if e.reference == "blind"]
+    not_blind = [e for e in measured if e.reference == "not_blind"]
 
-    # (case, the reviewer's verdict, whether it was recorded before the case reached OpsBridge)
-    referenced = [
-        (c, row.reference, row.reviewed_at is not None and row.reviewed_at < c.created_at)
-        for c in scope
-        if (row := row_of(c)) is not None and row.reference is not None
-    ]
+    def name(e: _Enrolled) -> dict[str, Any]:
+        return {"case": e.case.case_number if e.case else None, "cohort_line": e.member.line}
+
     disagreements = [
         {
-            "case": c.case_number,
-            "blind": blind,
-            "expected": expected.as_dict(),
-            "got": c.verdict.as_dict() if c.verdict else None,
+            **name(e),
+            "blind": e.reference == "blind",
+            "expected": e.row.reference.as_dict(),
+            "got": e.verdict.as_dict() if e.verdict else None,
         }
-        for c, expected, blind in referenced
-        if c.verdict is None or not c.verdict.correct(expected)["case"]
+        for e in blind + not_blind
+        if e.row is not None
+        and e.row.reference is not None
+        and (e.verdict is None or not e.verdict.correct(e.row.reference)["case"])
     ]
-    with_process = [
-        (r.process, r.reference)
-        for r in manual
-        if r.process is not None and r.reference is not None
+
+    def pairs(group: list[_Enrolled]) -> list[tuple[Verdict | None, Verdict]]:
+        return [(e.verdict, e.row.reference) for e in group if e.row and e.row.reference]
+
+    # --- manual arm ----------------------------------------------------------------------
+    manual_measured = [e for e in manual if e.reference != "excluded"]
+
+    def manual_progress(e: _Enrolled) -> str:
+        started = e.row.started_at if e.row else None
+        if started is None or started > as_of:
+            return "not_started"
+        return "started" if since <= started < until else "outside_window"
+
+    started = [e for e in manual_measured if manual_progress(e) == "started"]
+    process: list[tuple[Verdict, Verdict]] = []
+    for e in started:
+        kept = e.row
+        if (
+            e.reference == "recorded"
+            and kept is not None
+            and kept.reference is not None
+            and kept.process is not None
+            and kept.decided_at is not None
+            and kept.decided_at <= as_of
+        ):
+            process.append((kept.process, kept.reference))
+    referenced_manual = [e for e in started if e.reference == "recorded"]
+
+    # --- completeness ----------------------------------------------------------------------
+    unreferenced = [
+        e for e in measured + manual_measured if e.reference in ("missing", "after_cut_off")
     ]
+    incomplete = (
+        [
+            f"{len(unreferenced)} enrolled invoice(s) have no reviewer decision recorded by the "
+            f"cut-off (cohort lines {', '.join(str(e.member.line) for e in unreferenced)})"
+        ]
+        if unreferenced
+        else []
+    )
 
     chains = [ch for c in scope for ch in c.chains]
     approved = [ch for ch in chains if ch.status == "approved"]
@@ -148,32 +262,69 @@ def report(
         k for ch in changed for k in sorted(set(ch.final) | set(ch.drafted))
         if ch.final.get(k) != ch.drafted.get(k)
     )  # fmt: skip
+    readiness = Counter(e.case.evidence_readiness if e.case else "no_case" for e in measured)
+    enrolled_blind = _accuracy(pairs(blind))
 
-    readiness = Counter(c.evidence_readiness for c in scope)
+    def count(group: list[_Enrolled], attribute: str) -> dict[str, int]:
+        return dict(Counter(getattr(e, attribute) for e in group))
+
     return {
         "protocol": PROTOCOL,
+        "replaces": REPLACES,
         "window": {
             "since": since.isoformat(),
             "until": until.isoformat(),
             "as_of": as_of.isoformat(),
         },
-        "scope": {
-            "opsbridge_cases": len(scope),
-            "manual_cases": len(manual),
-            "excluded": [
-                {"arm": r.arm, "line": r.line, "case": case_of(r), "reason": r.excluded}
-                for r in excluded
-            ],
-            "unreferenced": [c.case_number for c in scope if row_of(c) is None],
-            "unknown_references": [
-                {"line": r.line}
-                for r in ops_rows.values()
-                if r.invoice not in by_invoice and not r.excluded
-            ],
+        "cohort": {"sha256": cohort.sha256, "members": len(cohort.members)},
+        "provenance": provenance or {},
+        "complete": not incomplete,
+        "incomplete_because": incomplete,
+        "headline": {
+            "measure": (
+                "blind next-action agreement over every enrolled OpsBridge invoice with a blind "
+                "decision; one never opened or never investigated counts as wrong"
+            ),
+            **enrolled_blind["next_action"],
+            "complete": not incomplete,
+        },
+        "coverage": {
+            "opsbridge": {
+                "enrolled": len(ops),
+                "excluded": [
+                    {**name(e), "reason": e.row.excluded}
+                    for e in ops
+                    if e.reference == "excluded" and e.row is not None
+                ],
+                "no_case": [e.member.line for e in measured if e.case is None],
+                "not_investigated": [
+                    e.case.case_number for e in with_case if e.case and e.verdict is None
+                ],
+                "investigated": len(investigated),
+                "references": count(measured, "reference"),
+                "decided_by_cut_off": sum(_decided(c) is not None for c in scope),
+                "resolved_by_cut_off": sum(c.resolved_at is not None for c in scope),
+                "explanations": dict(
+                    Counter(c.explanation_origin for c in scope if c.explanation_origin)
+                ),
+                "cases_outside_cohort": sorted(
+                    c.case_number for c in cases if c.invoice not in enrolled_invoices
+                ),
+            },
+            "manual": {
+                "enrolled": len(manual),
+                "excluded": [
+                    {"cohort_line": e.member.line, "reason": e.row.excluded}
+                    for e in manual
+                    if e.reference == "excluded" and e.row is not None
+                ],
+                "progress": dict(Counter(manual_progress(e) for e in manual_measured)),
+                "references": count(manual_measured, "reference"),
+            },
         },
         "extraction": {
             "evidence_readiness": dict(readiness),
-            "complete": _rate(readiness["complete"], len(scope)),
+            "complete": _rate(readiness["complete"], len(measured)),
             "documents": dict(sum((c.documents for c in scope), Counter())),
             "fields": dict(sum((c.fields for c in scope), Counter())),
             "field_corrections": sum(c.field_corrections for c in scope),
@@ -181,13 +332,17 @@ def report(
         },
         "accuracy": {
             "opsbridge": {
-                "blind": _accuracy([(c.verdict, e) for c, e, blind in referenced if blind]),
-                "not_blind": _accuracy([(c.verdict, e) for c, e, blind in referenced if not blind]),
+                "blind": enrolled_blind,
+                "blind_investigated_only": {
+                    "note": "a selected subset: enrolled invoices investigated by the cut-off",
+                    **_accuracy(pairs([e for e in blind if e.verdict is not None])),
+                },
+                "not_blind": _accuracy(pairs(not_blind)),
                 "disagreements": disagreements,
             },
             "manual": {
-                **_accuracy(list(with_process)),
-                "without_process_decision": len(manual) - len(with_process),
+                **_accuracy(list(process)),
+                "without_process_decision": len(referenced_manual) - len(process),
             },
         },
         "approval": {
@@ -201,15 +356,27 @@ def report(
         },
         "time_hours": {
             "opsbridge": {
+                "not_opened": len(measured) - len(with_case),
                 "to_decision": _durations([(c.created_at, _decided(c)) for c in scope], as_of),
                 "to_resolution": _durations([(c.created_at, c.resolved_at) for c in scope], as_of),
             },
             "manual": {
+                "not_started": len(manual_measured) - len(started),
                 "to_decision": _durations(
-                    [(r.started_at, r.decided_at) for r in manual if r.started_at], as_of
+                    [
+                        (e.row.started_at, e.row.decided_at)
+                        for e in started
+                        if e.row and e.row.started_at
+                    ],
+                    as_of,
                 ),
                 "to_resolution": _durations(
-                    [(r.started_at, r.resolved_at) for r in manual if r.started_at], as_of
+                    [
+                        (e.row.started_at, e.row.resolved_at)
+                        for e in started
+                        if e.row and e.row.started_at
+                    ],
+                    as_of,
                 ),
             },
         },
