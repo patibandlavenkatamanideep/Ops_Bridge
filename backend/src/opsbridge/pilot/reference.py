@@ -1,4 +1,4 @@
-"""The reviewer's reference file (protocol opsbridge-pilot/1, docs/pilot-plan.md).
+"""The reviewer's reference file (protocol opsbridge-pilot/2, docs/pilot-plan.md).
 
 One CSV row per sampled blocked invoice:
 - `arm`: `opsbridge` when the case was worked in OpsBridge, or `manual` when it was worked with
@@ -20,6 +20,11 @@ One CSV row per sampled blocked invoice:
 Times are ISO 8601 with a time zone. OpsBridge's own decisions and times come from its
 records, so those columns must be blank on its arm. The file is read strictly: every problem
 is reported with its line, and nothing is measured from a file that has one.
+
+A blank time is a point not reached, never a missing record (review N05): so a process
+decision is refused without the `decided_at` it was made at, and an invoice resolved before
+its follow-up was decided is refused as an impossible order. Each row must belong to the
+frozen cohort (pilot/cohort.py); the report checks that.
 """
 
 from __future__ import annotations
@@ -155,6 +160,10 @@ def _row(line: int, values: dict[str, str], problems: list[str]) -> ReferenceRow
         for name, t in (("decided_at", decided), ("resolved_at", resolved)):
             if started is not None and t is not None and t < started:
                 problems.append(f"{name} is before started_at")
+        if decided is not None and resolved is not None and resolved < decided:
+            problems.append("resolved_at is before decided_at")
+        if process is not None and decided is None and not values["decided_at"]:
+            problems.append("a process decision needs the decided_at it was made at")
     return ReferenceRow(
         line,
         arm,
