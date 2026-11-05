@@ -122,10 +122,12 @@ and `test_a_chunked_body_is_accepted_within_the_limit_and_refused_past_it` in
 ## Not provided
 
 - No PII discovery across stored data, no data-subject export tooling, no legal hold.
-- User profiles (`users`: name, e-mail, issuer subject) are kept while the account exists;
-  disabling an account at the identity provider ends new sign-ins but not a session that is
-  still valid (sessions are checked locally, up to their idle and absolute limits), and nothing
-  deletes a profile. The deprovisioning policy is the owner's to set (production review A16).
+- User profiles (`users`: name, e-mail, issuer subject) are kept while the account exists, and
+  nothing deletes a profile. Disabling an account at the identity provider ends new sign-ins.
+  A session that is still valid ends only when the provider signs the person out over the back
+  channel, or the membership is revoked; otherwise it lasts to its idle or absolute limit.
+  docs/account-lifecycle.md describes removing a person; its policy is the owner's to set
+  (production review A16).
 - No encryption by OpsBridge itself. The local artifact store is plain files under
   `var/artifacts`; the S3 store can request SSE-KMS per upload and relies on the bucket's
   default encryption, not tested against AWS (docs/deployment.md). In a versioned bucket,
