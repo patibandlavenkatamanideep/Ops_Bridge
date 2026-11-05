@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `87d4665` (PR #28), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `185c4c7` (PR #29), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -898,14 +898,18 @@ and blindness is shown only by the recorded time.
      that, the compose stack mounts the delegation signing key only in bootstrap and the
      worker (A06; PR #28, merged on 4 November as `87d4665`, whose CI run on `main`,
      41889856619, passed all four jobs and which `release_check.py ci` accepts), and
-     parser subprocesses are confined with Landlock, required when deployed (A06).
+     parser subprocesses are confined with Landlock, required when deployed (A06; PR #29,
+     merged on 5 November as `185c4c7`, whose CI run on `main`, 41942800839, passed all four
+     jobs and which `release_check.py ci` accepts). After that, confined parsers can open
+     no socket (A06), and `tests/test_workflows.py` checks the workflows before they run:
+     it found that the release did not repeat CI's mount-point check, now added (A12).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `87d4665`;
+   - the release workflow has not run; its preconditions pass on `185c4c7`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `main`'s head, `87d4665` (PR #28),
+   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `main`'s head, `185c4c7` (PR #29),
      which carries the fixed pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12,
      A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
