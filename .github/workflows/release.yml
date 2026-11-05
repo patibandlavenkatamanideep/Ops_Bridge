@@ -148,7 +148,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "${GITHUB_REPOSITORY}"
+        # Only this workflow's attestation, for this tag, from a GitHub-hosted runner: --repo
+        # alone accepts one any workflow of the repository signed, from any ref.
+        run: >-
+          gh attestation verify "oci://${IMAGE}@${DIGEST}" --repo "${GITHUB_REPOSITORY}"
+          --signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml"
+          --source-ref "${GITHUB_REF}" --deny-self-hosted-runners
       - name: Promote the qualified digest to the version tag (no rebuild)
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
