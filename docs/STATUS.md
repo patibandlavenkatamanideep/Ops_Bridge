@@ -417,7 +417,11 @@ blockers in `docs/production-readiness.md`):
    sandbox on 2026-11-05 as PR #29 (`185c4c7`), where they pass too. The same day PR #30
    (`79992cd`, where they pass as well) made confined parsers unable to open a socket (A06)
    and checks the workflows before they run (A12). The owner then applied the `main`
-   ruleset, and a test ties its required checks to CI's job names (A12).
+   ruleset, and a test ties its required checks to CI's job names (A12). The review of
+   2026-11-05 (N01–N08, docs/production-readiness.md) was then fixed locally on PR #36:
+   strict JSON, request bodies by received bytes, source clocks, bounded bundles, the
+   historical pilot report (`opsbridge-pilot/2`), credential ownership, truthful deadlines
+   and offline egress through proxies. N09 is not defined in the brief.
    Next: whatever the owner's answers below unblock.
 3. Needs the owner: push `v0.1.0-alpha.1` on `79992cd` (A12); a
    purchasing system or export with
@@ -1461,3 +1465,42 @@ staging, pilot owner).
   strict about the branch being up to date, and targets the default branch. A renamed check,
   a dropped check or the up-to-date requirement turned off each fails it.
 - Not done: no tag exists; pushing it is the owner's.
+
+
+### Review of 2026-11-05: N01–N08 fixed locally (production readiness, N01–N09)
+- Baseline: `main` at `79992cd`, CI green (41980269125), working tree clean; the live ruleset
+  requires the four jobs and 0 approvals, which is not independent review. PRODUCTION_REVIEW.md
+  and its inventory were not supplied; N09 is not defined in the brief.
+- Each finding was reproduced at the head first (docs/production-readiness.md has the table):
+  - N01: a duplicated quantity matched end to end;
+  - N02: an HTTP/2-framed oversized body was read whole;
+  - N03: an export dated a year ahead was actionable;
+  - N04: duplicate bundle members and a broken checksum were accepted;
+  - N05: an approval after the cut-off was counted;
+  - N06: a staging connection without a reference got the deployment token;
+  - N07: trickled headers held 0.6 s reads for 7.4 s, and an MCP call took 10.3 s against
+    0.3 s;
+  - N08: a loopback proxy received a CONNECT during an offline run.
+- Fixed with failing-first regressions:
+  - strict untrusted JSON;
+  - body limits by received bytes and time (chunked bodies now accepted within the limit);
+  - an RFC 3339 source clock with an allowance, and the data's age as the earlier of the
+    source's time and the host's;
+  - a single bounded bundle pass;
+  - pilot protocol `opsbridge-pilot/2` (a frozen cohort, the cut-off in one repeatable-read
+    snapshot, every enrolled invoice accounted for, migration 0023 for the status before a
+    correction);
+  - registered credentials only when deployed;
+  - one deadline capping every socket wait, and a cancel scope per MCP call;
+  - offline proxy and port guards, with live modes refused.
+- Local gates on the final tree: unit 727 passed, 5 skipped (Linux-only); integration 278
+  passed; canary 64/64; 34 receipts verify; the replay check reproduces every recorded run.
+  Ruff and mypy are clean. Not run here: the image build (disk), Landlock and seccomp
+  (macOS), OCR, and browser tests; they run in hosted CI.
+- Also: a new HIGH advisory in Debian's `apt` stopped CI's image gate. The image now pins
+  `apt` 2.6.2, and the image job passed on it (42082021608).
+- A slip, corrected: an unquoted zsh variable kept `-x db=...` from reaching alembic, so the
+  test and eval databases were briefly left at 0022, and evaluation tests failed. Both are at
+  0023 now.
+- Not done (the owner's): a source, export, cohort and reviewer (Phase D); a cloud account
+  (E); a model budget (F); operator sessions (G).
