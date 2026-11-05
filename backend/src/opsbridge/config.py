@@ -167,6 +167,10 @@ class Settings(BaseSettings):
     # An investigation's purchasing data may be acted on (proposals, approvals, dispatch,
     # resolution) for this long after it was read; then the investigation must be re-run.
     source_max_age_hours: float = Field(default=24.0, gt=0)
+    # How far ahead of this host's clock a source's own times may be (an export's
+    # extracted_at). Further ahead, the export is refused; within it, its data is taken as
+    # read now, never later (review N03).
+    source_clock_skew_seconds: float = Field(default=300.0, ge=0)
     # Reading the purchasing source for one investigation stops after this long (every page
     # and record together); what was read is kept and nothing is concluded from it.
     source_collection_seconds: float = Field(default=120.0, gt=0)
