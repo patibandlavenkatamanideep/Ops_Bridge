@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     max_open_invitations: int = 50
     max_upload_bytes: int = 5 * 1024 * 1024
     max_request_bytes: int = 6 * 1024 * 1024
+    # The time a request body may take to arrive once its headers have (api/body_limits.py).
+    max_request_body_seconds: float = Field(default=120.0, gt=0)
 
     artifact_dir: Path = REPO_ROOT / "var" / "artifacts"
     packs_dir: Path = REPO_ROOT / "packs"
