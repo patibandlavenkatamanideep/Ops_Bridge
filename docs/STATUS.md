@@ -1466,7 +1466,6 @@ staging, pilot owner).
   a dropped check or the up-to-date requirement turned off each fails it.
 - Not done: no tag exists; pushing it is the owner's.
 
-
 ### Review of 2026-11-05: N01–N08 fixed locally (production readiness, N01–N09)
 - Baseline: `main` at `79992cd`, CI green (41980269125), working tree clean; the live ruleset
   requires the four jobs and 0 approvals, which is not independent review. PRODUCTION_REVIEW.md
