@@ -13,11 +13,15 @@ timed out (the rules-only path takes over), the MCP client as an outcome it cann
 
 from __future__ import annotations
 
+import dataclasses
 import gzip
 import json
+import time
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
 
+import anthropic
+import anyio
 import httpx2
 import pytest
 
@@ -175,3 +179,70 @@ def test_a_declared_length_past_the_limit_is_refused_before_reading() -> None:
     with httpx2.Client(transport=transport) as client, pytest.raises(httpx2.ReadError):
         client.get("http://model/v1")
     assert body.sent <= CHUNK
+
+
+# --- one deadline over every phase (review N07) ----------------------------------------
+
+from .scripted_server import OK_HEADERS, scripted, trickle  # noqa: E402
+
+
+def _stepping(monkeypatch: pytest.MonkeyPatch, *times: float) -> None:
+    seen = list(times)
+    monkeypatch.setattr(
+        sdk_transport, "_monotonic", lambda: seen.pop(0) if len(seen) > 1 else seen[0]
+    )
+
+
+def _bounded(handler: Any) -> tuple[sdk_transport.BoundedTransport, httpx2.Request]:
+    transport = sdk_transport.BoundedTransport(httpx2.MockTransport(handler), max_bytes=MiB)
+    return transport, httpx2.Request(
+        "POST", "http://model/v1", extensions={"timeout": {"read": 10.0}}
+    )
+
+
+def test_a_reply_whose_headers_arrive_after_the_deadline_is_refused(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _stepping(monkeypatch, 0, 11)  # prepared; the headers are already late
+    transport, request = _bounded(lambda r: httpx2.Response(200, content=Body(b"")))
+    with pytest.raises(sdk_transport.ReadDeadlineExceeded):
+        transport.handle_request(request)
+
+
+def test_a_reply_that_ends_after_the_deadline_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
+    _stepping(monkeypatch, 0, 1, 1, 11)  # prepared; the headers; the chunk; the end, late
+    transport, request = _bounded(lambda r: httpx2.Response(200, content=Body(b"{}")))
+    response = transport.handle_request(request)
+    with pytest.raises(sdk_transport.ReadDeadlineExceeded):
+        response.read()
+
+
+def test_a_model_reply_trickling_its_headers_stops_at_the_requests_timeout() -> None:
+    """Through the Anthropic SDK and a real socket: each header byte arrives inside the
+    per-read timeout, so without a cap on each wait the reply took about seven seconds."""
+    with scripted(trickle(OK_HEADERS + b"{}", 0.1)) as script:
+        adapter = AnthropicAdapter(
+            "claude-test",
+            "test-key",
+            client_factory=lambda **kw: anthropic.Anthropic(base_url=script.url, **kw),
+        )
+        started = time.monotonic()
+        with pytest.raises(ModelTimeout):
+            adapter.generate(dataclasses.replace(_request(), timeout_seconds=0.5))
+        assert time.monotonic() - started < 2.0
+        assert script.client_closed.wait(2.0)
+
+
+def test_an_mcp_call_whose_server_never_answers_ends_at_its_timeout() -> None:
+    async def never(request: httpx2.Request) -> httpx2.Response:
+        await anyio.sleep(30)
+        raise AssertionError("unreachable")
+
+    client = McpToolClient(
+        "http://casework/mcp", lambda: "service-token", timeout_seconds=0.3,
+        transport=httpx2.MockTransport(never),
+    )  # fmt: skip
+    started = time.monotonic()
+    with pytest.raises(McpTransportError):
+        client.call("get_follow_up_task", {}, "delegation")
+    assert time.monotonic() - started < 2.0
