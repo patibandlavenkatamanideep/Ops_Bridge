@@ -208,6 +208,17 @@ def test_true_comparisons_and_dates_from_the_evidence_are_accepted(text: str) ->
     assert problems == [] and value is not None
 
 
+def test_model_output_naming_a_member_twice_is_rejected() -> None:
+    """Validated as its last value, the answer passed while its first statements, unchecked,
+    stayed in the text (review N01)."""
+    bad = {"text": "The supplier was paid 999 twice.", "citations": []}
+    raw = explanation()
+    assert raw.count('"statements": ') == 1
+    raw = raw.replace('"statements": ', f'"statements": {json.dumps([bad])}, "statements": ')
+    value, problems = validate_explanation(ctx(), raw)
+    assert value is None and problems == ["schema: duplicate JSON member 'statements'"]
+
+
 def test_malformed_output_is_rejected() -> None:
     assert validate_explanation(ctx(), "not json {")[0] is None
 
