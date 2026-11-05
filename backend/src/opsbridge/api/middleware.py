@@ -117,6 +117,9 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
     async def _guarded(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]], cid: str
     ) -> Response:
+        # A declared length over the limit is refused unread. The bytes actually received
+        # are counted whatever the framing (api/body_limits.py), so a chunked body or one
+        # without a length is no longer refused for its framing.
         length = request.headers.get("content-length")
         if length is not None:
             try:
@@ -127,11 +130,6 @@ class PerimeterMiddleware(BaseHTTPMiddleware):
                 return _error(
                     413, "payload_too_large", "The request body is too large.", cid, False
                 )
-        elif "chunked" in request.headers.get("transfer-encoding", "").lower():
-            # Without a declared length the limit could only be enforced after buffering.
-            return _error(
-                411, "length_required", "Request bodies must declare Content-Length.", cid, False
-            )
         if request.url.path.startswith(("/api/", "/auth/")):
             peer = request.client.host if request.client else "unknown"
             addr = client_address(
