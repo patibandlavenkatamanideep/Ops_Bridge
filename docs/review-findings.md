@@ -26,7 +26,7 @@ and, where relevant, real Keycloak and browser tests on this machine.
 | F11 | P1 | Accepted corrections never applied | Fixed, verified locally | `test_only_fields_matching_uses_can_be_corrected` |
 | F12 | P1 | Unreadable replacement leaves old records current | Fixed, verified locally | `test_an_unreadable_replacement_invoice_is_not_matched_on_the_old_extraction[*]` (3) |
 | F13 | P1 | Production configuration may keep development defaults | Fixed (settings checks), verified locally | `tests/test_deployment_settings.py` (16) |
-| F14 | P1 | `main` unprotected; CI does not qualify the runtime image | In-repository part done; branch protection and publishing remain the owner's | CI runs on pushes to `main`; API-type drift step; image job (build, smoke, SBOM, scan) — first run on PR #4; base images pinned by digest; Dependabot config |
+| F14 | P1 | `main` unprotected; CI does not qualify the runtime image | In-repository part done; branch protection applied by the owner (2026-11-05, ruleset 26598146); publishing remains the owner's | CI runs on pushes to `main`; API-type drift step; image job (build, smoke, SBOM, scan) — first run on PR #4; base images pinned by digest; Dependabot config |
 | F15 | P2 | Validators check numbers and citations, not claim meaning | Partly fixed, verified locally | role and unit checks: `test_compromised_explanations_are_rejected[…stated as invoiced / uses unit SET]`; comparisons and dates (2026-10-26): `[…says 18 exceeds 20 / says 20 is less than 18 / says 20 is 2 below 18 / date 2026-10-15 is not in its evidence]` (all passed validation before) and `test_true_comparisons_and_dates_from_the_evidence_are_accepted`; no false alarms on any corpus finding summary (`test_finding_numbers.py`); 0 of 120 recorded held-out mock explanations newly rejected (re-measured after each change) |
 | F16 | P2 | Local artifact reads do not verify digests | Fixed, verified locally | `tests/evidence/test_local_store.py`, `test_an_altered_original_is_refused_not_served` |
 | F17 | P2 | `verify` can pass with required gates skipped | Fixed, verified locally | `make verify-strict` fails here on the skipped OCR tests (tesseract not installed), as intended |
@@ -135,8 +135,9 @@ Not covered:
   These are settings checks, not proof of the deployed controls.
 - F14: the scan found fixable advisories only in Pillow 12.3.0 and certifi 2026.7.22; both
   were updated (13.0.0, 2026.10.19). The rebuilt image could not be rescanned locally (host
-  disk nearly full); the CI image job is the first scan of it. Publishing, signing,
-  provenance and branch protection are not done.
+  disk nearly full); the CI image job is the first scan of it. Publishing, signing and
+  provenance are not done: the release workflow that attests provenance has not run. Branch
+  protection was applied on 2026-11-05 (`infra/github/main-ruleset.json`).
 - F17: `verify --strict` is the release gate; the default `verify` stays a convenience
   report that now names every skipped gate and test.
 - F15: a number next to a role word (invoiced, ordered, received, returned, allocated,
