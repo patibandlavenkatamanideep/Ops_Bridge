@@ -413,10 +413,11 @@ blockers in `docs/production-readiness.md`):
    secrets, the HIGH image gate, the reference check, the session-ended page) was merged on
    2026-11-02 as `23b2f84`, where the release preconditions pass. The evidence bundle was
    merged on 2026-11-03 as PR #27 (`77a515b`), where they pass too, and the split key
-   volumes on 2026-11-04 as PR #28 (`87d4665`), where they pass as well. Since then: parser
-   subprocesses are confined with Landlock (A06). Next: whatever the owner's answers below
-   unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `87d4665` (A12); a
+   volumes on 2026-11-04 as PR #28 (`87d4665`), where they pass as well, and the parser
+   sandbox on 2026-11-05 as PR #29 (`185c4c7`), where they pass too. Since then: confined
+   parsers can open no socket (A06), and the workflows are checked before they run (A12).
+   Next: whatever the owner's answers below unblock.
+3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `185c4c7` (A12); a
    purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1407,3 +1408,35 @@ staging, pilot owner).
   required, since on macOS the parsers would read the export unconfined.
 - Not done: UDP (so DNS), Unix sockets with a path and system calls are not restricted, and
   the staging platform's kernel is still to be checked (docs/deployment.md).
+
+### PR #29 merged (2026-11-05, production review A06, A12)
+- PR #29 (the parser sandbox) was merged as `185c4c7`. Its CI run on `main` (41942800839)
+  passed all four jobs, and `release_check.py versions` and `ci` pass on it for
+  `v0.1.0-alpha.1`. It is now the proposed commit for the first tag.
+
+### Confined parsers can open no socket (2026-11-05, production review A06)
+- Landlock confines files and TCP. A confined probe could still send a UDP datagram (so DNS)
+  and connect to a Unix socket with a path.
+- Neither the PDF worker nor tesseract needs a socket. A seccomp filter installed after
+  Landlock refuses `socket()` and `io_uring_setup()` with EACCES; io_uring can open sockets
+  without `socket()`. It kills a call made through another ABI. `required` now asks for both
+  layers.
+- The probe runs unconfined as a control, then with each layer alone and with both, so
+  neither layer can be lost behind the other. In the hardened app container, removing the
+  filter, leaving io_uring out of it, or dropping Landlock's TCP rules each fails a test.
+- Hosted CI (run 41943712730): both layers held in the image under Docker, and 616 unit
+  tests ran on the runner.
+
+### The workflows are checked before they run (2026-11-05, production review A12)
+- The release workflow has never run, so its first tag would be its first test.
+  `tests/test_workflows.py` reads every workflow as Actions will. It checks that:
+  - each action is pinned to a commit;
+  - each step output read is written by an earlier step of the same job;
+  - the release repeats on its candidate every check CI's image job runs, under the same
+    scanner gate.
+- It found one gap: the release did not repeat CI's check that every volume mount point is
+  writable by the service user. The release now runs it on the candidate.
+- Renaming an output, unpinning an action or misspelling a step id each fails a test.
+- Not done: no workflow linter (actionlint, shellcheck) runs here or in CI. Running its
+  third-party image locally was refused by this session's permission check; adding it to CI
+  is the owner's call.

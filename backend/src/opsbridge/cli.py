@@ -682,16 +682,18 @@ def _init_keys(_args: argparse.Namespace) -> int:
 
 def _parser_sandbox_check(_args: argparse.Namespace) -> int:
     """Whether parser subprocesses here are confined (evidence/sandbox.py): a probe confined as
-    the PDF worker is tries to read a file and connect to a port of this process's."""
+    the PDF worker is tries to read a file and reach TCP, UDP and Unix sockets of this
+    process's."""
     from opsbridge.evidence import sandbox
 
-    problem = sandbox.self_test()
+    report = sandbox.run_probe()
+    problem = sandbox.verdict(report)
     if problem is not None:
         print(f"parser sandbox does not hold: {problem}")
         return 1
     print(
-        f"parser sandbox holds: {sandbox.Confinement(abi=sandbox.abi()).describe()}; a confined "
-        "probe could neither read a file outside its code nor connect over TCP"
+        f"parser sandbox holds: {report['sandbox']}; a confined probe could read no file "
+        "outside its code and reach no TCP, UDP or Unix socket"
     )
     return 0
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 import json
 import os
 import shutil
-import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -44,36 +43,30 @@ def _require_landlock() -> None:
         pytest.skip("Landlock with TCP rules is Linux 6.7+ (runs in hosted CI and the image)")
 
 
-def _probe(target: Path, port: int) -> dict[str, Any]:
-    proc = subprocess.run(
-        [sys.executable, "-I", "-m", "opsbridge.evidence.sandbox", "probe", str(target), str(port)],
-        capture_output=True,
-        timeout=30,
-        check=False,
-        env={"PATH": os.environ["PATH"]},
-    )
-    return dict(json.loads(proc.stdout))
+def _reached(report: dict[str, str]) -> tuple[str, ...]:
+    return tuple(report[k] for k in ("read", "tcp", "udp", "unix"))
 
 
-def test_a_confined_parser_reads_no_file_and_reaches_no_port_outside_its_code(
-    tmp_path: Path,
-) -> None:
+def test_a_confined_parser_reads_no_file_and_reaches_no_socket_outside_its_code() -> None:
+    """A file, a TCP listener, a UDP socket and a Unix socket of this process's, which the
+    probe tries to read, connect to, send to and connect to."""
     _require_landlock()
-    planted = tmp_path / "delegation_ed25519.pem"
-    planted.write_text("not for parsers")
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        listener.listen(4)
-        port = listener.getsockname()[1]
-        # Unconfined, the same file and port are open to this process.
-        assert planted.read_text() == "not for parsers"
-        socket.create_connection(("127.0.0.1", port), timeout=2).close()
-        report = _probe(planted, port)
-    assert report["sandbox"].startswith("landlock/")
-    assert (report["read"], report["connect"]) == ("denied", "denied")
+    # Unconfined, the probe reaches all four, so a refusal below is the sandbox's.
+    assert _reached(sandbox.run_probe(layers=())) == ("read", "connected", "sent", "connected")
+    full = sandbox.run_probe()
+    assert full["sandbox"].startswith("landlock/") and "seccomp" in full["sandbox"]
+    assert _reached(full) == ("denied",) * 4
     # Its own code still loads after confinement (pypdf, Pillow and stdlib codecs load late).
-    assert report["import"] == "ok"
+    assert full["import"] == "ok"
     assert sandbox.self_test() is None
+    # Each layer holds on its own, so neither can be lost behind the other: Landlock keeps
+    # files and TCP; the socket filter keeps every socket, UDP (DNS) and Unix ones included.
+    landlock = sandbox.run_probe(layers=("landlock",))
+    assert (landlock["read"], landlock["tcp"]) == ("denied", "denied")
+    seccomp = sandbox.run_probe(layers=("seccomp",))
+    assert (seccomp["tcp"], seccomp["udp"], seccomp["unix"]) == ("denied",) * 3
+    # Nor an io_uring, which could open a socket without socket().
+    assert (full["io_uring"], seccomp["io_uring"]) == ("denied", "denied")
 
 
 def test_the_pdf_worker_confines_itself_before_reading_the_file() -> None:
@@ -89,7 +82,7 @@ def test_the_pdf_worker_confines_itself_before_reading_the_file() -> None:
         )
         out = json.loads(proc.stdout)
         assert out["status"] == "ok"
-        assert out["sandbox"].startswith("landlock/")
+        assert out["sandbox"].startswith("landlock/") and "seccomp" in out["sandbox"]
     doc = parse(TEXT_PDF, "application/pdf", OcrSettings(sandbox="required"))
     assert doc.status == "parsed"
 
@@ -143,12 +136,22 @@ def test_required_refuses_to_parse_where_the_sandbox_is_unavailable(
     assert sandbox.enter("best_effort", []) == sandbox.Entry(
         "none (the kernel has no Landlock)", None
     )
-    # Files confined but TCP not (Landlock ABI 1-3) is not enough when it is required.
-    monkeypatch.setattr(sandbox, "confine", lambda *_a, **_k: sandbox.Confinement(abi=3))
-    assert "TCP" in (sandbox.enter("required", []).refusal or "")
-    assert sandbox.enter("best_effort", []).refusal is None
     # An unknown policy is taken as required.
     assert sandbox.enter("strict", []).refusal is not None
+    # Files confined but TCP not (Landlock ABI 1-3) is not enough when it is required, nor is
+    # Landlock without the socket filter; both are.
+    for confinement, problem in (
+        (sandbox.Confinement(abi=3, sockets=True), "TCP"),
+        (sandbox.Confinement(abi=8, sockets=False), "socket filter"),
+        (sandbox.Confinement(abi=0, sockets=True, missing=("no Landlock here",)), "Landlock"),
+    ):
+        monkeypatch.setattr(sandbox, "confine", lambda *_a, c=confinement, **_k: c)
+        assert problem in (sandbox.enter("required", []).refusal or "")
+        assert sandbox.enter("best_effort", []).refusal is None
+    monkeypatch.setattr(
+        sandbox, "confine", lambda *_a, **_k: sandbox.Confinement(abi=8, sockets=True)
+    )
+    assert sandbox.enter("required", []).refusal is None
 
 
 def test_where_landlock_is_unavailable_a_required_parse_is_refused() -> None:
