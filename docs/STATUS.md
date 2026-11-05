@@ -1492,8 +1492,8 @@ staging, pilot owner).
   - registered credentials only when deployed;
   - one deadline capping every socket wait, and a cancel scope per MCP call;
   - offline proxy and port guards, with live modes refused.
-- Local gates on the final tree: unit 727 passed, 5 skipped (Linux-only); integration 278
-  passed; canary 64/64; 34 receipts verify; the replay check reproduces every recorded run.
+- Local gates on the final tree (after the entry below too): unit 733 passed, 5 skipped
+  (Linux-only); integration 281 passed; canary 64/64; 34 receipts verify; the replay check reproduces every recorded run.
   Ruff and mypy are clean. Not run here: the image build (disk), Landlock and seccomp
   (macOS), OCR, and browser tests; they run in hosted CI.
 - Also: a new HIGH advisory in Debian's `apt` stopped CI's image gate. The image now pins
