@@ -78,6 +78,20 @@ CI job, change the file in the same pull request and replace the ruleset with it
 merging: until then the ruleset waits for the old name, which that pull request no longer
 reports.
 
+**Release tags** (prepared, not applied). A release names its image by its tag, so a tag
+moved or deleted afterwards would point at something else. Two rulesets cover the tags the
+release runs on (`v*.*.*`, pre-releases included). The first makes them immutable, with no
+bypass, administrators included (`infra/github/release-tags-immutable-ruleset.json`). The
+second lets only repository administrators create them
+(`infra/github/release-tags-creation-ruleset.json`; a bypass list covers every rule in its
+ruleset, hence two). To apply them (repository owner):
+
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/release-tags-immutable-ruleset.json
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/release-tags-creation-ruleset.json
+
+With these applied, a mistaken tag cannot be deleted by anyone. Remove that ruleset
+deliberately, and record why, before correcting one.
+
 **Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI run (started
 by the push to `main`) passed, with the version every package declares:
 
@@ -86,7 +100,8 @@ by the push to `main`) passed, with the version every package declares:
 The workflow refuses a tag that disagrees with any declared version and a commit whose CI run
 did not pass every required job. It then builds the image once from the locks and pushes it
 only as `candidate-<commit>`. It qualifies that digest with CI's image checks, records an SPDX
-SBOM, attests the digest's build provenance and verifies the attestation. Only then does it
+SBOM, attests the digest's build provenance and verifies the attestation: made by this
+workflow, for this tag, on a GitHub-hosted runner. Only then does it
 give the same digest the version tag, and it reports the digest in the run summary.
 
 **Pre-releases.** A tag `vX.Y.Z-alpha.N`, `-beta.N` or `-rc.N` is a pre-release. npm declares
