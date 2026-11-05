@@ -414,10 +414,12 @@ blockers in `docs/production-readiness.md`):
    2026-11-02 as `23b2f84`, where the release preconditions pass. The evidence bundle was
    merged on 2026-11-03 as PR #27 (`77a515b`), where they pass too, and the split key
    volumes on 2026-11-04 as PR #28 (`87d4665`), where they pass as well, and the parser
-   sandbox on 2026-11-05 as PR #29 (`185c4c7`), where they pass too. Since then: confined
-   parsers can open no socket (A06), and the workflows are checked before they run (A12).
+   sandbox on 2026-11-05 as PR #29 (`185c4c7`), where they pass too. The same day PR #30
+   (`79992cd`, where they pass as well) made confined parsers unable to open a socket (A06)
+   and checks the workflows before they run (A12). The owner then applied the `main`
+   ruleset, and a test ties its required checks to CI's job names (A12).
    Next: whatever the owner's answers below unblock.
-3. Needs the owner: apply the `main` ruleset and push `v0.1.0-alpha.1` on `185c4c7` (A12); a
+3. Needs the owner: push `v0.1.0-alpha.1` on `79992cd` (A12); a
    purchasing system or export with
    access, and an AP or procurement reviewer for the single-source pilot (A08); a model
    budget and independent
@@ -1440,3 +1442,22 @@ staging, pilot owner).
 - Not done: no workflow linter (actionlint, shellcheck) runs here or in CI. Running its
   third-party image locally was refused by this session's permission check; adding it to CI
   is the owner's call.
+
+### PR #30 merged and the `main` ruleset applied (2026-11-05, production review A12)
+- PR #30 (the socket filter and the workflow checks) was merged as `79992cd`. Its CI run on
+  `main` (41980269125) passed all four jobs, and `release_check.py versions` and `ci` pass on
+  it for `v0.1.0-alpha.1`. It is now the proposed commit for the first tag.
+- The owner imported `infra/github/main-ruleset.json` on GitHub as ruleset 26598146, active
+  on the default branch. Read back through the API, it matches the file. GitHub added three
+  defaults the file does not set: every merge method allowed,
+  `do_not_enforce_on_create: false` and `require_extra_approval_for_unattributed_changes:
+  true`.
+- From now on a change reaches `main` only through a pull request whose four CI jobs passed
+  on a branch up to date with `main`, with its review threads resolved. Force pushes and
+  deleting `main` are refused, and administrators bypass the rules only by merging a pull
+  request. Dependabot's pull requests must be brought up to date with `main` before they
+  merge.
+- `tests/test_workflows.py` now checks that the ruleset requires exactly CI's job names, is
+  strict about the branch being up to date, and targets the default branch. A renamed check,
+  a dropped check or the up-to-date requirement turned off each fails it.
+- Not done: no tag exists; pushing it is the owner's.
