@@ -12,7 +12,7 @@ from __future__ import annotations
 import secrets
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Callable, Iterable, Iterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -39,10 +39,33 @@ from opsbridge.workflow.investigation import WORKFLOW_VERSION, run_investigation
 from opsbridge.workflow.jobs import ClaimedJob
 from opsbridge.workflow.worker import Worker, build_investigation_deps
 
-from .local_server import serve
+from .local_server import free_port, serve
 from .verdict import verdict_of
 
 EVAL_DB = "opsbridge_eval"
+# The modes an offline run can take (review N08): no model, or the deterministic mock behind a
+# cassette that records or replays it. A live mode would be routed to a live adapter, or,
+# unconfigured, to none at all, and its trials scored as that mode with no model in them.
+# Replaying a recorded live model needs its cassette to stand in for its adapter, which this
+# bench does not do yet.
+OFFLINE_MODES = ("rules_only", "mock")
+
+
+class LiveModeRefused(ValueError):
+    """An offline run was asked for a model mode it can only run live."""
+
+
+def offline_modes(modes: Iterable[str]) -> list[str]:
+    modes = list(modes)
+    live = [m for m in modes if m not in OFFLINE_MODES]
+    if live:
+        raise LiveModeRefused(
+            f"model mode(s) {', '.join(live)} cannot run offline: only "
+            f"{', '.join(OFFLINE_MODES)} run from a cassette, with no live fallback"
+        )
+    return modes
+
+
 ESCALATE = "escalate:assign_case"
 INVESTIGATOR = {"furniture": "furn-investigator", "it_hardware": "it-investigator"}
 TENANT = {"furniture": "demo-furniture", "it_hardware": "demo-it"}
@@ -117,8 +140,10 @@ class BenchEnvironment:
         model_adapter: ModelAdapter | None,
         *,
         workflow_version: str = WORKFLOW_VERSION,
+        allow_port: Callable[[int], None] | None = None,
     ) -> None:
         self.base_settings = settings
+        self.allow_port = allow_port  # registers the simulator with the egress guard
         self.corpus = corpus
         self.workdir = workdir
         self.model_adapter = model_adapter
@@ -133,7 +158,10 @@ class BenchEnvironment:
             self.workdir / "simulator.sqlite3", master, fault_controls=False, production=False
         )
         seed_simulator(sim.state.store, self.corpus)
-        base = self._stack.enter_context(serve(sim))
+        port = free_port()
+        if self.allow_port is not None:
+            self.allow_port(port)
+        base = self._stack.enter_context(serve(sim, port=port))
         self.settings = self.base_settings.model_copy(
             update={
                 "simulator_url": base,
@@ -142,6 +170,10 @@ class BenchEnvironment:
                 "tool_transport": "inprocess",
                 "rate_limit_per_minute": 1_000_000,
                 "quotas_enabled": False,  # 240 runs per split would exceed tier quotas
+                # No live model is reachable from here, whatever the base settings say.
+                "live_model_opt_in": False,
+                "anthropic_model": None,
+                "ollama_model": None,
             }
         )
         migrator = make_engine("migrator", self.settings, database=EVAL_DB)
@@ -318,8 +350,14 @@ def environment(
     model_adapter: ModelAdapter | None,
     *,
     workflow_version: str = WORKFLOW_VERSION,
+    allow_port: Callable[[int], None] | None = None,
 ) -> Iterator[BenchEnvironment]:
     with BenchEnvironment(
-        settings, corpus, workdir, model_adapter, workflow_version=workflow_version
+        settings,
+        corpus,
+        workdir,
+        model_adapter,
+        workflow_version=workflow_version,
+        allow_port=allow_port,
     ) as env:
         yield env
