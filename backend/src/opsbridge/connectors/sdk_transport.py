@@ -7,7 +7,13 @@ transport under each client bounds every response as it arrives:
 - its bytes may not pass `max_bytes`, and a declared length past it is refused before
   reading;
 - the whole response must arrive within the request's own read timeout, which the client
-  otherwise applies to each read, so a body trickling in just inside it stops there;
+  otherwise applies to each read (review N07): every socket wait of the synchronous client
+  (connecting, TLS, sending, each read of the headers and the body) is capped at the time
+  left, under `deadline_transport()`, and the deadline is checked when the headers have
+  arrived, as each chunk arrives and at the end, so a reply trickling in, or late with no
+  chunk after it, stops there. The asynchronous MCP client is bounded by a cancel scope
+  around each call instead (mcp_services/client.py). Name resolution is not a socket wait:
+  a resolver that does not answer can delay a connection by its own timeout;
 - replies are asked for unencoded, and a compressed one is refused, since the client above
   would inflate it without a bound.
 
@@ -18,10 +24,16 @@ call whose outcome is unknown.
 
 from __future__ import annotations
 
+import ssl
 import time
-from collections.abc import AsyncIterator, Iterator
+import typing
+from collections.abc import AsyncIterator, Iterable, Iterator
+from typing import Any
 
+import httpcore2
 import httpx2
+
+from .http_transport import capped, until
 
 # A model reply is a few kilobytes of JSON; an MCP tool result is smaller still.
 MAX_MODEL_REPLY_BYTES = 8 * 1024 * 1024
@@ -43,13 +55,84 @@ class UnsupportedEncoding(httpx2.DecodingError):
     """The response is compressed; it was asked for unencoded."""
 
 
-class _Budget:
-    def __init__(self, request: httpx2.Request, max_bytes: int, until: float) -> None:
-        self.request, self.max_bytes, self.until, self.seen = request, max_bytes, until, 0
+class _DeadlineStream(httpcore2.NetworkStream):
+    def __init__(self, inner: httpcore2.NetworkStream) -> None:
+        self._inner = inner
 
-    def take(self, chunk: bytes) -> bytes:
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        return self._inner.read(max_bytes, capped(timeout))
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self._inner.write(buffer, capped(timeout))
+
+    def close(self) -> None:
+        self._inner.close()
+
+    def start_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(self._inner.start_tls(ssl_context, server_hostname, capped(timeout)))
+
+    def get_extra_info(self, info: str) -> typing.Any:
+        return self._inner.get_extra_info(info)
+
+
+class DeadlineBackend(httpcore2.NetworkBackend):
+    """httpcore2's network backend, each wait capped at the time left of the request."""
+
+    def __init__(self, inner: httpcore2.NetworkBackend | None = None) -> None:
+        self._inner = inner or httpcore2.SyncBackend()
+
+    def connect_tcp(
+        self,
+        host: str,
+        port: int,
+        timeout: float | None = None,
+        local_address: str | None = None,
+        socket_options: Iterable[Any] | None = None,
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(
+            self._inner.connect_tcp(host, port, capped(timeout), local_address, socket_options)
+        )
+
+    def connect_unix_socket(
+        self, path: str, timeout: float | None = None, socket_options: Iterable[Any] | None = None
+    ) -> httpcore2.NetworkStream:
+        return _DeadlineStream(
+            self._inner.connect_unix_socket(path, capped(timeout), socket_options)
+        )
+
+    def sleep(self, seconds: float) -> None:
+        self._inner.sleep(seconds)
+
+
+def deadline_transport(**kwargs: Any) -> httpx2.HTTPTransport:
+    """An httpx2 transport whose connections wait no longer than the request in progress
+    allows (the pool's backend is set after httpx2 builds it; a version that moves it fails
+    here)."""
+    transport = httpx2.HTTPTransport(**kwargs)
+    pool = transport._pool
+    if not isinstance(pool, httpcore2.ConnectionPool) or not hasattr(pool, "_network_backend"):
+        raise RuntimeError("httpx2's transport no longer exposes the pool's network backend")
+    pool._network_backend = DeadlineBackend(pool._network_backend)
+    return transport
+
+
+class _Budget:
+    def __init__(self, request: httpx2.Request, max_bytes: int, seconds: float) -> None:
+        self.request, self.max_bytes, self.seen = request, max_bytes, 0
+        self.until = _monotonic() + seconds  # the checks (a test may move this clock)
+        self.socket_until = time.monotonic() + seconds  # the socket waits
+
+    def check(self) -> None:
         if _monotonic() > self.until:
             raise ReadDeadlineExceeded("response not complete in time", request=self.request)
+
+    def take(self, chunk: bytes) -> bytes:
+        self.check()
         self.seen += len(chunk)
         if self.seen > self.max_bytes:
             raise ResponseTooLarge(
@@ -64,8 +147,14 @@ class _Stream(httpx2.SyncByteStream):
         self._inner, self._budget = inner, budget
 
     def __iter__(self) -> Iterator[bytes]:
-        for chunk in self._inner:
+        chunks = iter(self._inner)
+        while True:
+            with until(self._budget.socket_until):  # the reads the SDK makes, later
+                chunk = next(chunks, None)
+            if chunk is None:
+                break
             yield self._budget.take(chunk)
+        self._budget.check()  # the end came in time
 
     def close(self) -> None:
         self._inner.close()
@@ -78,16 +167,17 @@ class _AsyncStream(httpx2.AsyncByteStream):
     async def __aiter__(self) -> AsyncIterator[bytes]:
         async for chunk in self._inner:
             yield self._budget.take(chunk)
+        self._budget.check()  # the end came in time
 
     async def aclose(self) -> None:
         await self._inner.aclose()
 
 
 def _prepare(request: httpx2.Request) -> float:
-    """Asks for an unencoded reply; returns the response's total deadline."""
+    """Asks for an unencoded reply; returns the seconds the whole response may take."""
     request.headers["Accept-Encoding"] = "identity"
     read = (request.extensions.get("timeout") or {}).get("read")
-    return _monotonic() + (float(read) if read else DEFAULT_TOTAL_SECONDS)
+    return float(read) if read else DEFAULT_TOTAL_SECONDS
 
 
 def _refusal(
@@ -112,16 +202,21 @@ class BoundedTransport(httpx2.BaseTransport):
         self._inner, self._max_bytes = inner, max_bytes
 
     def handle_request(self, request: httpx2.Request) -> httpx2.Response:
-        until = _prepare(request)
-        response = self._inner.handle_request(request)
-        if (refused := _refusal(response, request, self._max_bytes)) is not None:
+        budget = _Budget(request, self._max_bytes, _prepare(request))
+        with until(budget.socket_until):
+            response = self._inner.handle_request(request)
+        try:
+            budget.check()  # the headers came in time
+            if (refused := _refusal(response, request, self._max_bytes)) is not None:
+                raise refused
+        except Exception:
             response.close()
-            raise refused
+            raise
         assert isinstance(response.stream, httpx2.SyncByteStream)
         return httpx2.Response(
             response.status_code,
             headers=response.headers,
-            stream=_Stream(response.stream, _Budget(request, self._max_bytes, until)),
+            stream=_Stream(response.stream, budget),
             extensions=response.extensions,
         )
 
@@ -134,16 +229,20 @@ class AsyncBoundedTransport(httpx2.AsyncBaseTransport):
         self._inner, self._max_bytes = inner, max_bytes
 
     async def handle_async_request(self, request: httpx2.Request) -> httpx2.Response:
-        until = _prepare(request)
+        budget = _Budget(request, self._max_bytes, _prepare(request))
         response = await self._inner.handle_async_request(request)
-        if (refused := _refusal(response, request, self._max_bytes)) is not None:
+        try:
+            budget.check()  # the headers came in time
+            if (refused := _refusal(response, request, self._max_bytes)) is not None:
+                raise refused
+        except Exception:
             await response.aclose()
-            raise refused
+            raise
         assert isinstance(response.stream, httpx2.AsyncByteStream)
         return httpx2.Response(
             response.status_code,
             headers=response.headers,
-            stream=_AsyncStream(response.stream, _Budget(request, self._max_bytes, until)),
+            stream=_AsyncStream(response.stream, budget),
             extensions=response.extensions,
         )
 
