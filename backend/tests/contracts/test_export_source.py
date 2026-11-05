@@ -172,3 +172,59 @@ def test_a_manifest_naming_a_member_twice_is_refused(tmp_path: Path) -> None:
     manifest.write_text(text.replace('"complete": false', '"complete": false, "complete": true'))
     with pytest.raises(SourceRecordInvalid, match="duplicate JSON member 'complete'"):
         ExportSource(tmp_path)
+
+
+# --- the source's clock (review N03) ---------------------------------------------------
+
+
+def at(t: datetime) -> Any:
+    return lambda: t
+
+
+def test_an_export_dated_ahead_of_this_clock_beyond_the_allowance_is_refused(
+    tmp_path: Path,
+) -> None:
+    """An export's time is its data's age, so an export dated a year ahead was current for a
+    year and a day. A source's clock may run a little ahead; not further."""
+    write_export(tmp_path, FILES)
+    allowance = timedelta(minutes=5)
+    ExportSource(tmp_path, now=at(EXTRACTED + timedelta(hours=1)), max_skew=allowance)
+    ExportSource(tmp_path, now=at(EXTRACTED - allowance), max_skew=allowance)  # at the edge
+    with pytest.raises(SourceRecordInvalid, match="ahead of this host's clock"):
+        ExportSource(
+            tmp_path, now=at(EXTRACTED - allowance - timedelta(seconds=1)), max_skew=allowance
+        )
+    with pytest.raises(SourceRecordInvalid, match="ahead of this host's clock"):
+        ExportSource(tmp_path, now=at(EXTRACTED - timedelta(days=365)))
+
+
+def test_reading_an_old_export_again_does_not_make_it_newer(tmp_path: Path) -> None:
+    write_export(tmp_path, FILES)
+    first = ExportSource(tmp_path, now=at(EXTRACTED + timedelta(hours=1)))
+    again = ExportSource(tmp_path, now=at(EXTRACTED + timedelta(days=30)))
+    assert first.as_of == again.as_of == EXTRACTED  # what the source asserts
+    assert again.observed_at == EXTRACTED + timedelta(days=30)  # when this host read it
+    manifest = (tmp_path / "manifest.json").read_bytes()
+    assert first.snapshot == again.snapshot == hashlib.sha256(manifest).hexdigest()
+    write_export(tmp_path, FILES, complete=False)
+    assert ExportSource(tmp_path, now=at(EXTRACTED)).snapshot != first.snapshot
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        "2026-10-27T09:00:00",  # no zone
+        "2026-10-27",  # a date
+        "20261027T090000+0000",  # ISO 8601 basic, not the contract's form
+        "2026-W44-1T09:00:00+00:00",  # a week date
+        "2026-10-27T09:00:00+24:00",
+        1761555600,  # a number of seconds
+        None,
+    ],
+)
+def test_an_extraction_time_not_in_the_contracts_form_is_refused(
+    tmp_path: Path, value: object
+) -> None:
+    write_export(tmp_path, FILES, extracted_at=value)
+    with pytest.raises(SourceRecordInvalid, match="extracted_at"):
+        ExportSource(tmp_path, now=at(EXTRACTED))
