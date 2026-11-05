@@ -61,7 +61,7 @@ class PurchasingClient:
             headers={"Authorization": f"Bearer {org_key(master_secret, org)}"},
             timeout=httpx.Timeout(timeout),
             follow_redirects=False,
-            transport=transport,
+            transport=transport or http_transport.deadline_transport(),
         )
 
     def close(self) -> None:
@@ -128,7 +128,7 @@ class PurchasingClient:
                 max_bytes=MAX_RESPONSE_BYTES,
                 total_seconds=total,
             )
-        except http_transport.ReadDeadlineExceeded as exc:
+        except httpx.TimeoutException as exc:  # a socket wait or the whole read ran out
             if self.deadline is not None and time.monotonic() >= self.deadline:
                 raise CollectionBudgetExhausted("the collection time budget ran out") from exc
             raise SourceUnavailable(f"{type(exc).__name__} contacting purchasing system") from exc
