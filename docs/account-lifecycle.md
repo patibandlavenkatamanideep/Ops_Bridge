@@ -27,8 +27,10 @@ A16). Nothing here has been exercised with a real identity provider or a real de
 3. **Bounded delay.** With both steps, access ends at the next request. With only the
    identity-provider step and no back-channel logout, it ends within the idle limit, or at
    worst the absolute limit.
-4. **Fallback when the provider cannot sign the person out:** revoke the membership (step 2).
-   There is no OpsBridge-side "end all sessions of this user" command yet. Ended sessions are
+4. **Fallback when the provider's logout did not reach OpsBridge** (Keycloak does not retry
+   one): `opsbridge end-sessions --subject <the person's id at the provider>` ends their live
+   sessions now, as a back-channel logout naming only them would (docs/operations.md). Revoking
+   the membership (step 2) ends their access in that tenant either way. Ended sessions are
    pruned 24 hours later with the ID tokens they hold (`ops.prune_sessions`).
 
 ## Work in progress
