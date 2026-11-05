@@ -32,7 +32,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A03 | "Instability" was correctness instability: two different wrong actions counted as stable | Fixed, verified locally (scoring 2; v1 kept under scoring 1). Run pages name their scheme, workflow and purpose. An engineering re-run of the v1 cases is recorded under scoring 2 and `investigation/1.2.0` (regression evidence, not held-out), and browser tests cover both schemes on committed results | 4 | See "Package 4, metrics" below | — |
 | A04 | Response size checked after buffering the whole body | Fixed, verified locally (purchasing source, task trackers, Ollama; a compressed body counts only when complete; replies the Anthropic and MCP SDKs read are bounded under their clients) | 3 | See "Package 3, transport bounds" below | — |
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
-| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets and are confined with Landlock (no other files, no TCP), required when deployed; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role (staging work); the staging platform's kernel must offer Landlock, or the sandbox is waived there by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort` | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
+| A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets and are confined with Landlock (no other files, no TCP) and a seccomp filter (no new sockets: no UDP, DNS or Unix sockets), required when deployed; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role (staging work); the staging platform's kernel must offer Landlock, or the sandbox is waived there by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort` | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
 | A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
@@ -469,12 +469,27 @@ are unchanged.
   skipped), the integration and browser jobs parsed their PDFs confined, and
   `parser-sandbox-check` held in the image under Docker. `export-check` runs offline in the
   image with the sandbox required (docs/pilot-plan.md).
+- The socket filter (5 November). Landlock left UDP (so DNS) and Unix sockets with a path
+  open to a confined parser: the probe sent a UDP datagram and connected to a Unix socket.
+  Neither the PDF worker nor tesseract needs a socket, so a seccomp filter installed after
+  Landlock refuses `socket()` and `io_uring_setup()` (io_uring can open sockets without
+  `socket()`) with EACCES. It kills a call made through another ABI (32-bit or x32), which
+  would get around the filter's numbers. `required` now asks for both layers. The probe
+  runs unconfined as a control, then with each layer alone and with both:
+  - the control reaches the file, TCP, UDP and the Unix socket;
+  - Landlock alone keeps the file and TCP;
+  - the filter alone keeps every socket and io_uring;
+  - both keep everything.
+
+  So neither layer can be lost behind the other. In the hardened app container, removing
+  the filter, leaving io_uring out of it, or dropping Landlock's TCP rules each fails a
+  test.
 
 **Not done** (staging, A11): keys from a secret store, mounted per role; the compose stack
-separates them with volumes on one host. The parser sandbox does not cover UDP (so DNS) or
-Unix sockets with a path, nor system calls (no custom seccomp profile). Whether the staging
-platform's kernel offers Landlock is to be checked there (docs/deployment.md); where it does
-not, the sandbox is waived only by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort`.
+separates them with volumes on one host. The parser sandbox's socket filter refuses new
+sockets and io_uring only, not other system calls. Whether the staging platform's kernel
+offers Landlock is to be checked there (docs/deployment.md); where it does not, the sandbox
+is waived only by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort`.
 
 ## Package 8, evidence packaging (A17)
 
