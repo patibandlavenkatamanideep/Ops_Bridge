@@ -163,8 +163,11 @@ the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
 never loads the private key; list old and new keys together while rotating, then drop the old
 one after the longest delegation lifetime, 5 minutes); the registry of task-connection
 credentials (`OPSBRIDGE_CONNECTION_CREDENTIALS`: reference → tenant, connector, repositories)
-with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`; metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
-spend ceiling).
+with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`. Two references may not read the same
+secret (`a-b` and `a_b` both read `..._A_B`); settings refuse that. In staging and production
+every GitHub connection names one of these. `OPSBRIDGE_GITHUB_TOKEN`, the deployment's own
+token, serves connections without a reference in development only (review N06). Also: the
+metrics token, and the Anthropic API key (only with the owner's opt-in and spend ceiling).
 
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
 every PR head and every commit on `main` with the same jobs, including the runtime image
@@ -172,8 +175,9 @@ built from the locks with base images pinned by digest, its SBOM (SPDX, a workfl
 and a vulnerability scan that fails on fixable critical or high findings. Nothing is published:
 pushing an image to a registry, signing it and recording provenance belong to a release
 workflow that the owner authorizes, and the image promoted to staging must be the one whose
-digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
-require the four CI jobs and one review before merging, disallow force-pushes. Dependabot
+digest CI qualified. The `main` ruleset (above) requires the four CI jobs on an up-to-date
+branch and refuses force pushes; with one maintainer it requires no approving review, so it
+is not independent review. Dependabot
 (`.github/dependabot.yml`) proposes weekly updates as pull requests; each must pass CI.
 
 **Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
@@ -209,6 +213,26 @@ relying on it: Fargate's kernel is the platform's choice, not ours. Where it doe
 run the API and worker on instances whose kernel offers it, or set
 `OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses with whatever layers hold (none, where
 neither does), and accepts that a parser flaw may reach the task's files and network.
+
+**Input and outbound limits** (review of 5 November, N01–N08). The application enforces
+these itself, so they hold if the edge's configuration drifts:
+- **Request bodies.** The bytes received are counted whatever the framing: `Content-Length`,
+  chunked, or neither as in HTTP/2. A request is refused (413) as soon as it passes
+  `OPSBRIDGE_MAX_REQUEST_BYTES` (6 MiB), and one whose body does not arrive within
+  `OPSBRIDGE_MAX_REQUEST_BODY_SECONDS` (120) gets 408. Chunked bodies within the limit are
+  accepted. Configure the edge to the same limits where it can, for example nginx's
+  `client_max_body_size` and `client_body_timeout`. Check what the chosen load balancer offers
+  against its current documentation when the edge is built.
+- **JSON from outside.** Uploads, source records and listings, export manifests, model answers
+  and tracker replies are refused when an object names a member twice.
+- **Source clocks.** An export dated ahead of the host's clock by more than
+  `OPSBRIDGE_SOURCE_CLOCK_SKEW_SECONDS` (300) is not read. Within that, its data is taken as
+  read now, never later, so a source clock cannot lengthen the window for acting on a result.
+- **Outbound HTTP.** Connectors and the Anthropic SDK connect directly: `HTTP(S)_PROXY` and
+  `ALL_PROXY` are not used. One deadline caps every connect, TLS, send and read of a request.
+  Name resolution is not capped: a resolver that does not answer can delay a connection by its
+  own timeout. An MCP call ends within three of its timeouts.
+- **Evidence bundles** are read in one bounded pass (`opsbridge/evaluation/bundle.py`).
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup
