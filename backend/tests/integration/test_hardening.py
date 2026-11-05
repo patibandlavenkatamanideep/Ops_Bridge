@@ -186,7 +186,10 @@ def test_upload_size_filename_tenant_and_role_defences(stack, app_db: Database) 
     assert r.status_code in (403, 404)
 
 
-def test_chunked_body_without_length_is_refused_before_buffering(stack) -> None:  # type: ignore[no-untyped-def]
+def test_a_chunked_body_is_accepted_within_the_limit_and_refused_past_it(stack) -> None:  # type: ignore[no-untyped-def]
+    """Chunked bodies were refused (411) because their size could not be checked before
+    reading. The bytes received are now counted whatever the framing (review N02), so one
+    within the limit is accepted, and an upload past it is refused with nothing stored."""
     st = stack
     case_id = investigated(st, "INV-9001")
     actor = st["actors"]["furn-investigator"]
@@ -197,7 +200,22 @@ def test_chunked_body_without_length_is_refused_before_buffering(stack) -> None:
         content=iter([b'{"body": "', b"x" * 10, b'"}']),
         headers={"X-CSRF-Token": actor.csrf, "content-type": "application/json"},
     )
-    assert r.status_code == 411 and r.json()["error"]["code"] == "length_required"
+    assert r.status_code == 201, r.text
+    before = get(st, "furn-investigator", f"{T}/cases/{case_id}/documents").json()["items"]
+    head = (
+        b'--n02\r\nContent-Disposition: form-data; name="kind"\r\n\r\nattachment\r\n'
+        b'--n02\r\nContent-Disposition: form-data; name="file"; filename="big.txt"\r\n'
+        b"Content-Type: text/plain\r\n\r\n"
+    )
+    filler = b"x" * st["settings"].max_request_bytes  # with the head, past the limit
+    r = st["client"].post(
+        f"{T}/cases/{case_id}/documents",
+        content=iter([head, filler, b"\r\n--n02--\r\n"]),
+        headers={"X-CSRF-Token": actor.csrf, "content-type": "multipart/form-data; boundary=n02"},
+    )
+    assert r.status_code == 413 and r.json()["error"]["code"] == "payload_too_large", r.text
+    after = get(st, "furn-investigator", f"{T}/cases/{case_id}/documents").json()["items"]
+    assert after == before
 
 
 def test_a_request_body_nested_too_deeply_is_refused_not_an_error(stack) -> None:  # type: ignore[no-untyped-def]
