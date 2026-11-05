@@ -113,3 +113,23 @@ def test_the_release_accepts_only_its_own_attestation_of_the_tag() -> None:
     assert '--signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml"' in verify
     assert '--source-ref "${GITHUB_REF}"' in verify
     assert "--deny-self-hosted-runners" in verify
+
+
+def test_release_tags_can_be_created_by_administrators_only_and_never_moved() -> None:
+    """Prepared for the owner to apply (docs/deployment.md): a release names its image by
+    its tag, so a tag moved or deleted after a release would point at something else."""
+    on = load(REPO_ROOT / ".github/workflows/release.yml").get(True) or {}
+    patterns = {f"refs/tags/{p}" for p in on["push"]["tags"]}
+    immutable, creation = (
+        json.loads((REPO_ROOT / f"infra/github/release-tags-{n}-ruleset.json").read_text("utf-8"))
+        for n in ("immutable", "creation")
+    )
+    for ruleset in (immutable, creation):
+        assert ruleset["target"] == "tag" and ruleset["enforcement"] == "active"
+        assert set(ruleset["conditions"]["ref_name"]["include"]) == patterns
+    assert {r["type"] for r in immutable["rules"]} == {"update", "deletion"}
+    assert immutable["bypass_actors"] == []  # no one, administrators included
+    assert [r["type"] for r in creation["rules"]] == ["creation"]
+    assert creation["bypass_actors"] == [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+    ]  # repository administrators
