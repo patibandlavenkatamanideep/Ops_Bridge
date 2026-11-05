@@ -88,6 +88,9 @@ jobs:
           docker run --rm --read-only --tmpfs /tmp --cap-drop ALL \
             --security-opt no-new-privileges:true "${CANDIDATE}" \
             python -m opsbridge.cli parser-sandbox-check
+          for dir in /app/var /app/var/artifacts /app/var/keys /app/var/delegation-public; do
+            docker run --rm -v "$dir" "${CANDIDATE}" touch "$dir/probe"
+          done
           docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify --summary-only
           status=0; docker run --rm "${CANDIDATE}" python -m opsbridge.cli eval-verify || status=$?
           test "$status" = 3
