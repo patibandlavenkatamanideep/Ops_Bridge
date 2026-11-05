@@ -160,3 +160,15 @@ def test_an_unreadable_manifest_is_refused(tmp_path: Path) -> None:
     (tmp_path / "manifest.json").write_text("{not json")
     with pytest.raises(SourceRecordInvalid):
         ExportSource(tmp_path)
+
+
+def test_a_manifest_naming_a_member_twice_is_refused(tmp_path: Path) -> None:
+    """`"complete": false` and then `true` declared the export complete, and absence a
+    fact, from the last of two answers (review N01)."""
+    write_export(tmp_path, FILES, complete=False)
+    manifest = tmp_path / "manifest.json"
+    text = manifest.read_text()
+    assert text.count('"complete": false') == 1
+    manifest.write_text(text.replace('"complete": false', '"complete": false, "complete": true'))
+    with pytest.raises(SourceRecordInvalid, match="duplicate JSON member 'complete'"):
+        ExportSource(tmp_path)
