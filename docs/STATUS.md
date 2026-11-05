@@ -1522,3 +1522,12 @@ staging, pilot owner).
   out in full.
 - The OpenAPI document regenerated from the code is identical to the committed one, so no API
   contract changed in this review's work.
+
+### Release identities and tags (2026-11-05, review Phase E, in the repository only)
+- The release verified its image's attestation with `--repo` alone, which accepts one any
+  workflow of the repository signed, from any ref or runner. It now also requires
+  `release.yml` as signer, the tag's ref and a GitHub-hosted runner; a test holds it. The
+  release has not run.
+- Two rulesets for release tags (`v*.*.*`) are prepared for the owner, not applied. One
+  makes them immutable for everyone; the other limits who creates them to administrators. Their
+  test found the first draft protecting `v*` while the release runs on `v*.*.*`.
