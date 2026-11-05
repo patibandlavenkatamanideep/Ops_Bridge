@@ -413,13 +413,27 @@ def _withdraw_absent(
         _withdraw(deps, tenant_id, record_type, source_key, withdrawn)
 
 
+def source_times(*, asserted: datetime | None, observed: datetime) -> dict[str, str]:
+    """When the purchasing data was read (review N03). `read_at`, its age, is the earlier of
+    the time the source asserts (an export's extracted_at) and the time this host read it:
+    an export is as old as the moment it was taken, whenever it is read, and a source clock
+    running ahead never makes its data newer than now."""
+    if asserted is None:
+        return {"read_at": observed.isoformat(), "observed_at": observed.isoformat()}
+    return {
+        "read_at": min(asserted, observed).isoformat(),
+        "observed_at": observed.isoformat(),
+        "asserted_at": asserted.isoformat(),
+    }
+
+
 def _collect(
     deps: InvestigationDeps, tenant_id: uuid.UUID, org: str, pack: PackSpec, case: dict[str, Any]
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
-    # Before the first request: the oldest data point read. An export is as old as the
-    # moment it was taken, whenever it is read.
-    read_at = getattr(client, "as_of", None) or datetime.now(UTC)
+    # Before the first request: the oldest data point read.
+    times = source_times(asserted=getattr(client, "as_of", None), observed=datetime.now(UTC))
+    snapshot = getattr(client, "snapshot", None)  # an export's manifest digest
     budget = float(getattr(deps.settings, "source_collection_seconds", 120.0))
     if isinstance(client, PurchasingClient):
         client.deadline = time.monotonic() + budget
@@ -519,7 +533,8 @@ def _collect(
         "source": {
             "contract": CONTRACT,
             "connector": client.connector_version,
-            "read_at": read_at.isoformat(),
+            **times,
+            **({"snapshot": snapshot} if snapshot else {}),
         },
     }
 
@@ -594,11 +609,20 @@ def _reconcile(
             collected.get("po_number"),
             case.get("supplier_id"),
         )
-        read_at = (collected.get("source") or {}).get("read_at")
-        if read_at is not None:
+        source = collected.get("source") or {}
+        if source.get("read_at") is not None:
             hours = float(getattr(deps.settings, "source_max_age_hours", 24))
-            until = datetime.fromisoformat(read_at) + timedelta(hours=hours)
-            state = {**state, "source_read_at": read_at, "source_valid_until": until.isoformat()}
+            until = datetime.fromisoformat(source["read_at"]) + timedelta(hours=hours)
+            state = {
+                **state,
+                "source_read_at": source["read_at"],
+                "source_valid_until": until.isoformat(),  # the last time it may be acted on
+                **{
+                    f"source_{k}": source[k]
+                    for k in ("observed_at", "asserted_at", "snapshot")
+                    if k in source  # absent from steps completed before review N03
+                },
+            }
         match = _match(s, case, policy_out, collected, workflow_version)
         return {**match, "evidence_state": state}
 
