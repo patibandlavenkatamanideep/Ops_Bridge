@@ -103,3 +103,13 @@ def test_the_main_ruleset_requires_every_ci_job_by_the_name_it_reports() -> None
     assert sorted(required) == sorted(job.get("name", key) for key, job in jobs.items())
     assert checks["strict_required_status_checks_policy"] is True
     assert ruleset["conditions"]["ref_name"]["include"] == ["~DEFAULT_BRANCH"]
+
+
+def test_the_release_accepts_only_its_own_attestation_of_the_tag() -> None:
+    """`--repo` alone accepts an attestation any workflow of the repository signed, from any
+    ref or runner (Phase E: narrow the identities verification allows)."""
+    release = load(REPO_ROOT / ".github/workflows/release.yml")["jobs"]["release"]
+    verify = next(s["run"] for s in release["steps"] if "attestation verify" in s.get("run", ""))
+    assert '--signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml"' in verify
+    assert '--source-ref "${GITHUB_REF}"' in verify
+    assert "--deny-self-hosted-runners" in verify
