@@ -48,12 +48,12 @@ only after a different person approves the exact version they reviewed.
 
 | Level | State |
 |---|---|
-| Local application | All build phases and the production-review fixes verified locally (unit 612, integration 270, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
-| Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A14, A15, A16; prepared for the owner A12; the rest need access or decisions. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
+| Local application | All build phases and the production-review fixes verified locally (unit 618, integration 270, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
+| Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A12 (the `main` ruleset is applied; the release is prepared), A14, A15, A16; the rest need access or decisions. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
-| Hosted CI | **Passing** on `main` at `185c4c7` (run 41942800839): lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, evidence bundle round trip, SBOM and vulnerability scan |
-| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `185c4c7`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
+| Hosted CI | **Passing** on `main` at `79992cd` (run 41980269125), and required by `main`'s ruleset before a pull request merges: lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, evidence bundle round trip, SBOM and vulnerability scan |
+| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `79992cd`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Operator pilot measured | **No** — protocol, measures (`pilot-report`) and the export check are ready; no export, reviewer or authorization yet |
 
