@@ -31,6 +31,7 @@ from .auth import DELEGATION_HEADER, DelegationSigner
 
 # Prefix of the casework tool's refusal to admit a create (casework.py).
 NOT_ADMITTED = "not admitted"
+CALL_TIMEOUTS = 3  # a whole call may take this many of its per-read timeouts
 
 
 class McpDenied(Exception):
@@ -106,17 +107,25 @@ class McpToolClient:
             ),
         )
 
+    @property
+    def call_seconds(self) -> float:
+        """The whole call: opening the session, the call itself and closing it (review N07).
+        The SDK's timeouts apply to each read, and a server that never answered held a call
+        for ten seconds against a 0.3-second timeout; a cancel scope ends it here."""
+        return CALL_TIMEOUTS * self.timeout_seconds
+
     def call(self, tool: str, args: dict[str, Any], delegation: str) -> dict[str, Any]:
         async def go() -> dict[str, Any]:
             headers = {
                 "Authorization": f"Bearer {self.service_token()}",
                 DELEGATION_HEADER: delegation,
             }
-            async with Client(
-                streamable_http_client(self.url, http_client=self._http(headers)),
-                read_timeout_seconds=self.timeout_seconds,
-            ) as c:
-                result = await c.call_tool(tool, args)
+            with anyio.fail_after(self.call_seconds):
+                async with Client(
+                    streamable_http_client(self.url, http_client=self._http(headers)),
+                    read_timeout_seconds=self.timeout_seconds,
+                ) as c:
+                    result = await c.call_tool(tool, args)
             text = "".join(getattr(b, "text", "") for b in result.content)
             if result.is_error:
                 raise McpDenied(text[:500] or "tool error")
@@ -138,11 +147,12 @@ class McpToolClient:
             headers = {"Authorization": f"Bearer {self.service_token()}"}
             if delegation:
                 headers[DELEGATION_HEADER] = delegation
-            async with Client(
-                streamable_http_client(self.url, http_client=self._http(headers)),
-                read_timeout_seconds=self.timeout_seconds,
-            ) as c:
-                return [t.name for t in (await c.list_tools()).tools]
+            with anyio.fail_after(self.call_seconds):
+                async with Client(
+                    streamable_http_client(self.url, http_client=self._http(headers)),
+                    read_timeout_seconds=self.timeout_seconds,
+                ) as c:
+                    return [t.name for t in (await c.list_tools()).tools]
 
         return anyio.run(go)
 
