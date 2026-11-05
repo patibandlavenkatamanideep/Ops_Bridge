@@ -53,17 +53,30 @@ keys, `var/` and virtual environments never enter the image. Compose profile `ap
   run from the repository at the recorded commit (`make eval-verify`, `make eval-replay-check`);
   the CI image job checks both behaviours (production review A17).
 
-## Branch rules and releases (prepared; the owner applies them)
+## Branch rules and releases (rules applied; the owner tags releases)
 
 **Branch rules for `main`** (`infra/github/main-ruleset.json`, production review A12): changes
 arrive by pull request, the four CI jobs must pass on the latest commit, review threads must
 be resolved, and force pushes and deletion are refused. With one maintainer the required
 approving reviews are 0; raise `required_approving_review_count` to 1 when a second maintainer
 joins. Break-glass: repository administrators may bypass the rules only by merging a pull
-request (`bypass_mode: pull_request`), and should say why in that pull request. Not applied: it
-changes repository administration. To apply (repository owner):
+request (`bypass_mode: pull_request`), and should say why in that pull request. A branch
+must be up to date with `main` before it merges, Dependabot's included ("Update branch").
 
-    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/main-ruleset.json
+Applied by the owner on 5 November 2026 as ruleset 26598146 (Settings → Rules → Rulesets).
+To read it back:
+
+    gh api repos/patibandlavenkatamanideep/Ops_Bridge/rulesets/26598146
+
+To change it, edit the file and replace the ruleset with it (repository owner). A second
+`POST …/rulesets` would add a second ruleset instead:
+
+    gh api -X PUT repos/patibandlavenkatamanideep/Ops_Bridge/rulesets/26598146 --input infra/github/main-ruleset.json
+
+`tests/test_workflows.py` checks that the file requires exactly CI's job names. To rename a
+CI job, change the file in the same pull request and replace the ruleset with it just before
+merging: until then the ruleset waits for the old name, which that pull request no longer
+reports.
 
 **Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI run (started
 by the push to `main`) passed, with the version every package declares:
