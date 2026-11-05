@@ -1021,7 +1021,7 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
     return 0
 
 
-def main(argv: list[str] | None = None) -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="opsbridge")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -1190,7 +1190,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--database", help="database name (default: from settings)")
     p.set_defaults(func=_end_sessions)
 
-    args = parser.parse_args(argv)
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
     result: int = args.func(args)
     return result
 
