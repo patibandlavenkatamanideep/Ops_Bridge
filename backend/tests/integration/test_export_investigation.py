@@ -5,7 +5,9 @@ The export is hand-written here in the IT pack's format (not rendered by the sim
 PO-2001 for 10 laptops, INV-7001 billing 10, a receipt of 8. The same rules find the same
 shortfall. The export's age is the data's age: an investigation records the export's
 `extracted_at` as its read time, so an export older than the age limit cannot be acted on,
-however recently it was read.
+however recently it was read. An export dated ahead of this host's clock by more than the
+allowance is not read at all, and one a little ahead is taken as read now (review N03): it
+used to give a result that could be acted on until its claimed time plus the age limit.
 """
 
 from __future__ import annotations
@@ -134,3 +136,28 @@ def test_an_export_older_than_the_age_limit_cannot_be_acted_on(stack, tmp_path: 
     assert "purchasing data was read" in (result["stale_reason"] or "")
     r = call(st["client"], st["actors"][WHO], "POST", f"{T}/cases/{case_id}/proposals", json={})
     assert r.status_code == 409 and r.json()["error"]["code"] == "stale_investigation", r.text
+
+
+def test_an_export_dated_ahead_of_the_clock_is_not_read(stack, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    write_export(tmp_path, datetime.now(UTC) + timedelta(days=365))
+    deps = st["deps"]
+    original = deps.purchasing_for
+    deps.purchasing_for = lambda org: ExportSource(tmp_path / org)
+    try:
+        case_id = open_case(st, WHO, ORG, "INV-7001")
+        run = investigate(st, WHO, ORG, case_id)
+    finally:
+        deps.purchasing_for = original
+    status = get(st, WHO, f"{T}/cases/{case_id}/runs/{run['run_id']}").json()
+    assert status["status"] == "failed", status
+    assert "ahead of this host's clock" in status["steps"][0]["error"]
+    assert get(st, WHO, f"{T}/cases/{case_id}/investigation").status_code == 404
+
+
+def test_an_export_a_little_ahead_is_taken_as_read_now(stack, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    before = datetime.now(UTC)
+    _, result = _investigate_from(stack, write_export(tmp_path, before + timedelta(minutes=2)))
+    read = datetime.fromisoformat(result["source_read_at"])
+    assert before <= read <= datetime.now(UTC)  # not the export's claim, two minutes ahead
+    assert result["stale_reason"] is None
