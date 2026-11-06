@@ -229,6 +229,29 @@ run the API and worker on instances whose kernel offers it, or set
 `OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses with whatever layers hold (none, where
 neither does), and accepts that a parser flaw may reach the task's files and network.
 
+**Choosing the runtime for the sandbox** (checked against AWS's documentation on 6 November
+2026; nothing has been run on AWS):
+- **Fargate.** AWS does not publish the kernel or the security modules of Fargate's platform
+  versions. Its documentation says only that a platform version combines a kernel and a
+  container runtime, and revisions change it. Nothing published says whether Landlock is on,
+  or whether the default seccomp profile allows Landlock's three system calls. So the plan's
+  first staging step is one Fargate task running `opsbridge parser-sandbox-check`, before any
+  service. If the check holds, keep Fargate and run the check in every new revision's
+  qualification, since a revision can change the kernel.
+- **If it does not hold: ECS on EC2 with Amazon Linux 2023 on kernel 6.12 or 6.18.** AL2023's
+  release notes of 4 August 2025 say "The Landlock feature `CONFIG_SECURITY_LANDLOCK` is now
+  enabled for kernel 6.1 & 6.12". Its 30 September 2026 release offers default AMIs with
+  kernels 6.1, 6.12 and 6.18. Kernel 6.1 is too old for the TCP rules (Landlock ABI 4 needs
+  6.7), so choose 6.12 or 6.18. Docker's default seccomp profile allows the system calls (CI's
+  image job runs the check under Docker). "Enabled" in a release note is the kernel build, not
+  proof that Landlock is active at boot, so the same `parser-sandbox-check` decides there too.
+- **Not acceptable as a silent fallback:** `best_effort` in staging. It is an explicit
+  decision for the owner to record, with the risk it accepts.
+
+Sources: [Fargate platform versions](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform-fargate.html),
+[AL2023 2023.8.20250804](https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-2023.8.20250804.html),
+[AL2023 2023.12.20260930](https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-2023.12.20260930.html).
+
 **Input and outbound limits** (review of 5 November, N01–N08). The application enforces
 these itself, so they hold if the edge's configuration drifts:
 - **Request bodies.** The bytes received are counted whatever the framing: `Content-Length`,
