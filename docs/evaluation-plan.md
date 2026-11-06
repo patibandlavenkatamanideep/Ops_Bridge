@@ -111,8 +111,8 @@ provenance (`model:replay`, a tool response served from the recording) are not b
 Fields a recording does not have are listed as not compared: the v1 recordings predate the
 finding and citation digests. Run order is a declared factor of v1: rules-only trials run
 before mock trials, and its recordings replay only in that order; out of order, a replay
-fails closed (`tests/integration/test_replay_mode_order.py`). The cause is a product defect
-listed in docs/STATUS.md (known limitations), to be fixed with the next frozen benchmark.
+fails closed (`tests/integration/test_replay_mode_order.py`). The cause, a product defect,
+is fixed for new runs as `investigation/1.3.0`; v1's recordings keep 1.1.0 and its order.
 
 ## Acceptance
 
