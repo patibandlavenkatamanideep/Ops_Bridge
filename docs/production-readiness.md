@@ -34,7 +34,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets and are confined with Landlock (no other files, no TCP) and a seccomp filter (no new sockets: no UDP, DNS or Unix sockets), required when deployed; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role (staging work); the staging platform's kernel must offer Landlock, or the sandbox is waived there by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort` | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/2`, from /1 on 5 November, review N05; `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
@@ -839,7 +839,9 @@ process's timings either. Defining a measure after the data arrives would invite
 the one that looks best, so the definitions and the report come first.
 
 **Added.**
-- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"):
+- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"),
+  replaced before any pilot data by `opsbridge-pilot/2` (review N05, "Review of 5 November
+  2026" above):
   - sample fixed in advance, with arms alternating in blocked order;
   - the reviewer's decision recorded before intake, which is the only blind case;
   - the reference file's columns;
