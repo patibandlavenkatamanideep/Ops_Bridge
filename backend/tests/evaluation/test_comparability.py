@@ -55,7 +55,7 @@ def test_a_plan_runs_the_investigation_workflow_it_was_frozen_with() -> None:
     assert "workflow_version" not in frozen
     assert manifest.workflow_version_of(frozen) == "investigation/1.1.0"
     fresh = manifest.freeze(REPO_ROOT, "opsbridge-bench-test", modes=["rules_only"], repeats=1)
-    assert manifest.workflow_version_of(fresh) == WORKFLOW_VERSION == "investigation/1.2.0"
+    assert manifest.workflow_version_of(fresh) == WORKFLOW_VERSION == "investigation/1.3.0"
     assert manifest.verify(fresh, REPO_ROOT) == []
     unknown = {k: v for k, v in fresh.items() if k != "manifest_sha256"}
     unknown["workflow_version"] = "investigation/9.0.0"
