@@ -56,10 +56,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   legal hold. Backups and object versions outlive retention until they expire.
 - The benchmark's labels were written by the same agent that wrote the rules, and its responses
   are mocked: it is engineering evidence, not an accuracy claim.
-- Product defect, open: a document's read problems are listed only on the first ingestion of
-  it in a run, so the v1 mock trials depend on the rules-only trials running first. It is
-  declared, and an out-of-order replay fails closed (`test_replay_mode_order.py`); the fix
-  waits for the next frozen benchmark (status-history, 2026-10-28).
+- The v1 recordings depend on their run order: under the workflow versions they were made
+  with (1.1.0, 1.2.0), a document's read problems were listed only on its first read in a run.
+  New runs use `investigation/1.3.0`, which lists the stored reason on every read; the
+  recordings keep their versions and order, and an out-of-order replay fails closed.
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
 - Processes need synchronized clocks. Comparisons with recorded times use the database's
   clock, and so does the pilot report's cut-off.
@@ -76,6 +76,15 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-06: the run-order defect fixed for new runs (`investigation/1.3.0`)
+- Reproduced first: two investigations of an unreadable invoice with unchanged bytes listed
+  different uncertainty; the second had lost the invoice's reason. Under 1.3.0 a record's
+  problems are the reason stored with the version read, the same for new and unchanged
+  bytes; a rejected parse's reason is now listed too.
+- 1.1.0 and 1.2.0 stay so the v1 and v1-rerun recordings replay with the versions they pin;
+  the replay check still reproduces every recorded run, and the canary is 64/64.
+- Unit 735 passed (5 skipped), integration 282 passed.
 
 ### 2026-11-06: the status split; the sandbox runtime
 - The journal moved to docs/status-history.md unchanged, and this page was rewritten to the
