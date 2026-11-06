@@ -50,6 +50,7 @@ docs/evaluation-plan.md):
 | `eval-bench --split S --replay [--from-run DIR]` | Strict offline replay of a recorded run; fails closed (exit 3) on a missing or diverged response or blocked egress. |
 | `eval-verify` | Ledger chain, signatures (committed public key) and every bound artifact; missing files fail. `--bundle FILE` verifies every record's artifacts from an evidence bundle instead (an installation without the repository). |
 | `eval-bundle --out FILE` | Packs the ledger, its signatures and public key and every file it binds into a reproducible archive with a SHA-256 manifest; the release builds, verifies and attests one. |
+| `eval-labels --labels FILE [--adjudications FILE] --out FILE` | Evaluation v2 (prepared, no labels yet): Cohen's kappa per field and labeller pair, every disagreement with its labels and adjudication, and the adjudicated reference; exits 1 while a disagreement is unadjudicated, 2 when a file is refused. |
 | `eval-rules --corpus FILE` | Fast DB-free rules-only check (development only). |
 | `eval-canary [--update-baseline]` | Regression check against the pinned canary baseline; updating it is a reviewed change. |
 
@@ -63,13 +64,18 @@ confined here: a probe confined as the PDF worker is tries to read a planted fil
 to a listening port; exit 0 when both are refused, 1 with the reason otherwise;
 docs/deployment.md).
 
-Pilot command: `pilot-report --tenant-id T --since S --until U [--as-of C] --reference
-FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
-`opsbridge-pilot/1`, docs/pilot-plan.md) from one tenant's cases opened in the window and the
-reviewer's reference CSV. It reads in a read-only transaction under that tenant's row-level
-security, and refuses a reference file with any problem, listing each one by line.
-`pilot-check-reference --reference FILE` reads the reference file the same way without a
-database, so the operator can check it while the pilot runs (exit 2 with problems by line).
+Pilot command: `pilot-report --tenant-id T --since S --until U --as-of C --cohort FILE
+--reference FILE --out FILE [--database D]`. It computes the four pilot measures (protocol
+`opsbridge-pilot/2`, docs/pilot-plan.md) over the frozen cohort, from what existed at the
+cut-off `C` (a time on the database's clock). It reads one tenant's cases opened in the
+window, in a read-only, repeatable-read transaction under that tenant's row-level security,
+and records the snapshot it read. It refuses a cohort or reference file with any problem,
+listing each one by line, and a reference row outside the cohort. It exits 0 when the report
+is complete, 1 when written but incomplete, 2 when refused.
+`pilot-check-reference --reference FILE [--cohort FILE]` reads the reference file the same
+way without a database, so the operator can check it while the pilot runs (exit 2 with
+problems by line). With the cohort, it also names rows outside it and counts the members
+without a row yet.
 `export-check --export DIR --pack P [--out FILE]` reads every record of one organization's
 export through pack P, the way an investigation does, and stores nothing. It lists each
 problem by collection and key: an unreadable file, a collection the pack doesn't read, a
