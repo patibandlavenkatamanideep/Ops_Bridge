@@ -753,6 +753,37 @@ def _aware_time(value: str) -> Any:
     return t
 
 
+def _eval_labels(args: argparse.Namespace) -> int:
+    """Labellers' agreement and the adjudicated reference for evaluation v2 (A10). Exit 0
+    when every disagreement is adjudicated, 1 while some are not, 2 when a file is refused."""
+    from opsbridge.evaluation.labeling import (
+        LabelError,
+        agreement,
+        read_adjudications,
+        read_labels,
+        reference,
+    )
+
+    try:
+        labels = read_labels(Path(args.labels))
+        decided = read_adjudications(Path(args.adjudications), labels) if args.adjudications else []
+    except (OSError, LabelError) as exc:
+        print(_shown(f"Refusing: {exc}"))
+        for problem in getattr(exc, "problems", []):
+            print(_shown(f"  {problem}"))
+        return 2
+    ref = reference(labels, decided)
+    out = Path(args.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    report = {"agreement": agreement(labels), "reference": ref}
+    out.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(
+        f"{len({label.case for label in labels})} cases, {len(ref['disagreements'])} "
+        f"disagreement(s), {len(ref['unresolved'])} field(s) still in dispute; wrote {out}"
+    )
+    return 0 if ref["complete"] else 1
+
+
 def _pilot_report(args: argparse.Namespace) -> int:
     """The pilot measures at the cut-off (protocol opsbridge-pilot/2). Exit 0 when the report
     is complete, 1 when it was written but is incomplete (an enrolled invoice has no reviewer
@@ -1149,6 +1180,14 @@ def build_parser() -> argparse.ArgumentParser:
     where.add_argument("--artifact-dir", help="restored local artifact directory (absolute)")
     where.add_argument("--artifact-bucket", help="restored S3 bucket (endpoint from settings)")
     p.set_defaults(func=_verify_restore)
+
+    p = sub.add_parser(
+        "eval-labels", help="labellers' agreement and the adjudicated reference (evaluation v2)"
+    )
+    p.add_argument("--labels", required=True, help="the labels CSV (two or more per case)")
+    p.add_argument("--adjudications", help="the adjudications CSV")
+    p.add_argument("--out", required=True, help="where to write the report (JSON)")
+    p.set_defaults(func=_eval_labels)
 
     p = sub.add_parser(
         "pilot-report", help="pilot measures from the records and the reviewer's reference file"
