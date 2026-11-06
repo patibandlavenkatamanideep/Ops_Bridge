@@ -64,13 +64,20 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 
-# The behaviour a run follows, recorded on the run when it is created. 1.2.0: an invoice that
-# could not be read is named with the reason stored on its document version, on every run.
-# 1.1.0 took the reason from the current read's problems only, so a repeated investigation of
-# unchanged bytes said "()"; it is kept to replay recordings made with it (opsbridge-bench-v1).
-WORKFLOW_VERSION = "investigation/1.2.0"
+# The behaviour a run follows, recorded on the run when it is created. 1.3.0: a record's
+# problems are the reason stored with the document version read, whether its bytes are new
+# or unchanged; 1.2.0 listed the current read's problems, none for unchanged bytes, so a
+# repeated investigation's uncertainty lost why a document needed review and a benchmark's
+# trials depended on their order (kept to replay opsbridge-bench-v1-rerun). 1.2.0: an invoice
+# that could not be read is named with the reason stored on its document version, on every
+# run. 1.1.0 took that reason from the current read's problems only, so a repeated
+# investigation of unchanged bytes said "()"; it is kept to replay opsbridge-bench-v1.
+WORKFLOW_VERSION = "investigation/1.3.0"
+STORED_REASON_VERSION = "investigation/1.2.0"
 LEGACY_WORKFLOW_VERSION = "investigation/1.1.0"
-WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, WORKFLOW_VERSION)
+WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION, WORKFLOW_VERSION)
+# Versions that list a record's problems from the current read only.
+_READ_PROBLEMS_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION)
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -223,7 +230,7 @@ def run_investigation(
 
     def collect() -> dict[str, Any]:
         try:
-            return _collect(deps, tenant_id, tenant_slug, pack, case_snapshot)
+            return _collect(deps, tenant_id, tenant_slug, pack, case_snapshot, workflow_version)
         except SourceUnavailable as exc:
             raise StepFailed(f"purchasing system unavailable: {exc}", retryable=True) from exc
         except SourceRecordInvalid as exc:
@@ -314,6 +321,7 @@ def _ingest_record(
     problems: list[str],
     refused: list[str],
     withdrawn: list[str],
+    workflow_version: str = WORKFLOW_VERSION,
 ) -> bool:
     spec = pack.sources.get(record_type)
     if spec is None or spec.collection is None:
@@ -361,7 +369,12 @@ def _ingest_record(
             "new_version": res.new_version,
         }
     )
-    problems.extend(f"{record_type} {key}: {p}" for p in res.problems if not p.startswith("flag:"))
+    if workflow_version in _READ_PROBLEMS_VERSIONS:
+        problems.extend(
+            f"{record_type} {key}: {p}" for p in res.problems if not p.startswith("flag:")
+        )
+    elif res.parse_status != "parsed" and res.parse_detail:
+        problems.append(f"{record_type} {key}: {res.parse_detail}")
     return True
 
 
@@ -428,7 +441,12 @@ def source_times(*, asserted: datetime | None, observed: datetime) -> dict[str, 
 
 
 def _collect(
-    deps: InvestigationDeps, tenant_id: uuid.UUID, org: str, pack: PackSpec, case: dict[str, Any]
+    deps: InvestigationDeps,
+    tenant_id: uuid.UUID,
+    org: str,
+    pack: PackSpec,
+    case: dict[str, Any],
+    workflow_version: str = WORKFLOW_VERSION,
 ) -> dict[str, Any]:
     client = deps.purchasing_for(org)
     # Before the first request: the oldest data point read.
@@ -459,6 +477,7 @@ def _collect(
             problems,
             refused,
             withdrawn,
+            workflow_version,
         ):
             unavailable.append(f"invoice {invoice_no}")
         if invoice_no:
@@ -480,6 +499,7 @@ def _collect(
                 problems,
                 refused,
                 withdrawn,
+                workflow_version,
             ):
                 unavailable.append(f"purchase order {po_no}")
             follow_ups: tuple[RecordType, ...] = (
@@ -505,6 +525,7 @@ def _collect(
                         problems,
                         refused,
                         withdrawn,
+                        workflow_version,
                     )
                 if listing.complete:
                     _withdraw_absent(deps, tenant_id, record_type, listing, withdrawn)
