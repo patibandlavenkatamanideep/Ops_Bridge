@@ -77,6 +77,16 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Recent entries
 
+### 2026-11-06: evaluation v2's labelling prepared before any label (A10)
+- `opsbridge eval-labels` reads labels and adjudications strictly. It reports Cohen's kappa
+  per field and labeller pair, keeps every disagreement with every label, and builds the
+  reference only from independent, reasoned adjudications. The reference is incomplete while a
+  dispute remains (exit 1).
+- Tested against kappas worked out by hand (`tests/evaluation/test_labeling.py`); dropping
+  the chance correction fails two tests. No labeller or label exists.
+- docs/developer-commands.md still described `pilot-report` under protocol `/1` (missed in the
+  N05 docs). It now names `/2`, `--cohort`, the required `--as-of` and the exit codes.
+
 ### 2026-11-06: the run-order defect fixed for new runs (`investigation/1.3.0`)
 - Reproduced first: two investigations of an unreadable invoice with unchanged bytes listed
   different uncertainty; the second had lost the invoice's reason. Under 1.3.0 a record's
