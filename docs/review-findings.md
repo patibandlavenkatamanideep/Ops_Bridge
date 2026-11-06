@@ -188,7 +188,10 @@ Not covered:
   defect (a re-investigation loses the reason) as well as the replay dependence. Fixing it
   changes the model requests of the recorded security cases, so it waits for the next frozen
   benchmark; meanwhile the run order is a declared factor and an out-of-order replay is
-  tested to fail closed (`test_replay_mode_order.py`).
+  tested to fail closed (`test_replay_mode_order.py`). Fixed for new runs as workflow
+  versions instead, which recordings pin: `investigation/1.2.0` the finding text, and
+  `investigation/1.3.0` (2026-11-06) the uncertainty, now the same on every read
+  (`test_a_repeated_investigation_lists_the_same_uncertainty`).
 
 ## Migrations and rollback
 
