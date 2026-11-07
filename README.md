@@ -52,8 +52,8 @@ only after a different person approves the exact version they reviewed.
 | Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A12 (the `main` ruleset is applied; the release is prepared), A14, A15, A16; the rest need access or decisions. A later review (5 November, N01–N09): N01–N08 fixed and on `main` (PR #36), N09 not defined in its brief. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
-| Hosted CI | **Passing** on `main` at `ff24e06` (run 42340729942), and required by `main`'s ruleset before a pull request merges: lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, evidence bundle round trip, SBOM and vulnerability scan |
-| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `ff24e06`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
+| Hosted CI | **Passing** on `main` at `4615569` (run 42356139646), and required by `main`'s ruleset before a pull request merges: lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, evidence bundle round trip, SBOM and vulnerability scan |
+| Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `4615569`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Operator pilot measured | **No** — protocol, measures (`pilot-report`) and the export check are ready; no export, reviewer or authorization yet |
 
