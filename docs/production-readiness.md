@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `ff24e06` (PR #37), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `4615569` (PR #38), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`, and its remainder (a re-read's uncertainty lost the reason) as `investigation/1.3.0` on 6 November; v1 recordings replay with `investigation/1.1.0` in their declared order and v1-rerun's with 1.2.0, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -60,7 +60,7 @@ regression failed for the stated reason before the fix.
 | Item | Value |
 |---|---|
 | Reviewed `main` | `79992cd` (5 November 2026), CI run 41980269125 green; Python `0.1.0a1`, frontend `0.1.0-alpha.1`, unpublished |
-| Work | `feat/opsbridge-foundation`, from `79992cd`; PR #36, merged on 7 November (UTC) as `e0f1e2d`, whose CI run on `main`, 42336948253, passed all four jobs. Follow-up fixes in PR #37, merged as `ff24e06` (CI run 42340729942 on `main`), and PR #38 |
+| Work | `feat/opsbridge-foundation`, from `79992cd`; PR #36, merged on 7 November (UTC) as `e0f1e2d`, whose CI run on `main`, 42336948253, passed all four jobs. Follow-up fixes in PR #37, merged as `ff24e06` (CI run 42340729942 on `main`), and PR #38, merged as `4615569` (CI run 42356139646) |
 | Ruleset | Live ruleset 26598146 on `main`, active: pull requests only, the four CI jobs required on an up-to-date branch, review threads resolved, no force push or deletion, administrators bypass only by merging a pull request, **0 approvals**. It is not enforced independent review |
 | Gates run here | Unit, integration (PostgreSQL 16, Keycloak and MCP in Podman), canary, receipts, replay check, lint and types. **Not here:** the image build (about 3 GB of disk free), Landlock and seccomp (macOS), OCR (no tesseract), browser tests (not run this session). Those run in hosted CI and are named, not counted as passed |
 | Review documents | `PRODUCTION_REVIEW.md` and its file inventory were not supplied. The findings are taken from the brief, which does not define N09 |
@@ -718,9 +718,10 @@ PR #27's merge commit `77a515b` (CI run 41568201604), whose release also builds,
 and attests the evidence bundle (Package 8, evidence packaging). Each merge since has
 qualified too: on 5 November `79992cd` (PR #30; CI run 41980269125), which also confines
 parser subprocesses, on 7 November (UTC) `e0f1e2d` (PR #36; CI run 42336948253), which
-fixes the review of 5 November (N01–N08), and the same day `ff24e06` (PR #37; CI run
-42340729942), which bounds name lookups and dates recorded times on one clock. The first tag
-belongs there. The ruleset's check names match
+fixes the review of 5 November (N01–N08), the same day `ff24e06` (PR #37; CI run
+42340729942), which bounds name lookups and measures the pilot cut-off and attempt leases on
+the database's clock, and `4615569` (PR #38; CI run 42356139646), which measures the duration
+metrics on it too. The first tag belongs there. The ruleset's check names match
 CI, and a test keeps them matched. The workflow has not run (no tag), so its first use is
 its first test, and no attestation exists yet. The promotion relies on `docker buildx
 imagetools create` keeping a single image index as it is. The step therefore refuses, before
@@ -977,14 +978,17 @@ and blindness is shown only by the recorded time.
      whose CI run on `main`, 42336948253, passed all four jobs and which `release_check.py
      ci` accepts), then name lookups within the outbound deadline and one clock for the pilot
      cut-off and attempt leases (PR #37, merged as `ff24e06`, whose CI run on `main`,
-     42340729942, passed all four jobs and which `release_check.py ci` accepts).
+     42340729942, passed all four jobs and which `release_check.py ci` accepts), and the
+     duration metrics measured between two database times (PR #38, merged as `4615569`,
+     whose CI run on `main`, 42356139646, passed all four jobs and which `release_check.py
+     ci` accepts).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `ff24e06`;
+   - the release workflow has not run; its preconditions pass on `4615569`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - push `v0.1.0-alpha.1` on `main`'s head, `ff24e06` (PR #37), which carries the fixed
+   - push `v0.1.0-alpha.1` on `main`'s head, `4615569` (PR #38), which carries the fixed
      pypdf, OpenSSL and `apt`, the HIGH gate, the evidence bundle and the N01–N08 fixes (A12,
      A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
