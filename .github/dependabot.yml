@@ -5,6 +5,9 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: weekly }
+    # Actions are pinned to commits of releases at least two weeks old; Dependabot's default
+    # wait is 3 days. Security updates are not held back.
+    cooldown: { default-days: 14 }
     groups:
       actions: { patterns: ["*"] }
     open-pull-requests-limit: 5
