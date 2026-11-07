@@ -1,7 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-07. `main` is at `ff24e06`, PR #37's merge (CI run 42340729942 green).
-Work continues on `feat/opsbridge-foundation` in PR #38.
+Last updated 2026-11-07. `main` is at `4615569`, PR #38's merge (CI run 42356139646 green).
+Work continues on `feat/opsbridge-foundation` in PR #39.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -18,16 +18,16 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `ff24e06` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `4615569` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
-- **PR #36** (the review of 5 November, N01–N08) and **PR #37** (name lookups within the
-  outbound deadline; proposal status changes and attempt leases on the database's clock) are
-  merged.
-- **PR #38**, waiting for the owner to merge: the approval-wait and execution-time metrics
-  measured between two database times, and the clock claims corrected (one clock per
-  comparison, not every row dated by the database).
+- **PR #36** (the review of 5 November, N01–N08), **PR #37** (name lookups within the
+  outbound deadline; proposal status changes and attempt leases on the database's clock) and
+  **PR #38** (the approval-wait and execution-time metrics measured between two database
+  times; the clock claims corrected) are merged.
+- **PR #39**, waiting for the owner to merge: this record and the README name `4615569`. It
+  changes no code.
 - **Dependabot:** eight pull requests, all behind `main`. The ruleset requires a branch up to
   date before it merges ("Update branch"). The Python base-image bump (#31) needs a check: the
   image pins `apt` 2.6.2, and a newer base image may already carry it.
@@ -68,8 +68,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #38, and push `v0.1.0-alpha.1` on `main`'s head when ready (after #38
-   merges, its merge commit is the head to check and name).
+1. Owner: push `v0.1.0-alpha.1` on `4615569` when ready, and merge PR #39 (records only).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
@@ -77,6 +76,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-07: PR #38 merged
+- PR #38 merged as `4615569`; `main`'s CI passed on it (42356139646), and `release_check.py
+  versions` and `ci` pass on it. README, this page and the readiness record name it (PR #39).
 
 ### 2026-11-07: PR #37 merged; durations and clock claims (PR #38)
 - PR #37 merged as `ff24e06`; `main`'s CI passed on it (42340729942), and `release_check.py
