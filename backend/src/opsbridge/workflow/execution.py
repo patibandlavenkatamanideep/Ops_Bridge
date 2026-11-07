@@ -36,7 +36,7 @@ from typing import Any
 
 from opentelemetry import trace
 from opentelemetry.trace import Span, Status, StatusCode
-from sqlalchemy import select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
@@ -120,11 +120,13 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
                 select(Attempt).where(Attempt.operation_id == op.id).order_by(Attempt.started_at)
             ).scalars()
         )
+        # The lease is measured on the database's clock, which recorded the start.
+        now = s.execute(select(func.now())).scalar_one()
         in_flight = [
             a
             for a in attempts
             if a.status == "started"
-            and a.started_at > _now() - timedelta(seconds=deps.lease_seconds)
+            and a.started_at > now - timedelta(seconds=deps.lease_seconds)
             and a.fencing_token != job.fencing_token
         ]
         if in_flight:
@@ -283,7 +285,7 @@ def finish_operation(
         pr = s.get(Proposal, op.proposal_id)
         if pr is not None and pr.status == "approved":
             pr.status = "superseded"
-            pr.status_changed_at = _now()
+            pr.status_changed_at = func.now()
     if status == "confirmed":
         s.execute(
             text(
