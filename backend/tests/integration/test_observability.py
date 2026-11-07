@@ -1,9 +1,11 @@
 """Telemetry contract (Phase 8; OB-19, OB-20): correlated traces with safe identifiers,
-bounded metric labels, aggregate state without weakening RLS, worker health endpoints."""
+bounded metric labels, aggregate state without weakening RLS, worker health endpoints.
+Durations are measured on the clock that recorded their start, the database's."""
 
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 
 import httpx
 import pytest
@@ -15,7 +17,9 @@ from prometheus_client import REGISTRY
 from sqlalchemy import text
 
 from opsbridge.persistence.db import Database, make_engine
+from opsbridge.services import proposals as proposals_module
 from opsbridge.telemetry import metrics
+from opsbridge.workflow import execution as execution_module
 from opsbridge.workflow.worker import Worker, serve_health
 
 from .servers import free_port
@@ -126,6 +130,32 @@ def test_metrics_have_bounded_labels_and_business_series(stack) -> None:  # type
     labels = " ".join(re.findall(r"\{([^}]*)\}", body))
     assert not UUID.search(labels), "a metric label carries an identifier"
     assert "demo-furniture" not in labels and "INV-9001" not in labels
+
+
+@pytest.mark.parametrize(
+    "app_clock",
+    [timedelta(minutes=-5), timedelta(minutes=5)],
+    ids=["5 minutes behind the database", "5 minutes ahead of it"],
+)
+def test_durations_are_measured_on_the_clock_that_recorded_their_start(
+    stack, monkeypatch: pytest.MonkeyPatch, app_clock: timedelta
+) -> None:  # type: ignore[no-untyped-def]
+    """The approval wait and the execution time subtracted a start the database recorded from
+    the application's clock: 5 minutes ahead, each came to about 300 s; behind, each was
+    clamped to 0."""
+    for module in (proposals_module, execution_module):
+        monkeypatch.setattr(module, "_now", lambda real=module._now: real() + app_clock)
+    st = stack
+    waits = sample("opsbridge_approval_wait_seconds_sum", decision="approve")
+    runs = sample("opsbridge_execution_duration_seconds_sum", status="confirmed")
+    case_id, prop = prepared(st, "INV-9001")
+    assert approve(st, case_id, prop).status_code == 200
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed"
+    waited = sample("opsbridge_approval_wait_seconds_sum", decision="approve") - waits
+    ran = sample("opsbridge_execution_duration_seconds_sum", status="confirmed") - runs
+    assert 0 < waited < 60 and 0 < ran < 60, (waited, ran)
 
 
 def test_aggregate_state_reports_backlog_while_rls_still_hides_rows(stack, migrator_engine) -> None:  # type: ignore[no-untyped-def]
