@@ -103,6 +103,14 @@ Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-20
 fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
 2.6.2 beside OpenSSL, and the image job passed on it (run 42082021608).
 
+On 7 November the image moved to Python 3.12.16 (PR #39). The tag's build of 5 November
+already carries OpenSSL 3.0.22-1~deb12u2 and `apt` 2.6.2, so both pins are dropped; its other
+packages differ from 3.12.15's only in `tzdata`. The image job passed on it, the fixable HIGH
+gate included (run 42358423116). Dependabot's #31 named the build of 28 October, which still
+had `apt` 2.6.1, and moved only the Dockerfile, leaving the alert sink and the docs on
+3.12.15. Dependabot also proposed `setup-uv` 10.3.3 ten days after its release (#33), against
+the two-week rule for actions: its action updates now wait 14 days (`tests/test_workflows.py`).
+
 Phases D–G need what only the owner can give: a source, export and reviewer; a cloud
 account and spend ceiling; a model budget; operator sessions. Nothing was assumed for them
 (see "Needs the owner" in the work plan).
@@ -678,7 +686,8 @@ the ruleset on 5 November):
   - only then does it give the same digest the version tag, without rebuilding, refusing if
     the tag resolves to anything else.
 
-  Actions are pinned to commits of releases at least two weeks old.
+  Actions are pinned to commits of releases at least two weeks old, and Dependabot proposes
+  none sooner (`cooldown`, 14 days).
 
 **Pre-releases** (30 October, closure review step 3). The first release is to be explicitly
 experimental, but the workflow accepted only `vMAJOR.MINOR.PATCH`, so it could only have
