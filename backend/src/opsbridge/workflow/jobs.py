@@ -20,7 +20,7 @@ import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Any, cast
 
 from sqlalchemy import CursorResult, text
@@ -252,14 +252,6 @@ def fail(
             )
         )
     return status if n else "lease_lost"
-
-
-def utcnow() -> datetime:
-    return datetime.now(UTC)
-
-
-def later(seconds: float) -> datetime:
-    return utcnow() + timedelta(seconds=seconds)
 
 
 def _rows(result: Any) -> int:
