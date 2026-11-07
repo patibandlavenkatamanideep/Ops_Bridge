@@ -60,10 +60,9 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   New runs use `investigation/1.3.0`, which lists the stored reason on every read; the
   recordings keep their versions and order, and an out-of-order replay fails closed.
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
-- Processes need synchronized clocks. Decisions that compare with recorded times use the
-  database's clock, and so does the pilot report's cut-off; expiry times the application sets
-  are compared on its own clock. Two duration metrics (approval wait, execution time) still
-  subtract a recorded time from the application's clock.
+- Processes need synchronized clocks. Each comparison takes both its times from one clock: the
+  database's for recorded events, leases, the pilot cut-off and the duration metrics; the
+  application's for the expiry times it sets (docs/security-and-threat-model.md, T45).
 
 ## Next executable task
 
