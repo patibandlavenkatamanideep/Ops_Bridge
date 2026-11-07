@@ -16,13 +16,16 @@ byte at a time never ended), a read that blocked waited its full timeout however
 the total was left, and a reply whose headers or end arrived late with no chunk after them
 was accepted. Now every socket wait is capped at the time left, and the deadline is checked
 after the headers and at the end of the body. Fake clocks test the checks; a scripted
-loopback server tests the waits in wall time.
+loopback server tests the waits in wall time. Looking a name up and trying each of its
+addresses count against the same deadline: a resolver that did not answer delayed a request
+by its own timeout, and each address tried was given all the time left.
 """
 
 from __future__ import annotations
 
 import gzip
 import json
+import socket
 import ssl
 import time
 import zlib
@@ -367,7 +370,7 @@ def test_every_socket_wait_is_capped_at_the_time_left() -> None:
     inner = _Recording()
     backend = ht.DeadlineBackend(inner)  # type: ignore[arg-type]
     with ht.deadline(0.25):
-        stream = backend.connect_tcp("source", 443, timeout=30.0)
+        stream = backend.connect_tcp("192.0.2.10", 443, timeout=30.0)
         tls = stream.start_tls(ssl.create_default_context(), "source", timeout=30.0)
         tls.write(b"GET / HTTP/1.1\r\n\r\n", timeout=30.0)
         tls.read(65536, timeout=30.0)
@@ -375,7 +378,7 @@ def test_every_socket_wait_is_capped_at_the_time_left() -> None:
     assert len(inner.timeouts) == 5
     assert all(t is not None and 0 < t <= 0.25 for t in inner.timeouts), inner.timeouts
     inner.timeouts.clear()
-    backend.connect_tcp("source", 443, timeout=30.0).read(1, timeout=30.0)  # outside a request
+    backend.connect_tcp("192.0.2.10", 443, timeout=30.0).read(1, timeout=30.0)  # no request
     assert inner.timeouts == [30.0, 30.0]
 
 
@@ -409,3 +412,83 @@ def test_a_connector_built_without_a_transport_keeps_its_total_deadline() -> Non
             source.fetch("invoices", "INV-1")
         source.close()
         assert time.monotonic() - started < 2.0
+
+
+# --- looking the name up, and each address, within the deadline -------------------------
+
+SOURCE = "source.test"  # a name no resolver knows; each test answers for it
+
+
+def answering(
+    monkeypatch: pytest.MonkeyPatch, addresses: list[str], port: int, *, after: float = 0.0
+) -> None:
+    """Looking up SOURCE takes `after` seconds and gives `addresses`; other names as usual."""
+    real = socket.getaddrinfo
+
+    def getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if host != SOURCE:
+            return real(host, *args, **kwargs)
+        time.sleep(after)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (a, port)) for a in addresses]
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+
+
+def test_a_resolver_that_does_not_answer_counts_against_the_deadline(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with scripted([(0.0, OK_HEADERS + b"{}")]) as script:
+        answering(monkeypatch, ["127.0.0.1"], script.port, after=3.0)
+        client = httpx.Client(
+            base_url=f"http://{SOURCE}:{script.port}", timeout=30.0,
+            transport=ht.deadline_transport(),
+        )  # fmt: skip
+        started = time.monotonic()
+        with client, pytest.raises(httpx.ConnectTimeout):
+            ht.request(client, "GET", "/", max_bytes=MiB, total_seconds=0.5)
+        assert time.monotonic() - started < 1.5
+
+
+def test_a_name_looked_up_in_time_connects_past_an_address_that_refuses(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = socket.socket.connect
+
+    def connect(sock: socket.socket, address: Any) -> None:
+        if address[0] == "192.0.2.1":
+            raise ConnectionRefusedError("refused")
+        real(sock, address)
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    with scripted([(0.0, OK_HEADERS + b"{}")]) as script:
+        answering(monkeypatch, ["192.0.2.1", "127.0.0.1"], script.port, after=0.05)
+        client = httpx.Client(
+            base_url=f"http://{SOURCE}:{script.port}", timeout=30.0,
+            transport=ht.deadline_transport(),
+        )  # fmt: skip
+        with client:
+            assert ht.request(client, "GET", "/", max_bytes=MiB, total_seconds=5).json() == {}
+
+
+def test_each_address_tried_has_only_the_time_left(monkeypatch: pytest.MonkeyPatch) -> None:
+    tried: list[Any] = []
+
+    def connect(sock: socket.socket, address: Any) -> None:
+        tried.append(address)
+        if address[0] == "192.0.2.1":  # refuses, late
+            time.sleep(0.4)
+            raise ConnectionRefusedError("refused")
+        time.sleep(sock.gettimeout() or 0)  # as a SYN nobody answers
+        raise TimeoutError("timed out")
+
+    monkeypatch.setattr(socket.socket, "connect", connect)
+    answering(monkeypatch, ["192.0.2.1", "192.0.2.2", "192.0.2.3"], 8080)
+    client = httpx.Client(
+        base_url=f"http://{SOURCE}:8080", timeout=30.0, transport=ht.deadline_transport()
+    )
+    started = time.monotonic()
+    with client, pytest.raises(httpx.ConnectTimeout):
+        ht.request(client, "GET", "/", max_bytes=MiB, total_seconds=0.6)
+    # Before: 0.4 s, then the whole 0.6 s again for each of the other two (1.6 s).
+    assert time.monotonic() - started < 0.85, tried
+    assert tried[:2] == [("192.0.2.1", 8080), ("192.0.2.2", 8080)]

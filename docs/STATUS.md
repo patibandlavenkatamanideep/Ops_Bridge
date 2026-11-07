@@ -1,8 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-06. `main` is at `79992cd` (CI run 41980269125 green). Work continues on
-`feat/opsbridge-foundation` in PR #36, whose CI passed all four jobs on `ec81177`
-(42089061306); later commits there change documentation only.
+Last updated 2026-11-06. `main` is at `e0f1e2d`, PR #36's merge (CI run 42336948253 green).
+Work continues on `feat/opsbridge-foundation` in PR #37.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -12,25 +11,24 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 733 passed (5 Linux-only skipped), integration 281 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
-| Hosted CI | Passing on `main` and on PR #36's head. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
+| Local | Built and verified on macOS: unit 753 passed (5 Linux-only skipped, and the live tests), integration 286 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `79992cd`; pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `e0f1e2d` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
-- **PR #36**, waiting for the owner to merge. It fixes the review of 5 November (N01–N08):
-  strict JSON, request bodies by received bytes, source clocks, bounded evidence bundles, the
-  historical pilot report, credential ownership, truthful deadlines and offline egress. It
-  also adds migrations 0023 and 0024, narrows the release's attestation check and prepares
-  release-tag rulesets.
+- **PR #36** (the review of 5 November, N01–N08) is merged.
+- **PR #37**, waiting for the owner to merge: name lookups and each address within the
+  outbound deadline, and every recorded time a decision compares with on the database's
+  clock (proposal status changes, attempt leases).
 - **Dependabot:** eight pull requests, all behind `main`. The ruleset requires a branch up to
-  date before it merges ("Update branch"). The Python base-image bump (#31) should be rechecked
-  after #36: the image now pins `apt` 2.6.2, and a newer base image may already carry it.
+  date before it merges ("Update branch"). The Python base-image bump (#31) needs a check: the
+  image pins `apt` 2.6.2, and a newer base image may already carry it.
 
 ## Blockers (each affects only the work that depends on it)
 
@@ -46,8 +44,9 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Known limitations
 
-- Name resolution is not covered by the outbound deadline; a silent resolver delays by its
-  own timeout. The offline egress guard covers Python sockets, not native code (libpq).
+- A name lookup that never answers no longer delays a request, but keeps its thread until the
+  system resolver gives up (16 at most). The offline egress guard covers Python sockets, not
+  native code (libpq).
 - Rate limits are shared across API instances but are no DDoS defence; the edge's own body and
   time limits are set at staging.
 - PDF and e-mail extraction rely on pack-specific patterns: unseen layouts go to review. OCR
@@ -61,14 +60,15 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   New runs use `investigation/1.3.0`, which lists the stored reason on every read; the
   recordings keep their versions and order, and an out-of-order replay fails closed.
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
-- Processes need synchronized clocks. Comparisons with recorded times use the database's
-  clock, and so does the pilot report's cut-off.
+- Processes need synchronized clocks. Decisions that compare with recorded times use the
+  database's clock, and so does the pilot report's cut-off; expiry times the application sets
+  are compared on its own clock. Two duration metrics (approval wait, execution time) still
+  subtract a recorded time from the application's clock.
 
 ## Next executable task
 
-1. Owner: merge PR #36. Then fast-forward the branch, check `main`'s CI and the release
-   preconditions, and name the merge commit for the tag in README, this page and the readiness
-   record (a test keeps those three in agreement).
+1. Owner: merge PR #37, and push `v0.1.0-alpha.1` on `main`'s head when ready (after #37
+   merges, its merge commit is the head to check and name).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
@@ -76,6 +76,20 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-06: PR #36 merged; lookups and recorded times (PR #37)
+- PR #36 merged as `e0f1e2d`; `main`'s CI passed on it (42336948253), and `release_check.py
+  versions` and `ci` pass on it. README, this page and the readiness record name it.
+- The outbound deadline now covers the name lookup and each address tried. Before, a lookup
+  that answered after 3 s held a 0.5 s request for 3 s, and three unanswered addresses took
+  1.6 s against 0.6 s.
+- A proposal's status changes were dated by the application's clock, every other recorded time
+  by the database's: the pilot cut-off test failed by chance with the database 0.2 s ahead,
+  and every time with the application 5 minutes off either way. The in-flight check for
+  another worker's attempt mixed the two clocks too: an hour ahead, a worker reconciled and
+  dispatched instead of backing off. Both use the database's clock now; the back-off had no
+  test before.
+- Unit 753 passed, integration 286, canary 64/64, receipts and replays as before.
 
 ### 2026-11-06: evaluation v2's labelling prepared before any label (A10)
 - `opsbridge eval-labels` reads labels and adjudications strictly. It reports Cohen's kappa

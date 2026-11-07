@@ -11,7 +11,8 @@ by number, never by invoice.
 
 Review N05: the report is of the cut-off. Anything done after it (an approval, a second
 investigation, a correction) changes nothing, a change committed while the report reads is
-in none of its queries, and a cut-off later than the database's clock is refused.
+in none of its queries, and a cut-off later than the database's clock is refused. Every time
+compared with the cut-off is on the database's clock, whatever the application's clock says.
 """
 
 from __future__ import annotations
@@ -33,6 +34,8 @@ from opsbridge.pilot import collect as collect_module
 from opsbridge.pilot.cohort import COLUMNS as COHORT_COLUMNS
 from opsbridge.pilot.collect import collect
 from opsbridge.pilot.reference import COLUMNS
+from opsbridge.services import proposals as proposals_module
+from opsbridge.workflow import execution as execution_module
 
 from .conftest import TEST_DB
 from .stack import get, investigate, open_case
@@ -262,13 +265,36 @@ def _invoice_quantity(st: dict[str, Any], case_id: str) -> dict[str, Any]:
     return dict(next(f for f in fields if f["field_path"] == "invoice_line.quantity"))
 
 
+@pytest.mark.parametrize(
+    "app_clock",
+    [timedelta(0), timedelta(minutes=-5), timedelta(minutes=5)],
+    ids=["as it is", "5 minutes behind the database", "5 minutes ahead of it"],
+)
 def test_nothing_done_after_the_cut_off_changes_a_report_of_it(
-    stack: dict[str, Any], migrator_engine: Engine, worker_db: Database
+    stack: dict[str, Any],
+    migrator_engine: Engine,
+    worker_db: Database,
+    monkeypatch: pytest.MonkeyPatch,
+    app_clock: timedelta,
 ) -> None:
-    """Before: a report as of the cut-off counted an approval made after it, as drafted."""
+    """Before: a report as of the cut-off counted an approval made after it, as drafted.
+
+    A proposal's status change was then dated by the application's clock, every other time by
+    the database's. With the application behind, a change after the cut-off counted before
+    it (approved, then superseded by the second investigation's evidence); ahead, a proposal
+    superseded before the cut-off was still awaiting approval at it. This failed by chance
+    when the database's clock ran a fraction of a second ahead."""
+    for module in (proposals_module, execution_module):
+        monkeypatch.setattr(module, "_now", lambda real=module._now: real() + app_clock)
     st = stack
     since = db_now(migrator_engine)
-    case_id, proposal = prepared(st, "INV-9001")
+    case_id, _ = prepared(st, "INV-9001")
+    r = call(
+        st["client"], st["actors"]["furn-investigator"], "POST",
+        f"{T}/cases/{case_id}/proposals", json={},
+    )  # fmt: skip
+    assert r.status_code == 201, r.text  # the first, still awaiting approval, is superseded
+    proposal = r.json()
     tid = tenant_id(migrator_engine, "demo-furniture")
     cut = db_now(migrator_engine)
 
@@ -280,9 +306,8 @@ def test_nothing_done_after_the_cut_off_changes_a_report_of_it(
         return facts
 
     then = facts()
-    assert then.first_approved_at is None and [c.status for c in then.chains] == [
-        "awaiting_approval"
-    ]
+    assert then.first_approved_at is None
+    assert sorted(c.status for c in then.chains) == ["awaiting_approval", "superseded"]
     # After the cut-off: approved, a field corrected, investigated again.
     assert approve(st, case_id, proposal).status_code == 200
     qty = _invoice_quantity(st, case_id)

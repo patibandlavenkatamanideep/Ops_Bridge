@@ -21,7 +21,9 @@ only what existed at the cut-off is read:
 - the first approval and the resolution made by then.
 The times compared are the database's own (it records every one), so the cut-off is a time
 on the database's clock, and one later than the snapshot itself is refused: facts after it
-could still change. This is a consistent snapshot read with recorded event times, not a
+could still change. A proposal's status changes were dated by the application's clock until
+6 November 2026, so one within the two clocks' difference of a cut-off could fall on the
+wrong side of it; the database dates them now, like everything else. This is a consistent snapshot read with recorded event times, not a
 reconstruction of anything those times do not record.
 """
 

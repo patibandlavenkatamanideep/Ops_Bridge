@@ -9,6 +9,7 @@ per-read timeout stops), and asks for unencoded replies, refusing a compressed o
 client above would inflate without a bound. Its errors subclass `httpx2`'s, so each SDK
 reports them as it reports other transport failures: the adapter as model unavailable or
 timed out (the rules-only path takes over), the MCP client as an outcome it cannot know.
+Looking the model's host up counts against the same deadline (review N07).
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from __future__ import annotations
 import dataclasses
 import gzip
 import json
+import socket
 import time
 from collections.abc import AsyncIterator, Iterator
 from typing import Any
@@ -231,6 +233,32 @@ def test_a_model_reply_trickling_its_headers_stops_at_the_requests_timeout() -> 
             adapter.generate(dataclasses.replace(_request(), timeout_seconds=0.5))
         assert time.monotonic() - started < 2.0
         assert script.client_closed.wait(2.0)
+
+
+def test_a_model_host_whose_lookup_never_answers_stops_at_the_requests_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    real = socket.getaddrinfo
+
+    def getaddrinfo(host: Any, *args: Any, **kwargs: Any) -> Any:
+        if host == "model.test":
+            time.sleep(3.0)  # a resolver that does not answer, then answers
+            host = "127.0.0.1"
+        return real(host, *args, **kwargs)
+
+    monkeypatch.setattr(socket, "getaddrinfo", getaddrinfo)
+    with scripted([(0.0, OK_HEADERS + b"{}")]) as script:
+        adapter = AnthropicAdapter(
+            "claude-test",
+            "test-key",
+            client_factory=lambda **kw: anthropic.Anthropic(
+                base_url=f"http://model.test:{script.port}", **kw
+            ),
+        )
+        started = time.monotonic()
+        with pytest.raises((ModelTimeout, ModelUnavailable)):
+            adapter.generate(dataclasses.replace(_request(), timeout_seconds=0.5))
+        assert time.monotonic() - started < 2.0
 
 
 def test_an_mcp_call_whose_server_never_answers_ends_at_its_timeout() -> None:

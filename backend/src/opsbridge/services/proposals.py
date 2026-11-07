@@ -23,7 +23,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
@@ -304,7 +304,7 @@ def create_from_investigation(
             )
         ).scalars():
             old.status = "superseded"
-            old.status_changed_at = _now()
+            old.status_changed_at = func.now()
         destination = destination_now(s, p.tenant_id, action)
         effect, affected = _effect(action, params, destination)
         refs = [e for f in latest.findings for e in f.get("evidence", [])][:20]
@@ -389,7 +389,7 @@ def edit(
         policy = _policy(s, old.policy_version_id)
         _check_params_policy(old.action_type, params, policy)
         old.status = "superseded"
-        old.status_changed_at = _now()
+        old.status_changed_at = func.now()
         destination = destination_now(s, p.tenant_id, old.action_type)
         effect, affected = _effect(old.action_type, params, destination)
         new = Proposal(
@@ -513,7 +513,7 @@ def decide(
             raise Forbidden("scope", f"Your approval scope does not include {pr.action_type}.")
         if pr.status == "awaiting_approval" and pr.expires_at <= _now():
             pr.status = "expired"
-            pr.status_changed_at = _now()
+            pr.status_changed_at = func.now()
             s.flush()
         if pr.status != "awaiting_approval":
             raise Conflict("invalid_state", f"The proposal is {pr.status}.", {"status": pr.status})
@@ -534,7 +534,7 @@ def decide(
         stale = check_current(s, case, pr)
         if decision == "approve" and not stale.ok:
             pr.status = "superseded"
-            pr.status_changed_at = _now()
+            pr.status_changed_at = func.now()
             audit.record(
                 s,
                 tenant_id=p.tenant_id,
@@ -578,10 +578,10 @@ def decide(
         op: Operation | None = None
         if decision == "reject":
             pr.status = "rejected"
-            pr.status_changed_at = now
+            pr.status_changed_at = func.now()
         else:
             pr.status = "approved"
-            pr.status_changed_at = now
+            pr.status_changed_at = func.now()
             op = Operation(
                 tenant_id=p.tenant_id,
                 case_id=case.id,
