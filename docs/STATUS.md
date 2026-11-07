@@ -1,7 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-06. `main` is at `e0f1e2d`, PR #36's merge (CI run 42336948253 green).
-Work continues on `feat/opsbridge-foundation` in PR #37.
+Last updated 2026-11-07. `main` is at `ff24e06`, PR #37's merge (CI run 42340729942 green).
+Work continues on `feat/opsbridge-foundation` in PR #38.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -11,21 +11,23 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 753 passed (5 Linux-only skipped, and the live tests), integration 286 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 753 passed (5 Linux-only skipped, and the live tests), integration 288 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `e0f1e2d` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `ff24e06` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
-- **PR #36** (the review of 5 November, N01–N08) is merged.
-- **PR #37**, waiting for the owner to merge: name lookups and each address within the
-  outbound deadline, and every recorded time a decision compares with on the database's
-  clock (proposal status changes, attempt leases).
+- **PR #36** (the review of 5 November, N01–N08) and **PR #37** (name lookups within the
+  outbound deadline; proposal status changes and attempt leases on the database's clock) are
+  merged.
+- **PR #38**, waiting for the owner to merge: the approval-wait and execution-time metrics
+  measured between two database times, and the clock claims corrected (one clock per
+  comparison, not every row dated by the database).
 - **Dependabot:** eight pull requests, all behind `main`. The ruleset requires a branch up to
   date before it merges ("Update branch"). The Python base-image bump (#31) needs a check: the
   image pins `apt` 2.6.2, and a newer base image may already carry it.
@@ -60,14 +62,13 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   New runs use `investigation/1.3.0`, which lists the stored reason on every read; the
   recordings keep their versions and order, and an out-of-order replay fails closed.
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
-- Processes need synchronized clocks. Decisions that compare with recorded times use the
-  database's clock, and so does the pilot report's cut-off; expiry times the application sets
-  are compared on its own clock. Two duration metrics (approval wait, execution time) still
-  subtract a recorded time from the application's clock.
+- Processes need synchronized clocks. Each comparison takes both its times from one clock: the
+  database's for recorded events, leases, the pilot cut-off and the duration metrics; the
+  application's for the expiry times it sets (docs/security-and-threat-model.md, T45).
 
 ## Next executable task
 
-1. Owner: merge PR #37, and push `v0.1.0-alpha.1` on `main`'s head when ready (after #37
+1. Owner: merge PR #38, and push `v0.1.0-alpha.1` on `main`'s head when ready (after #38
    merges, its merge commit is the head to check and name).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
@@ -76,6 +77,17 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-07: PR #37 merged; durations and clock claims (PR #38)
+- PR #37 merged as `ff24e06`; `main`'s CI passed on it (42340729942), and `release_check.py
+  versions` and `ci` pass on it. README, this page and the readiness record name it.
+- The approval-wait and execution-time metrics subtracted a database time from the
+  application's clock: about 300 s with it 5 minutes ahead, 0 with it behind. They subtract
+  two database times now (`tests/integration/test_observability.py`).
+- #37's threat-model entry T45 said every row is dated by the database; many are dated by the
+  application. Corrected after checking each comparison: each takes both its times from one
+  clock, and the session prune, which mixes them, waits 24 hours by default.
+- Unit 753 passed, integration 288.
 
 ### 2026-11-06: PR #36 merged; lookups and recorded times (PR #37)
 - PR #36 merged as `e0f1e2d`; `main`'s CI passed on it (42336948253), and `release_check.py

@@ -572,8 +572,9 @@ def decide(
         )
         s.add(ad)
         s.flush()
-        # Human wait: submitted for approval (status_changed_at) to this decision.
-        waited = max((now - pr.status_changed_at).total_seconds(), 0.0)
+        # Human wait: submitted for approval (status_changed_at) to this decision, both
+        # recorded by the database.
+        waited = max((ad.decided_at - pr.status_changed_at).total_seconds(), 0.0)
         metrics.after_commit(s, lambda: metrics.APPROVAL_WAIT.labels(decision).observe(waited))
         op: Operation | None = None
         if decision == "reject":

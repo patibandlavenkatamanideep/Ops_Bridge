@@ -254,7 +254,8 @@ def finish_operation(
     `count` is False when the operation was already counted as finished (a review of an
     unknown outcome)."""
     if status in TERMINAL and count:
-        elapsed = (_now() - op.created_at).total_seconds()
+        finished = s.execute(select(func.now())).scalar_one()  # the clock op.created_at is on
+        elapsed = (finished - op.created_at).total_seconds()
         connector = op.connector
 
         def _record() -> None:
