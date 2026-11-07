@@ -313,7 +313,7 @@ services:
 
   # Local receiver standing in for a pager and a ticket queue (scripts/alert_sink.py).
   alert-sink:
-    image: docker.io/library/python:3.12.15-slim-bookworm
+    image: docker.io/library/python:3.12.16-slim-bookworm
     profiles: [observability]
     command: ["python", "-I", "/sink/alert_sink.py", "--host", "0.0.0.0", "--port", "9099"]
     volumes:

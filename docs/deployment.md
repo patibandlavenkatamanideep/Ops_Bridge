@@ -15,7 +15,7 @@ been applied anywhere. Production readiness is not claimed.
 ## Local containers
 
 One image (`infra/containers/opsbridge.Dockerfile`, built from `backend/uv.lock` and
-`frontend/package-lock.json`; Python 3.12.15-slim, Node 24.22 for the UI build, uv 0.10.2)
+`frontend/package-lock.json`; Python 3.12.16-slim, Node 24.22 for the UI build, uv 0.10.2)
 runs every role as uid 10001. The build context is an allow-list (`.dockerignore`): `.env`,
 keys, `var/` and virtual environments never enter the image. Compose profile `app`:
 
