@@ -11,9 +11,9 @@ transport under each client bounds every response as it arrives:
   (connecting, TLS, sending, each read of the headers and the body) is capped at the time
   left, under `deadline_transport()`, and the deadline is checked when the headers have
   arrived, as each chunk arrives and at the end, so a reply trickling in, or late with no
-  chunk after it, stops there. The asynchronous MCP client is bounded by a cancel scope
-  around each call instead (mcp_services/client.py). Name resolution is not a socket wait:
-  a resolver that does not answer can delay a connection by its own timeout;
+  chunk after it, stops there. Looking the host up and trying each of its addresses count
+  against the same deadline, as in `http_transport`. The asynchronous MCP client is bounded
+  by a cancel scope around each call instead (mcp_services/client.py);
 - replies are asked for unencoded, and a compressed one is refused, since the client above
   would inflate it without a bound.
 
@@ -33,7 +33,7 @@ from typing import Any
 import httpcore2
 import httpx2
 
-from .http_transport import capped, until
+from .http_transport import addresses, capped, out_of_time, until
 
 # A model reply is a few kilobytes of JSON; an MCP tool result is smaller still.
 MAX_MODEL_REPLY_BYTES = 8 * 1024 * 1024
@@ -94,9 +94,24 @@ class DeadlineBackend(httpcore2.NetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[Any] | None = None,
     ) -> httpcore2.NetworkStream:
-        return _DeadlineStream(
-            self._inner.connect_tcp(host, port, capped(timeout), local_address, socket_options)
-        )
+        options = None if socket_options is None else list(socket_options)
+        try:
+            found = addresses(host, port)
+        except TimeoutError as exc:
+            raise httpcore2.ConnectTimeout(str(exc)) from exc
+        except OSError as exc:
+            raise httpcore2.ConnectError(str(exc)) from exc
+        for i, address in enumerate(found):  # in the resolver's order, each with the time left
+            try:
+                stream = self._inner.connect_tcp(
+                    address, port, capped(timeout), local_address, options
+                )
+            except (httpcore2.ConnectError, httpcore2.ConnectTimeout):
+                if i == len(found) - 1 or out_of_time():
+                    raise
+                continue
+            return _DeadlineStream(stream)
+        raise httpcore2.ConnectError(f"{host!r} has no address")
 
     def connect_unix_socket(
         self, path: str, timeout: float | None = None, socket_options: Iterable[Any] | None = None
