@@ -271,8 +271,9 @@ these itself, so they hold if the edge's configuration drifts:
   tried, and every connect, TLS, send and read of a request. A lookup that does not answer
   keeps its thread until the system resolver gives up (16 such threads at most); the request
   does not wait for it. An MCP call ends within three of its timeouts.
-- **Clocks.** Every time a decision compares with a recorded time is on the database's clock.
-  Expiry times the application sets are compared on its own clock, so run NTP on every host.
+- **Clocks.** Each comparison takes both its times from one clock: the database's for recorded
+  events, leases and the pilot cut-off; the application's for the session, proposal and
+  approval expiry it sets. Run NTP on every host, so the application's processes agree.
 - **Evidence bundles** are read in one bounded pass (`opsbridge/evaluation/bundle.py`).
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
