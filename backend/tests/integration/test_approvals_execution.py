@@ -10,7 +10,7 @@ import threading
 import time
 import uuid
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import httpx
@@ -672,6 +672,39 @@ def test_worker_crash_before_or_after_remote_commit_recovers_without_duplicate(
     assert op["confirmation"]["method"] == (
         "reconciled_by_marker" if when == "after" else "read_back"
     )
+
+
+@pytest.mark.parametrize(
+    "app_clock",
+    [timedelta(0), timedelta(hours=1)],
+    ids=["as it is", "an hour ahead of the database"],
+)
+def test_an_attempt_within_its_lease_holds_off_another_worker(
+    stack, worker_db: Database, monkeypatch: pytest.MonkeyPatch, app_clock: timedelta
+) -> None:  # type: ignore[no-untyped-def]
+    """A worker died mid-create. Until the attempt's lease has passed, another worker backs
+    off: it neither looks the task up nor sends it. The lease was measured by the worker's
+    own clock from a start the database recorded, so a worker whose clock ran ahead by more
+    than the lease took an attempt still in flight for an abandoned one."""
+    st = stack
+    case_id, prop = prepared(st, "INV-9001")
+    approve(st, case_id, prop)
+    use_connector(st, lambda: CrashingConnector(sim(st), "before"))
+    with pytest.raises(SimulatedCrash):
+        st["worker"].run_once()
+    use_connector(st, lambda: sim(st))
+    monkeypatch.setattr(execution, "_now", lambda real=execution._now: real() + app_clock)
+    with worker_db.session(DbContext()) as s:  # the job's lease has passed, the attempt's not
+        s.execute(
+            text(
+                "UPDATE jobs SET lease_expires_at = now() - interval '1 second', run_after = now() "
+                "WHERE status IN ('leased', 'queued')"
+            )
+        )
+    drain(st)
+    [op] = operations(st, case_id)
+    assert [(a["kind"], a["status"]) for a in op["attempts"]] == [("dispatch", "started")]
+    assert remote_tasks(st, op) == []
 
 
 # --- cancellation and local actions -------------------------------------------------------------
