@@ -267,9 +267,12 @@ these itself, so they hold if the edge's configuration drifts:
   `OPSBRIDGE_SOURCE_CLOCK_SKEW_SECONDS` (300) is not read. Within that, its data is taken as
   read now, never later, so a source clock cannot lengthen the window for acting on a result.
 - **Outbound HTTP.** Connectors and the Anthropic SDK connect directly: `HTTP(S)_PROXY` and
-  `ALL_PROXY` are not used. One deadline caps every connect, TLS, send and read of a request.
-  Name resolution is not capped: a resolver that does not answer can delay a connection by its
-  own timeout. An MCP call ends within three of its timeouts.
+  `ALL_PROXY` are not used. One deadline caps the lookup of the host's name, each address
+  tried, and every connect, TLS, send and read of a request. A lookup that does not answer
+  keeps its thread until the system resolver gives up (16 such threads at most); the request
+  does not wait for it. An MCP call ends within three of its timeouts.
+- **Clocks.** Every time a decision compares with a recorded time is on the database's clock.
+  Expiry times the application sets are compared on its own clock, so run NTP on every host.
 - **Evidence bundles** are read in one bounded pass (`opsbridge/evaluation/bundle.py`).
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
