@@ -38,7 +38,7 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `79992cd` (PR #30), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `e0f1e2d` (PR #36), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`, and its remainder (a re-read's uncertainty lost the reason) as `investigation/1.3.0` on 6 November; v1 recordings replay with `investigation/1.1.0` in their declared order and v1-rerun's with 1.2.0, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
@@ -60,7 +60,7 @@ regression failed for the stated reason before the fix.
 | Item | Value |
 |---|---|
 | Reviewed `main` | `79992cd` (5 November 2026), CI run 41980269125 green; Python `0.1.0a1`, frontend `0.1.0-alpha.1`, unpublished |
-| Work | `feat/opsbridge-foundation`, from `79992cd` (working tree clean); PR #36 |
+| Work | `feat/opsbridge-foundation`, from `79992cd`; PR #36, merged on 7 November (UTC) as `e0f1e2d`, whose CI run on `main`, 42336948253, passed all four jobs. Follow-up fixes in PR #37 |
 | Ruleset | Live ruleset 26598146 on `main`, active: pull requests only, the four CI jobs required on an up-to-date branch, review threads resolved, no force push or deletion, administrators bypass only by merging a pull request, **0 approvals**. It is not enforced independent review |
 | Gates run here | Unit, integration (PostgreSQL 16, Keycloak and MCP in Podman), canary, receipts, replay check, lint and types. **Not here:** the image build (about 3 GB of disk free), Landlock and seccomp (macOS), OCR (no tesseract), browser tests (not run this session). Those run in hosted CI and are named, not counted as passed |
 | Review documents | `PRODUCTION_REVIEW.md` and its file inventory were not supplied. The findings are taken from the brief, which does not define N09 |
@@ -73,7 +73,7 @@ regression failed for the stated reason before the fix.
 | N04 | Evidence bundle extraction unbounded | Yes: a member given twice, a manifest not first, a broken checksum and data after the end were accepted; no cap on expansion or any file | `evaluation/bundle.py` | One bounded pass: strict manifest first, canonical listed regular files given once, per-file, header and expansion limits, checksum read to the end, nothing extracted on refusal | `evaluation/test_evidence_bundle.py` (26, reduced limits, small archives); the reproducible round trip still verifies | Limits sized from the current bundle |
 | N05 | Pilot report not historical | Yes: an approval made after the cut-off counted as approved as drafted, and as a decision reached | `pilot/cohort.py` (new), `pilot/collect.py`, `pilot/measures.py`, `pilot/reference.py`, `cli.py`, `persistence/db.py`, migration 0023, `docs/pilot-plan.md` | Protocol `opsbridge-pilot/2`: a frozen cohort; only what existed at the cut-off, in one read-only, repeatable-read snapshot; every enrolled invoice accounted for; incomplete when a decision is missing; coverage apart from accuracy; provenance in the report | `tests/pilot/` (48), `integration/test_pilot_report.py` (4: later events change nothing; a concurrent commit is unseen and is seen under read committed, a mutation that fails the test), `test_migration_0023.py` | No pilot data, cohort or reviewer; no `/1` result existed to show beside `/2` |
 | N06 | Credential ownership incomplete | Yes: a staging connection without a reference received the deployment token; `a-b` and `a_b` both read one secret | `services/connections.py`, `config.py`, `api/routes/admin.py` | Deployed, each GitHub connection names a credential registered to its tenant and repository; colliding references are refused; a tenant is shown only the repositories it can use | `tests/test_connection_credentials.py`, `integration/test_credential_registry.py` | Per-tenant secrets at staging; a revoked credential is never reused, so its possible writes go to a person |
-| N07 | Total deadlines not truthful | Yes: trickled headers held a 0.6 s purchasing read for 7.4 s and a 0.5 s model request for 7.4 s; an MCP call to a silent server took 10.3 s against 0.3 s; late-ending replies were accepted | `connectors/http_transport.py`, `connectors/sdk_transport.py`, the connectors, `agents/adapters.py`, `mcp_services/client.py` | Every socket wait is capped at the time left of one deadline; the deadline is checked after the headers and at the end; an MCP call ends within its total | `test_http_transport.py`, `test_sdk_transport.py` (fake clocks and a scripted server, wall time); full integration | Name resolution is not capped; connectors no longer use environment proxies |
+| N07 | Total deadlines not truthful | Yes: trickled headers held a 0.6 s purchasing read for 7.4 s and a 0.5 s model request for 7.4 s; an MCP call to a silent server took 10.3 s against 0.3 s; late-ending replies were accepted | `connectors/http_transport.py`, `connectors/sdk_transport.py`, the connectors, `agents/adapters.py`, `mcp_services/client.py` | Every socket wait is capped at the time left of one deadline; the deadline is checked after the headers and at the end; an MCP call ends within its total | `test_http_transport.py`, `test_sdk_transport.py` (fake clocks and a scripted server, wall time); full integration | Since PR #37, the lookup and each address count against the deadline too: a lookup that never answered held a 0.5 s request for 3 s, and three unanswered addresses took 1.6 s against 0.6 s. A silent lookup keeps its thread until the resolver gives up; connectors no longer use environment proxies |
 | N08 | Offline replay egress | Yes: a client made before the guard reached a loopback proxy, which received the CONNECT; proxy variables stayed set; live modes were not refused | `evaluation/egress.py`, `evaluation/bench.py`, `cli.py`, `evaluation/canary.py`, `evaluation/local_server.py` | Proxy variables are removed and their ports refused while the guard holds; only registered loopback ports; live modes refused before a run | `evaluation/test_offline_proxy_guards.py`; replay check reproduces every recorded run | A Python-level guard, not a sandbox |
 | N09 | Not defined in the supplied brief | Not reproduced | Nothing | — | — | The owner to name it |
 
@@ -88,6 +88,16 @@ Also from the brief's Phase G, done locally:
     runner;
   - rulesets that make release tags immutable and administrator-created are prepared for the
     owner, not applied.
+
+Found after the merge (PR #37): every recorded time was meant to be on the database's clock,
+and the pilot report relies on it, but a proposal's status changes were dated by the
+application's. `test_nothing_done_after_the_cut_off_changes_a_report_of_it` failed by chance
+with the database 0.2 s ahead; with the application's clock 5 minutes behind, changes after
+the cut-off counted before it, and 5 minutes ahead, a proposal superseded before it was still
+awaiting approval. The database dates them now. The same mix decided whether another worker's
+attempt was in flight: with the worker's clock an hour ahead, it reconciled and dispatched
+instead of backing off. The lease is measured on the database's clock now; that back-off had
+no test before.
 
 Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-2026-109518,
 fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
@@ -706,8 +716,9 @@ belongs on PR #25's merge commit instead. That is `23b2f84`: its CI run on `main
 (41485053120) passed all four jobs, and all three checks pass on it. On 3 November so did
 PR #27's merge commit `77a515b` (CI run 41568201604), whose release also builds, verifies
 and attests the evidence bundle (Package 8, evidence packaging). Each merge since has
-qualified too, the latest on 5 November: `79992cd` (PR #30; CI run 41980269125), which also
-confines parser subprocesses. The first tag belongs there. The ruleset's check names match
+qualified too: on 5 November `79992cd` (PR #30; CI run 41980269125), which also confines
+parser subprocesses, and on 7 November (UTC) `e0f1e2d` (PR #36; CI run 42336948253), which
+fixes the review of 5 November (N01–N08). The first tag belongs there. The ruleset's check names match
 CI, and a test keeps them matched. The workflow has not run (no tag), so its first use is
 its first test, and no attestation exists yet. The promotion relies on `docker buildx
 imagetools create` keeping a single image index as it is. The step therefore refuses, before
@@ -959,15 +970,19 @@ and blindness is shown only by the recorded time.
      it found that the release did not repeat CI's mount-point check, now added (A12; PR
      #30, merged on 5 November as `79992cd`, whose CI run on `main`, 41980269125, passed all
      four jobs and which `release_check.py ci` accepts). The owner then applied the `main`
-     ruleset, and a test ties its required checks to CI's job names (A12).
+     ruleset, and a test ties its required checks to CI's job names (A12). The fixes for the
+     review of 5 November followed (N01–N08; PR #36, merged on 7 November (UTC) as `e0f1e2d`,
+     whose CI run on `main`, 42336948253, passed all four jobs and which `release_check.py
+     ci` accepts).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `79992cd`;
+   - the release workflow has not run; its preconditions pass on `e0f1e2d`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - push `v0.1.0-alpha.1` on `main`'s head, `79992cd` (PR #30), which carries the fixed
-     pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12, A17);
+   - push `v0.1.0-alpha.1` on `main`'s head, `e0f1e2d` (PR #36), which carries the fixed
+     pypdf, OpenSSL and `apt`, the HIGH gate, the evidence bundle and the N01–N08 fixes (A12,
+     A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);
