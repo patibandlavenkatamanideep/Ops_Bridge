@@ -11,13 +11,16 @@ while matching runs also makes it stale (a false alarm at worst, never a missed 
 This is local freshness only: it cannot show that the source system has not changed since
 the records were fetched. For that, an investigation also records when it read the purchasing
 system and until when its result may be acted on (`source_max_age_hours`); after that, or
-when the time was not recorded, the result is stale too.
+when the time was not recorded, the result is stale too. Purchasing data is never newer than
+the investigation that read it: a read time later than when the investigation was stored (a
+source clock ahead, recorded before review N03 refused that) moves the window back by as
+much.
 """
 
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import or_, select
@@ -88,12 +91,22 @@ def stale_reason(s: Session, case_id: uuid.UUID, iv: InvestigationVersion) -> st
     )
     if now["digest"] != recorded["digest"]:
         return STALE
+    return source_window_problem(recorded, iv.created_at, now=datetime.now(UTC))
+
+
+def source_window_problem(
+    recorded: dict[str, Any], stored_at: datetime, *, now: datetime
+) -> str | None:
+    """None while the purchasing data an investigation recorded may still be acted on."""
     if "source_valid_until" not in recorded:
         return "the investigation does not record when it read the purchasing system; re-run it"
-    if datetime.now(UTC) > datetime.fromisoformat(recorded["source_valid_until"]):
-        read = datetime.fromisoformat(recorded["source_read_at"])
+    read = datetime.fromisoformat(recorded["source_read_at"])
+    until = datetime.fromisoformat(recorded["source_valid_until"])
+    ahead = max(read - stored_at, timedelta(0))
+    if now > until - ahead:
+        shown = (read - ahead).astimezone(UTC)
         return (
-            f"purchasing data was read at {read:%Y-%m-%d %H:%M} UTC, longer ago than the "
+            f"purchasing data was read at {shown:%Y-%m-%d %H:%M} UTC, longer ago than the "
             "limit for acting on it; re-run the investigation"
         )
     return None

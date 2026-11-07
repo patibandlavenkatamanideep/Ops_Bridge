@@ -3,10 +3,13 @@
 The release workflow has never run: its first tag is its first test. These read the workflow
 files the way Actions will and catch, before that, what would otherwise fail a release
 halfway: a step output read but never written, an action not pinned to a commit, or a check
-of CI's image job that the release does not repeat on the digest it publishes."""
+of CI's image job that the release does not repeat on the digest it publishes. The ruleset on
+`main` (applied 5 November 2026) names CI's jobs: one it names wrongly never reports, and then
+nothing merges."""
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 from typing import Any
@@ -88,3 +91,45 @@ def test_the_release_repeats_every_check_of_ci_image_job_on_its_candidate() -> N
     ]
     assert gates[0]["severity"] == gates[1]["severity"] == "CRITICAL,HIGH"
     assert gates[0]["ignore-unfixed"] == gates[1]["ignore-unfixed"]
+
+
+def test_the_main_ruleset_requires_every_ci_job_by_the_name_it_reports() -> None:
+    """A required check that no job reports blocks every merge into main; a job the ruleset
+    leaves out can fail and still be merged."""
+    ruleset = json.loads((REPO_ROOT / "infra/github/main-ruleset.json").read_text("utf-8"))
+    (checks,) = [r["parameters"] for r in ruleset["rules"] if r["type"] == "required_status_checks"]
+    required = [check["context"] for check in checks["required_status_checks"]]
+    jobs = load(REPO_ROOT / ".github/workflows/ci.yml")["jobs"]
+    assert sorted(required) == sorted(job.get("name", key) for key, job in jobs.items())
+    assert checks["strict_required_status_checks_policy"] is True
+    assert ruleset["conditions"]["ref_name"]["include"] == ["~DEFAULT_BRANCH"]
+
+
+def test_the_release_accepts_only_its_own_attestation_of_the_tag() -> None:
+    """`--repo` alone accepts an attestation any workflow of the repository signed, from any
+    ref or runner (Phase E: narrow the identities verification allows)."""
+    release = load(REPO_ROOT / ".github/workflows/release.yml")["jobs"]["release"]
+    verify = next(s["run"] for s in release["steps"] if "attestation verify" in s.get("run", ""))
+    assert '--signer-workflow "${GITHUB_REPOSITORY}/.github/workflows/release.yml"' in verify
+    assert '--source-ref "${GITHUB_REF}"' in verify
+    assert "--deny-self-hosted-runners" in verify
+
+
+def test_release_tags_can_be_created_by_administrators_only_and_never_moved() -> None:
+    """Prepared for the owner to apply (docs/deployment.md): a release names its image by
+    its tag, so a tag moved or deleted after a release would point at something else."""
+    on = load(REPO_ROOT / ".github/workflows/release.yml").get(True) or {}
+    patterns = {f"refs/tags/{p}" for p in on["push"]["tags"]}
+    immutable, creation = (
+        json.loads((REPO_ROOT / f"infra/github/release-tags-{n}-ruleset.json").read_text("utf-8"))
+        for n in ("immutable", "creation")
+    )
+    for ruleset in (immutable, creation):
+        assert ruleset["target"] == "tag" and ruleset["enforcement"] == "active"
+        assert set(ruleset["conditions"]["ref_name"]["include"]) == patterns
+    assert {r["type"] for r in immutable["rules"]} == {"update", "deletion"}
+    assert immutable["bypass_actors"] == []  # no one, administrators included
+    assert [r["type"] for r in creation["rules"]] == ["creation"]
+    assert creation["bypass_actors"] == [
+        {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
+    ]  # repository administrators

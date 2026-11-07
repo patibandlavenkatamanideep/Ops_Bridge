@@ -5,7 +5,9 @@ dispatch read whatever secret `OPSBRIDGE_CONNECTION_SECRET_<REF>` held; an allow
 repository said nothing about who owns a credential. Now the deployment registers each
 reference with the tenant, connector and repositories it may serve; a reference that is not
 registered to the tenant and destination is refused when the connection is set and is never
-read at dispatch.
+read at dispatch. In staging and production a connection must name one: the deployment's own
+token no longer serves a connection without a reference, and a tenant is shown only the
+repositories registered to it (review N06).
 """
 
 from __future__ import annotations
@@ -112,3 +114,34 @@ def test_dispatch_never_reads_a_secret_the_tenant_does_not_own(
         connections.credential(settings, row("it-github"), "github_issues", "demo-it")
         == "it-secret"
     )
+
+
+def test_a_deployed_github_connection_must_name_a_registered_credential(
+    stack, app_db: Database, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    staging = _settings(stack).model_copy(update={"env": "staging"})
+    admin = it_admin(stack, migrator_engine)
+    with pytest.raises(Conflict) as exc:
+        connections.change(
+            app_db, admin, staging, connector="github_issues", repository=SANDBOX_REPO,
+            credential_ref=None, reason="the deployment token",
+        )  # fmt: skip
+    assert exc.value.code == "credential_required"
+    made = connections.change(
+        app_db, admin, staging, connector="github_issues", repository=SANDBOX_REPO,
+        credential_ref="it-github", reason="its own credential",
+    )  # fmt: skip
+    assert made["credential_configured"] is False  # registered; its secret is not set here
+    assert made["credential_source"] == "secret store reference 'it-github'"
+
+
+def test_a_tenant_is_shown_only_the_repositories_registered_to_it(
+    stack, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    staging = _settings(stack).model_copy(update={"env": "staging"})
+    shown = connections.history(stack["deps"].db, it_admin(stack, migrator_engine), staging)
+    assert shown["allowed_repositories"] == [SANDBOX_REPO]  # not OTHER_REPO, on the allowlist
+    development = connections.history(
+        stack["deps"].db, it_admin(stack, migrator_engine), _settings(stack)
+    )
+    assert development["allowed_repositories"] == sorted([SANDBOX_REPO, OTHER_REPO])

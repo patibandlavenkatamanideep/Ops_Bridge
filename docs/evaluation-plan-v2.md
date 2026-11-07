@@ -72,6 +72,24 @@ looked up separately from the call is not evidence of what generated a response.
   sequential plan with its stopping rule written down in advance.
 - A null or inconclusive result is a result and is published as such.
 
+## Prepared before any label (6 November 2026)
+
+- `opsbridge/evaluation/labeling.py` and `opsbridge eval-labels` read the labels and the
+  adjudications strictly. Every case needs two or more labellers, values come from OpsBridge's
+  vocabulary, and fact ids stay opaque until the instructions define them. They report:
+  - agreement per field and labeller pair, as Cohen's kappa, with the raw agreement it
+    corrects (a set field counts one decision per case and member);
+  - every disagreement with every label, never overwritten.
+
+  An adjudication must come from someone who did not label the case and must give a reason.
+  A case still in dispute is left out of the reference, which is then incomplete.
+  Tested on labels written by hand: `tests/evaluation/test_labeling.py`, kappas checked
+  against values worked out by hand.
+- Sample size and power: the paired comparison uses evalseal's exact McNemar test, as v1
+  does. Evalseal's `power` simulation and `min_discordant_items` (six one-directional
+  discordant cases at alpha 0.05) size it once the owner names the smallest difference worth
+  paying for.
+
 ## Blocked on the owner
 
 Independent labellers and their time; authorized case data; a model credential, a budget and

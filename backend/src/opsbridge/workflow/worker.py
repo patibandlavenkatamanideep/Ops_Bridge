@@ -54,7 +54,10 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
         """The organization's purchasing source: its export when the deployment reads
         exports, otherwise the simulator."""
         if settings.purchasing_export_dir is not None:
-            return ExportSource(settings.purchasing_export_dir / org)
+            return ExportSource(
+                settings.purchasing_export_dir / org,
+                max_skew=timedelta(seconds=settings.source_clock_skew_seconds),
+            )
         return PurchasingClient(
             settings.simulator_url, secret, org, timeout=settings.connector_timeout_seconds
         )

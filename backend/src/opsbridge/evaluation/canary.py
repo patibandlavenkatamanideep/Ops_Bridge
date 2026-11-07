@@ -26,7 +26,7 @@ SPLITS = ("dev", "validation", "security")
 def run(root: Path) -> dict[str, Any]:
     book = PolicyBook(root / "packs")
     cases: dict[str, Any] = {}
-    with loopback_only():
+    with loopback_only(ports=set()):  # the rules run in-process: no socket at all
         for split in SPLITS:
             for s in load_corpus(root / "fixtures" / "scenarios" / f"{split}.yaml").scenarios:
                 v = evaluate(s, book)

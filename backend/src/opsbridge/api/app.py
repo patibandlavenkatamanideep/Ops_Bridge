@@ -18,6 +18,7 @@ from opsbridge.evidence.parsers import require_sandbox
 from opsbridge.persistence.db import Database, get_database
 
 from . import errors
+from .body_limits import BodyLimit
 from .deps import AppState
 from .middleware import FixedWindowLimiter, PerimeterMiddleware
 from .routes import admin, auth, cases, evaluations, health, investigations, proposals
@@ -47,7 +48,13 @@ def create_app(
     app.state.oauth = auth.build_oauth(settings)
     errors.install(app)
 
-    # Order: the last added middleware runs first.
+    # Order: the last added middleware runs first. The body limit runs last, nearest the
+    # routes, so the perimeter's rate limit and correlation id apply to its refusals.
+    app.add_middleware(
+        BodyLimit,
+        max_bytes=settings.max_request_bytes,
+        max_seconds=settings.max_request_body_seconds,
+    )
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,

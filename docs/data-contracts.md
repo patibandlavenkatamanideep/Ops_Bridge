@@ -127,7 +127,8 @@ server of different versions) is shown as "the app and server versions differ", 
 rendered half-understood; fields a newer server adds are allowed. Errors are
 `{"error": {"code", "message", "correlation_id", "retryable", "details"}}`; status codes
 distinguish 401, 403, 404 (also for other tenants' resources), 409 (conflict, stale version,
-not entitled), 411/413 (body), 422, 429, 503 (dependency). Writes need the CSRF header.
+not entitled), 408/413 (a body not received in time, or past the limit), 422, 429, 503
+(dependency). Writes need the CSRF header.
 
 ## Jobs and events
 

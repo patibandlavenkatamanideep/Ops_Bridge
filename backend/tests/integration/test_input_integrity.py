@@ -6,6 +6,8 @@ was assessed, so nothing was found) and the case could then be resolved; an unre
 was dropped and the rest of the invoice matched; a receipt whose return line could not be
 read still counted the goods as received. Now the record is not built, the document needs
 review, and an investigation does not conclude while a document of the case needs review.
+An invoice naming a member twice is such a document too (review N01): it used to be read as
+the last of its two quantities and matched.
 """
 
 from __future__ import annotations
@@ -73,6 +75,27 @@ def test_invoice_lines_that_cannot_be_read_neither_match_nor_resolve(stack, item
     assert second["version"] == 2
     assert second["outcome"] == "manual_review", second["findings"]
     assert "invoice_extraction_needs_review" in {f["reason_code"] for f in second["findings"]}
+    r = _resolve(st, case_id)
+    assert r.status_code == 409 and r.json()["error"]["code"] == "resolution_evidence_missing"
+
+
+def test_an_invoice_giving_a_quantity_twice_neither_matches_nor_resolves(stack) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    store = st["store"]
+    original = store.get_record(ORG, "invoices", "INV-7001")
+    assert original is not None
+    text = json.dumps(json.loads(original[0]))
+    assert text.count('"quantity": "10"') == 1
+    twice = text.replace('"quantity": "10"', '"quantity": 999999, "quantity": "10"').encode()
+    store.put_record(ORG, "invoices", "INV-7001", twice, original[1], "PO-2001")
+    try:
+        case_id = open_case(st, WHO, ORG, "INV-7001")
+        investigate(st, WHO, ORG, case_id)
+    finally:
+        store.put_record(ORG, "invoices", "INV-7001", original[0], original[1], "PO-2001")
+    result = _latest(st, case_id)
+    assert result["outcome"] == "manual_review", result["findings"]
+    assert "invoice_extraction_needs_review" in {f["reason_code"] for f in result["findings"]}
     r = _resolve(st, case_id)
     assert r.status_code == 409 and r.json()["error"]["code"] == "resolution_evidence_missing"
 

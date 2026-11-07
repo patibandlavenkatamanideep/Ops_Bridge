@@ -30,6 +30,14 @@ snapshot). An export that is not there at all is `SourceUnavailable`. The data i
 the export: `as_of` is `extracted_at`, which an investigation records as its read time, so the
 age limit applies to the export, not to when it was read.
 
+Times (review N03). `extracted_at` and `modified_at` are RFC 3339 times with a zone, written
+`2026-10-28T09:00:00+00:00` or with `Z`; anything else is refused. Three times are kept apart:
+what the export asserts (`as_of`), when this host read the manifest (`observed_at`), and the
+manifest's own digest (`snapshot`), which names the snapshot read. An `extracted_at` later
+than `observed_at` by more than `max_skew` is refused: an export dated ahead would otherwise
+stay current until its claimed time plus the age limit. Within the allowance the
+investigation takes the earlier of the two as the data's age (workflow/investigation.py).
+
 This proves the contract against hand-written exports only; no customer export has been read.
 """
 
@@ -37,8 +45,9 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -54,6 +63,8 @@ MAX_RECORDS = 10_000
 _KEY_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 _COLLECTION_RE = re.compile(r"^[a-z_]{1,40}$")
 _SHA_RE = re.compile(r"^[0-9a-f]{64}$")
+_RFC3339 = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2})$")
+MAX_CLOCK_SKEW = timedelta(minutes=5)  # how far ahead of this host a source's clock may be
 
 
 @dataclass(frozen=True)
@@ -67,32 +78,51 @@ class _Entry:
 
 
 def _time(value: Any, what: str) -> datetime:
+    shown = ascii(value)[:60]
+    if not isinstance(value, str) or not _RFC3339.match(value):
+        raise SourceRecordInvalid(f"export {what} is not an RFC 3339 time with a zone: {shown}")
     try:
-        t = datetime.fromisoformat(str(value))
-    except ValueError as exc:
-        raise SourceRecordInvalid(f"export {what} is not a time: {value!r}") from exc
-    if t.tzinfo is None:
-        raise SourceRecordInvalid(f"export {what} has no time zone")
-    return t
+        return datetime.fromisoformat(value)
+    except ValueError as exc:  # the right form, out of range (month 13, offset +24:00)
+        raise SourceRecordInvalid(f"export {what} is not a time: {shown}") from exc
+
+
+def _now() -> datetime:
+    return datetime.now(UTC)
 
 
 class ExportSource:
     connector_version = CONNECTOR_VERSION
 
-    def __init__(self, root: Path) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        now: Callable[[], datetime] = _now,
+        max_skew: timedelta = MAX_CLOCK_SKEW,
+    ) -> None:
         self.root = root.resolve()
         path = self.root / "manifest.json"
         if not path.is_file():
             raise SourceUnavailable(f"no export at {root}")
         if path.stat().st_size > MAX_MANIFEST_BYTES:
             raise SourceRecordInvalid("export manifest too large")
+        raw = path.read_bytes()
+        self.observed_at = now()
+        self.snapshot = hashlib.sha256(raw).hexdigest()
         try:
-            m = safejson.loads(path.read_bytes())
+            m = safejson.loads(raw)
         except ValueError as exc:
             raise SourceRecordInvalid(f"export manifest unreadable: {exc}") from exc
         if not isinstance(m, dict) or m.get("schema") != EXPORT_SCHEMA:
             raise SourceRecordInvalid(f"export schema is not {EXPORT_SCHEMA}")
         self.as_of = _time(m.get("extracted_at"), "extracted_at")
+        if self.as_of > self.observed_at + max_skew:
+            ahead = self.as_of - self.observed_at
+            raise SourceRecordInvalid(
+                f"export extracted_at {self.as_of.isoformat()} is {ahead} ahead of this "
+                f"host's clock (allowed: {max_skew})"
+            )
         if not isinstance(m.get("complete"), bool):
             raise SourceRecordInvalid("export does not say whether it is complete")
         self.complete: bool = m["complete"]

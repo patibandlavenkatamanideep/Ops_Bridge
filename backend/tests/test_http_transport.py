@@ -9,14 +9,24 @@ stops at a total deadline the per-read timeout never reaches.
 A compressed body is accepted only when its stream reached its own end: one that stops short
 (even after a complete-looking document), fails its checksum, or carries anything after its
 end (a second gzip member included) is a decoding error, never a body.
+
+One deadline covers the whole exchange (review N07). It was checked only between body
+chunks: connecting and the headers were bounded by the per-read timeout alone (headers sent a
+byte at a time never ended), a read that blocked waited its full timeout however little of
+the total was left, and a reply whose headers or end arrived late with no chunk after them
+was accepted. Now every socket wait is capped at the time left, and the deadline is checked
+after the headers and at the end of the body. Fake clocks test the checks; a scripted
+loopback server tests the waits in wall time.
 """
 
 from __future__ import annotations
 
 import gzip
 import json
+import ssl
+import time
 import zlib
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from typing import Any
 
 import httpx
@@ -288,3 +298,114 @@ def test_an_unreadable_compressed_source_record_is_not_read() -> None:
     )  # fmt: skip
     with pytest.raises(SourceUnavailable):
         source.fetch("invoices", "INV-1")
+
+
+# --- one deadline over every phase (review N07) ----------------------------------------
+
+from .scripted_server import OK_HEADERS, scripted, trickle  # noqa: E402
+
+
+def stepping(*times: float) -> Callable[[], float]:
+    """A clock answering `times` in turn, then the last one again."""
+    seen = list(times)
+
+    def clock() -> float:
+        return seen.pop(0) if len(seen) > 1 else seen[0]
+
+    return clock
+
+
+def test_a_reply_whose_headers_arrive_after_the_deadline_is_refused_even_when_empty() -> None:
+    client = _client(lambda request: httpx.Response(200, content=iter([])))
+    with pytest.raises(ht.ReadDeadlineExceeded):
+        ht.request(client, "GET", "/late", max_bytes=MiB, total_seconds=10, clock=stepping(0, 11))
+
+
+def test_a_body_that_ends_after_the_deadline_is_refused() -> None:
+    client = _client(lambda request: httpx.Response(200, content=Body(1024, chunk=b"x" * 1024)))
+    clock = stepping(0, 1, 1, 11)  # started; the headers; the one chunk; the end, too late
+    with pytest.raises(ht.ReadDeadlineExceeded):
+        ht.request(client, "GET", "/late-end", max_bytes=MiB, total_seconds=10, clock=clock)
+    on_time = _client(lambda request: httpx.Response(200, content=Body(1024, chunk=b"x" * 1024)))
+    r = ht.request(on_time, "GET", "/", max_bytes=MiB, total_seconds=10, clock=stepping(0, 1, 2, 3))
+    assert len(r.content) == 1024
+
+
+class _Recording:
+    """Network backend and stream doubles that record the timeouts they are given."""
+
+    def __init__(self) -> None:
+        self.timeouts: list[float | None] = []
+
+    def connect_tcp(
+        self, host: str, port: int, timeout: float | None = None, *_: object
+    ) -> _Recording:
+        self.timeouts.append(timeout)
+        return self
+
+    def read(self, max_bytes: int, timeout: float | None = None) -> bytes:
+        self.timeouts.append(timeout)
+        return b""
+
+    def write(self, buffer: bytes, timeout: float | None = None) -> None:
+        self.timeouts.append(timeout)
+
+    def start_tls(
+        self,
+        ssl_context: ssl.SSLContext,
+        server_hostname: str | None = None,
+        timeout: float | None = None,
+    ) -> _Recording:
+        self.timeouts.append(timeout)
+        return self
+
+    def close(self) -> None:
+        pass
+
+
+def test_every_socket_wait_is_capped_at_the_time_left() -> None:
+    inner = _Recording()
+    backend = ht.DeadlineBackend(inner)  # type: ignore[arg-type]
+    with ht.deadline(0.25):
+        stream = backend.connect_tcp("source", 443, timeout=30.0)
+        tls = stream.start_tls(ssl.create_default_context(), "source", timeout=30.0)
+        tls.write(b"GET / HTTP/1.1\r\n\r\n", timeout=30.0)
+        tls.read(65536, timeout=30.0)
+        tls.read(65536, timeout=None)  # no per-read timeout: the deadline still applies
+    assert len(inner.timeouts) == 5
+    assert all(t is not None and 0 < t <= 0.25 for t in inner.timeouts), inner.timeouts
+    inner.timeouts.clear()
+    backend.connect_tcp("source", 443, timeout=30.0).read(1, timeout=30.0)  # outside a request
+    assert inner.timeouts == [30.0, 30.0]
+
+
+CHUNKED = b"HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nTransfer-Encoding: chunked\r\n\r\n"
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [(3.0, OK_HEADERS + b"{}")],
+        trickle(OK_HEADERS, 0.1),  # each byte inside the per-read timeout; ~7 s in all
+        [(0.0, CHUNKED + b"1\r\n{\r\n"), (3.0, b"1\r\n}\r\n0\r\n\r\n")],
+    ],
+    ids=["delayed headers", "trickled headers", "a blocked body read"],
+)
+def test_every_phase_counts_against_one_total_deadline(steps: list[tuple[float, bytes]]) -> None:
+    with scripted(steps) as script:
+        client = httpx.Client(base_url=script.url, timeout=30.0, transport=ht.deadline_transport())
+        started = time.monotonic()
+        with client, pytest.raises(httpx.TimeoutException):
+            ht.request(client, "GET", "/", max_bytes=MiB, total_seconds=0.5)
+        assert time.monotonic() - started < 1.5
+        assert script.client_closed.wait(2.0)  # the refused connection is not left open
+
+
+def test_a_connector_built_without_a_transport_keeps_its_total_deadline() -> None:
+    with scripted(trickle(OK_HEADERS + b"{}", 0.1)) as script:
+        source = PurchasingClient(script.url, "secret", "org", timeout=0.2)  # 0.6 s in all
+        started = time.monotonic()
+        with pytest.raises(SourceUnavailable):
+            source.fetch("invoices", "INV-1")
+        source.close()
+        assert time.monotonic() - started < 2.0

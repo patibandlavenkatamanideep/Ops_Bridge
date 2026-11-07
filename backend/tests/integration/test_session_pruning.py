@@ -12,7 +12,8 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import Engine, update
+from sqlalchemy import Engine, text, update
+from sqlalchemy.exc import DBAPIError
 
 from opsbridge.auth.sessions import create_session, hash_token, prune_sessions
 from opsbridge.config import get_settings
@@ -54,3 +55,20 @@ def test_sessions_that_ended_before_the_grace_period_are_pruned(
     assert present(active) and present(recent)
     assert not any(present(h) for h in (expired, idle, revoked))
     assert prune_sessions(worker_db, timedelta(hours=24)) == 0  # nothing more to remove
+
+
+@pytest.mark.parametrize("keep", ["-100 years", "1 day -25 hours", None])
+def test_the_function_refuses_a_period_that_would_reach_live_sessions(
+    app_db: Database, worker_db: Database, migrator_engine: Engine, keep: str | None
+) -> None:
+    """Python checks the setting (above 0), but the function is what the worker may execute:
+    `ops.prune_sessions('-100 years')` deleted every session, live ones included, as the
+    pruning role, which may delete any tenant's (review G: maintenance functions validate
+    their own arguments)."""
+    uid = make_user(migrator_engine, "live-person")
+    h = hash_token(create_session(app_db, get_settings(), uid, ID_TOKEN))
+    with pytest.raises(DBAPIError, match="keep must be a non-negative interval"):
+        with worker_db.session(DbContext()) as s:
+            s.execute(text("SELECT ops.prune_sessions(CAST(:keep AS interval))"), {"keep": keep})
+    with app_db.session(DbContext(session_hash=h)) as s:
+        assert s.get(UserSession, h) is not None  # the live session is still there

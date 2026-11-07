@@ -9,7 +9,9 @@ in. The v1 benchmark runs rules-only before mock (its frozen order), and its rec
 replay only in that order. Run in another order, the replay must fail closed (a request that
 differs from the recording), never yield a different result quietly. Uses the committed
 security recording (not held-out data). `investigation/1.2.0` removed the order dependence
-(test_reinvestigation_regression_cases.py).
+from the finding text (test_reinvestigation_regression_cases.py), and 1.3.0 from the case's
+uncertainty too (test_reinvestigation_reason.py); recordings keep the version they were made
+with.
 """
 
 from __future__ import annotations

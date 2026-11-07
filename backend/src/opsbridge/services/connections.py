@@ -8,10 +8,25 @@ deployment's secret store, read here from `OPSBRIDGE_CONNECTION_SECRET_<REF>` (u
 `-` as `_`); the secret is never stored or shown. A reference must be registered by the
 deployment for this tenant, connector and repository (`connection_credentials`): checked when
 the connection is set and again before the secret is read, so a tenant cannot use another
-tenant's credential, nor one a repository allowlist happens to permit. A GitHub connection
-without a reference uses the deployment's `OPSBRIDGE_GITHUB_TOKEN`. Repositories must be on
+tenant's credential, nor one a repository allowlist happens to permit. Repositories must be on
 the deployment's allowlist, and live GitHub writes stay off unless the deployment authorizes
 them.
+
+Review N06. A GitHub connection without a reference used the deployment's
+`OPSBRIDGE_GITHUB_TOKEN` in every environment, so any tenant administrator could send with it
+to any allowlisted repository. That fallback is now development's only: in staging and
+production a GitHub connection names a credential registered to its tenant and repository,
+and one without (stored earlier, or blank) gets no token, for new writes and recovery alike.
+Two references reading the same secret are refused when settings load. A tenant is shown the
+repositories it can send to, not the deployment's whole allowlist.
+
+Revocation ends new writes and recovery differently. A revoked version sends nothing new; a
+write it may already have made is not looked for with its credential either, since a revoked
+credential is not used again under any policy: the operation becomes outcome_unknown and a
+person checks the destination (proposals.review_unknown_outcome). A superseded version's
+credential still recovers the writes it made. A write that landed is recovered whatever has
+happened to its approver since (workflow/execution.py checks eligibility only where nothing
+can have landed), so evidence of a sent task does not disappear with the approver's role.
 """
 
 from __future__ import annotations
@@ -27,15 +42,17 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.auth.permissions import TIERS, Principal, require
+from opsbridge.config import CONNECTION_SECRET_PREFIX, CREDENTIAL_REF_RE
 from opsbridge.config import ConnectionCredential as ConnectionCredential
+from opsbridge.config import connection_secret_name as secret_name
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import TaskConnection, Tenant, TenantSettings, User
 
 from .investigations import Conflict
 
-REF_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
+REF_RE = CREDENTIAL_REF_RE
 REPO_RE = re.compile(r"^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$")
-SECRET_PREFIX = "OPSBRIDGE_CONNECTION_SECRET_"
+SECRET_PREFIX = CONNECTION_SECRET_PREFIX
 
 
 def _ctx(p: Principal) -> DbContext:
@@ -99,6 +116,11 @@ def registered(
     )
 
 
+def default_token_serves(settings: Any) -> bool:
+    """Whether the deployment's GitHub token serves connections without a reference."""
+    return not getattr(settings, "deployed", False)
+
+
 def credential(
     settings: Any, conn: TaskConnection | None, connector: str, tenant: str
 ) -> str | None:
@@ -107,7 +129,7 @@ def credential(
     (a revoked credential is not used again, not even to recover a write). Registration is
     checked before the secret is read. The simulator's credential is derived per
     organization; GitHub without a reference (or with no connection, for operations
-    approved before 0017) uses the deployment token."""
+    approved before 0017) uses the deployment token in development only."""
     if connector == "sim_tasks":
         return None
     if conn is not None and conn.status == "revoked":
@@ -116,9 +138,19 @@ def credential(
         repository = (conn.destination or {}).get("repository")
         if not registered(settings, conn.credential_ref, tenant, connector, repository):
             return None
-        return os.environ.get(SECRET_PREFIX + conn.credential_ref.upper().replace("-", "_"))
+        return os.environ.get(secret_name(conn.credential_ref))
     token = getattr(settings, "github_token", None)
-    return token.get_secret_value() if token else None
+    return token.get_secret_value() if token and default_token_serves(settings) else None
+
+
+def credential_source(settings: Any, conn: TaskConnection) -> str:
+    if conn.connector == "sim_tasks":
+        return "derived from the simulator key for this organization"
+    if conn.credential_ref:
+        return f"secret store reference {conn.credential_ref!r}"
+    if default_token_serves(settings):
+        return "the deployment's default GitHub token (development only)"
+    return "none: in staging and production a connection names a credential registered for it"
 
 
 def allowed_repositories(settings: Any) -> frozenset[str]:
@@ -126,6 +158,22 @@ def allowed_repositories(settings: Any) -> frozenset[str]:
     if getattr(settings, "github_sandbox_repo", None):
         names.append(settings.github_sandbox_repo)
     return frozenset(n.lower() for n in names)
+
+
+def tenant_repositories(settings: Any, tenant: str) -> list[str]:
+    """The repositories `tenant` (slug) can send to: those registered to it that the
+    deployment allows, and in development the whole allowlist (the default token serves it)."""
+    allowed = allowed_repositories(settings)
+    grants = (getattr(settings, "connection_credentials", None) or {}).values()
+    usable = {
+        r.lower()
+        for g in grants
+        if g.tenant == tenant and g.connector == "github_issues"
+        for r in g.repositories
+    } & allowed
+    if default_token_serves(settings):
+        usable |= allowed
+    return sorted(usable)
 
 
 def _slug(s: Session, tenant_id: uuid.UUID) -> str:
@@ -138,12 +186,7 @@ def view(s: Session, conn: TaskConnection, settings: Any) -> dict[str, Any]:
         user = s.get(User, uid) if uid else None
         return user.username if user else None
 
-    if conn.connector == "sim_tasks":
-        source = "derived from the simulator key for this organization"
-    elif conn.credential_ref:
-        source = f"secret store reference {conn.credential_ref!r}"
-    else:
-        source = "the deployment's default GitHub token"
+    source = credential_source(settings, conn)
     return {
         "id": str(conn.id),
         "version": conn.version,
@@ -172,10 +215,11 @@ def history(db: Database, p: Principal, settings: Any) -> dict[str, Any]:
             .order_by(TaskConnection.version.desc())
         ).scalars()
         versions = [view(s, c, settings) for c in rows]
+        slug = _slug(s, p.tenant_id)
     return {
         "active": next((v for v in versions if v["status"] == "active"), None),
         "versions": versions,
-        "allowed_repositories": sorted(allowed_repositories(settings)),
+        "allowed_repositories": tenant_repositories(settings, slug),
     }
 
 
@@ -221,12 +265,19 @@ def change(
                 raise Conflict(
                     "repository_not_allowed",
                     f"Repository {repo!r} is not on this deployment's allowlist.",
-                    {"allowed_repositories": sorted(allowed_repositories(settings))},
+                    {"allowed_repositories": tenant_repositories(settings, tenant.slug)},
                 )
             if credential_ref is not None and not REF_RE.match(credential_ref):
                 raise Conflict(
                     "invalid_task_connection",
                     "A credential reference is lower-case letters, digits, '-' and '_'.",
+                )
+            if credential_ref is None and not default_token_serves(settings):
+                raise Conflict(
+                    "credential_required",
+                    f"In {settings.env} a GitHub connection names a credential the deployment "
+                    f"registered for this organization and repository {repo!r}; ask the "
+                    "deployment's operator.",
                 )
             if credential_ref is not None and not registered(
                 settings, credential_ref, tenant.slug, connector, repo

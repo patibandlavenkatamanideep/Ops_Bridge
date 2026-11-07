@@ -18,6 +18,7 @@ from opsbridge.canonical import digest
 from opsbridge.config import REPO_ROOT
 from opsbridge.evaluation import manifest, metrics
 from opsbridge.services import evaluations
+from opsbridge.workflow.investigation import WORKFLOW_VERSION
 
 V1 = REPO_ROOT / "evals" / "manifests" / "opsbridge-bench-v1.json"
 RERUN_POLICY = "evals/acceptance-policies/opsbridge-bench-v1-rerun.json"
@@ -95,7 +96,7 @@ def test_a_run_page_names_its_purpose_and_workflow(tmp_path: Any) -> None:
     viewer = SimpleNamespace(has=lambda permission: True, tenant_pack="furniture")
     for benchmark, purpose, workflow in (
         ("opsbridge-bench-v1", None, "investigation/1.1.0"),
-        ("opsbridge-bench-v1-rerun", PURPOSE, "investigation/1.2.0"),
+        ("opsbridge-bench-v1-rerun", PURPOSE, WORKFLOW_VERSION),  # frozen afresh here
     ):
         run_id = "heldout-record-20261029T000000Z"
         result = {

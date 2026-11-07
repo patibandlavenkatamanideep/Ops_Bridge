@@ -65,7 +65,7 @@ class TaskConnectionOut(BaseModel):
 class TaskConnectionsOut(BaseModel):
     active: TaskConnectionOut | None
     versions: list[TaskConnectionOut]
-    allowed_repositories: list[str]  # GitHub repositories this deployment allows
+    allowed_repositories: list[str]  # GitHub repositories this tenant can send to (N06)
 
 
 class TaskConnectionIn(BaseModel):

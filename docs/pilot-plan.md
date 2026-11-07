@@ -74,7 +74,7 @@ size, differences are indicative, not statistically conclusive.
 Weekly review with the pilot owner: defects, mapping gaps, policy questions. Stop or pause
 on any unsafe outcome, data handling concern, or participant request.
 
-## First step: a single-source pilot (protocol `opsbridge-pilot/1`)
+## First step: a single-source pilot (protocol `opsbridge-pilot/2`)
 
 Before the study above, the production review (closure review of 30 October 2026, step 5)
 asks for one pilot on one real purchasing source:
@@ -94,6 +94,18 @@ a blind decision is recorded. The reviewer would have typed it in later, and a w
 would have scored the decision against another case. A row now names the invoice instead.
 The measures did not change.
 
+A second correction was made before any pilot data, sample or agreement existed (5 November
+2026, review N05), as protocol `opsbridge-pilot/2`. Under `/1`:
+- the report took `--as-of` as its cut-off but read the present, so an approval, correction
+  or investigation made after the cut-off could improve it;
+- its many queries each saw the latest commit;
+- its denominators came from the cases opened and the rows written, so an enrolled invoice
+  never opened, or a decision never recorded, was in none of them.
+
+`/2` adds a frozen cohort, measures only what existed at the cut-off from one snapshot,
+counts every enrolled invoice, and says when the report is incomplete. No result exists under
+`/1`, so there is nothing to show beside the new definitions.
+
 **Prerequisites.** Items 1–6 of the prerequisites above, for one export and one pilot
 tenant. The export is held to `purchasing-source/1` (`OPSBRIDGE_PURCHASING_EXPORT_DIR`,
 production-readiness Package 5). Its pack mapping is reviewed before the first case.
@@ -107,7 +119,9 @@ lacks).
 1. The owner and the reviewer fix the sample before any case is opened: the blocked invoices
    in an agreed period, up to an agreed number. Each invoice is assigned to an arm in
    alternation, in the order it was blocked: `opsbridge` (worked in OpsBridge) or `manual`
-   (worked with the existing process).
+   (worked with the existing process). The sample is written once as the **cohort file**
+   (below), and its SHA-256 (`shasum -a 256 cohort.csv`) is recorded with the agreement. It is
+   not edited afterwards: a report names the digest of the cohort it measured.
 2. For each sampled invoice, the reviewer records an independent decision in the reference
    file **before its case is opened in OpsBridge**. A decision is blind only if it was
    recorded before intake. A later decision is reported separately and is not part of the
@@ -150,9 +164,21 @@ whether an invoice will match a case; only intake and the report can. OpsBridge'
 come only from its records. The report names cases by number and rows by line, never by
 invoice.
 
-**Measures.** The unit is the case. Excluded invoices are in no measure. An OpsBridge case
-without a reference row is in every measure except accuracy. Failures stay in their
-denominators.
+**Cohort file** (CSV, UTF-8, one row per sampled invoice in the order it was blocked;
+`opsbridge/pilot/cohort.py`). Its first line is exactly `arm,case,invoice,supplier`. An
+`opsbridge` row names the invoice and supplier as intake will (`case` empty); a `manual` row
+names its pseudonymous reference (`invoice` and `supplier` empty). It is read strictly, like
+the reference file, and every reference row must name one of its members.
+
+**Measures.** The unit is the enrolled invoice (a cohort member). Excluded invoices are in no
+measure. Failures stay in their denominators: a member never opened as a case, or opened
+but not investigated by the cut-off, counts as wrong. A member without a reviewer decision
+recorded by the cut-off makes the report **incomplete**: it is listed and the report says
+so, and it is not dropped from a denominator. Coverage (how many members were excluded,
+opened, investigated, referenced, decided and resolved by the cut-off, and the explanations'
+origins) is reported apart from accuracy. Accuracy is given over every enrolled member with
+a blind decision, the headline, and over the investigated ones only, labelled as a selected
+subset. Cases opened for invoices outside the cohort are listed and measured nowhere.
 
 | Measure | OpsBridge arm | Manual arm |
 |---|---|---|
@@ -162,7 +188,10 @@ denominators.
 | Time to decision and to resolution | Hours from intake to the first approved follow-up or the resolution, whichever is first, and from intake to resolution | Hours from `started_at` to `decided_at` and to `resolved_at` |
 
 Times are reported as n, reached, still open at the cut-off, median and p90. Open cases are
-counted, never dropped. The arms start their clocks at different points: OpsBridge at intake,
+counted, never dropped; members never opened (OpsBridge) or not started by the cut-off or
+outside the window (manual) are counted beside them. A manual row's blank time is a point not
+reached: a process decision without its `decided_at`, or a resolution before the decision,
+is refused. The arms start their clocks at different points: OpsBridge at intake,
 the manual arm when work began. Any waiting before intake is therefore not in the OpsBridge
 figure, and the report must say so wherever the arms are compared.
 
@@ -197,16 +226,40 @@ content. A mapping problem can quote the value that failed, so the report stays 
 export. On the terminal, such a value is printed with control and format characters spelled
 out (`\x1b`, `‮`), so an export can't erase or reorder its own problems there.
 
+While the reference file grows, check it against the cohort too:
+`pilot-check-reference --reference <reference.csv> --cohort <cohort.csv>` names any row outside
+the cohort and counts the members without a row yet.
+
 At the cut-off, compute the measures:
 
     uv --directory backend run python -m opsbridge.cli pilot-report --tenant-id <pilot tenant> \
       --since <window start> --until <window end> --as-of <cut-off> \
-      --reference <reference.csv> --out <report.json>
+      --cohort <cohort.csv> --reference <reference.csv> --out <report.json>
 
-It reads one tenant's cases opened in the window, under that tenant's row-level security, in
-a read-only transaction (`opsbridge/pilot/collect.py`). The measures are computed in
-`opsbridge/pilot/measures.py`. Each investigation is read as a verdict by the same function
-the benchmark scores with (`opsbridge/evaluation/verdict.py`).
+`--as-of` is required and is a time on the database's clock, since every time it is compared
+with was recorded by the database; one later than that clock is refused, because what happens
+before it could still change. The report reads one tenant's cases opened in the window, under
+that tenant's row-level security, in one read-only, repeatable-read transaction: every query
+sees the database as of the first (`opsbridge/pilot/collect.py`). Only what existed at the
+cut-off is read:
+- the first investigation made by then;
+- each proposal's versions made by then, with the status the last one had then;
+- corrections made by then, a field corrected since counted with the status that correction
+  found (recorded from migration 0023; earlier ones are `status_not_recorded`);
+- the first approval and the resolution made by then.
+
+The measures are computed in `opsbridge/pilot/measures.py`. Each investigation is read as a
+verdict by the same function the benchmark scores with (`opsbridge/evaluation/verdict.py`).
+The report records:
+- the protocol;
+- the code version;
+- the cohort's and the reference file's SHA-256;
+- the cut-off;
+- the transaction's isolation and snapshot, as the database reported them.
+
+It exits 0 when complete, 1 when written but incomplete, and 2 when it refused to measure.
+This is a consistent read with recorded event times, not a reconstruction of anything those
+times do not record.
 
 **Limits.**
 - The reference is one person's judgement: there is no second reviewer and no adjudication
@@ -217,6 +270,6 @@ the benchmark scores with (`opsbridge/evaluation/verdict.py`).
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 34 tests, and
-`tests/integration/test_pilot_report.py`, 2 tests). No pilot has started: no export,
-reviewer or authorization exists yet.
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 48 tests, and
+`tests/integration/test_pilot_report.py`, 4 tests, with `test_migration_0023.py`). No pilot
+has started: no export, cohort, reviewer or authorization exists yet.

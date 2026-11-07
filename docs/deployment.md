@@ -53,17 +53,44 @@ keys, `var/` and virtual environments never enter the image. Compose profile `ap
   run from the repository at the recorded commit (`make eval-verify`, `make eval-replay-check`);
   the CI image job checks both behaviours (production review A17).
 
-## Branch rules and releases (prepared; the owner applies them)
+## Branch rules and releases (rules applied; the owner tags releases)
 
 **Branch rules for `main`** (`infra/github/main-ruleset.json`, production review A12): changes
 arrive by pull request, the four CI jobs must pass on the latest commit, review threads must
 be resolved, and force pushes and deletion are refused. With one maintainer the required
 approving reviews are 0; raise `required_approving_review_count` to 1 when a second maintainer
 joins. Break-glass: repository administrators may bypass the rules only by merging a pull
-request (`bypass_mode: pull_request`), and should say why in that pull request. Not applied: it
-changes repository administration. To apply (repository owner):
+request (`bypass_mode: pull_request`), and should say why in that pull request. A branch
+must be up to date with `main` before it merges, Dependabot's included ("Update branch").
 
-    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/main-ruleset.json
+Applied by the owner on 5 November 2026 as ruleset 26598146 (Settings → Rules → Rulesets).
+To read it back:
+
+    gh api repos/patibandlavenkatamanideep/Ops_Bridge/rulesets/26598146
+
+To change it, edit the file and replace the ruleset with it (repository owner). A second
+`POST …/rulesets` would add a second ruleset instead:
+
+    gh api -X PUT repos/patibandlavenkatamanideep/Ops_Bridge/rulesets/26598146 --input infra/github/main-ruleset.json
+
+`tests/test_workflows.py` checks that the file requires exactly CI's job names. To rename a
+CI job, change the file in the same pull request and replace the ruleset with it just before
+merging: until then the ruleset waits for the old name, which that pull request no longer
+reports.
+
+**Release tags** (prepared, not applied). A release names its image by its tag, so a tag
+moved or deleted afterwards would point at something else. Two rulesets cover the tags the
+release runs on (`v*.*.*`, pre-releases included). The first makes them immutable, with no
+bypass, administrators included (`infra/github/release-tags-immutable-ruleset.json`). The
+second lets only repository administrators create them
+(`infra/github/release-tags-creation-ruleset.json`; a bypass list covers every rule in its
+ruleset, hence two). To apply them (repository owner):
+
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/release-tags-immutable-ruleset.json
+    gh api -X POST repos/patibandlavenkatamanideep/Ops_Bridge/rulesets --input infra/github/release-tags-creation-ruleset.json
+
+With these applied, a mistaken tag cannot be deleted by anyone. Remove that ruleset
+deliberately, and record why, before correcting one.
 
 **Releases** (`.github/workflows/release.yml`): tag a commit on `main` whose CI run (started
 by the push to `main`) passed, with the version every package declares:
@@ -73,7 +100,8 @@ by the push to `main`) passed, with the version every package declares:
 The workflow refuses a tag that disagrees with any declared version and a commit whose CI run
 did not pass every required job. It then builds the image once from the locks and pushes it
 only as `candidate-<commit>`. It qualifies that digest with CI's image checks, records an SPDX
-SBOM, attests the digest's build provenance and verifies the attestation. Only then does it
+SBOM, attests the digest's build provenance and verifies the attestation: made by this
+workflow, for this tag, on a GitHub-hosted runner. Only then does it
 give the same digest the version tag, and it reports the digest in the run summary.
 
 **Pre-releases.** A tag `vX.Y.Z-alpha.N`, `-beta.N` or `-rc.N` is a pre-release. npm declares
@@ -150,8 +178,11 @@ the MCP services, which only verify (`OPSBRIDGE_DELEGATION_PUBLIC_KEYS` or
 never loads the private key; list old and new keys together while rotating, then drop the old
 one after the longest delegation lifetime, 5 minutes); the registry of task-connection
 credentials (`OPSBRIDGE_CONNECTION_CREDENTIALS`: reference → tenant, connector, repositories)
-with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`; metrics token; optional GitHub sandbox token and Anthropic API key (only with the owner's opt-in and
-spend ceiling).
+with each secret as `OPSBRIDGE_CONNECTION_SECRET_<REF>`. Two references may not read the same
+secret (`a-b` and `a_b` both read `..._A_B`); settings refuse that. In staging and production
+every GitHub connection names one of these. `OPSBRIDGE_GITHUB_TOKEN`, the deployment's own
+token, serves connections without a reference in development only (review N06). Also: the
+metrics token, and the Anthropic API key (only with the owner's opt-in and spend ceiling).
 
 **Release qualification (in the repository) and what stays with the owner.** CI qualifies
 every PR head and every commit on `main` with the same jobs, including the runtime image
@@ -159,8 +190,9 @@ built from the locks with base images pinned by digest, its SBOM (SPDX, a workfl
 and a vulnerability scan that fails on fixable critical or high findings. Nothing is published:
 pushing an image to a registry, signing it and recording provenance belong to a release
 workflow that the owner authorizes, and the image promoted to staging must be the one whose
-digest CI qualified. Recommended repository settings (the owner's to apply): protect `main`,
-require the four CI jobs and one review before merging, disallow force-pushes. Dependabot
+digest CI qualified. The `main` ruleset (above) requires the four CI jobs on an up-to-date
+branch and refuses force pushes; with one maintainer it requires no approving review, so it
+is not independent review. Dependabot
 (`.github/dependabot.yml`) proposes weekly updates as pull requests; each must pass CI.
 
 **Deployed settings checks.** `OPSBRIDGE_ENV=staging` (synthetic data; the purchasing
@@ -196,6 +228,49 @@ relying on it: Fargate's kernel is the platform's choice, not ours. Where it doe
 run the API and worker on instances whose kernel offers it, or set
 `OPSBRIDGE_PARSER_SANDBOX=best_effort`. That parses with whatever layers hold (none, where
 neither does), and accepts that a parser flaw may reach the task's files and network.
+
+**Choosing the runtime for the sandbox** (checked against AWS's documentation on 6 November
+2026; nothing has been run on AWS):
+- **Fargate.** AWS does not publish the kernel or the security modules of Fargate's platform
+  versions. Its documentation says only that a platform version combines a kernel and a
+  container runtime, and revisions change it. Nothing published says whether Landlock is on,
+  or whether the default seccomp profile allows Landlock's three system calls. So the plan's
+  first staging step is one Fargate task running `opsbridge parser-sandbox-check`, before any
+  service. If the check holds, keep Fargate and run the check in every new revision's
+  qualification, since a revision can change the kernel.
+- **If it does not hold: ECS on EC2 with Amazon Linux 2023 on kernel 6.12 or 6.18.** AL2023's
+  release notes of 4 August 2025 say "The Landlock feature `CONFIG_SECURITY_LANDLOCK` is now
+  enabled for kernel 6.1 & 6.12". Its 30 September 2026 release offers default AMIs with
+  kernels 6.1, 6.12 and 6.18. Kernel 6.1 is too old for the TCP rules (Landlock ABI 4 needs
+  6.7), so choose 6.12 or 6.18. Docker's default seccomp profile allows the system calls (CI's
+  image job runs the check under Docker). "Enabled" in a release note is the kernel build, not
+  proof that Landlock is active at boot, so the same `parser-sandbox-check` decides there too.
+- **Not acceptable as a silent fallback:** `best_effort` in staging. It is an explicit
+  decision for the owner to record, with the risk it accepts.
+
+Sources: [Fargate platform versions](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/platform-fargate.html),
+[AL2023 2023.8.20250804](https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-2023.8.20250804.html),
+[AL2023 2023.12.20260930](https://docs.aws.amazon.com/linux/al2023/release-notes/relnotes-2023.12.20260930.html).
+
+**Input and outbound limits** (review of 5 November, N01–N08). The application enforces
+these itself, so they hold if the edge's configuration drifts:
+- **Request bodies.** The bytes received are counted whatever the framing: `Content-Length`,
+  chunked, or neither as in HTTP/2. A request is refused (413) as soon as it passes
+  `OPSBRIDGE_MAX_REQUEST_BYTES` (6 MiB), and one whose body does not arrive within
+  `OPSBRIDGE_MAX_REQUEST_BODY_SECONDS` (120) gets 408. Chunked bodies within the limit are
+  accepted. Configure the edge to the same limits where it can, for example nginx's
+  `client_max_body_size` and `client_body_timeout`. Check what the chosen load balancer offers
+  against its current documentation when the edge is built.
+- **JSON from outside.** Uploads, source records and listings, export manifests, model answers
+  and tracker replies are refused when an object names a member twice.
+- **Source clocks.** An export dated ahead of the host's clock by more than
+  `OPSBRIDGE_SOURCE_CLOCK_SKEW_SECONDS` (300) is not read. Within that, its data is taken as
+  read now, never later, so a source clock cannot lengthen the window for acting on a result.
+- **Outbound HTTP.** Connectors and the Anthropic SDK connect directly: `HTTP(S)_PROXY` and
+  `ALL_PROXY` are not used. One deadline caps every connect, TLS, send and read of a request.
+  Name resolution is not capped: a resolver that does not answer can delay a connection by its
+  own timeout. An MCP call ends within three of its timeouts.
+- **Evidence bundles** are read in one bounded pass (`opsbridge/evaluation/bundle.py`).
 
 **Cost considerations** (no prices quoted here; use the AWS pricing calculator for the chosen
 region): Fargate vCPU-hours and GB-hours per task; RDS instance hours, storage and backup

@@ -188,7 +188,6 @@ class AnthropicAdapter:
         transport: Any = None,  # an httpx2 transport under the bound (tests: a mock)
     ) -> None:
         import anthropic
-        import httpx2
 
         if not model:
             raise ModelUnavailable("no Anthropic model id configured (OPSBRIDGE_ANTHROPIC_MODEL)")
@@ -207,7 +206,7 @@ class AnthropicAdapter:
         # (sdk_transport), keeping the SDK's own client defaults otherwise.
         http_client = anthropic.DefaultHttpxClient(
             transport=sdk_transport.BoundedTransport(
-                transport or httpx2.HTTPTransport(),
+                transport or sdk_transport.deadline_transport(),
                 max_bytes=sdk_transport.MAX_MODEL_REPLY_BYTES,
             )
         )
@@ -309,7 +308,10 @@ class OllamaAdapter:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self._client = httpx.Client(
-            base_url=self.base_url, timeout=60.0, transport=transport, follow_redirects=False
+            base_url=self.base_url,
+            timeout=60.0,
+            transport=transport or http_transport.deadline_transport(),
+            follow_redirects=False,
         )
 
     def available(self) -> tuple[bool, str | None]:

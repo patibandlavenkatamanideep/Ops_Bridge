@@ -34,12 +34,12 @@ Nothing here has reached sandbox, staging or pilot.
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets and are confined with Landlock (no other files, no TCP) and a seccomp filter (no new sockets: no UDP, DNS or Unix sockets), required when deployed; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role (staging work); the staging platform's kernel must offer Landlock, or the sandbox is waived there by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort` | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/1`, `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/2`, from /1 on 5 November, review N05; `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Prepared, not applied: ruleset file and release workflow (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner applies the ruleset and pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `185c4c7` (PR #29), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
-| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`; v1 recordings replay with `investigation/1.1.0` in their declared order, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
+| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `79992cd` (PR #30), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`, and its remainder (a re-read's uncertainty lost the reason) as `investigation/1.3.0` on 6 November; v1 recordings replay with `investigation/1.1.0` in their declared order and v1-rerun's with 1.2.0, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
@@ -49,6 +49,53 @@ Nothing here has reached sandbox, staging or pilot.
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
 22 October) and X1–X7 (found along the way). A01–A18 do not replace them; where they overlap
 the earlier entry is referenced.
+
+## Review of 5 November 2026 (N01–N09)
+
+A later review of `main` at `79992cd` listed concrete defects N01–N09. They are tracked here
+apart from A01–A18, which keep their history. No earlier finding was reopened: none of their
+invariants failed. Each finding was reproduced at the head before it was changed, and its
+regression failed for the stated reason before the fix.
+
+| Item | Value |
+|---|---|
+| Reviewed `main` | `79992cd` (5 November 2026), CI run 41980269125 green; Python `0.1.0a1`, frontend `0.1.0-alpha.1`, unpublished |
+| Work | `feat/opsbridge-foundation`, from `79992cd` (working tree clean); PR #36 |
+| Ruleset | Live ruleset 26598146 on `main`, active: pull requests only, the four CI jobs required on an up-to-date branch, review threads resolved, no force push or deletion, administrators bypass only by merging a pull request, **0 approvals**. It is not enforced independent review |
+| Gates run here | Unit, integration (PostgreSQL 16, Keycloak and MCP in Podman), canary, receipts, replay check, lint and types. **Not here:** the image build (about 3 GB of disk free), Landlock and seccomp (macOS), OCR (no tesseract), browser tests (not run this session). Those run in hosted CI and are named, not counted as passed |
+| Review documents | `PRODUCTION_REVIEW.md` and its file inventory were not supplied. The findings are taken from the brief, which does not define N09 |
+
+| # | Finding | Reproduced at `79992cd` | Changed | Invariant now | Evidence | Remaining |
+|---|---|---|---|---|---|---|
+| N01 | Duplicate JSON members | Yes: an invoice line with `quantity` 999999 and then 10 mapped as 10 and **matched** end to end | `safejson.py` | An object naming a member twice (as decoded, NFC) is refused whole; no record is built | `test_safejson.py`, `evidence/test_duplicate_json_members.py`, listing, manifest and model-output tests, `test_an_invoice_giving_a_quantity_twice_neither_matches_nor_resolves`; canary 64/64, 34 receipts verify, replay reproduces | OpsBridge's own recorded files are read with `json`; a scan found no duplicate in them |
+| N02 | Request body limits trusted the framing | Yes: an HTTP/2-framed 5,000-byte body was read whole against a 1,000-byte limit; chunked bodies got 411; a trickled body was accepted | `api/body_limits.py` (new), `middleware.py`, `app.py`, `errors.py`, `config.py` | Received bytes are counted whatever the framing and refused at the chunk that passes the limit; the body has a time budget (408); chunked bodies within the limit are accepted | `tests/test_request_body_limits.py` (12, incl. a uvicorn socket: the 413 arrives while the client is still sending), `test_hardening.py` | The edge proxy's own limits, at staging |
+| N03 | Source clock and freshness | Yes: an export dated a year ahead gave a completed, actionable result; one 2 minutes ahead was recorded as read in the future | `connectors/exports.py`, `workflow/investigation.py`, `services/freshness.py`, `workflow/worker.py`, `config.py` | An export more than `source_clock_skew_seconds` ahead is refused; times are RFC 3339 with a zone; the data's age is the earlier of the source's time and the host's; the window is never later than the stored time allows | `contracts/test_export_source.py` (injected clock), `workflow/test_source_window.py`, `test_an_export_dated_ahead_of_the_clock_is_not_read` | A live source asserts no time; none needed a migration (JSONB) |
+| N04 | Evidence bundle extraction unbounded | Yes: a member given twice, a manifest not first, a broken checksum and data after the end were accepted; no cap on expansion or any file | `evaluation/bundle.py` | One bounded pass: strict manifest first, canonical listed regular files given once, per-file, header and expansion limits, checksum read to the end, nothing extracted on refusal | `evaluation/test_evidence_bundle.py` (26, reduced limits, small archives); the reproducible round trip still verifies | Limits sized from the current bundle |
+| N05 | Pilot report not historical | Yes: an approval made after the cut-off counted as approved as drafted, and as a decision reached | `pilot/cohort.py` (new), `pilot/collect.py`, `pilot/measures.py`, `pilot/reference.py`, `cli.py`, `persistence/db.py`, migration 0023, `docs/pilot-plan.md` | Protocol `opsbridge-pilot/2`: a frozen cohort; only what existed at the cut-off, in one read-only, repeatable-read snapshot; every enrolled invoice accounted for; incomplete when a decision is missing; coverage apart from accuracy; provenance in the report | `tests/pilot/` (48), `integration/test_pilot_report.py` (4: later events change nothing; a concurrent commit is unseen and is seen under read committed, a mutation that fails the test), `test_migration_0023.py` | No pilot data, cohort or reviewer; no `/1` result existed to show beside `/2` |
+| N06 | Credential ownership incomplete | Yes: a staging connection without a reference received the deployment token; `a-b` and `a_b` both read one secret | `services/connections.py`, `config.py`, `api/routes/admin.py` | Deployed, each GitHub connection names a credential registered to its tenant and repository; colliding references are refused; a tenant is shown only the repositories it can use | `tests/test_connection_credentials.py`, `integration/test_credential_registry.py` | Per-tenant secrets at staging; a revoked credential is never reused, so its possible writes go to a person |
+| N07 | Total deadlines not truthful | Yes: trickled headers held a 0.6 s purchasing read for 7.4 s and a 0.5 s model request for 7.4 s; an MCP call to a silent server took 10.3 s against 0.3 s; late-ending replies were accepted | `connectors/http_transport.py`, `connectors/sdk_transport.py`, the connectors, `agents/adapters.py`, `mcp_services/client.py` | Every socket wait is capped at the time left of one deadline; the deadline is checked after the headers and at the end; an MCP call ends within its total | `test_http_transport.py`, `test_sdk_transport.py` (fake clocks and a scripted server, wall time); full integration | Name resolution is not capped; connectors no longer use environment proxies |
+| N08 | Offline replay egress | Yes: a client made before the guard reached a loopback proxy, which received the CONNECT; proxy variables stayed set; live modes were not refused | `evaluation/egress.py`, `evaluation/bench.py`, `cli.py`, `evaluation/canary.py`, `evaluation/local_server.py` | Proxy variables are removed and their ports refused while the guard holds; only registered loopback ports; live modes refused before a run | `evaluation/test_offline_proxy_guards.py`; replay check reproduces every recorded run | A Python-level guard, not a sandbox |
+| N09 | Not defined in the supplied brief | Not reproduced | Nothing | — | — | The owner to name it |
+
+Also from the brief's Phase G, done locally:
+- `ops.prune_sessions` validates its own period (migration 0024); `'-100 years'` deleted live
+  sessions before.
+- docs/account-lifecycle.md (A16's mechanics, and the owner's six decisions).
+- `tests/test_docs_consistency.py` (named commands, settings and release commits exist and
+  agree; it found `make eval-verify` missing).
+- From Phase E, in the repository only:
+  - the release accepts only its own workflow's attestation of the tag, from a GitHub-hosted
+    runner;
+  - rulesets that make release tags immutable and administrator-created are prepared for the
+    owner, not applied.
+
+Found along the way: on 5 November a new HIGH advisory in Debian's `apt` (CVE-2026-109518,
+fixed in 2.6.2) stopped CI's image gate. The runtime image pins `apt` and `libapt-pkg6.0` to
+2.6.2 beside OpenSSL, and the image job passed on it (run 42082021608).
+
+Phases D–G need what only the owner can give: a source, export and reviewer; a cloud
+account and spend ceiling; a model budget; operator sessions. Nothing was assumed for them
+(see "Needs the owner" in the work plan).
 
 ## Package 1: canonical business-input integrity (A01, A02)
 
@@ -593,12 +640,15 @@ Its security recording's model requests name both reasons where v1's said "()".
 
 ## Package 8, governance and releases (A12)
 
-**Prepared** (nothing applied; repository administration and publishing are the owner's):
+**Prepared** (repository administration and publishing are the owner's; the owner applied
+the ruleset on 5 November):
 - `infra/github/main-ruleset.json`: pull requests only, the four CI jobs required on the
   latest commit, review threads resolved, no force push or deletion; administrators may
   bypass only through a pull request (break-glass). Required approvals 0 while there is one
-  maintainer. The check names were matched against the CI job names. The apply command is in
-  docs/deployment.md.
+  maintainer. Applied as ruleset 26598146; read back through the API it matches the file,
+  apart from defaults GitHub adds (every merge method allowed). `tests/test_workflows.py`
+  checks that it requires exactly CI's job names, strictly, on the default branch. How to
+  read and replace it is in docs/deployment.md.
 - `.github/workflows/release.yml`, corrected in the closure pass. Before, it checked CI
   check runs by name only (any app or workflow can create one with any name), then built a
   fresh image, so what it published was never an image anything had tested. CI publishes
@@ -655,13 +705,15 @@ still ships pypdf 6.20.1 and an OpenSSL with fixable HIGH findings (below), so t
 belongs on PR #25's merge commit instead. That is `23b2f84`: its CI run on `main`
 (41485053120) passed all four jobs, and all three checks pass on it. On 3 November so did
 PR #27's merge commit `77a515b` (CI run 41568201604), whose release also builds, verifies
-and attests the evidence bundle (Package 8, evidence packaging); the first tag belongs
-there. The ruleset's check
-names match CI. The workflow has not run (no tag), so its first use is its first test, and no
-attestation exists yet. The promotion relies on `docker buildx imagetools create` keeping a
-single image index as it is. The step therefore refuses, before tagging, a candidate that is
-not an index; the build's provenance attestation makes it one. It checks again after tagging
-that the tag resolves to the qualified digest. The candidate tag stays in the registry.
+and attests the evidence bundle (Package 8, evidence packaging). Each merge since has
+qualified too, the latest on 5 November: `79992cd` (PR #30; CI run 41980269125), which also
+confines parser subprocesses. The first tag belongs there. The ruleset's check names match
+CI, and a test keeps them matched. The workflow has not run (no tag), so its first use is
+its first test, and no attestation exists yet. The promotion relies on `docker buildx
+imagetools create` keeping a single image index as it is. The step therefore refuses, before
+tagging, a candidate that is not an index; the build's provenance attestation makes it one.
+It checks again after tagging that the tag resolves to the qualified digest. The candidate
+tag stays in the registry.
 
 **Vulnerability gate** (2 November). CI and the release stopped only fixable CRITICAL
 findings. A report-only HIGH scan of the image (run 41418268617) found twelve, all fixable:
@@ -787,7 +839,9 @@ process's timings either. Defining a measure after the data arrives would invite
 the one that looks best, so the definitions and the report come first.
 
 **Added.**
-- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"):
+- Protocol `opsbridge-pilot/1` in docs/pilot-plan.md ("First step: a single-source pilot"),
+  replaced before any pilot data by `opsbridge-pilot/2` (review N05, "Review of 5 November
+  2026" above):
   - sample fixed in advance, with arms alternating in blocked order;
   - the reviewer's decision recorded before intake, which is the only blind case;
   - the reference file's columns;
@@ -902,16 +956,18 @@ and blindness is shown only by the recorded time.
      merged on 5 November as `185c4c7`, whose CI run on `main`, 41942800839, passed all four
      jobs and which `release_check.py ci` accepts). After that, confined parsers can open
      no socket (A06), and `tests/test_workflows.py` checks the workflows before they run:
-     it found that the release did not repeat CI's mount-point check, now added (A12).
+     it found that the release did not repeat CI's mount-point check, now added (A12; PR
+     #30, merged on 5 November as `79992cd`, whose CI run on `main`, 41980269125, passed all
+     four jobs and which `release_check.py ci` accepts). The owner then applied the `main`
+     ruleset, and a test ties its required checks to CI's job names (A12).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `185c4c7`;
+   - the release workflow has not run; its preconditions pass on `79992cd`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - apply the `main` ruleset and push `v0.1.0-alpha.1` on `main`'s head, `185c4c7` (PR #29),
-     which carries the fixed pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12,
-     A17);
+   - push `v0.1.0-alpha.1` on `main`'s head, `79992cd` (PR #30), which carries the fixed
+     pypdf and OpenSSL, the HIGH gate and the evidence bundle (A12, A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
      for the single-source pilot (A08, A14);
    - a model budget, credential and independent labellers (A09, A10);

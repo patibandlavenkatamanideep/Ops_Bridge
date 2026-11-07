@@ -20,10 +20,13 @@ def free_port() -> int:
 
 
 @contextmanager
-def serve(app: Any, health_path: str = "/healthz", host: str = "127.0.0.1") -> Iterator[str]:
+def serve(
+    app: Any, health_path: str = "/healthz", host: str = "127.0.0.1", port: int | None = None
+) -> Iterator[str]:
     """Yields the loopback URL. `host` widens what the server listens on, for a caller that
-    is not on this host's loopback (a container calling back, in a test)."""
-    port = free_port()
+    is not on this host's loopback (a container calling back, in a test). `port` is chosen
+    by the caller when it must be known first (an offline run registers it, egress.py)."""
+    port = port or free_port()
     config = uvicorn.Config(app, host=host, port=port, log_level="warning", lifespan="on")
     server = uvicorn.Server(config)
     thread = threading.Thread(target=server.run, daemon=True)

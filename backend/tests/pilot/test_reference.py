@@ -138,6 +138,24 @@ def test_manual_timings_must_be_in_order_and_start_is_required(tmp_path: Path) -
     ]
 
 
+def test_a_blank_time_is_a_point_not_reached_so_impossible_orders_are_refused(
+    tmp_path: Path,
+) -> None:
+    """A process decision without the time it was made, or a resolution before the decision,
+    cannot be placed against a cut-off (review N05)."""
+    undated = MANUAL | {"decided_at": "", "resolved_at": ""}
+    reversed_ = MANUAL | {
+        "case": "M-9", "decided_at": "2026-11-03T12:00:00+00:00",
+        "resolved_at": "2026-11-03T11:00:00+00:00",
+    }  # fmt: skip
+    with pytest.raises(ReferenceError) as caught:
+        read_reference(write(tmp_path, undated, reversed_))
+    assert caught.value.problems == [
+        "line 2: a process decision needs the decided_at it was made at",
+        "line 3: resolved_at is before decided_at",
+    ]
+
+
 def test_an_invoice_or_case_appears_once_and_the_columns_are_exact(tmp_path: Path) -> None:
     same = OPSBRIDGE | {"invoice": "INV-7001 ", "supplier": "VEN-LUMEN"}  # once normalized
     other_supplier = OPSBRIDGE | {"supplier": ""}  # intake keeps these apart, so may the file
