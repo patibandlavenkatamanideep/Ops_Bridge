@@ -43,7 +43,7 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
 - `quay.io/keycloak/keycloak:26.8.1` (local OIDC provider, development profile only).
 - `prom/prometheus:v3.13.4` (optional observability profile and `promtool` for rule tests;
   a patched minor chosen over the newest `.0`).
-- Application image bases (Phase 8): `python:3.12.15-slim-bookworm` (development machine
+- Application image bases (Phase 8): `python:3.12.16-slim-bookworm` (development machine
   runs 3.12.12; same minor, patch differs), `node:24.22.0-bookworm-slim` (UI build stage only),
   `ghcr.io/astral-sh/uv:0.10.2` (the uv version used locally; 0.10.48 appeared in a tag listing
   but does not exist on ghcr.io).
@@ -58,7 +58,8 @@ Exact resolved versions, including transitive ones, are in `backend/uv.lock`.
   are switched off.
 - `prom/alertmanager:v0.34.1` (observability profile and `amtool` for routing tests;
   Apache-2.0; a patch release of 2026-09-17). The local alert sink runs on the same
-  `python:3.12.15-slim-bookworm` image as the application, standard library only.
+  `python:3.12.16-slim-bookworm` image as the application, standard library only. Dependabot
+  watches `infra/containers` only, so the sink's tag in the compose file moves with it by hand.
 - `chrislusf/seaweedfs:4.47` (S3-compatible server for the S3 artifact-store integration
   tests; image licence label Apache-2.0, built 2026-09-14). Development and tests only, not a
   production store; it does not accept SSE request headers without its own KMS setup.
