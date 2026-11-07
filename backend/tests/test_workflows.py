@@ -133,3 +133,13 @@ def test_release_tags_can_be_created_by_administrators_only_and_never_moved() ->
     assert creation["bypass_actors"] == [
         {"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}
     ]  # repository administrators
+
+
+def test_dependabot_proposes_only_actions_released_two_weeks_before() -> None:
+    """Actions are pinned to commits of releases at least two weeks old; left to its default
+    of 3 days, Dependabot proposed setup-uv 10.3.3 ten days after its release (PR #33)."""
+    config = load(REPO_ROOT / ".github/dependabot.yml")
+    (actions,) = [u for u in config["updates"] if u["package-ecosystem"] == "github-actions"]
+    cooldown = actions.get("cooldown", {})
+    assert set(cooldown) == {"default-days"}, "the cooldown covers every action"
+    assert cooldown["default-days"] >= 14
