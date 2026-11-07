@@ -18,9 +18,13 @@ ended), a read that blocked waited its full timeout however little of the total 
 and a reply whose headers or end came late, with no chunk after them, was accepted. Now
 `DeadlineBackend`, the network backend under `deadline_transport()`, caps each socket wait
 at the time left of the request in progress, and the deadline is checked again after the
-headers and at the end. Connectors use that transport unless a test gives its own; it
-connects directly, without proxies from the environment. A wait cut short raises the
-client's own timeout errors; the response, and with it the connection, is closed.
+headers and at the end. Looking the host's name up and trying each of its addresses count
+against the same deadline: a resolver that did not answer delayed the request by its own
+timeout, and each address tried was given all the time left. The lookup runs on its own
+thread, and the request stops waiting for it when the time is up. Connectors use that
+transport unless a test gives its own; it connects directly, without proxies from the
+environment. A wait cut short raises the client's own timeout errors; the response, and with
+it the connection, is closed.
 
 The errors subclass httpx's own, so a caller's existing handling stays right: a create whose
 reply could not be read is still a read failure after the request was sent (ambiguous), and
@@ -30,11 +34,15 @@ a read-back or a source read is unavailable or invalid as before.
 from __future__ import annotations
 
 import contextvars
+import ipaddress
+import socket
 import ssl
+import threading
 import time
 import typing
 import zlib
 from collections.abc import Callable, Iterable, Iterator
+from concurrent.futures import Future
 from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any
@@ -81,6 +89,51 @@ def capped(timeout: float | None) -> float | None:
     return left if timeout is None else min(timeout, left)
 
 
+def out_of_time() -> bool:
+    """Whether the deadline in progress, if there is one, has passed."""
+    until = _deadline.get()
+    return until is not None and time.monotonic() >= until
+
+
+# Lookups waiting on a resolver at once; past this, a request waits for one to end, within
+# its deadline. A lookup that never answers holds its thread until the resolver gives up.
+_LOOKUPS = threading.BoundedSemaphore(16)
+
+
+def addresses(host: str, port: int) -> list[str]:
+    """The addresses to try for `host`, looked up within the deadline in progress.
+
+    Without a deadline, or for an address already, `host` itself (the inner backend looks it
+    up, as before). Raises TimeoutError when the time is up first, and the resolver's own
+    OSError when the name has no address."""
+    until = _deadline.get()
+    try:
+        ipaddress.ip_address(host)
+        literal = True
+    except ValueError:
+        literal = False
+    if until is None or literal:
+        return [host]
+    if not _LOOKUPS.acquire(timeout=max(until - time.monotonic(), 0)):
+        raise TimeoutError(f"no lookup of {host!r} could start in time")
+    found: Future[list[Any]] = Future()
+
+    def look_up() -> None:
+        try:
+            found.set_result(socket.getaddrinfo(host, port, type=socket.SOCK_STREAM))
+        except BaseException as exc:
+            found.set_exception(exc)
+        finally:
+            _LOOKUPS.release()
+
+    threading.Thread(target=look_up, name="opsbridge-lookup", daemon=True).start()
+    try:
+        infos = found.result(timeout=max(until - time.monotonic(), 0))
+    except TimeoutError:
+        raise TimeoutError(f"{host!r} was not looked up in time") from None
+    return list(dict.fromkeys(str(info[4][0]) for info in infos))
+
+
 class _DeadlineStream(httpcore.NetworkStream):
     def __init__(self, inner: httpcore.NetworkStream) -> None:
         self._inner = inner
@@ -120,9 +173,24 @@ class DeadlineBackend(httpcore.NetworkBackend):
         local_address: str | None = None,
         socket_options: Iterable[Any] | None = None,
     ) -> httpcore.NetworkStream:
-        return _DeadlineStream(
-            self._inner.connect_tcp(host, port, capped(timeout), local_address, socket_options)
-        )
+        options = None if socket_options is None else list(socket_options)
+        try:
+            found = addresses(host, port)
+        except TimeoutError as exc:
+            raise httpcore.ConnectTimeout(str(exc)) from exc
+        except OSError as exc:
+            raise httpcore.ConnectError(str(exc)) from exc
+        for i, address in enumerate(found):  # in the resolver's order, each with the time left
+            try:
+                stream = self._inner.connect_tcp(
+                    address, port, capped(timeout), local_address, options
+                )
+            except (httpcore.ConnectError, httpcore.ConnectTimeout):
+                if i == len(found) - 1 or out_of_time():
+                    raise
+                continue
+            return _DeadlineStream(stream)
+        raise httpcore.ConnectError(f"{host!r} has no address")
 
     def connect_unix_socket(
         self, path: str, timeout: float | None = None, socket_options: Iterable[Any] | None = None
