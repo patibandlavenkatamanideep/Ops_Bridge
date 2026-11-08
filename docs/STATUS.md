@@ -1,7 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-07. `main` is at `ff24e06`, PR #37's merge (CI run 42340729942 green).
-Work continues on `feat/opsbridge-foundation` in PR #38.
+Last updated 2026-11-07. `main` is at `4615569`, PR #38's merge (CI run 42356139646 green).
+Work continues on `feat/opsbridge-foundation` in PR #39.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -11,26 +11,28 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 753 passed (5 Linux-only skipped, and the live tests), integration 288 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 754 passed (5 Linux-only skipped, and the live tests), integration 288 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `ff24e06` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `4615569` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
-- **PR #36** (the review of 5 November, N01–N08) and **PR #37** (name lookups within the
-  outbound deadline; proposal status changes and attempt leases on the database's clock) are
-  merged.
-- **PR #38**, waiting for the owner to merge: the approval-wait and execution-time metrics
-  measured between two database times, and the clock claims corrected (one clock per
-  comparison, not every row dated by the database).
+- **PR #36** (the review of 5 November, N01–N08), **PR #37** (name lookups within the
+  outbound deadline; proposal status changes and attempt leases on the database's clock) and
+  **PR #38** (the approval-wait and execution-time metrics measured between two database
+  times; the clock claims corrected) are merged.
+- **PR #39**, waiting for the owner to merge: the image on Python 3.12.16, whose base carries
+  the OpenSSL and `apt` fixes, so their pins are dropped (supersedes Dependabot #31);
+  Dependabot's action updates held for 14 days after a release; this record names `4615569`.
 - **Dependabot:** eight pull requests, all behind `main`. The ruleset requires a branch up to
-  date before it merges ("Update branch"). The Python base-image bump (#31) needs a check: the
-  image pins `apt` 2.6.2, and a newer base image may already carry it.
+  date before it merges ("Update branch"). #31 (the Python base) is superseded by PR #39.
+  #33 proposes `setup-uv` 10.3.3, released 28 October: under the two-week rule for actions,
+  not before 11 November. #32 moves the UI build stage to Node 26, a major version.
 
 ## Blockers (each affects only the work that depends on it)
 
@@ -68,8 +70,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #38, and push `v0.1.0-alpha.1` on `main`'s head when ready (after #38
-   merges, its merge commit is the head to check and name).
+1. Owner: merge PR #39, and push `v0.1.0-alpha.1` on `main`'s head when ready (`4615569`
+   qualifies now; after #39 merges, its merge commit is the head to check and name).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
@@ -77,6 +79,19 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-07: PR #38 merged; the Python 3.12.16 base; actions held two weeks (PR #39)
+- PR #38 merged as `4615569`; `main`'s CI passed on it (42356139646), and `release_check.py
+  versions` and `ci` pass on it. README, this page and the readiness record name it.
+- Dependabot #31 checked by reading each base image's package database from the registry.
+  The tag's build of 5 November carries OpenSSL 3.0.22-1~deb12u2 and `apt` 2.6.2; #31's build
+  of 28 October still had `apt` 2.6.1. The image now uses the newer build without the two
+  pins, and the alert sink, ADR 0002 and the deployment guide name 3.12.16. The image job
+  passed on it, the HIGH gate included (42358423116).
+- Dependabot waited only its default 3 days before proposing an action (#33: `setup-uv`,
+  ten days old). Its action updates now wait 14 days, the record's rule; the new test in
+  `tests/test_workflows.py` failed first.
+- Unit 754 passed.
 
 ### 2026-11-07: PR #37 merged; durations and clock claims (PR #38)
 - PR #37 merged as `ff24e06`; `main`'s CI passed on it (42340729942), and `release_check.py

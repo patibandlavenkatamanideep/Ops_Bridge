@@ -11,7 +11,7 @@ RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
 RUN npm run build
 
-FROM docker.io/library/python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70 AS python
+FROM docker.io/library/python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df AS python
 COPY --from=ghcr.io/astral-sh/uv:0.10.2@sha256:94a23af2d50e97b87b522d3cea24aaf8a1faedec1344c952767434f69585cbf9 /uv /usr/local/bin/uv
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never \
     UV_PROJECT_ENVIRONMENT=/app/backend/.venv
@@ -23,15 +23,14 @@ COPY backend/alembic.ini ./
 COPY backend/src ./src
 RUN uv sync --frozen --no-dev
 
-FROM docker.io/library/python:3.12.15-slim-bookworm@sha256:6a0e06f5ba0b373d051aabd3fffb9b873f27f9a2a3a14bcbe37dee6f0e3bbc70
+FROM docker.io/library/python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa9c1e6ca5692344d97cf229832ef584be2cec9fc03df
 # Optional local OCR for PDFs without a text layer (off unless OPSBRIDGE_OCR_ENABLED=true):
 # Debian's tesseract with English data, pinned. OCR text is never authoritative.
-# OpenSSL is raised past the base image's to the version fixing CVE-2026-84782, and apt to the
-# one fixing CVE-2026-109518 (both HIGH; the CI gate stops fixable HIGH findings). A later base
-# image that already has a newer one makes its pin a refused downgrade: drop the pin then.
+# The base image carries the fixes for CVE-2026-84782 (OpenSSL 3.0.22-1~deb12u2) and
+# CVE-2026-109518 (apt 2.6.2), both HIGH; the CI gate stops fixable HIGH findings. To raise a
+# package past the base image's, pin it here, and drop the pin once the base carries it.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tesseract-ocr=5.3.0-2 tesseract-ocr-eng=1:4.1.0-2 \
-      libssl3=3.0.22-1~deb12u2 openssl=3.0.22-1~deb12u2 apt=2.6.2 libapt-pkg6.0=2.6.2 \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 opsbridge \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --shell /usr/sbin/nologin opsbridge
