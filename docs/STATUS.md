@@ -1,7 +1,8 @@
 # OpsBridge status
 
-Last updated 2026-11-07. `main` is at `4615569`, PR #38's merge (CI run 42356139646 green).
-Work continues on `feat/opsbridge-foundation` in PR #39.
+Last updated 2026-11-16. `main` is at `2cd06dc`, PR #39's merge (CI run 42468377115 green,
+its image job re-run after a failed download). Work continues on `feat/opsbridge-foundation`
+in PR #45.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -18,21 +19,23 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `4615569` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `2cd06dc` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
 - **PR #36** (the review of 5 November, N01–N08), **PR #37** (name lookups within the
   outbound deadline; proposal status changes and attempt leases on the database's clock) and
   **PR #38** (the approval-wait and execution-time metrics measured between two database
-  times; the clock claims corrected) are merged.
-- **PR #39**, waiting for the owner to merge: the image on Python 3.12.16, whose base carries
-  the OpenSSL and `apt` fixes, so their pins are dropped (supersedes Dependabot #31);
-  Dependabot's action updates held for 14 days after a release; this record names `4615569`.
-- **Dependabot:** eight pull requests, all behind `main`. The ruleset requires a branch up to
-  date before it merges ("Update branch"). #31 (the Python base) is superseded by PR #39.
-  #33 proposes `setup-uv` 10.3.3, released 28 October: under the two-week rule for actions,
-  not before 11 November. #32 moves the UI build stage to Node 26, a major version.
+  times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
+  3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days).
+- **PR #45**, waiting for the owner to merge: OpenTelemetry's API, SDK and OTLP exporter
+  raised together to 1.45.2, which Dependabot cannot do; this record names `2cd06dc`.
+- **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
+  passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
+  0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
+  `main`'s and was re-run. #32 moves the UI build stage to Node 26, a major version; #12, #10
+  and #9 are older frontend majors. The ruleset requires a branch up to date before it merges
+  ("Update branch"). Dependabot closed #31 itself on 7 November ("up-to-date now").
 
 ## Blockers (each affects only the work that depends on it)
 
@@ -70,8 +73,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #39, and push `v0.1.0-alpha.1` on `main`'s head when ready (`4615569`
-   qualifies now; after #39 merges, its merge commit is the head to check and name).
+1. Owner: merge PR #45, and push `v0.1.0-alpha.1` on `main`'s head when ready (`2cd06dc`
+   qualifies now; after #45 merges, its merge commit is the head to check and name).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
@@ -79,6 +82,20 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-16: PR #39 merged; OpenTelemetry raised by hand (PR #45)
+- PR #39 merged on 8 November as `2cd06dc`. `main`'s CI failed there: GitHub answered 504 to
+  the SBOM step's download of Syft's checksums, after every test had passed. The failed job
+  was re-run and passed (42468377115, attempt 2); `release_check.py versions` and `ci` pass
+  on `2cd06dc`. Just after the re-run, `ci` still failed, because the Actions API's `status`
+  filter showed the run in progress; about four minutes later it passed. That was lag, so
+  nothing changed.
+- Dependabot's weekly `uv` update failed on OpenTelemetry's API, SDK and OTLP exporter, which
+  pin one another's version. All three were raised together to 1.45.2; only the eight
+  OpenTelemetry packages change in the lock. ADR 0002 says to raise them together by hand.
+- Unit 754 passed, integration 288. The first integration run after the Podman VM booted had
+  one failure (`test_machine_identity_token_is_audience_scoped`); its message was not kept.
+  It passed alone, in a second full run, and straight after a cold Keycloak restart.
 
 ### 2026-11-07: PR #38 merged; the Python 3.12.16 base; actions held two weeks (PR #39)
 - PR #38 merged as `4615569`; `main`'s CI passed on it (42356139646), and `release_check.py
