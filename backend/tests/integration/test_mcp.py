@@ -335,6 +335,38 @@ def test_approved_operation_executes_through_casework_mcp(stack, mcp, mcp_db: Da
     assert actions[:2] == ["mcp.casework.create_follow_up_task", "mcp.casework.get_follow_up_task"]
 
 
+def test_casework_refuses_a_create_where_outbound_writes_are_disabled(
+    stack, mcp, mcp_db: Database
+) -> None:  # type: ignore[no-untyped-def]
+    """The tool admits a create with the executor's own admission, so a worker configured to
+    send cannot write through a casework service configured not to (pilot dry run)."""
+    st, s = stack, stack["settings"]
+    casework = build_casework_server(
+        mcp_db,
+        mcp["verifier"](CASEWORK_AUD),
+        DelegationVerifier(mcp["key"].public_key(), CASEWORK_AUD),
+        "http://127.0.0.1/mcp",
+        s.oidc_issuer,
+        lambda tid, destination: SimTaskConnector(st["base"], MASTER, "demo-furniture"),
+        timeout_seconds=1.0,
+        outbound_writes_enabled=False,
+    )
+    original = st["exec"]["exec"]
+    with serve(casework.streamable_http_app(stateless_http=True, json_response=True)) as cbase:
+        _via_mcp(st, {**mcp, "casework": McpToolClient(f"{cbase}/mcp", mcp["tokens"])}, {})
+        try:
+            case_id, prop = prepared(st, "INV-9001")
+            assert approve(st, case_id, prop).status_code == 200
+            drain(st)
+        finally:
+            st["exec"]["exec"] = original
+    [op] = operations(st, case_id)
+    assert remote_tasks(st, op) == []
+    assert (op["status"], op["failure_category"]) == ("failed", "not_admitted")
+    [attempt] = op["attempts"]
+    assert attempt["status"] == "definite_failure"
+
+
 def test_a_bare_numeric_po_number_survives_the_mcp_hop(stack, mcp) -> None:  # type: ignore[no-untyped-def]
     from .test_approvals_execution import NUMERIC_PO, seed_numeric_po_case
 
