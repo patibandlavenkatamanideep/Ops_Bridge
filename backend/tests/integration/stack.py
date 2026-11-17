@@ -20,7 +20,7 @@ from opsbridge.persistence.db import Database, make_engine
 from opsbridge.persistence.models import User
 from opsbridge.seed import seed_demo
 from opsbridge.simulator.app import create_simulator
-from opsbridge.simulator.scenarios import load_corpus, seed_simulator
+from opsbridge.simulator.scenarios import Scenario, load_corpus, render, seed_simulator
 from opsbridge.workflow.execution import dispatch
 from opsbridge.workflow.investigation import run_investigation
 from opsbridge.workflow.retention import sweep
@@ -30,6 +30,7 @@ from .servers import serve
 from .test_api_cases import call, login
 
 MASTER = "test-simulator-master-secret"
+REHEARSAL = REPO_ROOT / "fixtures" / "pilot" / "rehearsal.yaml"
 
 
 @pytest.fixture(scope="module")
@@ -91,6 +92,18 @@ def stack(
             "store": store,
             "base": base,
         }
+
+
+def rehearsal(scenario_id: str) -> Scenario:
+    """One of the pilot's synthetic rehearsal cases (fixtures/pilot/rehearsal.yaml)."""
+    [s] = [s for s in load_corpus(REHEARSAL).scenarios if s.id == scenario_id]
+    return s
+
+
+def put_scenario(st: dict[str, Any], s: Scenario) -> None:
+    """Put a scenario's records in the simulator, as the purchasing system holds them now."""
+    for collection, key, body, ctype, po in render(s):
+        st["store"].put_record("demo-furniture", collection, key, body, ctype, po)
 
 
 def open_case(st: dict[str, Any], who: str, tenant: str, invoice: str) -> str:
