@@ -97,6 +97,108 @@ def test_rejected_receipt_lines_are_a_record_but_not_received_quantity() -> None
     assert qty.values["excess"] == "20"
 
 
+# --- Delivered is not accepted (pilot scenario A) --------------------------------------
+# The invoice bills 20 chairs; receiving accepted 18 and rejected 2 as damaged; the supplier
+# says all 20 were delivered. All three can be true: 20 arrived and 18 count.
+
+PRIOR_RULES = "opsbridge-rules/1.2.0"
+
+
+def delivered_twenty_accepted_eighteen(claim: str = "20", currency: str = "USD") -> MatchInput:
+    return MatchInput(
+        invoice=invoice((inv_line("1", "1", "20", "185.00"),), currency=currency),
+        purchase_orders=(po(currency=currency),),
+        receipts=(receipt((r_line("1", "18"), r_line("1", "2", status="rejected", row=3))),),
+        supplier_assertions=(assertion(claim),),
+    )
+
+
+def test_rejected_units_are_counted_and_cited_not_called_undelivered() -> None:
+    result = run(delivered_twenty_accepted_eighteen())
+    assert result.outcome == "discrepancies_found"
+    [qty] = result.of_type("quantity_mismatch")
+    assert qty.reason_code == "invoiced_exceeds_received"
+    assert (qty.values["received_accepted"], qty.values["received_rejected"]) == ("18", "2")
+    assert qty.values["excess"] == "2"
+    assert qty.summary == (
+        "Invoice bills 20 EA on PO line 1, but only 18 were accepted at receiving (2 more "
+        "were delivered and rejected, and rejected units are not counted as received); 2 EA "
+        "exceed the allocatable quantity."
+    )
+    rejected_row = {ref.locator for ref in qty.evidence if ref.field.startswith("receipt_line")}
+    assert {"csv:row=3;col=qty_accepted;line=1", "csv:row=3;col=status"} <= rejected_row
+
+    # The supplier's "all 20 delivered" agrees with receiving, so it is no conflict.
+    assert not result.of_type("source_conflict")
+    [note] = [f for f in result.findings if f.reason_code == "supplier_claim_includes_rejected"]
+    assert (note.finding_type, note.status) == ("note", "informational")
+    assert note.values["supplier_claimed_delivered"] == "20"
+    assert (note.values["net_received"], note.values["received_rejected"]) == ("18", "2")
+    assert "csv:row=3;col=status" in {ref.locator for ref in note.evidence}
+    assert {ref.field for ref in note.evidence} >= {"supplier_message.delivered_quantity"}
+
+    # The next owner is the policy's route for a quantity mismatch; nothing is credited.
+    rec = recommend(result, FURNITURE, "CASE-A")
+    assert (rec.decision, rec.action_type, rec.assignee_group) == (
+        "propose_action",
+        "create_follow_up_task",
+        "receiving",
+    )
+    assert result.rules_version == "opsbridge-rules/1.3.0"
+
+
+def test_without_a_precedence_rule_a_claim_counting_rejected_units_is_no_conflict() -> None:
+    result = reconcile(delivered_twenty_accepted_eighteen(currency="EUR"), IT)
+    assert not result.of_type("source_conflict")
+    assert result.outcome == "discrepancies_found"  # the quantity mismatch, not a review
+    assert (
+        reconcile(
+            delivered_twenty_accepted_eighteen(currency="EUR"), IT, rules_version=PRIOR_RULES
+        ).outcome
+        == "manual_review"
+    )
+
+
+def test_a_claim_matching_neither_count_is_still_a_conflict() -> None:
+    result = run(delivered_twenty_accepted_eighteen(claim="19"))
+    [conflict] = result.of_type("source_conflict")
+    assert conflict.reason_code == "conflict_resolved_by_precedence"
+    assert conflict.values["net_received"] == "18"
+
+
+def test_runs_under_rules_1_2_0_keep_the_rejected_lines_silent() -> None:
+    """Recordings pinned to an earlier workflow replay with the rules they were made under."""
+    result = reconcile(delivered_twenty_accepted_eighteen(), FURNITURE, rules_version=PRIOR_RULES)
+    assert result.rules_version == PRIOR_RULES
+    [qty] = result.of_type("quantity_mismatch")
+    assert qty.summary == (
+        "Invoice bills 20 EA on PO line 1, but only 18 were received; 2 EA exceed the "
+        "allocatable quantity."
+    )
+    assert "received_rejected" not in qty.values
+    assert "csv:row=3;col=status" not in {ref.locator for ref in qty.evidence}
+    [conflict] = result.of_type("source_conflict")
+    assert conflict.reason_code == "conflict_resolved_by_precedence"
+
+
+def test_without_rejected_lines_both_rules_versions_agree() -> None:
+    data = MatchInput(
+        invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
+        purchase_orders=(po(),),
+        receipts=(receipt((r_line("1", "18"),)),),
+        supplier_assertions=(assertion("20"),),
+    )
+    new, old = run(data), reconcile(data, FURNITURE, rules_version=PRIOR_RULES)
+    assert (new.outcome, new.findings) == (old.outcome, old.findings)
+
+
+def test_an_unknown_rules_version_is_refused() -> None:
+    with pytest.raises(ValueError, match="rules version"):
+        reconcile(
+            delivered_twenty_accepted_eighteen(), FURNITURE, rules_version="opsbridge-rules/9"
+        )
+
+
 def test_returns_reduce_received_quantity() -> None:
     data = MatchInput(
         invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
