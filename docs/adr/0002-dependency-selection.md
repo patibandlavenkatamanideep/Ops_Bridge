@@ -16,9 +16,9 @@ Status: accepted (2026-10-14). Versions verified against PyPI, npm and quay.io o
 | httpx | 0.28.1 | HTTP client for simulator, GitHub, Ollama | BSD-3 |
 | pypdf | 6.20.1 | Text-layer PDF extraction | BSD-3 |
 | evalseal | 2.2.0 | Evaluation receipts (owner's verified release, tag v2.2.0) | MIT |
-| opentelemetry-api/sdk | 1.45.1 | Tracing | Apache-2.0 |
+| opentelemetry-api/sdk | 1.45.2 (each pins the other's version, so Dependabot cannot move them one at a time: raise them and the exporter together by hand) | Tracing | Apache-2.0 |
 | prometheus-client | 0.26.0 | Metrics endpoint | Apache-2.0/BSD-2 |
-| opentelemetry-exporter-otlp-proto-http | 1.45.1 (matches api/sdk) | Optional OTLP trace export (Phase 8); pulls opentelemetry-proto 1.45.1, protobuf 7.36.2, requests 2.34.2, urllib3 2.8.0 | Apache-2.0 / BSD-3 / Apache-2.0 / MIT |
+| opentelemetry-exporter-otlp-proto-http | 1.45.2 (matches api/sdk) | Optional OTLP trace export (Phase 8); pulls opentelemetry-proto 1.45.2, protobuf 7.36.2, requests 2.34.2, urllib3 2.8.0 | Apache-2.0 / BSD-3 / Apache-2.0 / MIT |
 | boto3 | 1.43.107 (pulls botocore 1.43.114, s3transfer 0.19.2, jmespath 1.1.0, python-dateutil 2.9.0.post0, six 1.17.0) | Official AWS SDK for the S3-compatible artifact store; imported only when a bucket is configured | Apache-2.0 / Apache-2.0 / Apache-2.0 / MIT / Apache-2.0 or BSD-3 / MIT |
 | pytest / ruff / mypy | 9.1.1 / 0.17.0 / 2.4.0 | Quality gates | MIT |
 
