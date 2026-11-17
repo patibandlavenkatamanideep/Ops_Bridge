@@ -29,7 +29,11 @@ decided by `proposal.decide` with the action type in the approver's scope.
 `failed` | `outcome_unknown`; or `pending_dispatch` / `executing` →
 `cancelled_before_dispatch` when no write has landed and the next one is refused (an
 `executing` operation gets there after a definite failure or an ambiguous one proved
-absent).
+absent). Its `failure_category` says why: `cancelled_by_user`, `precondition_failed` (which
+supersedes the proposal), or `outbound_writes_disabled`. The last is a dry run's: with
+`OPSBRIDGE_OUTBOUND_WRITES=disabled` no write outside OpsBridge (a follow-up task) is admitted
+by the worker or the Casework MCP tool. The approval stands, and local actions still run
+(docs/pilot/quickstart.md).
 `operations.cancellation` is separate: `none` | `requested` | `confirmed` | `unknown`.
 
 **Attempt** (`attempts.status`): `started` → `succeeded` | `definite_failure` |
