@@ -34,8 +34,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - **PR #47** (draft): the pilot's preparation. A rules-only dry run with outbound writes
   disabled, a per-case preflight, scenario A fixed (rules 1.3.0), scenario B checked, and the
   36/40 question answered case by case. Handoff in docs/pilot/.
-- **Receiving and disposition** (draft, on `feat/receiving-disposition`, which branches from
-  PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
+- **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
   workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
   rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
@@ -106,7 +105,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Recent entries
 
-### 2026-11-18: receiving and disposition (draft PR, after #47)
+### 2026-11-18: receiving and disposition (PR #48, draft, after #47)
 - Baseline on `344225d`: a short delivery and a rejection with the same 18 accepted asked
   receiving the same question. A rejection recorded after the receipt was ignored (the case
   matched). A return of rejected units subtracted them twice. The rejection reason was
