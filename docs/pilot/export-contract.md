@@ -29,9 +29,9 @@ Each `records` entry:
 
 | Field | Required | Meaning |
 |---|---|---|
-| `collection` | yes | `purchase_orders`, `invoices`, `receipts`, `allocations` or `messages` (lower-case letters and `_`) |
+| `collection` | yes | `purchase_orders`, `invoices`, `receipts`, `receiving_events`, `allocations` or `messages` (lower-case letters and `_`) |
 | `key` | yes | The record's identifier: an invoice's number, a purchase order's number, a receipt's or message's own id. Letters, digits, `.`, `_`, `-`, up to 120 |
-| `po_number` | for receipts, allocations and messages | The purchase order it belongs to. A case reads these records by listing its order's; one listed under no order, or under another, is never read |
+| `po_number` | for receipts, receiving events, allocations and messages | The purchase order it belongs to. A case reads these records by listing its order's; one listed under no order, or under another, is never read |
 | `file` | yes | A path relative to the tenant's directory, inside it |
 | `content_type` | yes | `application/json`, `text/csv`, `application/pdf` (with a text layer) or `text/plain`, as the pack reads that collection |
 | `sha256` | yes | The SHA-256 of the file's bytes, in lower-case hex |
@@ -59,7 +59,8 @@ allocations, plain-text supplier messages):
 |---|---|---|
 | Purchase order (JSON) | `po_number`, `supplier.id`, `supplier.name`, `currency`, `status` (`OPEN`, `CLOSED`, `CANCELLED`); per line `line_no`, `qty_ordered`, `uom`, `unit_price` | per line `sku`, `description`, `discount` (default 0) |
 | Invoice (PDF with a text layer, one supplier layout) | `Invoice No:`, `Invoice Date:` (YYYY-MM-DD), `Supplier:`, `Currency:`, `Total:`; per line number, description, quantity, unit, unit price, discount, `GOODS` or `CHARGE`, amount | `Supplier ID:`, `PO Reference:`; per line the PO line and SKU |
-| Receipt (CSV, one row per movement) | `receipt_id`, `po_ref`, `po_line`, `received_on` (YYYY-MM-DD), `qty`, `uom`, `movement` (`RECEIPT` or `RETURN`), `status` (`ACCEPTED`, `REJECTED`, `REVERSED`) | none |
+| Receipt (CSV, one row per movement) | `receipt_id`, `po_ref`, `po_line`, `received_on` (YYYY-MM-DD), `qty`, `uom`, `movement` (`RECEIPT` or `RETURN`), `status` (`ACCEPTED`, `REJECTED`, `REVERSED`) | `reason` (why receiving rejected the units) |
+| Receiving event (CSV, one row per event; docs/receiving-disposition.md, section 3) | `event_id`, `event`, `po_ref`, `po_line`; `qty` and `uom` for rejections, returns, replacement deliveries and acceptances and posted credits; what it refers to (`receipt_id` or `follows`) | `occurred_on` (date or zoned time), `invoice` and `document` (a posted credit names both), `reason` |
 | Allocation history (JSON) | per entry `invoice`, `po`, `po_line`, `qty`, `state` (`MATCHED`, `CANCELLED`) | none |
 | Supplier message (text) | none: a sentence such as "delivered all 20 chairs … PO-4001" is read as a delivery claim, anything else is kept as text | |
 
@@ -78,11 +79,15 @@ Units and dates:
 - Dates are calendar dates.
 - The invoice date chooses the policy version in effect.
 
-How receipts count:
-- Only `ACCEPTED` receipts count as received, net of accepted returns.
-- `REJECTED` units are counted and cited as delivered and rejected (rules
-  `opsbridge-rules/1.3.0`).
+How receipts count (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md):
+- Only `ACCEPTED` units count as accepted, net of accepted returns and of units a later
+  rejection event names.
+- `REJECTED` units are delivered and rejected. Their disposition is asked of the policy's
+  disposition owner, or of receiving when no reason is recorded.
 - `REVERSED` movements are ignored.
+- A receipt without an acceptance status is delivered, never accepted: the case asks for the
+  acceptance.
+- Receiving events are optional; an export without any is read as before.
 
 ## Missing records: never zero, never a silent match
 
