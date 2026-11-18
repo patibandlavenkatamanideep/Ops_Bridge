@@ -121,6 +121,10 @@ def main() -> int:
             # are content digests, so re-seeding unchanged records changes nothing.
             corpora = [] if args.seed_records else [str(ROOT / "fixtures" / "scenarios" / "dev.yaml")]
             seeded = subprocess.run([PY, "-m", "opsbridge.cli", "simulator-seed", *corpora], cwd=ROOT / "backend")
+            if seeded.returncode == 0:  # the receiving cases (docs/receiving-disposition.md)
+                seeded = subprocess.run(
+                    [PY, "-m", "opsbridge.cli", "receiving-pack", "--seed-simulator"], cwd=ROOT / "backend"
+                )
             if seeded.returncode != 0:
                 print("[devstack] loading simulator records failed; not starting.")
                 return 1
