@@ -86,9 +86,11 @@ def test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch(stack
 
 
 def test_pilot_scenario_a_delivered_is_not_accepted(stack) -> None:  # type: ignore[no-untyped-def]
-    """20 chairs billed; receiving accepted 18 and rejected 2 as damaged; the supplier says all
-    20 were delivered. All three are true. The operator sees each passage and quantity, why
-    arrival does not clear the invoice, what stays open, and who the policy sends it to."""
+    """20 chairs billed; receiving accepted 18 and rejected 2; the supplier says all 20 were
+    delivered. All three are true. The operator sees each passage and quantity, why arrival
+    does not clear the invoice, and what stays open. The rehearsal's receipt records no reason
+    for the rejection (its format has no column for one), so from rules 1.4.0 receiving is
+    asked for the inspection record before anyone asks the supplier for a remedy."""
     st = stack
     put_scenario(st, rehearsal("pilot-a"))
     t = "/api/v1/tenants/demo-furniture"
@@ -105,18 +107,21 @@ def test_pilot_scenario_a_delivered_is_not_accepted(stack) -> None:  # type: ign
         pass
     inv = get(st, "furn-investigator", f"{t}/cases/{case_id}/investigation").json()
     assert (inv["outcome"], inv["rules_version"]) == (
-        "discrepancies_found",
-        "opsbridge-rules/1.3.0",
+        "needs_information",
+        "opsbridge-rules/1.4.0",
     )
-    [qty] = [f for f in inv["findings"] if f["finding_type"] == "quantity_mismatch"]
-    assert {
-        k: qty["values"][k] for k in ("invoiced", "received_accepted", "received_rejected")
-    } == {
+    [rejected] = [f for f in inv["findings"] if f["finding_type"] == "disposition"]
+    assert rejected["reason_code"] == "rejection_reason_missing"
+    keys = ("invoiced", "delivered", "undelivered", "received_accepted", "received_rejected")
+    assert {k: rejected["values"][k] for k in keys} == {
         "invoiced": "20",
+        "delivered": "20",
+        "undelivered": "0",
         "received_accepted": "18",
         "received_rejected": "2",
     }
-    assert "2 more were delivered and rejected" in qty["summary"]
+    assert "no reason is recorded" in rejected["summary"]
+    assert not [f for f in inv["findings"] if f["finding_type"] == "quantity_mismatch"]
     [claim] = [f for f in inv["findings"] if f["reason_code"] == "supplier_claim_includes_rejected"]
     assert "agrees with receiving" in claim["summary"]
     assert not [f for f in inv["findings"] if f["finding_type"] == "source_conflict"]
@@ -137,12 +142,16 @@ def test_pilot_scenario_a_delivered_is_not_accepted(stack) -> None:  # type: ign
     [said] = [c for c in inv["citations"] if c["field"].startswith("supplier_message")]
     assert "delivered all 20 chairs" in said["excerpt"]
 
-    # What stays open goes where policy furniture-ap@v2 routes a quantity mismatch; nothing is
-    # credited, replaced or paid, and the case is not resolved.
+    # Receiving is asked for the inspection record; nothing is credited, replaced or paid,
+    # and the case is not resolved.
     rec = inv["recommendation"]
-    assert (rec["action_type"], rec["assignee_group"]) == ("create_follow_up_task", "receiving")
+    assert (rec["decision"], rec["action_type"], rec["assignee_group"]) == (
+        "request_information",
+        "create_follow_up_task",
+        "receiving",
+    )
     case = get(st, "furn-investigator", f"{t}/cases/{case_id}").json()
-    assert case["status"] == "awaiting_review"
+    assert case["status"] == "needs_information"
 
 
 def test_missing_receipt_is_needs_information_without_asserting_non_delivery(stack) -> None:  # type: ignore[no-untyped-def]
