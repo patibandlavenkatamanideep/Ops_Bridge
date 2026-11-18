@@ -1083,8 +1083,68 @@ docs/receiving-disposition.md.
 - No reviewer has judged the disposition questions or owners.
 - No shipped policy names a disposition owner or a hold scope; the demo tenant's policy sends
   rejected goods to manual review. A labelled synthetic version names both, for tests only.
-- A rejection still only in the source system does not stop a dispatch within the age limit.
+- A rejection still only in the source system did not stop a dispatch within the age limit.
+  It now does for a live source (next section).
 - Any evidence change, material or not, makes an approval stale.
+
+## Source freshness at dispatch (18 November 2026)
+
+**Reproduced.** The steps:
+1. A receipt for 20 accepted.
+2. The follow-up is approved and its dispatch held.
+3. A rejection of 2 is recorded in the purchasing system only, and the case is not re-run.
+4. The dispatch is released.
+
+On the code before this change the task was created (`confirmed`, one remote task). Local
+freshness saw nothing, because nothing new had been read, and the 24-hour window was open.
+This was confirmed as a mutation: with the new check switched off, the regression test fails
+for exactly that reason.
+
+**Changed.**
+- **The check.** Before every new external write, the executor asks the purchasing system
+  whether it still holds what the approved proposal rests on (`workflow/source_check.py`):
+  - every source record in the proposal's manifest, by its raw digest;
+  - the invoice and the order, by key;
+  - a complete listing, under the order, of receipts, allocations, supplier messages and
+    receiving events.
+- **When it runs.** The operation stays `pending_dispatch` while the source is asked, outside
+  any transaction. Local admission then runs again under the lock.
+- **Changed upstream:** `cancelled_before_dispatch` / `source_changed`. Nothing is ingested;
+  re-running the investigation reads the change.
+- **Cannot tell:** `cancelled_before_dispatch` / `source_unverified`. This covers an export
+  (`reads_live` false: it shows the system when taken), an unreachable source, an unusable
+  answer, a listing over the connector's bound, and no answer within half the job lease.
+- **Either way:** the outbound connector is never called, and the proposal is superseded, so
+  the action is back in review. The audit event carries the reason, and the Receiving tab
+  shows it under "since approval".
+- **Unchanged:** `operation.source_verified` is audited with the counts.
+- **Not asked:** dry runs (`OPSBRIDGE_OUTBOUND_WRITES=disabled`), local actions, and recovery
+  of a write that may have landed.
+- **The contract:** `purchasing-source/1` adapters declare `reads_live`. The simulator
+  connector does; the export reader does not.
+
+**Tested.**
+- **Stack** (`tests/integration/test_dispatch_source_check.py`, 6):
+  - a rejection only upstream: the connector is never built, there is no attempt and no
+    task, the proposal is superseded, nothing is ingested, and the Receiving tab gives the
+    reason;
+  - an edited receipt, an unreachable source and an export: each held;
+  - the control, an unchanged source: sent once, with the check audited;
+  - a dry run and a review note: the source is not asked.
+- **Unit** (`tests/workflow/test_source_check.py`, 14): every comparison outcome, failures,
+  an incomplete listing, an export, and an adapter that does not declare itself live.
+
+**Limits.**
+- **Exports:** a deployment that reads exports cannot send follow-up tasks. They stay in
+  review. The pilot runs with outbound writes disabled, so nothing changes there.
+- **Unavailable source:** the action goes back to review with no automatic retry, so a
+  short outage costs a new approval.
+- **Late upstream changes:** a change committed after the check is too late for that write,
+  as with local admission.
+- **The Casework MCP tool** has no purchasing access. It re-checks local admission only, and
+  relies on the executor's check made just before the call.
+- **Real systems:** the check is proven against the simulator only. A real system's adapter
+  must pass the contract suite and be truly live.
 
 ## Work plan
 
