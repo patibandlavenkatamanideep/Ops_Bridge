@@ -597,3 +597,11 @@ fieldset {
   padding: 0.4rem 0.6rem;
   border-left: 3px solid var(--accent);
 }
+
+/* Receiving and disposition (pages/case/ReceivingPanel.tsx) */
+.receiving-line {
+  margin: 1.25rem 0;
+}
+.table tr.superseded td {
+  color: var(--muted);
+}
