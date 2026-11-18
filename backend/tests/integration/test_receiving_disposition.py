@@ -15,14 +15,17 @@ from typing import Any
 import pytest
 from sqlalchemy import Engine, select, text
 
+from opsbridge.config import REPO_ROOT
 from opsbridge.domain.receiving import precision
 from opsbridge.evidence.ingest import ingest
+from opsbridge.packs import load_policy_file
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     ApprovalDecision,
     DocumentVersion,
     GoodsReceiptRecord,
     Operation,
+    PolicyVersion,
     ReceiptLineRecord,
     ReceivingEventRecord,
     SourceDocument,
@@ -195,6 +198,56 @@ def test_the_two_18_unit_cases_keep_different_facts_citations_and_next_steps(
     for iv in (a, b):
         assert iv["citations"] and all(c["status"] == "valid" for c in iv["citations"])
     _ = (a_id, b_id)
+
+
+SYNTHETIC_POLICY = REPO_ROOT / "fixtures" / "receiving" / "furniture-ap-v3-synthetic.yaml"
+
+
+def publish_synthetic_policy(engine: Engine) -> None:
+    """Publish the labelled synthetic example version, in this test's tenant only."""
+    loaded = load_policy_file(SYNTHETIC_POLICY)
+    p = loaded.policy
+    tid = tenant_id(engine)
+    with Database(engine).session(DbContext(tenant_id=tid)) as s:
+        s.add(
+            PolicyVersion(
+                tenant_id=tid,
+                policy_id=p.policy_id,
+                version=p.version,
+                effective_from=p.effective_from,
+                document=loaded.document,
+                sha256=loaded.sha256,
+            )
+        )
+
+
+def test_with_the_synthetic_policy_version_rejected_goods_go_to_its_named_owner(
+    stack: dict[str, Any], migrator_engine: Engine
+) -> None:
+    """Routing to a named owner, shown with a labelled synthetic version, never the default."""
+    st = stack
+    publish_synthetic_policy(migrator_engine)
+    case_id, iv = opened(st, variant("rcv-b-rejected-damaged", "4720"))
+
+    assert iv["policy_ref"] == "furniture-ap@v3"
+    assert "disposition_owner_unconfigured" not in codes(iv)
+    assert "disposition_unrecorded" in codes(iv)
+    rec = iv["recommendation"]
+    assert (iv["outcome"], rec["route"], rec["assignee_group"]) == (
+        "discrepancies_found",
+        "disposition",
+        "procurement",
+    )
+    split = finding(iv, "hold_disputed_portion")
+    assert (split["values"]["matched_quantity"], split["values"]["disputed_quantity"]) == (
+        "18",
+        "2",
+    )
+    prop = propose(st, case_id)
+    assert prop["action_type"] == "create_follow_up_task"
+    assert prop["parameters"]["title"].startswith(
+        "Resolve rejected units with the supplier for PO-4720"
+    )
 
 
 # --- a rejection learned after an approval -----------------------------------------------------
