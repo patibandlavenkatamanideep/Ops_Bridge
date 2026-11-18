@@ -1036,7 +1036,9 @@ docs/receiving-disposition.md.
 - **The rejection reason.** It had no field and was dropped at import. It is now stored and
   cited (`receipt_lines.reason`, migration 0025).
 - **A receipt line with no status.** The mapping defaulted it to accepted. It is now
-  `unstated`, and the case asks for the acceptance.
+  `unstated`, and the case asks for the acceptance. This changes new imports for a pack that
+  marks the status optional or maps none. Both shipped packs require it, so they are
+  unchanged. The full table is in docs/pilot/export-contract.md.
 - **An action carried out on evidence that later changed.** Nothing said so. An audit event
   now records it, and the case's Receiving tab asks for reconciliation; nothing is resent or
   undone.
@@ -1069,15 +1071,18 @@ docs/receiving-disposition.md.
 - The canary changed only its rules version and an added `hold_unconfigured` note on 18
   quantity-mismatch cases.
 
-**Changed behaviour the pilot inherits.** The rehearsal's scenario A (INV-8401) rejects 2
-chairs with no reason recorded, so it now asks receiving for the inspection record. Its label
-was changed with that reason given (`fixtures/pilot/rehearsal.yaml`).
+**Changed behaviour the pilot inherits.**
+- **The rehearsal's scenario A (INV-8401)** rejects 2 chairs with no reason recorded, so it now
+  asks receiving for the inspection record. Its label was changed with that reason given
+  (`fixtures/pilot/rehearsal.yaml`).
+- **A pilot pack with an optional receipt status:** a blank status is no longer read as
+  accepted (see above).
 
 **Externally unvalidated.**
 - No receiving data from any organization has been read.
 - No reviewer has judged the disposition questions or owners.
-- No policy names a disposition owner or a hold scope; the demo tenant's policy sends
-  rejected goods to manual review.
+- No shipped policy names a disposition owner or a hold scope; the demo tenant's policy sends
+  rejected goods to manual review. A labelled synthetic version names both, for tests only.
 - A rejection still only in the source system does not stop a dispatch within the age limit.
 - Any evidence change, material or not, makes an approval stale.
 
