@@ -25,7 +25,7 @@ without a replacement, and the absence of any payment action.
 | B: 20 arrive, 18 accepted, 2 rejected as damaged | 18 accepted, 2 rejected; **the reason has no field** | quantity mismatch, rejected units counted | cites the rejected row; **the same question as A**, to receiving | n/a |
 | A receipt for 20 accepted, then a separate rejection of 2 | two receipts: 20 accepted, 2 rejected | **matched** | nothing about the rejection | the approval is blocked (the evidence changed), but the new result is "matched" again |
 | B, then the 2 rejected chairs are returned | 18 accepted, 2 rejected, a return of 2 | **16 received, "4 EA exceed"** | the rejected units are subtracted twice | n/a |
-| An export with a received quantity and no status column | **status `accepted`** (the mapping's default) | as if accepted | none | n/a |
+| An export with a received quantity and no status (a pack that maps none, or marks it optional) | **status `accepted`** (the mapping's default) | as if accepted | none | n/a |
 | A corrected receipt (8, then 10) after approval | a new version; the old one superseded | the new facts | both versions can be opened | blocked; returns for review (already worked) |
 | The rejection arrives after the follow-up was sent | the new record | the new result | none | **nothing said the sent action rested on changed facts** |
 
@@ -95,8 +95,15 @@ it creates no event and fills no reason (`tests/integration/test_migration_0025.
 
 Source field names stay in the pack.
 
-- **Receipts** (CSV, one row per movement) gain an optional `reason` column. Receipts exported
-  without it map exactly as before.
+- **Receipts** (CSV, one row per movement) gain an optional `reason` column. A receipt exported
+  without it gets no reason, and nothing else about it changes.
+- **A receipt row with no status** is the one compatibility change. It used to be read as
+  `accepted`, and is now `unstated`, so the case asks for the acceptance.
+  - Both shipped packs require the status, and refuse a blank one, as before.
+  - A pack that marks the status optional, or maps none, gets the new behaviour.
+  - A pack can state `default: accepted`, which is then cited as the pack's choice.
+  - Which exports change, and what happens to records already stored:
+    docs/pilot/export-contract.md, "How receipts count".
 - **Receiving events** (CSV, collection `receiving_events`, filed under the PO, one row per
   event):
 
@@ -182,6 +189,18 @@ Ownership:
   choose whom to ask."
 - That is a policy decision for the organization. Publishing an owner means a new policy
   version, and the frozen benchmarks bind the existing versions by digest.
+- **The default stays unset on purpose.** Until an organization names an owner and a hold
+  scope, manual review is the right outcome. The scenarios behind this work came from public
+  discussion of receiving practice, which does not establish any company's policy.
+- **Routing to a named owner** is shown with a labelled synthetic version,
+  `fixtures/receiving/furniture-ap-v3-synthetic.yaml`. It is furniture-ap@v2 plus a
+  `disposition` route to `procurement` and `disputed_quantity_hold: disputed_portion`.
+  - It lives outside `packs/`, so `make seed-demo` never loads it.
+  - A unit test checks it differs from v2 only by those two additions.
+  - The unit tests use it as `CONFIGURED`.
+  - `test_with_the_synthetic_policy_version_rejected_goods_go_to_its_named_owner` publishes it
+    in a test tenant. Case B then goes to procurement with "Resolve rejected units with the
+    supplier for PO-…", and its split is 18 matched and 2 disputed.
 
 Payment:
 - A note gives the matched and disputed quantities whenever a quantity is disputed:
@@ -200,16 +219,25 @@ These cases reuse the existing approval, evidence-version and admission mechanis
 (`services/execution_admission.py`, `services/freshness.py`). There is no second approval
 system.
 
-- **Pending:** receipt for 20 posted → follow-up approved and queued → rejection of 2 recorded
-  → dispatch attempted. Nothing is sent: `cancelled_before_dispatch`, `precondition_failed`.
+A rejection learned after an approval ends one of two ways, depending on whether the approved
+action has been carried out yet. They are shown in different places (section 8):
+
+| | Path 1: still pending | Path 2: already carried out |
+|---|---|---|
+| Shown by | stack tests only (a local worker carries out an approval at once) | the UI walkthrough in section 8, and stack tests |
+| Expected result | nothing is sent; the proposal is superseded | the action is kept; the case asks for reconciliation |
+
+- **Path 1, pending:** receipt for 20 posted → follow-up approved and queued → rejection of 2
+  recorded → dispatch attempted. Nothing is sent: `cancelled_before_dispatch`,
+  `precondition_failed`.
   - The proposal is superseded, and the case is back for review on 18 accepted and 2 rejected.
   - The original receipt (version 1, 20 accepted) and the approval stay as recorded.
   - This holds when the rejection reaches OpsBridge through another case's read of the same
     PO: the worker and the casework MCP tool both refuse.
   - Tests: `test_a_rejection_learned_after_approval_stops_the_pending_follow_up`, `…_at_both_boundaries`.
 - **Identical reimport:** the approval stands and the action is carried out once.
-- **Already carried out:** the operation and the evidence it was approved on are kept, and
-  nothing is resent or undone.
+- **Path 2, already carried out:** the operation and the evidence it was approved on are kept,
+  and nothing is resent or undone.
   - The re-investigation returns the case to review and records the audit event
     `operation.evidence_changed_after_execution`.
   - The Receiving tab says reconciliation is needed.
@@ -266,7 +294,15 @@ with **Model: Rules only**, and open the **Receiving** tab:
 | Next question | receiving: "Confirm delivered quantity for PO-4601" | manual review (ap-review): who asks the supplier how the 2 rejected chairs will be remedied |
 | Payment | split shown; recommendation unresolved (furniture-ap@v2 sets no hold scope) | the same |
 
-The late rejection, in the UI:
+### The late rejection: two paths, two expected results
+
+A rejection learned after an approval ends differently depending on whether the approved action
+was already carried out (section 6). The UI walkthrough shows only path 2. Path 1 is shown only
+by the stack tests.
+
+**Path 2, in the UI: the action was already carried out. Expect reconciliation, not a block.**
+A local worker carries out an approval within seconds, so by the time the rejection arrives the
+action has run.
 1. Open `INV-8609` (GR-6609: 20 accepted) and run it. It matches.
 2. Create the proposal (a review note), and approve it as `furn-approver` in another browser
    profile. The worker carries it out.
@@ -274,19 +310,32 @@ The late rejection, in the UI:
 
         uv --directory backend run --frozen python -m opsbridge.cli receiving-pack --seed-simulator --late-events
 
-4. Run the investigation again. The case returns for review:
-   - 18 accepted and 2 rejected;
-   - the review note executed on the old evidence is kept;
-   - **Since approval** reads "reconciliation: the action was carried out on evidence that has
+4. Run the investigation again. Expect:
+   - the case back for review, on 18 accepted and 2 rejected;
+   - the review note that was carried out on the old evidence, still there, not resent or
+     undone;
+   - **Since approval:** "reconciliation: the action was carried out on evidence that has
      since changed; nothing was repeated or undone";
-   - the timeline marks REJ-4609 (occurred 2026-10-20, date only) "learned after approval".
+   - the timeline marking REJ-4609 (occurred 2026-10-20, date only) "learned after approval".
 
-A pending action stopped by the late rejection is shown by the tests. A local worker carries
-out an approval at once, so this case can't be staged by hand:
+You will not see "nothing was sent" here. That result belongs to path 1.
+
+**Path 1, in the stack tests: the action is still pending. Expect nothing sent.** The tests hold
+the dispatch job so the rejection lands between approval and dispatch, which can't be staged by
+hand:
 
     make infra-up migrate
     OPSBRIDGE_REQUIRE_INTEGRATION=1 uv --directory backend run --frozen pytest -m integration \
-      tests/integration/test_receiving_disposition.py
+      tests/integration/test_receiving_disposition.py -k "stops_the_pending or both_boundaries"
+
+Expected: 2 passed. They assert:
+- the operation is `cancelled_before_dispatch` with `precondition_failed`, with no attempt and
+  no remote task;
+- the proposal is superseded;
+- the worker's and the casework MCP tool's admission refuse it as stale, including when
+  another case's read brought the rejection in.
+
+Drop `-k …` to run all of this file's stack tests, path 2 included.
 
 The same cases as an export, for `export-check` or a dry run (docs/pilot/quickstart.md):
 
@@ -301,12 +350,13 @@ quantities, citations, the question, the owner, and approval or execution behavi
 applies:
 - `backend/tests/domain/test_receiving.py`: rules and positions. It also holds every new
   summary to the number checks that model text must pass.
-- `backend/tests/evidence/test_receiving_mapping.py`: import.
+- `backend/tests/evidence/test_receiving_mapping.py`: import, including which packs a blank
+  receipt status affects.
 - `backend/tests/pilot/test_receiving_pack.py`: the 12 pack cases against labels written by
   hand before the rules ran.
 - `backend/tests/pilot/test_export_check.py`: the export.
 - `backend/tests/integration/test_receiving_disposition.py`: persistence, approvals,
-  execution, the case view and tenant isolation.
+  execution, the case view, tenant isolation, and routing under the synthetic policy version.
 - `backend/tests/integration/test_migration_0025.py`: the migration.
 - `frontend/src/pages/case/ReceivingPanel.test.tsx`: the tab.
 
@@ -319,6 +369,9 @@ applies:
 - The canary baseline changed in two ways only: its rules version, and an added
   `hold_unconfigured` note on 18 quantity-mismatch cases. No outcome, type or next action
   changed.
+
+One import behaviour changed: a receipt row with no status is `unstated`, no longer
+`accepted` (section 3). Both shipped packs require a status, so their exports are unaffected.
 
 Two pilot rehearsal artifacts changed:
 - **The rehearsal's scenario A (INV-8401)** records 2 rejected chairs with no reason (its format
@@ -334,8 +387,9 @@ Two pilot rehearsal artifacts changed:
 - **Unread source changes:** a rejection recorded in the purchasing system but not yet read
   does not stop a dispatch within the age limit (local freshness, section 6).
 - **Material changes:** any evidence change invalidates an approval, even an immaterial one.
-- **Disposition owners:** no policy in the repository names one, and the demo tenant's policy
-  sends rejected goods to manual review. Configuring one is the organization's decision.
+- **Disposition owners:** no shipped policy names one, and the demo tenant's policy sends
+  rejected goods to manual review. Configuring one is the organization's decision. The
+  synthetic example version names one only to test routing (section 5).
 - **Inspection evidence:** this is a recorded rejection reason. Inspection reports as
   documents are not modelled.
 - **Coverage:** the IT hardware pack has no receiving-event mapping, and the agent tools don't
