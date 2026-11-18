@@ -86,7 +86,11 @@ installation's write mode (`opsbridge-export-check/2`, docs/pilot/export-contrac
 exits 1 when there is anything to review, and 2 when the export or pack can't be opened.
 `pilot-rehearsal-export --out DIR` writes the synthetic rehearsal cases
 (`fixtures/pilot/rehearsal.yaml`) as an export under `DIR/demo-furniture`, dated now, and never
-writes over an existing export. The worker's `/readyz` (port 9101) reports `outbound_writes`
+writes over an existing export. `receiving-pack --seed-simulator` puts the synthetic receiving
+and disposition cases (`fixtures/receiving/disposition.yaml`) in the local simulator's store,
+holding back the events recorded after approval; `--late-events` adds those later, and
+`--export-to DIR` writes all of them as an export (docs/receiving-disposition.md, section 8).
+The worker's `/readyz` (port 9101) reports `outbound_writes`
 and `purchasing_source`: a dry run is confirmed there (docs/pilot/quickstart.md).
 `python3 scripts/bench_pairing.py [--run DIR]` pairs a recorded run's rules-only and mock
 verdicts case by case and writes nothing.
