@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import uuid
 from decimal import Decimal
+from typing import Any
 
 from opsbridge.canonical import sha256_bytes
 from opsbridge.config import REPO_ROOT
@@ -136,6 +137,63 @@ def test_an_export_without_an_acceptance_status_gives_unstated_not_accepted() ->
     [line] = m.receipts[0].lines
     assert (line.quantity, line.status) == (Decimal("20"), "unstated")
     _ = FieldSpec  # the pack model the mapping is written in
+
+
+# A receipt row whose status is blank. Before rules 1.4.0 a status the mapping did not get
+# defaulted to accepted; now it is unstated, which changes the case (it asks for the
+# acceptance). These pin which exports that affects (docs/pilot/export-contract.md).
+BLANK_STATUS = (
+    b"receipt_id,po_ref,received_on,po_line,qty,uom,movement,status\n"
+    b"GR-6503,PO-4103,2026-10-20,1,20,EA,RECEIPT,\n"
+)
+
+
+def _status_mapped(**changes: Any) -> PackSpec:
+    """The furniture pack with its receipt status spec changed as given."""
+    receipt = FURNITURE.sources["goods_receipt"]
+    assert receipt.lines is not None
+    lines = dict(receipt.lines.record)
+    lines["status"] = lines["status"].model_copy(update=changes)
+    return FURNITURE.model_copy(
+        update={
+            "sources": {
+                **FURNITURE.sources,
+                "goods_receipt": receipt.model_copy(update={"lines": LinesSpec(record=lines)}),
+            }
+        }
+    )
+
+
+def test_the_shipped_packs_require_a_receipt_status() -> None:
+    for name in ("furniture", "it_hardware"):
+        receipt = PACKS.get(name).sources["goods_receipt"]
+        assert receipt.lines is not None
+        spec = receipt.lines.record["status"]
+        assert (spec.optional, spec.default) == (False, None), name
+
+
+def test_a_blank_status_is_refused_by_a_shipped_pack_as_before() -> None:
+    m = _map("goods_receipt", BLANK_STATUS)
+    assert m.receipts == []
+    assert "goods_receipt:GR-6503:row2: missing receipt_line.status" in m.problems
+
+
+def test_a_blank_status_a_pack_marks_optional_is_now_unstated_not_accepted() -> None:
+    m = _map("goods_receipt", BLANK_STATUS, _status_mapped(optional=True))
+    assert m.ok, m.problems
+    [line] = m.receipts[0].lines
+    assert line.status == "unstated"
+    assert "receipt_line.status" not in line.refs
+
+
+def test_a_pack_can_state_its_receipts_are_accepted_and_it_is_cited_as_the_pack_default() -> None:
+    m = _map("goods_receipt", BLANK_STATUS, _status_mapped(default="accepted"))
+    assert m.ok, m.problems
+    [line] = m.receipts[0].lines
+    assert line.status == "accepted"
+    assert line.refs["receipt_line.status"].locator == "pack:default"
+    [status] = [f for f in m.fields if f.field_path == "receipt_line.status"]
+    assert (status.method, status.locator) == ("pack_default", "pack:default")
 
 
 def test_a_supplier_saying_everything_arrived_is_an_assertion_never_a_receipt() -> None:
