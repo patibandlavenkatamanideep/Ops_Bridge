@@ -244,11 +244,19 @@ action has been carried out yet. They are shown in different places (section 8):
 - **Outcome uncertain** (`outcome_unknown`): it stays on the existing review path. No new
   attempt is made, and nothing is claimed undone.
 
-Freshness is local:
-- A rejection still only in the purchasing system, not yet read by OpsBridge, does not stop a
-  dispatch within the source age limit (`OPSBRIDGE_SOURCE_MAX_AGE_HOURS`).
-- Any evidence change makes an approval stale, including a change that is not material to it:
-  a false alarm at worst.
+A rejection that OpsBridge has not read yet:
+- **Before 18 November 2026** it did not stop a dispatch within the source age limit, because
+  freshness was local.
+- **Now** the executor asks the purchasing system before every new follow-up task. A
+  rejection recorded upstream after the approval, with the case not re-run, ends the
+  operation `source_changed` and the task is never sent.
+  - An export cannot answer that question, nor can an unreachable source; either holds the
+    action in review (`source_unverified`).
+  - Details: docs/execution-and-recovery.md, "Source freshness at dispatch".
+  - Test: `test_a_rejection_recorded_upstream_only_never_reaches_the_outbound_connector`.
+
+Any evidence change makes an approval stale, including a change that is not material to it:
+a false alarm at worst.
 
 ## 7. The case view
 
@@ -384,8 +392,10 @@ Two pilot rehearsal artifacts changed:
 
 ## 11. Known gaps
 
-- **Unread source changes:** a rejection recorded in the purchasing system but not yet read
-  does not stop a dispatch within the age limit (local freshness, section 6).
+- **Unread source changes:** closed at dispatch for a live source since 18 November 2026
+  (section 6). With an export, external writes stay in review, because an export cannot
+  show the system now. A change committed upstream after the dispatch-time check is too late
+  for that write.
 - **Material changes:** any evidence change invalidates an approval, even an immaterial one.
 - **Disposition owners:** no shipped policy names one, and the demo tenant's policy sends
   rejected goods to manual review. Configuring one is the organization's decision. The
