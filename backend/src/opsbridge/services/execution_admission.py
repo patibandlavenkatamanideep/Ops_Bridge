@@ -46,6 +46,12 @@ def marker(operation_key: str) -> str:
     return f"opsbridge-op:{operation_key}"
 
 
+# Before a new external write the executor also asks the purchasing system whether it still
+# holds what was approved (workflow/source_check.py). These end the operation the same way as
+# precondition_failed: nothing sent, the proposal superseded, the case back in review.
+SOURCE_CHANGED = "source_changed"  # a record changed, is new, or is gone upstream
+SOURCE_UNVERIFIED = "source_unverified"  # the source could not answer (export, unreachable)
+
 OUTBOUND_DISABLED = (
     "outbound writes are disabled on this installation (OPSBRIDGE_OUTBOUND_WRITES=disabled); "
     "nothing was sent"
