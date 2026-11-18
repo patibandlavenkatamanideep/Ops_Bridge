@@ -37,6 +37,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
   workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
   rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
+- **PR #49** (draft, source freshness at dispatch; its branch starts at PR #48's head): before
+  a follow-up task is sent, the executor asks the purchasing system whether it still holds
+  what was approved. If it changed or cannot say, nothing is sent and the action returns to
+  review. With an export, follow-up tasks stay in review.
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
   passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
   0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
@@ -106,7 +110,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Recent entries
 
-### 2026-11-18: source freshness at dispatch (draft PR after #48)
+### 2026-11-18: source freshness at dispatch (PR #49, draft, after #48)
 - Reproduced on #48's head: a follow-up approved on 20 accepted was sent after a rejection of
   2 was recorded in the purchasing system only (case not re-run). Local freshness could not
   see it, and the 24-hour window was open.
