@@ -94,7 +94,10 @@ over the original bytes; normalized-text digests are separate (`opsbridge-norm/1
 `purchasing-source/1`: `fetch(collection, key)` returns the original bytes, content type and
 ETag, or None only when the source says the record does not exist; `list_for_po(collection,
 po_number)` returns `Listing(keys, withdrawn, complete, pages)` after following every page.
-Outages raise `SourceUnavailable`, unusable answers `SourceRecordInvalid`. The simulator's
+Outages raise `SourceUnavailable`, unusable answers `SourceRecordInvalid`. `reads_live` says
+whether every call reads what the system holds at that moment: the executor asks only such a
+source, before a new external write, whether it still holds what was approved
+(`workflow/source_check.py`); for any other source the write is held for review. The simulator's
 listing route serves `{"items": [{"key", "content_type", "sha256", "updated_at",
 "deleted"}], "next_cursor"}` in key order with `limit` and `cursor` parameters; deleted
 records are tombstones. An investigation's `collect_context` output records `withdrawn`,
