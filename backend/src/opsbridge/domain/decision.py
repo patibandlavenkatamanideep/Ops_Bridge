@@ -20,6 +20,7 @@ ROUTE_PRIORITY: tuple[str, ...] = (
     "manual_review",
     "missing_receipt",
     "quantity_mismatch",
+    "disposition",  # rejected goods: the remedy is asked of the policy's disposition owner
     "price_mismatch",
     "matched",
 )
@@ -55,7 +56,7 @@ def _route_findings(result: MatchResult, route: str) -> list[Finding]:
         return [f for f in result.findings if f.status == "needs_review"]
     if route == "missing_receipt":
         return [f for f in result.findings if f.status == "needs_information"]
-    if route in ("quantity_mismatch", "price_mismatch"):
+    if route in ("quantity_mismatch", "disposition", "price_mismatch"):
         return [f for f in result.findings if f.finding_type == route and f.status == "discrepancy"]
     return []
 
@@ -64,6 +65,7 @@ _DECISION_FOR_ROUTE: dict[str, Decision] = {
     "manual_review": "escalate",
     "missing_receipt": "request_information",
     "quantity_mismatch": "propose_action",
+    "disposition": "propose_action",
     "price_mismatch": "propose_action",
     "matched": "no_discrepancy",
 }
