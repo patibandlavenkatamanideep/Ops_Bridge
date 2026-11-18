@@ -83,6 +83,26 @@ model is used instead — and the deterministic finding (8 of 10 laptops receive
 stands with a template explanation, routed to `it-asset-intake`. Same code; only the pack and policy differ. A furniture user
 cannot open this case (404).
 
+## 7. Delivered is not accepted (optional, 90 s)
+
+Load the synthetic receiving cases once:
+`uv --directory backend run --frozen python -m opsbridge.cli receiving-pack --seed-simulator`.
+
+1. Open `INV-8601` and `INV-8602` and run each rules-only. Both bill 20 chairs against 18
+   accepted.
+2. On the **Receiving** tab:
+   - **INV-8601:** 18 delivered and 2 not delivered; receiving is asked about delivery.
+   - **INV-8602:** 20 delivered, 2 rejected as "damaged in transit". This is a disposition
+     question, and the policy names no owner for it, so the case says so and goes to manual
+     review.
+3. Open `INV-8609`, which matches. Approve its review note, then write the rejection the
+   source records later:
+   `uv --directory backend run --frozen python -m opsbridge.cli receiving-pack --seed-simulator --late-events`.
+4. Re-run the investigation. **Since approval** asks for reconciliation, and the timeline
+   marks the rejection "learned after approval".
+
+Details and the side-by-side table: docs/receiving-disposition.md, section 8.
+
 ## If something goes wrong
 
 - Sign-in loops: check Keycloak at http://localhost:8081 and `make infra-up`.
