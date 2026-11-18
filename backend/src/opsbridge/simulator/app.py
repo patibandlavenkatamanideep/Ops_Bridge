@@ -33,7 +33,15 @@ from .store import MAX_PAGE_SIZE, SimStore
 
 ORG_RE = r"^[a-z0-9-]{1,64}$"
 KEY_RE = r"^[A-Za-z0-9._-]{1,120}$"
-COLLECTIONS = ("purchase_orders", "invoices", "receipts", "allocations", "messages", "suppliers")
+COLLECTIONS = (
+    "purchase_orders",
+    "invoices",
+    "receipts",
+    "receiving_events",
+    "allocations",
+    "messages",
+    "suppliers",
+)
 FaultMode = Literal[
     "delay",
     "fail_500",
