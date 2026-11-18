@@ -2,8 +2,9 @@
 
 Expected results are written from the scenario, by hand (docs/receiving-disposition.md):
 every case bills 20 EA on PO-1001 line 1, ordered 20 at 185.00. Policy furniture-ap@v2 names
-no owner for rejected goods; `CONFIGURED` is the same policy with a disposition owner
-(procurement) and a hold scope, as a later policy version would publish it.
+no owner for rejected goods. `CONFIGURED` is the labelled synthetic example version
+fixtures/receiving/furniture-ap-v3-synthetic.yaml: v2 plus a disposition owner (procurement)
+and a disputed-portion hold. It is an example of a later version, not a default.
 """
 
 from __future__ import annotations
@@ -12,11 +13,13 @@ from typing import Any, get_args
 
 import pytest
 
+from opsbridge.config import REPO_ROOT
 from opsbridge.domain.decision import recommend
 from opsbridge.domain.matching import RULES_VERSION, MatchResult, reconcile
-from opsbridge.domain.policy import ActionRoute, ActionType, ReconciliationPolicy
+from opsbridge.domain.policy import ActionType, ReconciliationPolicy
 from opsbridge.domain.receiving import positions
 from opsbridge.domain.records import MatchInput, ReceiptLine, ReceivingEvent
+from opsbridge.packs import load_policy_file
 
 from .builders import (
     D,
@@ -32,16 +35,14 @@ from .builders import (
 )
 
 V2 = load_policy("furniture/policies/furniture-ap-v2.yaml")
-DISPOSITION = ActionRoute(
-    action_type="create_follow_up_task",
-    assignee_group="procurement",
-    title_template="Resolve rejected units with the supplier for {po} ({case})",
-)
+SYNTHETIC = load_policy_file(
+    REPO_ROOT / "fixtures" / "receiving" / "furniture-ap-v3-synthetic.yaml"
+).policy
 
 
 def configured(hold: str | None = "disputed_portion") -> ReconciliationPolicy:
-    routes = {**V2.action_routes, "disposition": DISPOSITION}
-    return V2.model_copy(update={"action_routes": routes, "disputed_quantity_hold": hold})
+    """The synthetic example version, with its hold scope replaced where a test varies it."""
+    return SYNTHETIC.model_copy(update={"disputed_quantity_hold": hold})
 
 
 CONFIGURED = configured()
@@ -487,6 +488,21 @@ def test_existing_policy_documents_are_unchanged_by_the_new_fields() -> None:
     assert configured("whole_invoice").model_dump(mode="json")["disputed_quantity_hold"] == (
         "whole_invoice"
     )
+
+
+def test_the_synthetic_policy_is_v2_plus_only_its_two_labelled_additions() -> None:
+    v2 = V2.model_dump(mode="json")
+    v3 = SYNTHETIC.model_dump(mode="json")
+    assert v3.pop("disputed_quantity_hold") == "disputed_portion"
+    assert v3["action_routes"].pop("disposition") == {
+        "action_type": "create_follow_up_task",
+        "assignee_group": "procurement",
+        "title_template": "Resolve rejected units with the supplier for {po} ({case})",
+    }
+    assert v3.pop("description").startswith("SYNTHETIC EXAMPLE, not a default")
+    assert (v3.pop("version"), v2.pop("version")) == (3, 2)
+    v2.pop("description")
+    assert v3 == v2
 
 
 # --- the matcher's own wording passes the checks model text is held to ----------------------
