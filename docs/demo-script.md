@@ -95,11 +95,17 @@ Load the synthetic receiving cases once:
    - **INV-8602:** 20 delivered, 2 rejected as "damaged in transit". This is a disposition
      question, and the policy names no owner for it, so the case says so and goes to manual
      review.
-3. Open `INV-8609`, which matches. Approve its review note, then write the rejection the
+3. **A rejection learned after the action was carried out.** Open `INV-8609`, which matches.
+   Approve its review note; the worker carries it out at once. Then write the rejection the
    source records later:
    `uv --directory backend run --frozen python -m opsbridge.cli receiving-pack --seed-simulator --late-events`.
-4. Re-run the investigation. **Since approval** asks for reconciliation, and the timeline
-   marks the rejection "learned after approval".
+4. Re-run the investigation. Expect reconciliation, not a block: the review note stays as it
+   was, **Since approval** asks for reconciliation, and the timeline marks the rejection
+   "learned after approval".
+
+The other path, a rejection arriving while the approved action is still queued, ends with
+nothing sent. A local worker runs actions too quickly to show that by hand, so only the stack
+tests show it (docs/receiving-disposition.md, section 8, "Path 1").
 
 Details and the side-by-side table: docs/receiving-disposition.md, section 8.
 
