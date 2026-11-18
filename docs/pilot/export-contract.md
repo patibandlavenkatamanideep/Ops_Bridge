@@ -87,7 +87,33 @@ How receipts count (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md
 - `REVERSED` movements are ignored.
 - A receipt without an acceptance status is delivered, never accepted: the case asks for the
   acceptance.
-- Receiving events are optional; an export without any is read as before.
+- Receiving events are optional. An export without any events is read as before.
+
+**Changed in rules 1.4.0: a receipt row with no status.** The export format is still
+supported, but this one change can alter a case's result:
+- **Before:** a receipt row whose status the mapping did not get was read as `accepted`.
+- **Now:** it is `unstated`. Its units count as delivered, not accepted, and the case asks
+  receiving for the acceptance (`acceptance_not_stated`, needs information) where it could
+  have matched before.
+
+Which exports this affects:
+
+| Your pack's receipt `status` | A row with a blank status | Changed? |
+|---|---|---|
+| Required (both shipped packs, `furniture` and `it_hardware`) | Refused: "missing receipt_line.status". The receipt is not used | No |
+| `optional: true`, or not mapped at all | Was `accepted`, is now `unstated` | **Yes** |
+| `default: accepted` | `accepted`, cited as the pack's default (`pack:default`), not as the source's | No (now an explicit choice) |
+
+Use `default: accepted` only if your system records nothing but accepted receipts. That makes
+it a stated decision in the pack, which reviewers can see, not an inference.
+
+Records already stored keep the status they were stored with:
+- Rereading identical bytes stores nothing new.
+- A source document that changes is mapped again, and its lines then follow the table above.
+- Any changed document also makes an approval resting on it stale (section 6 of
+  docs/receiving-disposition.md).
+
+Tests: `backend/tests/evidence/test_receiving_mapping.py`, the blank-status cases.
 
 ## Missing records: never zero, never a silent match
 
