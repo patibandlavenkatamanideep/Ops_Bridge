@@ -86,6 +86,8 @@ class ExecutionDeps:
     # Where attempt requests/responses are kept (content-addressed, tenant-scoped); without
     # one only digests are recorded.
     store: ArtifactStore | None = None
+    # The installation's OPSBRIDGE_OUTBOUND_WRITES: off, no write outside OpsBridge is admitted.
+    outbound_writes_enabled: bool = True
 
 
 def _ctx(tenant_id: uuid.UUID) -> DbContext:
@@ -181,7 +183,7 @@ def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
     """Finish the operation instead of a new write if it was cancelled or is no longer
     eligible (services/execution_admission.py, shared with the casework tool); True when
     finished."""
-    refused = admission.refusal(s, op)
+    refused = admission.refusal(s, op, outbound_writes_enabled=deps.outbound_writes_enabled)
     if refused is None:
         return False
     if refused.category == "cancelled_by_user":
@@ -192,12 +194,12 @@ def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
             category="cancelled_by_user",
             cancellation="confirmed",
         )
-    else:
+    else:  # precondition_failed supersedes the proposal; outbound_writes_disabled does not
         finish_operation(
             s,
             op,
             "cancelled_before_dispatch",
-            category="precondition_failed",
+            category=refused.category,
             detail=refused.detail,
         )
     return True

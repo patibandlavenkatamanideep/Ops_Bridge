@@ -271,6 +271,7 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         timeout_seconds=settings.connector_timeout_seconds,
         lease_seconds=settings.worker_lease_seconds,
         store=artifact_store(settings),
+        outbound_writes_enabled=settings.outbound_writes == "enabled",
     )
 
 
@@ -329,9 +330,14 @@ class _HealthHandler(BaseHTTPRequestHandler):
             except Exception as exc:
                 checks["database"] = f"error:{type(exc).__name__}"
             ready = all(v == "ok" for v in checks.values())
-            self._send(
-                200 if ready else 503, json.dumps({"ready": ready, "checks": checks}).encode()
-            )
+            body = {
+                "ready": ready,
+                "checks": checks,
+                # What this process would do: confirm a dry run here, not in a config file.
+                "outbound_writes": w.settings.outbound_writes,
+                "purchasing_source": "export" if w.settings.purchasing_export_dir else "simulator",
+            }
+            self._send(200 if ready else 503, json.dumps(body).encode())
         elif self.path == "/metrics":
             self._send(200, metrics.render(), metrics.CONTENT_TYPE_LATEST)
         else:

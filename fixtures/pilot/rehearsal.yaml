@@ -1,0 +1,176 @@
+# Synthetic pilot rehearsal cases (docs/pilot/quickstart.md). No benchmark or canary reads
+# this file, and nothing here comes from a customer. `split: dev` is the scenario format's
+# development label; the format's renderer is bound by digest to the frozen benchmarks, so it
+# is not changed for a label. Labels are written by hand from
+# packs/furniture/policies/furniture-ap-v2.yaml. Organization: demo-furniture.
+schema_version: 1
+corpus_id: opsbridge-pilot-rehearsal-v1
+scenarios:
+- id: pilot-a
+  pack: furniture
+  family: PILOT-DELIVERED-NOT-ACCEPTED
+  template: acme-pdf-v1
+  split: dev
+  description: 'Scenario A: 20 chairs billed; receiving accepted 18 and rejected 2 as damaged; the
+    supplier says all 20 were delivered.'
+  supplier: {id: SUP-ACME, name: Acme Office Furniture Inc}
+  po:
+    number: PO-4001
+    currency: USD
+    date: '2026-10-01'
+    lines:
+    - {line: 1, item: CH-100, desc: 'Task chair, mesh back', qty: '20', unit: EA, price: '185.00'}
+  receipts:
+  - id: GR-6401A
+    date: '2026-10-20'
+    lines:
+    - {line: 1, qty: '18', unit: EA, kind: receipt, status: accepted}
+    - {line: 1, qty: '2', unit: EA, kind: receipt, status: rejected}
+  invoice:
+    number: INV-8401
+    date: '2026-10-28'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-4001
+    currency: USD
+    lines:
+    - {line: 1, po_line: 1, item: CH-100, desc: 'Task chair, mesh back', qty: '20', unit: EA,
+       price: '185.00', kind: goods}
+  allocations: []
+  messages:
+  - id: MSG-P4010
+    text: "Hello AP team,\nWe delivered all 20 chairs for PO-4001 on 20 October. Please pay the\
+      \ full invoice.\nRegards, Acme billing"
+  expected:
+    outcome: discrepancies_found
+    types: [quantity_mismatch]
+    next_action: propose_action:create_follow_up_task
+    note: 20 arrived, 18 count; the 2 rejected chairs are billed
+- id: pilot-b
+  pack: furniture
+  family: PILOT-EVIDENCE-CHANGES
+  template: acme-pdf-v1
+  split: dev
+  description: 'Scenario B, before the correction: 10 desks billed, 8 received. A corrected
+    receipt (10 accepted) arrives after the follow-up is approved.'
+  supplier: {id: SUP-ACME, name: Acme Office Furniture Inc}
+  po:
+    number: PO-4002
+    currency: USD
+    date: '2026-10-01'
+    lines:
+    - {line: 1, item: DK-410, desc: Height-adjustable desk, qty: '10', unit: EA, price: '410.00'}
+  receipts:
+  - id: GR-6402A
+    date: '2026-10-21'
+    lines:
+    - {line: 1, qty: '8', unit: EA, kind: receipt, status: accepted}
+  invoice:
+    number: INV-8402
+    date: '2026-10-28'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-4002
+    currency: USD
+    lines:
+    - {line: 1, po_line: 1, item: DK-410, desc: Height-adjustable desk, qty: '10', unit: EA,
+       price: '410.00', kind: goods}
+  allocations: []
+  messages: []
+  expected:
+    outcome: discrepancies_found
+    types: [quantity_mismatch]
+    next_action: propose_action:create_follow_up_task
+    note: before the corrected receipt
+- id: pilot-c
+  pack: furniture
+  family: PILOT-MISSING-RECEIPT
+  template: acme-pdf-v1
+  split: dev
+  description: 6 bookcases billed; no receiving record exists, so the case stops for it.
+  supplier: {id: SUP-ACME, name: Acme Office Furniture Inc}
+  po:
+    number: PO-4003
+    currency: USD
+    date: '2026-10-01'
+    lines:
+    - {line: 1, item: BC-220, desc: 'Bookcase, five shelves', qty: '6', unit: EA, price: '240.00'}
+  receipts: []
+  invoice:
+    number: INV-8403
+    date: '2026-10-28'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-4003
+    currency: USD
+    lines:
+    - {line: 1, po_line: 1, item: BC-220, desc: 'Bookcase, five shelves', qty: '6', unit: EA,
+       price: '240.00', kind: goods}
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types: [missing_receipt]
+    next_action: request_information:create_follow_up_task
+    note: missing evidence is unknown, not zero received
+- id: pilot-d
+  pack: furniture
+  family: PILOT-MATCHED
+  template: acme-pdf-v1
+  split: dev
+  description: 4 lamps ordered, received and billed at the ordered price.
+  supplier: {id: SUP-ACME, name: Acme Office Furniture Inc}
+  po:
+    number: PO-4004
+    currency: USD
+    date: '2026-10-01'
+    lines:
+    - {line: 1, item: LP-15, desc: 'Desk lamp, LED', qty: '4', unit: EA, price: '39.50'}
+  receipts:
+  - id: GR-6404A
+    date: '2026-10-22'
+    lines:
+    - {line: 1, qty: '4', unit: EA, kind: receipt, status: accepted}
+  invoice:
+    number: INV-8404
+    date: '2026-10-28'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-4004
+    currency: USD
+    lines:
+    - {line: 1, po_line: 1, item: LP-15, desc: 'Desk lamp, LED', qty: '4', unit: EA, price: '39.50',
+       kind: goods}
+  allocations: []
+  messages: []
+  expected:
+    outcome: matched
+    types: []
+    next_action: no_discrepancy:record_review_note
+    note: all equal
+- id: pilot-e
+  pack: furniture
+  family: PILOT-PO-NOT-EXPORTED
+  template: acme-pdf-v1
+  split: dev
+  description: The invoice names PO-4005, which the export does not hold.
+  supplier: {id: SUP-ACME, name: Acme Office Furniture Inc}
+  po: null
+  receipts: []
+  invoice:
+    number: INV-8405
+    date: '2026-10-28'
+    supplier_id: SUP-ACME
+    supplier_name: Acme Office Furniture Inc
+    po_number: PO-4005
+    currency: USD
+    lines:
+    - {line: 1, po_line: 1, item: CH-100, desc: 'Task chair, mesh back', qty: '2', unit: EA,
+       price: '185.00', kind: goods}
+  allocations: []
+  messages: []
+  expected:
+    outcome: needs_information
+    types: []
+    next_action: request_information:create_follow_up_task
+    note: without its purchase order nothing can be matched

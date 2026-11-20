@@ -31,7 +31,13 @@ from .units import canonical_unit, conversion_factor
 from .validation import Problem, match_input_problems
 from .validation import norm_id as _norm_id
 
-RULES_VERSION = "opsbridge-rules/1.2.0"
+# 1.3.0 counts receipt lines rejected at receiving: a shortfall says how many were delivered
+# and rejected and cites them, and a supplier's delivery claim equal to the accepted plus the
+# rejected units agrees with receiving instead of conflicting with it. 1.2.0 skipped rejected
+# lines without a word; runs recorded under it replay with it.
+RULES_VERSION = "opsbridge-rules/1.3.0"
+SILENT_REJECTIONS_RULES_VERSION = "opsbridge-rules/1.2.0"
+RULES_VERSIONS = (SILENT_REJECTIONS_RULES_VERSION, RULES_VERSION)
 
 FindingType = Literal[
     "missing_receipt",
@@ -200,22 +206,28 @@ def _input_findings(problems: list[Problem]) -> list[Finding]:
     return out
 
 
-def reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
-    """Evaluate an invoice against its PO, receipts and prior allocations."""
+def reconcile(
+    data: MatchInput, policy: ReconciliationPolicy, rules_version: str = RULES_VERSION
+) -> MatchResult:
+    """Evaluate an invoice against its PO, receipts and prior allocations, under the rules
+    version a run was made with (the current one for a new run)."""
+    if rules_version not in RULES_VERSIONS:
+        raise ValueError(f"unknown rules version {rules_version!r}")
     with localcontext(MATCH_CONTEXT):
-        return _reconcile(data, policy)
+        return _reconcile(data, policy, rules_version)
 
 
-def _reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
+def _reconcile(data: MatchInput, policy: ReconciliationPolicy, rules_version: str) -> MatchResult:
     findings: list[Finding] = []
     invoice = data.invoice
+    rejections = rules_version != SILENT_REJECTIONS_RULES_VERSION
 
     def done(po: str | None = None, supplier: str | None = None) -> MatchResult:
         return MatchResult(
             outcome=_outcome(findings),
             findings=tuple(findings),
             policy_ref=policy.ref,
-            rules_version=RULES_VERSION,
+            rules_version=rules_version,
             resolved_po_number=po,
             resolved_supplier_id=supplier,
         )
@@ -389,15 +401,17 @@ def _reconcile(data: MatchInput, policy: ReconciliationPolicy) -> MatchResult:
             )
         )
 
-    received_by_line: dict[str, Decimal] = {}
+    received_by_line: dict[str, _Received] = {}
     for po_line_number, inv_lines in by_po_line.items():
         po_line = po_lines[_norm_id(po_line_number)]
-        received = _check_line(data, policy, invoice, po, po_line, inv_lines, inv_ccy, findings)
+        received = _check_line(
+            data, policy, invoice, po, po_line, inv_lines, inv_ccy, findings, rejections
+        )
         if received is not None:
             received_by_line[_norm_id(po_line.line_number) or ""] = received
 
     # 5. Supplier statements that conflict with receiving records.
-    _check_assertions(data, policy, po, received_by_line, findings)
+    _check_assertions(data, policy, po, received_by_line, findings, rejections)
 
     return done(po.po_number, po.supplier_id)
 
@@ -533,6 +547,15 @@ def _net_unit_price(
     return quantize(net, policy.price_rounding.places, policy.price_rounding.mode)
 
 
+@dataclass(frozen=True)
+class _Received:
+    """What receiving recorded for one PO line, in PO units."""
+
+    net: Decimal  # accepted receipts minus accepted returns
+    rejected: Decimal  # delivered and rejected (counted from rules 1.3.0)
+    rejected_refs: tuple[SourceRef, ...]
+
+
 def _check_line(
     data: MatchInput,
     policy: ReconciliationPolicy,
@@ -542,8 +565,9 @@ def _check_line(
     inv_lines: list[InvoiceLine],
     currency: str,
     findings: list[Finding],
-) -> Decimal | None:
-    """Quantity and price checks for one PO line. Returns net received qty if known."""
+    rejections: bool,
+) -> _Received | None:
+    """Quantity and price checks for one PO line. Returns what was received if known."""
     line_no = po_line.line_number
     inv_line_nos = tuple(il.line_number for il in inv_lines)
     po_unit = canonical_unit(po_line.unit, policy.unit_aliases)
@@ -590,9 +614,18 @@ def _check_line(
     ]
     received = Decimal(0)
     returned = Decimal(0)
+    rejected = Decimal(0)  # delivered, and not counted because receiving rejected it
     receipt_refs: list[SourceRef] = []
+    rejected_refs: list[SourceRef] = []
     for _gr, rl in receipt_lines:
         if rl.status != "accepted":
+            if rejections and rl.status == "rejected" and rl.kind == "receipt":
+                qty, _factor, problem = _to_po_units(rl.quantity, rl.unit, po_unit, policy)
+                if problem is None and qty is not None:
+                    rejected += qty
+                    rejected_refs.extend(
+                        _refs((rl.refs, "receipt_line.quantity"), (rl.refs, "receipt_line.status"))
+                    )
             continue
         qty, _factor, problem = _to_po_units(rl.quantity, rl.unit, po_unit, policy)
         if problem is not None or qty is None:
@@ -634,6 +667,8 @@ def _check_line(
         "prior_allocated": decimal_str(prior_allocated),
         "unit": po_unit,
     }
+    if rejected:
+        values["received_rejected"] = decimal_str(rejected)
 
     if not receipt_lines:
         findings.append(
@@ -670,12 +705,20 @@ def _check_line(
                 if already_allocated
                 else "invoiced_exceeds_received"
             )
-            detail = (
-                f"{decimal_str(prior_allocated)} of the {decimal_str(net_received)} received were "
-                "already matched to earlier invoices"
-                if prior_allocated > 0
-                else f"only {decimal_str(net_received)} were received"
-            )
+            if prior_allocated > 0:
+                detail = (
+                    f"{decimal_str(prior_allocated)} of the {decimal_str(net_received)} received "
+                    "were already matched to earlier invoices"
+                )
+            elif rejected and not returned:
+                detail = f"only {decimal_str(net_received)} were accepted at receiving"
+            else:
+                detail = f"only {decimal_str(net_received)} were received"
+            if rejected:
+                detail += (
+                    f" ({decimal_str(rejected)} more were delivered and rejected, and rejected "
+                    "units are not counted as received)"
+                )
             values["excess"] = decimal_str(excess)
             findings.append(
                 Finding(
@@ -687,7 +730,7 @@ def _check_line(
                     po_line_number=line_no,
                     invoice_line_numbers=inv_line_nos,
                     values=dict(values),
-                    evidence=base_refs + tuple(receipt_refs) + prior_refs,
+                    evidence=base_refs + tuple(receipt_refs) + tuple(rejected_refs) + prior_refs,
                 )
             )
 
@@ -715,7 +758,9 @@ def _check_line(
     for il, factor in price_inputs:
         _check_price(policy, po, po_line, il, factor, currency, findings)
 
-    return net_received if receipt_lines else None
+    if not receipt_lines:
+        return None
+    return _Received(net_received, rejected, tuple(rejected_refs))
 
 
 def _unit_finding(
@@ -851,8 +896,9 @@ def _check_assertions(
     data: MatchInput,
     policy: ReconciliationPolicy,
     po: PurchaseOrder,
-    received_by_line: dict[str, Decimal],
+    received_by_line: dict[str, _Received],
     findings: list[Finding],
+    rejections: bool,
 ) -> None:
     precedence = policy.source_precedence
     for assertion in data.supplier_assertions:
@@ -882,10 +928,28 @@ def _check_assertions(
                 )
             )
             continue
-        received = received_by_line[_norm_id(line_no) or ""]
+        line = received_by_line[_norm_id(line_no) or ""]
+        received = line.net
         if assertion.quantity == received:
             continue
         values["net_received"] = decimal_str(received)
+        if rejections and line.rejected and assertion.quantity == received + line.rejected:
+            # Delivered is not accepted: the claim counts the units receiving rejected.
+            findings.append(
+                Finding(
+                    "note",
+                    "informational",
+                    "supplier_claim_includes_rejected",
+                    f"Supplier correspondence claims {decimal_str(assertion.quantity)} delivered "
+                    f"on PO line {line_no}, which agrees with receiving: "
+                    f"{decimal_str(received)} were accepted and {decimal_str(line.rejected)} "
+                    "rejected. Only accepted units are counted as received.",
+                    po_line_number=line_no,
+                    values={**values, "received_rejected": decimal_str(line.rejected)},
+                    evidence=evidence + line.rejected_refs,
+                )
+            )
+            continue
         if "goods_receipt" in precedence and "supplier_message" in precedence:
             if precedence.index("goods_receipt") < precedence.index("supplier_message"):
                 findings.append(

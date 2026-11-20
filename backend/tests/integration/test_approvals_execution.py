@@ -965,6 +965,59 @@ def _tenant_of(migrator_engine: Engine, slug: str) -> uuid.UUID:
     return tid
 
 
+# --- Dry run: outbound writes disabled (pilot preparation) -----------------------------
+
+
+def refusal_detail(migrator_engine: Engine, op: dict[str, Any]) -> str:
+    """Why the executor refused, as its audit event records it (operators see the category)."""
+    with Database(migrator_engine).session(
+        DbContext(tenant_id=_tenant_of(migrator_engine, ORG))
+    ) as s:
+        details = s.execute(
+            text(
+                "SELECT details FROM audit_events WHERE resource_id = :id "
+                "AND action = 'operation.cancelled_before_dispatch'"
+            ),
+            {"id": op["id"]},
+        ).scalar_one()
+    return str(details["detail"])
+
+
+def test_with_outbound_writes_disabled_an_approved_follow_up_is_never_sent(
+    stack, migrator_engine: Engine
+) -> None:  # type: ignore[no-untyped-def]
+    """The worker refuses the write itself; no button is hidden, the approval goes through."""
+    st = stack
+    st["exec"]["exec"] = replace(st["exec"]["exec"], outbound_writes_enabled=False)
+    case_id, prop = prepared(st, "INV-9001")
+    assert prop["action_type"] == "create_follow_up_task"
+    assert approve(st, case_id, prop).status_code == 200
+    drain(st)
+    [op] = operations(st, case_id)
+    assert (op["status"], op["failure_category"]) == (
+        "cancelled_before_dispatch",
+        "outbound_writes_disabled",  # shown as is in the case's proposals panel
+    )
+    assert op["attempts"] == [] and remote_tasks(st, op) == []
+    assert "outbound writes are disabled on this installation" in refusal_detail(
+        migrator_engine, op
+    )
+    # The approval stands: the pilot report counts it as approved, not as undecided.
+    proposals = get(st, "furn-approver", f"{T}/cases/{case_id}/proposals").json()["items"]
+    assert [p["status"] for p in proposals] == ["approved"]
+
+
+def test_with_outbound_writes_disabled_actions_inside_opsbridge_still_run(stack) -> None:  # type: ignore[no-untyped-def]
+    st = stack
+    st["exec"]["exec"] = replace(st["exec"]["exec"], outbound_writes_enabled=False)
+    case_id, prop = prepared(st, "INV-9024")  # manual review: assign the case to a person
+    assert prop["action_type"] == "assign_case"
+    assert approve(st, case_id, prop).status_code == 200
+    drain(st)
+    [op] = operations(st, case_id)
+    assert op["status"] == "confirmed" and op["connector"] == "opsbridge_local"
+
+
 def test_local_review_note_runs_through_the_same_ledger(stack) -> None:  # type: ignore[no-untyped-def]
     st = stack
     case_id, prop = prepared(

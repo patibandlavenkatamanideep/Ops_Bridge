@@ -65,6 +65,7 @@ def build_casework_server(
     issuer_url: str,
     connector_for: Callable[[uuid.UUID, dict[str, Any]], TaskConnector],
     timeout_seconds: float = 5.0,
+    outbound_writes_enabled: bool = True,
 ) -> MCPServer:
     server = MCPServer(
         name="opsbridge-casework",
@@ -146,7 +147,9 @@ def build_casework_server(
         with db.session(cc.db_ctx) as s:
             current = s.get(Operation, op.id)
             assert current is not None
-            refused = admission.refusal(s, current, lock_case=False)
+            refused = admission.refusal(
+                s, current, outbound_writes_enabled=outbound_writes_enabled, lock_case=False
+            )
             if refused is not None:
                 raise ToolDenied(f"{NOT_ADMITTED} ({refused.category}): {refused.detail}")
             claimed = s.execute(
