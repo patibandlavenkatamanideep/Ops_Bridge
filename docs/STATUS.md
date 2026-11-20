@@ -12,7 +12,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 904 passed (5 Linux-only skipped, and the live tests), integration 318 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 927 passed (5 Linux-only skipped, and the live tests), integration 325 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
@@ -80,8 +80,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - Evidence that changes after approval stops the dispatch. The Receiving tab lists the
   documents added or no longer current since each approval and a timeline of receiving
   evidence, but there is no field-by-field diff, and the refusal's reasons are in the audit
-  log, not the API (the UI shows its category). No command provisions a pilot (non-demo)
-  tenant.
+  log, not the API (the UI shows its category).
+- A pilot tenant is provisioned with `tenant-provision` from a spec file. It has been run only
+  against the local database and synthetic specs, never against an organization's identity
+  provider.
 - Receiving: any evidence change, material or not, makes an approval stale. (A rejection
   only in the purchasing system now stops the dispatch: the executor asks the source first.
   With an export it cannot, so external writes stay in review.) No
@@ -109,6 +111,30 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-19: pilot tenant provisioning (draft PR after #49)
+- Before: only the synthetic demo tenants could be created (`seed-demo`), and their accounts
+  share one password. The quickstart left a pilot tenant to the owner, with no command.
+- `tenant-provision --spec FILE [--dry-run]` (`provision.py`, template
+  `fixtures/pilot/tenant.example.yaml`) creates one organization's tenant in one audited
+  transaction:
+  - the tenant, not flagged as a demo;
+  - settings, rules only by default;
+  - the first task connection;
+  - its policy versions, validated for the pack;
+  - its first administrators, by identity-provider subject.
+- Everyone else joins by invitation in the app. A re-run publishes added policy versions and
+  changes nothing else.
+- Refused, with nothing written: a demo slug or tenant, a demo account's subject, another
+  pack, a policy for another pack, a changed policy under the same version, a model mode the
+  tier lacks, and unfilled template values.
+- Tests: 23 unit (the spec), 7 on the stack:
+  - what is written and audited;
+  - the administrator invites through the app, and a demo administrator has no access;
+  - re-runs, atomic refusals and dry runs;
+  - `seed-demo` leaves the tenant alone.
+  - A mutation flagging the tenant as a demo fails 5 of them.
+- Unit 927 (frontend 17), integration 325.
 
 ### 2026-11-18: source freshness at dispatch (PR #49, draft, after #48)
 - Reproduced on #48's head: a follow-up approved on 20 accepted was sent after a rejection of
