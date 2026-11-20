@@ -36,6 +36,27 @@ def _seed_demo(_args: argparse.Namespace) -> int:
     return 0
 
 
+def _tenant_provision(args: argparse.Namespace) -> int:
+    """Provision one organization's (non-demo) tenant from a spec file (provision.py)."""
+    from opsbridge.config import get_settings
+    from opsbridge.packs import PackRegistry
+    from opsbridge.persistence.db import Database, make_engine
+    from opsbridge.provision import ProvisionError, run
+
+    db = Database(make_engine("migrator"))
+    try:
+        report = run(
+            db, Path(args.spec), PackRegistry(get_settings().packs_dir), dry_run=args.dry_run
+        )
+    except ProvisionError as exc:
+        print(f"refused; nothing was written: {exc}", file=sys.stderr)
+        return 2
+    finally:
+        db.engine.dispose()
+    print(json.dumps(report.to_dict(), indent=2))
+    return 0
+
+
 def _api(args: argparse.Namespace) -> int:
     import uvicorn
 
@@ -1126,6 +1147,14 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("seed-demo", help="idempotently seed the designated synthetic demo tenants")
     p.set_defaults(func=_seed_demo)
+
+    p = sub.add_parser(
+        "tenant-provision",
+        help="provision one organization's tenant (never a demo tenant) from a spec file",
+    )
+    p.add_argument("--spec", required=True, help="an opsbridge-tenant/1 YAML file")
+    p.add_argument("--dry-run", action="store_true", help="validate and report, then roll back")
+    p.set_defaults(func=_tenant_provision)
 
     p = sub.add_parser("api", help="run the HTTP API")
     p.add_argument("--host", default="127.0.0.1")
