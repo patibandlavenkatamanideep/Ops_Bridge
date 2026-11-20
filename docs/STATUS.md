@@ -1,8 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-16. `main` is at `2cd06dc`, PR #39's merge (CI run 42468377115 green,
-its image job re-run after a failed download). Work continues on `feat/opsbridge-foundation`
-in PR #45.
+Last updated 2026-11-17. `main` is at `53e6c5a`, PR #45's merge (CI run 44078427478 green on
+the first attempt). This record's update is PR #46.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -20,7 +19,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Receiving and disposition | Implemented and tested on synthetic data (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md): delivered, accepted and rejected kept apart; late rejections, returns, replacements and credits; a stale approval refused at both write boundaries. No organization's receiving data read; no reviewer has judged the questions or owners; no shipped policy names a disposition owner (a labelled synthetic version does, for tests only) |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Prepared and checked on synthetic data: protocol `opsbridge-pilot/2`, a per-case export check, and a rules-only dry run with outbound writes disabled (docs/pilot/quickstart.md). The external first pass is blocked: no authorized export, reviewer or authorization |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `2cd06dc` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `53e6c5a` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
@@ -28,9 +27,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   outbound deadline; proposal status changes and attempt leases on the database's clock) and
   **PR #38** (the approval-wait and execution-time metrics measured between two database
   times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
-  3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days).
-- **PR #45**, waiting for the owner to merge: OpenTelemetry's API, SDK and OTLP exporter
-  raised together to 1.45.2, which Dependabot cannot do; this record names `2cd06dc`.
+  3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days) and **PR #45**
+  (OpenTelemetry's API, SDK and OTLP exporter raised together to 1.45.2).
 - **PR #47** (draft): the pilot's preparation. A rules-only dry run with outbound writes
   disabled, a per-case preflight, scenario A fixed (rules 1.3.0), scenario B checked, and the
   36/40 question answered case by case. Handoff in docs/pilot/.
@@ -95,8 +93,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #45, and push `v0.1.0-alpha.1` on `main`'s head when ready (`2cd06dc`
-   qualifies now; after #45 merges, its merge commit is the head to check and name).
+1. Owner: push `v0.1.0-alpha.1` on `main`'s head when ready (`53e6c5a` qualifies now).
 2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
    reviewer and written authorization. Then follow docs/pilot/quickstart.md, section 6
    (pre-registration first).
@@ -160,6 +157,11 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   (`scripts/bench_pairing.py`).
 - Unit 770, integration 295, canary 64/64, replay check reproduces every recording; the
   quickstart passed from a clean clone, with a browser walk-through.
+
+### 2026-11-17: PR #45 merged and qualified
+- PR #45 merged as `53e6c5a`. Its push CI run on `main`, 44078427478, passed all four jobs on
+  the first attempt, and `release_check.py versions` and `ci` pass on that SHA (checked in a
+  clean worktree of it). README, this page and the readiness record name it.
 
 ### 2026-11-16: PR #39 merged; OpenTelemetry raised by hand (PR #45)
 - PR #39 merged on 8 November as `2cd06dc`. `main`'s CI failed there: GitHub answered 504 to
