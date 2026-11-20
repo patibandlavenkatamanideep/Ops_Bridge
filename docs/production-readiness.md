@@ -1010,7 +1010,8 @@ docs/pilot/.
 **Not done.**
 - The external pilot is BLOCKED: no authorized export, reviewer, cohort or written
   authorization exists.
-- No command provisions a pilot (non-demo) tenant.
+- No command provisioned a pilot (non-demo) tenant. Since 19 November `tenant-provision`
+  does (section "Pilot tenant provisioning").
 - The partial-export finding speaks of pages (written for paged sources).
 - There is no diff view.
 
@@ -1145,6 +1146,55 @@ for exactly that reason.
   relies on the executor's check made just before the call.
 - **Real systems:** the check is proven against the simulator only. A real system's adapter
   must pass the contract suite and be truly live.
+
+## Pilot tenant provisioning (19 November 2026)
+
+**Before.** `seed-demo` creates only the designated synthetic demo tenants, whose accounts
+share one password. A pilot on customer data needs its own tenant, and the quickstart left that
+to the owner, with no command to do it.
+
+**Changed.** `tenant-provision --spec FILE [--dry-run]` (`backend/src/opsbridge/provision.py`,
+template `fixtures/pilot/tenant.example.yaml`) runs with the migrator role, in one
+transaction, and audits every creation with the spec file's digest. It creates only what the
+application has no other way to create:
+- the tenant, not flagged as a demo;
+- its settings, rules only by default;
+- its first task connection: the simulator organization named after the tenant. Nothing is
+  sent with outbound writes disabled, and the administrator can change it;
+- its policy versions, validated for the pack;
+- its first administrators, by identity-provider subject.
+
+Everyone else joins through the app's invitations. A re-run publishes policy versions added to
+the spec, and changes nothing else: names, tiers, settings and memberships are left as they
+are.
+
+**Refused**, with nothing written:
+- a demo tenant's slug, or an existing demo tenant;
+- a demo account's subject;
+- another pack for an existing tenant;
+- a policy for another pack;
+- a changed policy under an existing version number;
+- a model mode or connector the tier lacks;
+- a spec with unfilled template values, or one that is unreadable or invalid.
+
+**Tested.**
+- `tests/pilot/test_provision_spec.py` (23): the spec and every refusal that needs no
+  database.
+- `tests/integration/test_tenant_provision.py` (7):
+  - what is written and audited;
+  - the administrator signs in and invites a reviewer through the API, and a demo
+    administrator gets no access;
+  - a re-run changes nothing, not even a different tier, and publishes an added version;
+  - a refusal leaves no trace, including the second administrator in the same spec;
+  - the database step refuses a demo tenant and a change of pack on its own;
+  - a dry run keeps nothing, and `seed-demo` leaves the tenant alone.
+  - A mutation that flags the tenant as a demo fails 5 of these.
+- The command was dry-run against the local database with a synthetic spec (nothing
+  written), and refused the unfilled template and a missing file with exit 2.
+
+**Not done.** It has not been run against any organization's identity provider. It creates no
+identity-provider accounts, which are the identity provider's own. There is no command to
+deprovision a tenant (A16).
 
 ## Work plan
 
