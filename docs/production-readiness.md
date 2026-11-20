@@ -38,12 +38,12 @@ Nothing here has reached sandbox, staging or pilot.
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
-| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `2cd06dc` (PR #39), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
+| A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `53e6c5a` (PR #45; `53e6c5ad6c36962db4234139553bf4497ea0f376`, CI run https://github.com/patibandlavenkatamanideep/Ops_Bridge/actions/runs/44078427478), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`, and its remainder (a re-read's uncertainty lost the reason) as `investigation/1.3.0` on 6 November; v1 recordings replay with `investigation/1.1.0` in their declared order and v1-rerun's with 1.2.0, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
 | A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus. On 17 November the pilot dry run was walked in a browser from a clean checkout on synthetic data; a reviewer sheet and a results template (pre-registration, first pass, adaptation kept apart) are ready | 7, 9 | Browser tests; docs/pilot/ | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
-| A17 | Image lacks the evaluation evidence the repository verifies | Done, verified in CI: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; the image check and bundle round trip pass on `main` at `2cd06dc` (CI run 42468377115) | 8 | See "Package 8, evidence packaging" below | — |
+| A17 | Image lacks the evaluation evidence the repository verifies | Done, verified in CI: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; the image check and bundle round trip pass on `main` at `53e6c5a` (CI run 44078427478) | 8 | See "Package 8, evidence packaging" below | — |
 | A18 | Large modules; status documents drift | Ongoing: README status refreshed 2026-11-07 against this record; each package updated STATUS, this record and the runbooks. Shared contracts extracted where they removed duplication (`domain/validation.py`, `services/execution_admission.py`, `connectors/http_transport.py`); no broad refactor | all | — | — |
 
 Earlier findings keep their own history in `docs/review-findings.md`: F01–F18 (review of
@@ -60,7 +60,7 @@ regression failed for the stated reason before the fix.
 | Item | Value |
 |---|---|
 | Reviewed `main` | `79992cd` (5 November 2026), CI run 41980269125 green; Python `0.1.0a1`, frontend `0.1.0-alpha.1`, unpublished |
-| Work | `feat/opsbridge-foundation`, from `79992cd`; PR #36, merged on 7 November (UTC) as `e0f1e2d`, whose CI run on `main`, 42336948253, passed all four jobs. Follow-up fixes in PR #37, merged as `ff24e06` (CI run 42340729942 on `main`), PR #38, merged as `4615569` (CI run 42356139646), PR #39, merged as `2cd06dc` (CI run 42468377115, its image job re-run after a failed download), and PR #45 |
+| Work | `feat/opsbridge-foundation`, from `79992cd`; PR #36, merged on 7 November (UTC) as `e0f1e2d`, whose CI run on `main`, 42336948253, passed all four jobs. Follow-up fixes in PR #37, merged as `ff24e06` (CI run 42340729942 on `main`), PR #38, merged as `4615569` (CI run 42356139646), PR #39, merged as `2cd06dc` (CI run 42468377115, its image job re-run after a failed download), and PR #45, merged on 17 November as `53e6c5a` (CI run 44078427478, first attempt) |
 | Ruleset | Live ruleset 26598146 on `main`, active: pull requests only, the four CI jobs required on an up-to-date branch, review threads resolved, no force push or deletion, administrators bypass only by merging a pull request, **0 approvals**. It is not enforced independent review |
 | Gates run here | Unit, integration (PostgreSQL 16, Keycloak and MCP in Podman), canary, receipts, replay check, lint and types. **Not here:** the image build (about 3 GB of disk free), Landlock and seccomp (macOS), OCR (no tesseract), browser tests (not run this session). Those run in hosted CI and are named, not counted as passed |
 | Review documents | `PRODUCTION_REVIEW.md` and its file inventory were not supplied. The findings are taken from the brief, which does not define N09 |
@@ -736,8 +736,9 @@ parser subprocesses, on 7 November (UTC) `e0f1e2d` (PR #36; CI run 42336948253),
 fixes the review of 5 November (N01–N08), the same day `ff24e06` (PR #37; CI run
 42340729942), which bounds name lookups and measures the pilot cut-off and attempt leases on
 the database's clock, `4615569` (PR #38; CI run 42356139646), which measures the duration
-metrics on it too, and on 8 November `2cd06dc` (PR #39; CI run 42468377115), which builds the
-image on Python 3.12.16. The first tag belongs there. The ruleset's check names match
+metrics on it too, on 8 November `2cd06dc` (PR #39; CI run 42468377115), which builds the
+image on Python 3.12.16, and on 17 November `53e6c5a` (PR #45; CI run 44078427478), which
+raises OpenTelemetry to 1.45.2. The first tag belongs there. The ruleset's check names match
 CI, and a test keeps them matched. The workflow has not run (no tag), so its first use is
 its first test, and no attestation exists yet. The promotion relies on `docker buildx
 imagetools create` keeping a single image index as it is. The step therefore refuses, before
@@ -1254,14 +1255,18 @@ deprovision a tenant (A16).
      whose CI run on `main`, 42356139646, passed all four jobs and which `release_check.py
      ci` accepts), and the Python 3.12.16 base image (PR #39, merged on 8 November as
      `2cd06dc`, whose CI run on `main`, 42468377115, passed all four jobs once a failed
-     download in its SBOM step was re-run, and which `release_check.py ci` accepts).
+     download in its SBOM step was re-run, and which `release_check.py ci` accepts), then
+     OpenTelemetry 1.45.2 (PR #45, merged on 17 November as
+     `53e6c5ad6c36962db4234139553bf4497ea0f376`; its push CI run, https://github.com/patibandlavenkatamanideep/Ops_Bridge/actions/runs/44078427478,
+     passed all four jobs on the first attempt, and `release_check.py versions --tag
+     v0.1.0-alpha.1` and `ci` pass on that SHA, checked in a clean worktree of it).
 
    Remaining limits:
-   - the release workflow has not run; its preconditions pass on `2cd06dc`;
+   - the release workflow has not run; its preconditions pass on `53e6c5a`;
    - there is no held-out or out-of-sample result beyond v1;
    - the SDKs' streaming APIs are unused and unbounded.
 5. Needs the owner:
-   - push `v0.1.0-alpha.1` on `main`'s head, `2cd06dc` (PR #39), which carries the fixed
+   - push `v0.1.0-alpha.1` on `main`'s head, `53e6c5a` (PR #45), which carries the fixed
      pypdf, OpenSSL and `apt`, the HIGH gate, the evidence bundle and the N01–N08 fixes (A12,
      A17);
    - a purchasing system or export and authorization, and an AP or procurement reviewer
