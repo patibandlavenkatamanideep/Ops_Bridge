@@ -42,6 +42,9 @@ _KEY_RE = re.compile(r"^[A-Za-z0-9._-]{1,120}$")
 
 class PurchasingClient:
     connector_version = CONNECTOR_VERSION
+    # Every call reads what the system holds at that moment, so dispatch can ask it whether an
+    # approval's records are still current (workflow/source_check.py).
+    reads_live = True
 
     def __init__(
         self,

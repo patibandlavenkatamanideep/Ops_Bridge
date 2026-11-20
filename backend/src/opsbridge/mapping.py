@@ -30,6 +30,7 @@ from opsbridge.domain.records import (
     POLine,
     PurchaseOrder,
     ReceiptLine,
+    ReceivingEvent,
     SourceRef,
     SupplierAssertion,
 )
@@ -40,11 +41,17 @@ from opsbridge.domain.validation import (
     norm_id,
     purchase_order_problems,
     receipt_problems,
+    receiving_event_problems,
 )
 from opsbridge.evidence.parsers import ParsedDocument
 
 RecordType = Literal[
-    "purchase_order", "invoice", "goods_receipt", "allocation_history", "supplier_message"
+    "purchase_order",
+    "invoice",
+    "goods_receipt",
+    "allocation_history",
+    "supplier_message",
+    "receiving_event",
 ]
 Transform = Literal["str", "decimal", "date", "upper", "lower", "strip"]
 
@@ -128,6 +135,7 @@ class MappingResult:
     receipts: list[GoodsReceipt] = field(default_factory=list)
     allocations: list[InvoiceAllocation] = field(default_factory=list)
     assertions: list[SupplierAssertion] = field(default_factory=list)
+    events: list[ReceivingEvent] = field(default_factory=list)
     fields: list[ExtractedValue] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)
 
@@ -573,6 +581,7 @@ def _prefix(rtype: str) -> str:
         "goods_receipt": "goods_receipt",
         "allocation_history": "allocation",
         "supplier_message": "supplier_message",
+        "receiving_event": "receiving_event",
     }[rtype]
 
 
@@ -583,6 +592,7 @@ def _line_prefix(rtype: str) -> str:
         "goods_receipt": "receipt_line",
         "allocation_history": "allocation",
         "supplier_message": "supplier_message",
+        "receiving_event": "receiving_event",
     }[rtype]
 
 
@@ -657,7 +667,10 @@ def _build(
                         quantity=lv["quantity"],
                         unit=lv["unit"],
                         kind=lv.get("kind") or "receipt",
-                        status=lv.get("status") or "accepted",
+                        # A pack that maps no status gives a received quantity whose
+                        # acceptance the source does not state: never read as accepted.
+                        status=lv.get("status") or "unstated",
+                        reason=lv.get("reason"),
                         refs=lr,
                     )
                     for lv, lr in lines
@@ -674,6 +687,24 @@ def _build(
                 quantity=h["quantity"],
                 status=h.get("status") or "active",
                 refs={k: v for k, v in refs.items() if k == "allocation.quantity"},
+            )
+        )
+    elif rtype == "receiving_event":
+        out.events.append(
+            ReceivingEvent(
+                event_id=h["event_id"],
+                event_type=h["event_type"],
+                po_number=h["po_number"],
+                po_line_number=h["po_line_number"],
+                quantity=h.get("quantity"),
+                unit=h.get("unit"),
+                occurred=h.get("occurred"),
+                receipt_number=h.get("receipt_number"),
+                follows=h.get("follows"),
+                invoice_number=h.get("invoice_number"),
+                document_number=h.get("document_number"),
+                reason=h.get("reason"),
+                refs=refs,
             )
         )
 
@@ -740,4 +771,12 @@ def _refuse_invalid(out: MappingResult) -> None:
         "allocation",
         lambda a: f"{a.invoice_number} to {a.po_number} line {a.po_line_number}",
         allocation_problems,
+    )
+    out.events = _keep_valid(
+        out,
+        out.events,
+        "receiving event",
+        lambda e: e.event_id,
+        receiving_event_problems,
+        lambda e: norm_id(e.event_id),
     )

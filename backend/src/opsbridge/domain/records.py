@@ -96,11 +96,20 @@ class Invoice:
 
 @dataclass(frozen=True)
 class ReceiptLine:
+    """One movement on a receiving record.
+
+    `status` says what receiving decided about the units: `accepted`, `rejected` (delivered
+    and refused at inspection), `reversed` (the posting was undone), or `unstated` (the source
+    gives a received quantity without saying whether it was accepted; such units are
+    delivered, never counted as accepted). `reason` is the source's rejection reason, if any.
+    """
+
     po_line_number: str
     quantity: Decimal
     unit: str
     kind: Literal["receipt", "return"] = "receipt"
-    status: Literal["accepted", "rejected", "reversed"] = "accepted"
+    status: Literal["accepted", "rejected", "reversed", "unstated"] = "accepted"
+    reason: str | None = None
     refs: Refs = field(default_factory=dict)
 
 
@@ -141,6 +150,52 @@ class SupplierAssertion:
     refs: Refs = field(default_factory=dict)
 
 
+ReceivingEventType = Literal[
+    "rejection",
+    "return",
+    "replacement_promised",
+    "replacement_delivery",
+    "replacement_acceptance",
+    "credit_promised",
+    "credit_posted",
+]
+
+
+@dataclass(frozen=True)
+class ReceivingEvent:
+    """A receiving or disposition fact recorded after a delivery (docs/receiving-disposition.md).
+
+    Each names what it concerns exactly, never by a guess:
+    - `rejection`: units of a delivery refused at inspection after the receipt was posted;
+      `receipt_number` is that receipt. Units it rejects stop counting as accepted.
+    - `return`: rejected units sent back to the supplier.
+    - `replacement_promised`, `replacement_delivery`, `replacement_acceptance`: the supplier's
+      remedy by replacement; an acceptance follows the delivery it accepts.
+    - `credit_promised`, `credit_posted`: the supplier's remedy by credit. A promise is not a
+      credit; a posted credit names the credit document and the invoice it applies to.
+    A disposition event refers to the rejected units through `follows` (the event it follows)
+    or `receipt_number` (the receipt whose rejected lines it concerns).
+
+    `occurred` is when it happened, as the source states it: `YYYY-MM-DD`, an RFC 3339 time
+    with a zone, or None when the source does not say. When OpsBridge learned of it is the
+    stored record's own time, kept apart.
+    """
+
+    event_id: str
+    event_type: ReceivingEventType
+    po_number: str
+    po_line_number: str
+    quantity: Decimal | None
+    unit: str | None
+    occurred: str | None = None
+    receipt_number: str | None = None
+    follows: str | None = None
+    invoice_number: str | None = None
+    document_number: str | None = None
+    reason: str | None = None
+    refs: Refs = field(default_factory=dict)
+
+
 @dataclass(frozen=True)
 class MatchInput:
     invoice: Invoice
@@ -149,3 +204,4 @@ class MatchInput:
     prior_allocations: tuple[InvoiceAllocation, ...] = ()
     supplier_assertions: tuple[SupplierAssertion, ...] = ()
     suppliers: tuple[Supplier, ...] = ()
+    receiving_events: tuple[ReceivingEvent, ...] = ()

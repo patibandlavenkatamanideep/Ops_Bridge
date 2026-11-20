@@ -374,6 +374,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tenants/{tenant}/cases/{case_id}/receiving": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Receiving */
+        get: operations["receiving_api_v1_tenants__tenant__cases__case_id__receiving_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tenants/{tenant}/cases/{case_id}/resolve": {
         parameters: {
             query?: never;
@@ -731,6 +748,15 @@ export interface components {
             /** Status */
             status: string;
         };
+        /** BasisOut */
+        BasisOut: {
+            /** Finding Id */
+            finding_id: string;
+            /** Reason Code */
+            reason_code: string;
+            /** Summary */
+            summary: string;
+        };
         /** Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post */
         Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post: {
             /** File */
@@ -807,6 +833,19 @@ export interface components {
             title: string;
             /** Updated At */
             updated_at: string;
+        };
+        /** ChangeOut */
+        ChangeOut: {
+            /** Change */
+            change: string;
+            /** Document Title */
+            document_title: string;
+            /** Kind */
+            kind: string;
+            /** Recorded At */
+            recorded_at: string;
+            /** Version No */
+            version_no: number;
         };
         /** ChunkOut */
         ChunkOut: {
@@ -967,6 +1006,19 @@ export interface components {
             max_model_calls_per_run: number;
             /** Model Modes */
             model_modes: string[];
+        };
+        /** EvidenceRefOut */
+        EvidenceRefOut: {
+            /** Document Id */
+            document_id: string;
+            /** Field */
+            field: string;
+            /** Locator */
+            locator: string;
+            /** Sha256 */
+            sha256: string;
+            /** Version Id */
+            version_id: string;
         };
         /** FieldOut */
         FieldOut: {
@@ -1282,6 +1334,15 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** PositionProblemOut */
+        PositionProblemOut: {
+            /** Code */
+            code: string;
+            /** Detail */
+            detail: string;
+            /** Status */
+            status: string;
+        };
         /** ProposalCreateIn */
         ProposalCreateIn: {
             /** Body */
@@ -1364,6 +1425,21 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** QuestionOut */
+        QuestionOut: {
+            /** Action Type */
+            action_type: string | null;
+            /** Basis */
+            basis: components["schemas"]["BasisOut"][];
+            /** Decision */
+            decision: string | null;
+            /** Owner */
+            owner: string | null;
+            /** Owner Configured */
+            owner_configured: boolean;
+            /** Title */
+            title: string | null;
+        };
         /** QueueItemOut */
         QueueItemOut: {
             /** Age Seconds */
@@ -1421,6 +1497,109 @@ export interface components {
             needs_review: number;
             /** Unassigned */
             unassigned: number;
+        };
+        /**
+         * ReceivingLineOut
+         * @description One PO line, in its unit. A null quantity is unknown, never zero.
+         */
+        ReceivingLineOut: {
+            /** Accepted */
+            accepted: string | null;
+            /** Covered */
+            covered: string | null;
+            /** Credit Posted */
+            credit_posted: string | null;
+            /** Credit Promised */
+            credit_promised: string | null;
+            /** Credits Elsewhere */
+            credits_elsewhere: string[];
+            /** Delivered */
+            delivered: string | null;
+            /** Disposition */
+            disposition: string;
+            /** Disputed */
+            disputed: string | null;
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRefOut"][];
+            /** Invoiced */
+            invoiced: string | null;
+            /** Matched */
+            matched: string | null;
+            /** Open Rejected */
+            open_rejected: string | null;
+            /** Ordered */
+            ordered: string | null;
+            /** Po Line Number */
+            po_line_number: string;
+            /** Problems */
+            problems: components["schemas"]["PositionProblemOut"][];
+            /** Rejected */
+            rejected: string | null;
+            /** Rejections */
+            rejections: components["schemas"]["RejectionOut"][];
+            /** Replacement Accepted */
+            replacement_accepted: string | null;
+            /** Replacement Delivered */
+            replacement_delivered: string | null;
+            /** Replacement Promised */
+            replacement_promised: string | null;
+            /** Returned */
+            returned: string | null;
+            /** Returned After Acceptance */
+            returned_after_acceptance: string | null;
+            /** Undelivered */
+            undelivered: string | null;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * ReceivingOut
+         * @description docs/receiving-disposition.md: positions from the current records, the split the
+         *     latest investigation concluded, and what changed since each approval.
+         */
+        ReceivingOut: {
+            /** Investigation Version */
+            investigation_version: number;
+            /** Invoice Number */
+            invoice_number: string;
+            /** Lines */
+            lines: components["schemas"]["ReceivingLineOut"][];
+            /** Po Number */
+            po_number: string | null;
+            /** Policy Ref */
+            policy_ref: string;
+            question: components["schemas"]["QuestionOut"];
+            /** Rules Version */
+            rules_version: string;
+            /** Since Approval */
+            since_approval: components["schemas"]["SinceApprovalOut"][];
+            split: components["schemas"]["SplitOut"] | null;
+            /** Timeline */
+            timeline: components["schemas"]["TimelineEntryOut"][];
+            /** Unattached Events */
+            unattached_events: components["schemas"]["UnattachedEventOut"][];
+        };
+        /** RejectionOut */
+        RejectionOut: {
+            /** Evidence */
+            evidence: components["schemas"]["EvidenceRefOut"][];
+            /** Late */
+            late: boolean;
+            /** Occurred */
+            occurred: string | null;
+            /**
+             * Occurred Precision
+             * @enum {string}
+             */
+            occurred_precision: "date" | "time" | "unknown";
+            /** Quantity */
+            quantity: string | null;
+            /** Reason */
+            reason: string | null;
+            /** Receipt Number */
+            receipt_number: string | null;
+            /** Source */
+            source: string;
         };
         /** ResolveIn */
         ResolveIn: {
@@ -1513,6 +1692,36 @@ export interface components {
             /** Task Connector */
             task_connector: string;
         };
+        /** SinceApprovalOut */
+        SinceApprovalOut: {
+            /** Action Type */
+            action_type: string;
+            /** Approved At */
+            approved_at: string;
+            /** Changes */
+            changes: components["schemas"]["ChangeOut"][];
+            /** Operation Status */
+            operation_status: string | null;
+            /** Proposal Id */
+            proposal_id: string;
+            /** Proposal Status */
+            proposal_status: string;
+            /** Requires */
+            requires: string;
+        };
+        /** SplitOut */
+        SplitOut: {
+            /** Disputed Quantity */
+            disputed_quantity: string | null;
+            /** Hold */
+            hold: string | null;
+            /** Matched Quantity */
+            matched_quantity: string | null;
+            /** Summary */
+            summary: string;
+            /** Unit */
+            unit: string | null;
+        };
         /** StartIn */
         StartIn: {
             /** Model Mode */
@@ -1588,6 +1797,52 @@ export interface components {
             synthetic_demo: boolean;
             /** Tier */
             tier: string;
+        };
+        /** TimelineEntryOut */
+        TimelineEntryOut: {
+            /** After Approval */
+            after_approval: boolean;
+            /** Current */
+            current: boolean;
+            /** Document Id */
+            document_id?: string | null;
+            /** Document Title */
+            document_title?: string | null;
+            /** Event Type */
+            event_type?: string | null;
+            /** Id */
+            id: string;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "receipt" | "event" | "approval" | "execution";
+            /** Occurred */
+            occurred: string | null;
+            /**
+             * Occurred Precision
+             * @enum {string}
+             */
+            occurred_precision: "date" | "time" | "unknown";
+            /** Recorded At */
+            recorded_at: string;
+            /** Summary */
+            summary: string;
+            /** Superseded At */
+            superseded_at?: string | null;
+            /** Version Id */
+            version_id?: string | null;
+            /** Version No */
+            version_no?: number | null;
+            /** Withdrawn */
+            withdrawn?: boolean | null;
+        };
+        /** UnattachedEventOut */
+        UnattachedEventOut: {
+            /** Event Id */
+            event_id: string;
+            /** Po Line Number */
+            po_line_number: string;
         };
         /** UploadOut */
         UploadOut: {
@@ -2482,6 +2737,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DecisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    receiving_api_v1_tenants__tenant__cases__case_id__receiving_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                case_id: string;
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReceivingOut"];
                 };
             };
             /** @description Validation Error */

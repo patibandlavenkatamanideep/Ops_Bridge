@@ -385,7 +385,7 @@ class SourceDocument(Base):
         UniqueConstraint("tenant_id", "source_key", name="uq_source_documents_key"),
         CheckConstraint(
             "kind in ('purchase_order','invoice','goods_receipt','supplier_message','policy',"
-            "'allocation_history','attachment')",
+            "'allocation_history','attachment','receiving_event')",
             name="ck_source_documents_kind",
         ),
     )
@@ -647,11 +647,55 @@ class ReceiptLineRecord(Base):
     quantity: Mapped[Decimal]
     unit: Mapped[str] = mapped_column(String(32))
     kind: Mapped[str] = mapped_column(String(16), default="receipt")
+    # accepted | rejected | reversed | unstated (acceptance not stated by the source)
     status: Mapped[str] = mapped_column(String(16), default="accepted")
+    reason: Mapped[str | None] = mapped_column(Text)  # the source's rejection reason (0025)
     refs: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     __table_args__ = (
         _tenant_unique("receipt_lines"),
         _fk(["goods_receipt_id"], "goods_receipts", "fk_receipt_lines_receipt", ondelete="CASCADE"),
+    )
+
+
+class ReceivingEventRecord(_RecordMixin, Base):
+    """A receiving or disposition event (domain.records.ReceivingEvent), migration 0025.
+
+    `occurred` is the time the source states, as given (a date, a time with a zone, or NULL
+    when unknown); `created_at` is when OpsBridge recorded it. A newer document holding the
+    same event id supersedes the older record; both stay in the history."""
+
+    __tablename__ = "receiving_events"
+    id: Mapped[uuid.UUID] = pk()
+    tenant_id: Mapped[uuid.UUID] = tenant_fk()
+    source_version_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True))
+    event_id: Mapped[str] = mapped_column(String(100))
+    event_type: Mapped[str] = mapped_column(String(32))
+    po_number: Mapped[str] = mapped_column(String(100))
+    po_line_number: Mapped[str] = mapped_column(String(32))
+    quantity: Mapped[Decimal | None]
+    unit: Mapped[str | None] = mapped_column(String(32))
+    occurred: Mapped[str | None] = mapped_column(String(40))
+    receipt_number: Mapped[str | None] = mapped_column(String(100))
+    follows: Mapped[str | None] = mapped_column(String(100))
+    invoice_number: Mapped[str | None] = mapped_column(String(100))
+    document_number: Mapped[str | None] = mapped_column(String(100))
+    reason: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        _tenant_unique("receiving_events"),
+        _fk(["source_version_id"], "document_versions", "fk_receiving_events_version"),
+        CheckConstraint(
+            "event_type in ('rejection','return','replacement_promised','replacement_delivery',"
+            "'replacement_acceptance','credit_promised','credit_posted')",
+            name="ck_receiving_events_type",
+        ),
+        Index(
+            "uq_receiving_events_current",
+            "tenant_id",
+            "event_id",
+            unique=True,
+            postgresql_where=text("superseded_at IS NULL"),
+        ),
+        Index("ix_receiving_events_po", "tenant_id", "po_number"),
     )
 
 
@@ -1231,6 +1275,7 @@ TENANT_TABLES: tuple[str, ...] = (
     "invoice_lines",
     "goods_receipts",
     "receipt_lines",
+    "receiving_events",
     "invoice_allocations",
     "supplier_assertions",
     "cases",

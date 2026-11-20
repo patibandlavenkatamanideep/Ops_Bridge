@@ -29,7 +29,14 @@ from opsbridge.canonical import digest
 from opsbridge.connectors.purchasing import CollectionBudgetExhausted, PurchasingClient
 from opsbridge.connectors.source_contract import CONTRACT, Listing, PurchasingSource
 from opsbridge.domain.decision import recommend
-from opsbridge.domain.matching import Finding, MatchResult, reconcile
+from opsbridge.domain.matching import (
+    REJECTIONS_RULES_VERSION,
+    RULES_VERSION,
+    SILENT_REJECTIONS_RULES_VERSION,
+    Finding,
+    MatchResult,
+    reconcile,
+)
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest, withdraw
@@ -51,7 +58,10 @@ from opsbridge.persistence.models import (
     InvestigationVersion,
     InvoiceAllocationRecord,
     ModelCall,
+    Operation,
     PolicyVersion,
+    Proposal,
+    ReceivingEventRecord,
     SourceDocument,
     SupplierAssertionRecord,
     Tenant,
@@ -64,20 +74,45 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 
-# The behaviour a run follows, recorded on the run when it is created. 1.3.0: a record's
-# problems are the reason stored with the document version read, whether its bytes are new
-# or unchanged; 1.2.0 listed the current read's problems, none for unchanged bytes, so a
-# repeated investigation's uncertainty lost why a document needed review and a benchmark's
+# The behaviour a run follows, recorded on the run when it is created. 1.5.0: collection also
+# lists the receiving events filed under the PO (late rejections, returns, replacements,
+# credits), and matching follows rules opsbridge-rules/1.4.0, which keeps delivered, accepted
+# and rejected apart and asks about the disposition of rejected units (docs/
+# receiving-disposition.md). 1.4.0: matching follows rules opsbridge-rules/1.3.0, which counts
+# and cites receipt lines rejected at receiving; earlier versions follow 1.2.0, which skipped
+# them without a word. 1.3.0: a
+# record's problems are the reason stored with the document version read, whether its bytes
+# are new or unchanged; 1.2.0 listed the current read's problems, none for unchanged bytes, so
+# a repeated investigation's uncertainty lost why a document needed review and a benchmark's
 # trials depended on their order (kept to replay opsbridge-bench-v1-rerun). 1.2.0: an invoice
 # that could not be read is named with the reason stored on its document version, on every
 # run. 1.1.0 took that reason from the current read's problems only, so a repeated
 # investigation of unchanged bytes said "()"; it is kept to replay opsbridge-bench-v1.
-WORKFLOW_VERSION = "investigation/1.3.0"
+WORKFLOW_VERSION = "investigation/1.5.0"
+REJECTIONS_VERSION = "investigation/1.4.0"
+STORED_PROBLEMS_VERSION = "investigation/1.3.0"
 STORED_REASON_VERSION = "investigation/1.2.0"
 LEGACY_WORKFLOW_VERSION = "investigation/1.1.0"
-WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION, WORKFLOW_VERSION)
+WORKFLOW_VERSIONS = (
+    LEGACY_WORKFLOW_VERSION,
+    STORED_REASON_VERSION,
+    STORED_PROBLEMS_VERSION,
+    REJECTIONS_VERSION,
+    WORKFLOW_VERSION,
+)
 # Versions that list a record's problems from the current read only.
 _READ_PROBLEMS_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION)
+
+
+def rules_version_for(workflow_version: str) -> str:
+    """The matching rules a run of this workflow version follows."""
+    if workflow_version == WORKFLOW_VERSION:
+        return RULES_VERSION
+    if workflow_version == REJECTIONS_VERSION:
+        return REJECTIONS_RULES_VERSION
+    return SILENT_REJECTIONS_RULES_VERSION
+
+
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -382,6 +417,7 @@ _RECORDS_BY_PO: dict[str, Any] = {
     "goods_receipt": GoodsReceiptRecord,
     "allocation_history": InvoiceAllocationRecord,
     "supplier_message": SupplierAssertionRecord,
+    "receiving_event": ReceivingEventRecord,
 }
 
 
@@ -507,6 +543,8 @@ def _collect(
                 "allocation_history",
                 "supplier_message",
             )
+            if workflow_version == WORKFLOW_VERSION:  # earlier versions replay without them
+                follow_ups += ("receiving_event",)
             for record_type in follow_ups:
                 spec = pack.sources.get(record_type)
                 if spec is None or spec.collection is None:
@@ -844,7 +882,7 @@ def _match(
             "corrections": [],
             "policy_ref": policy.ref,
         }
-    result: MatchResult = reconcile(loaded.match_input, policy)
+    result: MatchResult = reconcile(loaded.match_input, policy, rules_version_for(workflow_version))
     rec = recommend(result, policy, case["case_number"])
     uncertainty += [
         f"supplier claim unconfirmed: {f.summary}"
@@ -872,7 +910,13 @@ def _match(
 
 # Kinds whose records decide a match: one missing can only make the result look better.
 # Supplier messages are excluded: their claims are never used as receipt evidence.
-_DECISIVE_KINDS = ("invoice", "purchase_order", "goods_receipt", "allocation_history")
+_DECISIVE_KINDS = (
+    "invoice",
+    "purchase_order",
+    "goods_receipt",
+    "allocation_history",
+    "receiving_event",
+)
 
 
 def _documents_needing_review(s: Session, case_id: uuid.UUID) -> list[tuple[str, str, str]]:
@@ -1244,6 +1288,46 @@ def _readiness(outcome: str, collected: dict[str, Any]) -> str:
     return "complete"
 
 
+def _flag_executed_on_changed_evidence(
+    s: Session,
+    tenant_id: uuid.UUID,
+    case_id: uuid.UUID,
+    iv: InvestigationVersion,
+    requested_by: uuid.UUID | None,
+) -> None:
+    """An action already sent (or perhaps sent) on evidence this investigation no longer
+    shows stays as it was: nothing is resent, cancelled or claimed undone. The fact is
+    recorded so the case, now back for review, says so (docs/receiving-disposition.md); an
+    uncertain outcome stays on its own review path."""
+    rows = s.execute(
+        select(Operation, Proposal)
+        .join(Proposal, Proposal.id == Operation.proposal_id)
+        .where(
+            Operation.case_id == case_id,
+            Operation.status.in_(("confirmed", "outcome_unknown")),
+            Proposal.source_manifest_digest != iv.source_manifest_digest,
+        )
+    ).all()
+    for op, pr in rows:
+        audit.record(
+            s,
+            tenant_id=tenant_id,
+            actor_kind="service",
+            actor_id=SERVICE_IDENTITY,
+            on_behalf_of=requested_by,
+            action="operation.evidence_changed_after_execution",
+            resource_type="operation",
+            resource_id=str(op.id),
+            details={
+                "status": op.status,
+                "proposal_id": str(pr.id),
+                "investigation_version": iv.version,
+                "approved_on_manifest": pr.source_manifest_digest,
+                "current_manifest": iv.source_manifest_digest,
+            },
+        )
+
+
 def _finalize(
     deps: InvestigationDeps,
     tenant_id: uuid.UUID,
@@ -1318,8 +1402,16 @@ def _finalize(
             source_manifest_digest=digest(manifest),
             evidence_state=recon.get("evidence_state"),
         )
+        previous = s.execute(
+            select(InvestigationVersion.source_manifest_digest)
+            .where(InvestigationVersion.case_id == case.id)
+            .order_by(InvestigationVersion.version.desc())
+            .limit(1)
+        ).scalar_one_or_none()
         s.add(iv)
         s.flush()
+        if previous is not None and previous != iv.source_manifest_digest:
+            _flag_executed_on_changed_evidence(s, tenant_id, case.id, iv, run.requested_by)
         if case.status == "collecting_evidence":
             transition(case, "investigating")
         target = (
@@ -1330,7 +1422,8 @@ def _finalize(
             {
                 f["finding_type"]
                 for f in recon["findings"]
-                if f["finding_type"] in ("missing_receipt", "quantity_mismatch", "price_mismatch")
+                if f["finding_type"]
+                in ("missing_receipt", "quantity_mismatch", "price_mismatch", "disposition")
             }
         )
         case.evidence_readiness = iv.evidence_readiness

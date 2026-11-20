@@ -100,7 +100,9 @@ Not covered:
   before every new write. Since 0017 the destination comes from the tenant's versioned task
   connection, and dispatch builds its connector from the approved destination.
 - F04: local freshness only; a source-system change OpsBridge has not fetched is not seen.
-  Investigations recorded before 0012 count as stale and must be re-run.
+  Investigations recorded before 0012 count as stale and must be re-run. (Since 18 November
+  2026 the executor asks a live source before every new external write, and holds the write
+  when it cannot: docs/execution-and-recovery.md, "Source freshness at dispatch".)
 - F07: one legal entity and one purchasing source per tenant are assumed; credit-note
   numbering and multiple source systems are not modelled. Existing cases keep their
   previously normalized numbers. A replay is recognised by the Idempotency-Key and the

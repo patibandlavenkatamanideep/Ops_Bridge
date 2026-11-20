@@ -33,7 +33,7 @@ from opsbridge.persistence.models import ApprovalDecision, Case, Operation, Prop
 class Refusal:
     """Why a new write may not be admitted now."""
 
-    category: str  # cancelled_by_user | precondition_failed
+    category: str  # cancelled_by_user | outbound_writes_disabled | precondition_failed
     problems: tuple[str, ...]
 
     @property
@@ -46,16 +46,36 @@ def marker(operation_key: str) -> str:
     return f"opsbridge-op:{operation_key}"
 
 
-def refusal(s: Session, op: Operation, *, lock_case: bool = True) -> Refusal | None:
+# Before a new external write the executor also asks the purchasing system whether it still
+# holds what was approved (workflow/source_check.py). These end the operation the same way as
+# precondition_failed: nothing sent, the proposal superseded, the case back in review.
+SOURCE_CHANGED = "source_changed"  # a record changed, is new, or is gone upstream
+SOURCE_UNVERIFIED = "source_unverified"  # the source could not answer (export, unreachable)
+
+OUTBOUND_DISABLED = (
+    "outbound writes are disabled on this installation (OPSBRIDGE_OUTBOUND_WRITES=disabled); "
+    "nothing was sent"
+)
+
+
+def refusal(
+    s: Session, op: Operation, *, outbound_writes_enabled: bool, lock_case: bool = True
+) -> Refusal | None:
     """None when a new write for `op` may be sent now; otherwise why not.
 
-    `lock_case` takes the case row lock that corrections and uploads also take, so one
-    committed first is seen and one waiting lands after the decision. A boundary without
-    UPDATE rights (the casework service) reads committed state instead: same ordering, no
-    lock.
+    `outbound_writes_enabled` is the installation's setting: when it is off, a write outside
+    OpsBridge is never admitted, whatever was approved; the approval itself still stands, so
+    the refusal has its own category. `lock_case` takes the case row lock
+    that corrections and uploads also take, so one committed first is seen and one waiting
+    lands after the decision. A boundary without UPDATE rights (the casework service) reads
+    committed state instead: same ordering, no lock.
     """
+    from opsbridge.services.proposals import EXTERNAL_ACTIONS
+
     if op.cancellation == "requested":
         return Refusal("cancelled_by_user", ("cancellation was requested",))
+    if not outbound_writes_enabled and op.action_type in EXTERNAL_ACTIONS:
+        return Refusal("outbound_writes_disabled", (OUTBOUND_DISABLED,))
     problems = _eligibility(s, op, lock_case=lock_case)
     return Refusal("precondition_failed", tuple(problems)) if problems else None
 

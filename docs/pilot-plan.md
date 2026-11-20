@@ -1,5 +1,11 @@
 # Pilot plan (proposed; not started)
 
+To run the first, rules-only pilot: docs/pilot/quickstart.md (a dry run, checked on synthetic
+data), docs/pilot/export-contract.md (what the export must hold and the preflight),
+docs/pilot/reviewer-sheet.md (the reviewer's independent answer) and
+docs/pilot/results-template.md (pre-registration and results, kept apart). Blank cohort and
+reference files are in docs/pilot/templates/.
+
 No pilot has been run, no participants recruited and no operator measurements exist. This
 plan is what a pilot owner would agree to before one starts; thresholds below are proposals
 for the pilot owner to change and sign off **before** any session.
@@ -128,7 +134,8 @@ lacks).
    headline accuracy, because the reviewer may have seen OpsBridge's output. An `opsbridge`
    row names the invoice as it will be entered at intake, since the case and its number
    don't exist yet.
-3. `opsbridge` cases are opened in the pilot tenant and worked and approved as usual.
+3. `opsbridge` cases are opened in the pilot tenant (provisioned with `tenant-provision`,
+   docs/pilot/quickstart.md, section 6) and worked and approved as usual.
 4. `manual` invoices are worked with the existing process. Their start, decision and
    resolution times come from that process's own records where they exist. What the process
    decided is recorded in the reviewer's vocabulary.
@@ -270,6 +277,9 @@ times do not record.
   have seen OpsBridge's output; nothing else is enforced.
 - Manual timings are only as good as the records they come from.
 
-**Status:** prepared and tested on synthetic data (`tests/pilot/`, 48 tests, and
-`tests/integration/test_pilot_report.py`, 4 tests, with `test_migration_0023.py`). No pilot
-has started: no export, cohort, reviewer or authorization exists yet.
+**Status:** prepared and tested on synthetic data (`tests/pilot/`, 58 tests, and
+`tests/integration/test_pilot_report.py`, 4 tests, with `test_migration_0023.py`). The dry run
+(an export, rules only, outbound writes disabled) passed end to end on the synthetic
+rehearsal export (`tests/integration/test_export_investigation.py`, and once in a browser from
+a clean checkout). No pilot has started: no export, cohort, reviewer or authorization exists
+yet.

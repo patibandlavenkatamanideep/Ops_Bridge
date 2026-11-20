@@ -147,6 +147,11 @@ class Settings(BaseSettings):
     records_mcp_url: str = "http://localhost:8101/mcp"
     casework_mcp_url: str = "http://localhost:8102/mcp"
     tool_transport: Literal["inprocess", "mcp"] = "inprocess"
+    # `disabled` for a dry run or a read-only pilot: every new write outside OpsBridge (a
+    # follow-up task) is refused where it would be made, by the worker and by the Casework MCP
+    # tool alike, and the operation ends as cancelled before dispatch. Proposals, approvals,
+    # review notes, assignments and supplier message drafts stay inside OpsBridge and still run.
+    outbound_writes: Literal["enabled", "disabled"] = "enabled"
 
     model_mode: ModelMode = "mock"
     live_model_opt_in: bool = False

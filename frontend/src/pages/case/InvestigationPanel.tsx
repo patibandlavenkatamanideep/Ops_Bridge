@@ -17,6 +17,7 @@ const FINDING_LABEL: Record<string, string> = {
   quantity_mismatch: "Quantity mismatch",
   price_mismatch: "Price mismatch",
   missing_receipt: "Missing receipt",
+  disposition: "Rejected goods",
   source_conflict: "Source conflict",
   manual_review: "Needs review",
   note: "Note",

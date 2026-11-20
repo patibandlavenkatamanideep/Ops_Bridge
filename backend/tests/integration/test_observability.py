@@ -98,6 +98,10 @@ def test_one_trace_from_request_through_worker_steps_and_connector(stack) -> Non
     everything = " ".join(
         str(v) for s in EXPORTER.get_finished_spans() for v in (s.attributes or {}).values()
     )
+    # Dispatch asks the purchasing system first (source_check.py), so the simulator's spans
+    # name the collections it lists. A collection name in a route is an identifier; the word
+    # as content (the follow-up's assignee group) must still not appear.
+    everything = everything.replace("/receiving_events", "/<collection>")
     for content in ("Task chair", "CH-100", "185.00", "receiving"):
         assert content not in everything
 
@@ -208,6 +212,28 @@ def test_worker_health_endpoints(stack, worker_db: Database) -> None:  # type: i
         assert httpx.get(f"{base}/readyz").json()["checks"]["loop"] == "stale"
     finally:
         server.shutdown()
+
+
+def test_the_worker_says_whether_it_writes_outside_opsbridge(
+    stack, worker_db: Database, tmp_path
+) -> None:  # type: ignore[no-untyped-def]
+    """A dry run is confirmed from the process that enforces it (docs/pilot/quickstart.md)."""
+    settings = stack["settings"]
+    for changes, expected in (
+        ({}, {"outbound_writes": "enabled", "purchasing_source": "simulator"}),
+        (
+            {"outbound_writes": "disabled", "purchasing_export_dir": tmp_path},
+            {"outbound_writes": "disabled", "purchasing_source": "export"},
+        ),
+    ):
+        worker = Worker(db=worker_db, settings=settings.model_copy(update=changes))
+        port = free_port()
+        server = serve_health(worker, "127.0.0.1", port)
+        try:
+            ready = httpx.get(f"http://127.0.0.1:{port}/readyz").json()
+        finally:
+            server.shutdown()
+        assert {k: ready[k] for k in expected} == expected
 
 
 def test_metrics_endpoint_can_require_a_token(stack) -> None:  # type: ignore[no-untyped-def]

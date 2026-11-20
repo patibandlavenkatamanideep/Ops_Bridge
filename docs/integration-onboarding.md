@@ -54,6 +54,11 @@ system's API, implement the same two operations with a read-only service account
   returns the keys it holds, the keys it reports deleted, voided or reversed (`withdrawn`),
   and whether the listing is complete. A failed page fails the listing; a cursor that does
   not advance is refused; reaching the adapter's page bound returns `complete=False`.
+- `reads_live = True` only if every call reads what the system holds at that moment (no
+  cache, no snapshot). Before a new external write the executor asks such an adapter whether
+  the approved records are unchanged, by their bytes, and whether anything is new under the
+  order. An adapter that is not live, an export among them, cannot answer, so external writes
+  stay in review.
 
 OpsBridge acts on those answers: a record the source no longer holds (reported withdrawn, a
 404, or missing from a complete listing for its PO) stops being current and is marked "No
@@ -106,10 +111,23 @@ run the live test only with the owner's authorization.
 
 ## 6. Tenant, identity and access
 
-Add the tenant to the seed fixture or provision it through an admin process: slug, tier,
-pack, policies, members with roles and approval scopes. Connect the customer's OIDC
-provider (issuer, client, redirect URIs); OpsBridge derives tenant and roles from its own
-membership records, never from token claims or headers.
+Provision the organization's tenant with `tenant-provision --spec FILE` (template
+`fixtures/pilot/tenant.example.yaml`, code `backend/src/opsbridge/provision.py`). Never add it
+to the demo seed fixture: demo tenants are flagged synthetic, and their accounts share a
+password.
+
+The spec gives:
+- the slug, tier, pack and model mode;
+- the policy files, each validated for the pack and published as an immutable version;
+- the identity provider's issuer and the first administrators' subjects.
+
+It creates only that, and the first task connection, in one audited transaction.
+Re-running it publishes policy versions added to the spec, and changes nothing else.
+The administrators invite everyone else from the app's settings, with roles and approval
+scopes.
+
+Connect the customer's OIDC provider (issuer, client, redirect URIs). OpsBridge derives
+tenant and roles from its own membership records, never from token claims or headers.
 
 ## 7. Prove it before go-live
 
