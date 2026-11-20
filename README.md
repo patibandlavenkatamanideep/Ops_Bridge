@@ -27,6 +27,10 @@ only after a different person approves the exact version they reviewed.
 - **Deterministic matching** with Decimal money, units and conversions, effective-dated
   policies, cumulative receipts net of returns and prior allocations; anything it cannot
   evaluate exactly becomes an explicit manual-review or needs-information finding.
+- **Receiving and disposition**: delivered, accepted and rejected kept apart; late
+  rejections, returns, replacements and credits as dated, cited events; the next question
+  goes to receiving or the policy's disposition owner, and a stale approval is refused
+  ([docs/receiving-disposition.md](docs/receiving-disposition.md)).
 - **Evidence and citations** to page/line, CSV row or JSON pointer of a specific document
   version and digest; corrections overlay the original extraction, never replace it.
 - **Bounded agent steps** (mock, Anthropic or local Ollama behind one contract): read-only
@@ -48,14 +52,15 @@ only after a different person approves the exact version they reviewed.
 
 | Level | State |
 |---|---|
-| Local application | All build phases and the production-review fixes verified locally (unit 754, integration 288, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
+| Local application | All build phases and the production-review fixes verified locally (unit 885, integration 311, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
 | Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A12 (the `main` ruleset is applied; the release is prepared), A14, A15, A16; the rest need access or decisions. A later review (5 November, N01–N09): N01–N08 fixed and on `main` (PR #36), N09 not defined in its brief. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
 | Hosted CI | **Passing** on `main` at `53e6c5a` (run 44078427478), and required by `main`'s ruleset before a pull request merges: lint, types, unit, canary, receipts, build; integration; browser; image build, smoke test, evidence bundle round trip, SBOM and vulnerability scan |
 | Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `53e6c5a`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
-| Operator pilot measured | **No** — protocol, measures (`pilot-report`) and the export check are ready; no export, reviewer or authorization yet |
+| Receiving and disposition | Implemented and tested on synthetic data only (rules `opsbridge-rules/1.4.0`); no organization's receiving data or reviewer yet |
+| Operator pilot measured | **No** — protocol, measures (`pilot-report`), a per-case export check and a rules-only dry run with outbound writes disabled are ready and checked on synthetic data ([docs/pilot/quickstart.md](docs/pilot/quickstart.md)); no export, reviewer or authorization yet |
 
 Held-out benchmark (40 synthetic cases, mocked responses): correct next action 36/40 = 0.90
 (Wilson 95% 0.77–0.96) for both rules-only and agent-assisted modes; all four misses are an
@@ -101,7 +106,8 @@ Demo walkthrough: [docs/demo-script.md](docs/demo-script.md).
 ## Documentation
 
 [architecture](docs/architecture.md) · [discovery](docs/discovery.md) ·
-[data contracts](docs/data-contracts.md) · [integrations](docs/integrations.md) ·
+[data contracts](docs/data-contracts.md) · [receiving and disposition](docs/receiving-disposition.md) ·
+[integrations](docs/integrations.md) ·
 [agents and models](docs/agents-and-models.md) · [execution and recovery](docs/execution-and-recovery.md) ·
 [security and threat model](docs/security-and-threat-model.md) ·
 [privacy and retention](docs/privacy-and-retention.md) ·

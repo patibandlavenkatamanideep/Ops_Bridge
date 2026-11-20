@@ -26,6 +26,7 @@ from opsbridge.domain.records import (
     POLine,
     PurchaseOrder,
     ReceiptLine,
+    ReceivingEvent,
     SourceRef,
     Supplier,
     SupplierAssertion,
@@ -41,6 +42,7 @@ from opsbridge.persistence.models import (
     POLineRecord,
     PurchaseOrderRecord,
     ReceiptLineRecord,
+    ReceivingEventRecord,
     SupplierAssertionRecord,
     SupplierRecord,
 )
@@ -214,6 +216,7 @@ def load_match_input(
     receipts_rows = []
     alloc_rows = []
     assertion_rows = []
+    event_rows: list[ReceivingEventRecord] = []
     if po_number:
         po_rows = list(
             session.execute(
@@ -247,9 +250,19 @@ def load_match_input(
                 )
             ).scalars()
         )
+        event_rows = list(
+            session.execute(
+                select(ReceivingEventRecord)
+                .where(
+                    ReceivingEventRecord.po_number == po_number,
+                    ReceivingEventRecord.superseded_at.is_(None),
+                )
+                .order_by(ReceivingEventRecord.created_at, ReceivingEventRecord.event_id)
+            ).scalars()
+        )
         if not po_rows:
             missing.append(f"purchase order {po_number}")
-    for rows in (po_rows, receipts_rows, alloc_rows, assertion_rows):
+    for rows in (po_rows, receipts_rows, alloc_rows, assertion_rows, event_rows):
         versions |= {r.source_version_id for r in rows}
 
     ap = _Applier(load_corrections(session, versions))
@@ -334,6 +347,7 @@ def load_match_input(
                         unit=rl.unit,
                         kind=cast(Any, rl.kind),
                         status=cast(Any, rl.status),
+                        reason=rl.reason,
                         refs=_refs(rl.refs),
                     )
                     for rl in r_lines
@@ -363,6 +377,24 @@ def load_match_input(
         )
         for a in assertion_rows
     )
+    events = tuple(
+        ReceivingEvent(
+            event_id=e.event_id,
+            event_type=cast(Any, e.event_type),
+            po_number=e.po_number,
+            po_line_number=e.po_line_number,
+            quantity=e.quantity,
+            unit=e.unit,
+            occurred=e.occurred,
+            receipt_number=e.receipt_number,
+            follows=e.follows,
+            invoice_number=e.invoice_number,
+            document_number=e.document_number,
+            reason=e.reason,
+            refs=_refs(e.refs),
+        )
+        for e in event_rows
+    )
     suppliers = tuple(
         Supplier(s.supplier_key, s.name) for s in session.execute(select(SupplierRecord)).scalars()
     )
@@ -374,6 +406,7 @@ def load_match_input(
             prior_allocations=allocations,
             supplier_assertions=assertions,
             suppliers=suppliers,
+            receiving_events=events,
         ),
         versions,
         ap.applied,

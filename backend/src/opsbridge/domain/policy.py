@@ -128,10 +128,19 @@ class ReconciliationPolicy(_Strict):
     # Ordered from most to least authoritative. Empty means precedence is undefined and
     # conflicts between sources must be escalated.
     source_precedence: list[SourceKind] = []
+    # Route keys: manual_review, missing_receipt, quantity_mismatch, price_mismatch, matched,
+    # and `disposition` (who resolves rejected goods with the supplier). Without a
+    # disposition route, rejected goods go to manual review saying that no owner is set.
     action_routes: dict[str, ActionRoute]
     allowed_actions: list[ActionType]
     approval: ApprovalPolicy = ApprovalPolicy()
     data_routing: DataRouting = "hosted_permitted"
+    # Whether a disputed quantity holds the whole invoice or only the disputed portion for
+    # review. Unset: the split is shown and the payment recommendation is left unresolved.
+    # Left out of the stored document when unset, so earlier policy versions keep their digest.
+    disputed_quantity_hold: Literal["whole_invoice", "disputed_portion"] | None = Field(
+        default=None, exclude_if=lambda v: v is None
+    )
 
     @field_validator("supported_currencies")
     @classmethod

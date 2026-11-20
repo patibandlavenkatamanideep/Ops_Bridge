@@ -16,7 +16,8 @@ record and line carries `refs` (field → `SourceRef`) for citations.
 | `Invoice` | `invoice_number`, `supplier_id?`, `supplier_name`, `po_number?`, `currency`, `invoice_date`, `status` (open, cancelled), `lines[InvoiceLine]` |
 | `InvoiceLine` | `line_number`, `po_line_number?`, `item_code?`, `description`, `quantity`, `unit`, `unit_price`, `discount_amount`, `kind` (goods, charge) |
 | `GoodsReceipt` | `receipt_number`, `po_number`, `received_date`, `lines[ReceiptLine]` |
-| `ReceiptLine` | `po_line_number`, `quantity`, `unit`, `kind` (receipt, return), `status` (accepted, rejected, reversed) |
+| `ReceiptLine` | `po_line_number`, `quantity`, `unit`, `kind` (receipt, return), `status` (accepted, rejected, reversed, unstated: a received quantity whose acceptance the source does not state), `reason?` (why it was rejected) |
+| `ReceivingEvent` | a fact recorded after a delivery (docs/receiving-disposition.md): `event_id`, `event_type` (rejection, return, replacement_promised, replacement_delivery, replacement_acceptance, credit_promised, credit_posted), `po_number`, `po_line_number`, `quantity?`, `unit?`, `occurred?` (as the source states it), `receipt_number?`, `follows?`, `invoice_number?`, `document_number?`, `reason?` |
 | `InvoiceAllocation` | earlier invoice quantity already matched: `invoice_number`, `po_number`, `po_line_number`, `quantity`, `status` (active, cancelled) |
 | `SupplierAssertion` | a parsed claim from a supplier message: `po_number`, `po_line_number?`, `claim` (delivered_quantity), `quantity`, `unit?`, `extraction_status` |
 
@@ -33,7 +34,8 @@ resolve (`evidence/citations.py`).
 
 `PackSpec`: `schema_version` (1), `pack_id`, `version`, `display_name`, `policy_id`,
 `sources` keyed by record type (`purchase_order`, `invoice`, `goods_receipt`,
-`allocation_history`, `supplier_message`). Each `SourceSpec` has a `format` (`json`, `csv`,
+`allocation_history`, `supplier_message`, `receiving_event`). A receipt line whose pack maps
+no status gets `unstated`, never `accepted`. Each `SourceSpec` has a `format` (`json`, `csv`,
 `pdf_text`, `text`), a `collection` in the source system, `record` fields and optional
 `lines`, plus `header_patterns`/`lines.pattern` (named regex groups) for text layouts,
 `group_by` for CSV rows, `assertion_patterns` for supplier messages and `amount_check` for
@@ -152,6 +154,9 @@ Outbox events are written in the approval transaction and marked delivered on co
 ## Versioning rules
 
 Changing a canonical record, a mapping semantic or the rules output bumps the relevant
-version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.1.0`; pack and
-policy versions in their YAML). Benchmark inputs are frozen by digest; changing them needs a
-new benchmark id. Database changes go through Alembic migrations (0001–0004).
+version (`RULES_VERSION` in `domain/matching.py`, currently `opsbridge-rules/1.4.0`, which
+keeps delivered, accepted and rejected apart and reads receiving events; runs recorded under
+an earlier workflow replay with the rules they were made under: `investigation/1.4.0` with
+1.3.0, `1.1.0`–`1.3.0` with 1.2.0; pack and policy versions in their YAML). Benchmark inputs
+are frozen by digest; changing them needs a new benchmark id. Database changes go through
+Alembic migrations (0001–0025; 0025 adds `receiving_events` and `receipt_lines.reason`).

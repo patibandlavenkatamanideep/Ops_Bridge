@@ -72,6 +72,35 @@ sources:
         unit: {column: uom}
         kind: {column: movement, map: {RECEIPT: receipt, RETURN: return}}
         status: {column: status, map: {ACCEPTED: accepted, REJECTED: rejected, REVERSED: reversed}}
+        reason: {column: reason, optional: true}  # why receiving rejected the units, if given
+  # Receiving and disposition events recorded after a delivery: one row per event, filed
+  # under the PO (docs/receiving-disposition.md). A rejection names the receipt it inspects;
+  # a remedy names the event it follows or the receipt whose rejected units it concerns.
+  receiving_event:
+    format: csv
+    collection: receiving_events
+    record:
+      event_id: {column: event_id, transform: upper}
+      event_type:
+        column: event
+        map:
+          REJECTED: rejection
+          RETURNED: return
+          REPLACEMENT_PROMISED: replacement_promised
+          REPLACEMENT_DELIVERED: replacement_delivery
+          REPLACEMENT_ACCEPTED: replacement_acceptance
+          CREDIT_PROMISED: credit_promised
+          CREDIT_POSTED: credit_posted
+      po_number: {column: po_ref, transform: upper}
+      po_line_number: {column: po_line}
+      quantity: {column: qty, transform: decimal, optional: true}
+      unit: {column: uom, optional: true}
+      occurred: {column: occurred_on, optional: true}
+      receipt_number: {column: receipt_id, transform: upper, optional: true}
+      follows: {column: follows, transform: upper, optional: true}
+      invoice_number: {column: invoice, transform: upper, optional: true}
+      document_number: {column: document, transform: upper, optional: true}
+      reason: {column: reason, optional: true}
   allocation_history:
     format: json
     collection: allocations

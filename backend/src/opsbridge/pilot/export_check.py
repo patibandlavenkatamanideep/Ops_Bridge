@@ -1,5 +1,5 @@
 """Checks an organization's export against its pack before a pilot reads it (protocol
-`opsbridge-pilot/1`, docs/pilot-plan.md).
+`opsbridge-pilot/2`, docs/pilot-plan.md, docs/pilot/export-contract.md).
 
 An investigation reads an export one record at a time, so a defect in it shows up only in the
 case that needs that record, and in a pilot that case counts against OpsBridge. This reads every
@@ -16,19 +16,33 @@ A problem is something to review before the first case, not always a defect: an 
 purchase order the source really lacks is a fact. The report holds keys, counts and problems,
 not document content, but a mapping problem can quote the value that failed, so the report
 stays where the export is kept.
+
+It also says, per invoice, whether a case for it can be evaluated reliably from this export,
+and if not, why: its own document, its purchase order, or a record listed under that order
+has a problem, or the export is partial. A blank or unreadable value is a problem here, never
+a zero, and an order with no exported receipt is noted: its case will ask for the receiving
+record. Records no case can reach (listed under no order, or under one the export lacks) are
+listed as unlinked.
 """
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, defaultdict
 from typing import Any
 
 from opsbridge.connectors.exports import ExportSource
 from opsbridge.connectors.source_contract import SourceRecordInvalid
+from opsbridge.domain.records import ReceivingEvent
 from opsbridge.evidence.parsers import OcrSettings, parse
 from opsbridge.mapping import DocRef, MappingResult, PackSpec, RecordType, map_document
 
-SCHEMA = "opsbridge-export-check/1"
+SCHEMA = "opsbridge-export-check/2"
+_BY_PO: tuple[RecordType, ...] = (
+    "goods_receipt",
+    "allocation_history",
+    "supplier_message",
+    "receiving_event",
+)
 
 
 def _by_po(record_type: RecordType, mapped: MappingResult) -> list[Any]:
@@ -37,6 +51,7 @@ def _by_po(record_type: RecordType, mapped: MappingResult) -> list[Any]:
         "goods_receipt": mapped.receipts,
         "allocation_history": mapped.allocations,
         "supplier_message": mapped.assertions,
+        "receiving_event": mapped.events,
     }
     return by_type.get(record_type, [])
 
@@ -72,15 +87,23 @@ def check_export(
     read_as = {s.collection: rt for rt, s in pack.sources.items() if s.collection is not None}
     po_spec = pack.sources.get("purchase_order")
     status: Counter[str] = Counter()
+    loaded: Counter[str] = Counter()  # records read and mapped without a problem
     problems: list[dict[str, str]] = []
     named: list[tuple[str, str, str]] = []  # invoice collection, key, the PO it names
+    invoices: dict[tuple[str, str], str | None] = {}  # invoice -> the PO its case reads
+    own: dict[tuple[str, str], list[str]] = defaultdict(list)  # a record's own problems
+    receipt_numbers: dict[str, set[str]] = defaultdict(set)  # PO -> receipts mapped for it
+    events: dict[str, list[ReceivingEvent]] = defaultdict(list)  # PO -> events mapped for it
 
     def problem(collection: str, key: str, text: str) -> None:
         problems.append({"collection": collection, "key": key, "problem": text})
+        own[(collection, key)].append(text)
 
     listed = source.listed()
     for collection, key, listed_po in listed:
         record_type = read_as.get(collection)
+        if record_type == "invoice":
+            invoices[(collection, key)] = listed_po
         if record_type is None:
             status["not_read"] += 1
             problem(
@@ -113,9 +136,17 @@ def check_export(
             problem(collection, key, "; ".join(mapped.problems))
         else:
             status["parsed"] += 1
+            loaded[collection] += 1
+        if record_type == "invoice":  # the order the document names, as a case reads it
+            named_po = next((i.po_number for i in mapped.invoices if i.po_number), None)
+            invoices[(collection, key)] = named_po or listed_po
         for text in _disagreements(record_type, key, listed_po, mapped):
             problem(collection, key, text)
         named += [(collection, key, i.po_number) for i in mapped.invoices if i.po_number]
+        for gr in mapped.receipts:
+            receipt_numbers[gr.po_number].add(gr.receipt_number)
+        for ev in mapped.events:
+            events[ev.po_number].append(ev)
 
     if po_spec is not None and po_spec.collection is not None:
         for collection, key, po in named:
@@ -141,5 +172,114 @@ def check_export(
         "complete": source.complete,
         "records": len(listed),
         "status": dict(status),
+        "loaded": dict(sorted(loaded.items())),
         "problems": problems,
+        "cases": _cases(source, pack, listed, invoices, own, _unresolved(receipt_numbers, events)),
+        "unlinked": _unlinked(source, pack, listed),
     }
+
+
+def _cases(
+    source: ExportSource,
+    pack: PackSpec,
+    listed: list[tuple[str, str, str | None]],
+    invoices: dict[tuple[str, str], str | None],
+    own: dict[tuple[str, str], list[str]],
+    unresolved: dict[str, list[str]],
+) -> list[dict[str, Any]]:
+    """Whether a case for each invoice can be evaluated reliably from this export."""
+    po_collection = _collection(pack, "purchase_order")
+    receipts = _collection(pack, "goods_receipt")
+    by_po = _by_po_collections(pack)
+    out = []
+    for (collection, key), po in invoices.items():
+        blocking = list(own.get((collection, key), []))
+        notes: list[str] = []
+        if not source.complete:
+            blocking.append(
+                "the export is partial (complete: false), so a record it lacks cannot be told "
+                "from one the source lacks; the investigation will send the case to manual review"
+            )
+        if po is None:
+            blocking.append("the invoice names no purchase order, so a case reads none")
+        else:
+            # Problems of the order itself and of every record a case lists under it.
+            blocking += [
+                f"{c} {k}: {text}"
+                for c, k, listed_po in listed
+                if (c == po_collection and k == po) or (c in by_po and listed_po == po)
+                for text in own.get((c, k), [])
+            ]
+            held = po_collection is not None and source.holds(po_collection, po) is True
+            if held and not any(c == receipts and listed_po == po for c, _k, listed_po in listed):
+                notes.append(
+                    f"no receipt is exported for {po}: the investigation will report the "
+                    "receiving record as missing (needs information), never as zero received"
+                )
+            notes += unresolved.get(po, [])
+        out.append(
+            {
+                "invoice": key,
+                "purchase_order": po,
+                "evaluable": not blocking,
+                "blocking": blocking,
+                "notes": notes,
+            }
+        )
+    return out
+
+
+def _unresolved(
+    receipt_numbers: dict[str, set[str]], events: dict[str, list[ReceivingEvent]]
+) -> dict[str, list[str]]:
+    """Per PO, receiving events whose receipt or preceding event this export does not hold:
+    an investigation leaves them unapplied and asks for the record (domain/receiving.py)."""
+    out: dict[str, list[str]] = defaultdict(list)
+    for po, evs in events.items():
+        ids = {ev.event_id for ev in evs}
+        for ev in evs:
+            what = ev.event_type.replace("_", " ")
+            if ev.follows is not None and ev.follows not in ids:
+                missing = f"event {ev.follows}"
+            elif (
+                ev.follows is None
+                and ev.receipt_number is not None
+                and (ev.receipt_number not in receipt_numbers.get(po, set()))
+            ):
+                missing = f"receipt {ev.receipt_number}"
+            else:
+                continue
+            out[po].append(
+                f"{what} {ev.event_id} refers to {missing}, which is not in this export: it will "
+                "not be applied, and the investigation will ask for it (needs information)"
+            )
+    return out
+
+
+def _unlinked(
+    source: ExportSource, pack: PackSpec, listed: list[tuple[str, str, str | None]]
+) -> list[dict[str, str]]:
+    """Records read by purchase order that no case can reach."""
+    po_collection = _collection(pack, "purchase_order")
+    by_po = _by_po_collections(pack)
+    out = []
+    for collection, key, po in listed:
+        if collection not in by_po:
+            continue
+        if po is None:
+            reason = "listed under no purchase order, so no case reads it"
+        elif po_collection is not None and source.holds(po_collection, po) is False:
+            reason = f"listed under {po}, which is not in this export"
+        else:
+            continue
+        out.append({"collection": collection, "key": key, "reason": reason})
+    return out
+
+
+def _collection(pack: PackSpec, record_type: RecordType) -> str | None:
+    spec = pack.sources.get(record_type)
+    return spec.collection if spec is not None else None
+
+
+def _by_po_collections(pack: PackSpec) -> set[str]:
+    return {c for rt in _BY_PO if (c := _collection(pack, rt)) is not None}

@@ -18,7 +18,7 @@ from opsbridge.persistence.models import DocumentVersion, WorkflowStep
 from opsbridge.workflow import jobs
 from opsbridge.workflow.investigation import _run_step
 
-from .stack import get, investigate, open_case
+from .stack import get, investigate, open_case, put_scenario, rehearsal
 from .test_api_cases import call
 
 pytestmark = pytest.mark.integration
@@ -83,6 +83,75 @@ def test_twenty_ordered_eighteen_received_produces_cited_quantity_mismatch(stack
         v["normalization_version"] == "opsbridge-norm/1"
         and v["normalized_sha256"] != v["raw_sha256"]
     )
+
+
+def test_pilot_scenario_a_delivered_is_not_accepted(stack) -> None:  # type: ignore[no-untyped-def]
+    """20 chairs billed; receiving accepted 18 and rejected 2; the supplier says all 20 were
+    delivered. All three are true. The operator sees each passage and quantity, why arrival
+    does not clear the invoice, and what stays open. The rehearsal's receipt records no reason
+    for the rejection (its format has no column for one), so from rules 1.4.0 receiving is
+    asked for the inspection record before anyone asks the supplier for a remedy."""
+    st = stack
+    put_scenario(st, rehearsal("pilot-a"))
+    t = "/api/v1/tenants/demo-furniture"
+    case_id = open_case(st, "furn-investigator", "demo-furniture", "INV-8401")
+    r = call(
+        st["client"],
+        st["actors"]["furn-investigator"],
+        "POST",
+        f"{t}/cases/{case_id}/investigations",
+        json={"model_mode": "rules_only"},
+    )
+    assert r.status_code in (200, 202), r.text
+    while st["worker"].run_once():
+        pass
+    inv = get(st, "furn-investigator", f"{t}/cases/{case_id}/investigation").json()
+    assert (inv["outcome"], inv["rules_version"]) == (
+        "needs_information",
+        "opsbridge-rules/1.4.0",
+    )
+    [rejected] = [f for f in inv["findings"] if f["finding_type"] == "disposition"]
+    assert rejected["reason_code"] == "rejection_reason_missing"
+    keys = ("invoiced", "delivered", "undelivered", "received_accepted", "received_rejected")
+    assert {k: rejected["values"][k] for k in keys} == {
+        "invoiced": "20",
+        "delivered": "20",
+        "undelivered": "0",
+        "received_accepted": "18",
+        "received_rejected": "2",
+    }
+    assert "no reason is recorded" in rejected["summary"]
+    assert not [f for f in inv["findings"] if f["finding_type"] == "quantity_mismatch"]
+    [claim] = [f for f in inv["findings"] if f["reason_code"] == "supplier_claim_includes_rejected"]
+    assert "agrees with receiving" in claim["summary"]
+    assert not [f for f in inv["findings"] if f["finding_type"] == "source_conflict"]
+
+    # Every passage resolves to its source version: both receipt rows with their status, the
+    # invoice's 20 and the supplier's own sentence.
+    assert inv["citations"] and all(c["status"] == "valid" for c in inv["citations"])
+    rows = {
+        (c["field"], c["value"]) for c in inv["citations"] if c["field"].startswith("receipt_line")
+    }
+    assert {
+        ("receipt_line.quantity", "18"),
+        ("receipt_line.quantity", "2"),
+        ("receipt_line.status", "rejected"),
+    } <= rows
+    invoice_qty = next(c for c in inv["citations"] if c["field"] == "invoice_line.quantity")
+    assert invoice_qty["value"] == "20"
+    [said] = [c for c in inv["citations"] if c["field"].startswith("supplier_message")]
+    assert "delivered all 20 chairs" in said["excerpt"]
+
+    # Receiving is asked for the inspection record; nothing is credited, replaced or paid,
+    # and the case is not resolved.
+    rec = inv["recommendation"]
+    assert (rec["decision"], rec["action_type"], rec["assignee_group"]) == (
+        "request_information",
+        "create_follow_up_task",
+        "receiving",
+    )
+    case = get(st, "furn-investigator", f"{t}/cases/{case_id}").json()
+    assert case["status"] == "needs_information"
 
 
 def test_missing_receipt_is_needs_information_without_asserting_non_delivery(stack) -> None:  # type: ignore[no-untyped-def]

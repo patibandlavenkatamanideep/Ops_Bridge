@@ -11,13 +11,14 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 754 passed (5 Linux-only skipped, and the live tests), integration 288 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 885 passed (5 Linux-only skipped, and the live tests), integration 311 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
+| Receiving and disposition | Implemented and tested on synthetic data (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md): delivered, accepted and rejected kept apart; late rejections, returns, replacements and credits; a stale approval refused at both write boundaries. No organization's receiving data read; no reviewer has judged the questions or owners; no shipped policy names a disposition owner (a labelled synthetic version does, for tests only) |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
-| Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
+| Pilot | Not started. Prepared and checked on synthetic data: protocol `opsbridge-pilot/2`, a per-case export check, and a rules-only dry run with outbound writes disabled (docs/pilot/quickstart.md). The external first pass is blocked: no authorized export, reviewer or authorization |
 | Release | None published. `v0.1.0-alpha.1` qualifies on `53e6c5a` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
@@ -28,6 +29,12 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
   3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days) and **PR #45**
   (OpenTelemetry's API, SDK and OTLP exporter raised together to 1.45.2).
+- **PR #47** (draft): the pilot's preparation. A rules-only dry run with outbound writes
+  disabled, a per-case preflight, scenario A fixed (rules 1.3.0), scenario B checked, and the
+  36/40 question answered case by case. Handoff in docs/pilot/.
+- **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
+  workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
+  rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
   passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
   0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
@@ -62,8 +69,18 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   are mocked: it is engineering evidence, not an accuracy claim.
 - The v1 recordings depend on their run order: under the workflow versions they were made
   with (1.1.0, 1.2.0), a document's read problems were listed only on its first read in a run.
-  New runs use `investigation/1.3.0`, which lists the stored reason on every read; the
+  New runs (`investigation/1.3.0` and later) list the stored reason on every read; the
   recordings keep their versions and order, and an out-of-order replay fails closed.
+- Evidence that changes after approval stops the dispatch. The Receiving tab lists the
+  documents added or no longer current since each approval and a timeline of receiving
+  evidence, but there is no field-by-field diff, and the refusal's reasons are in the audit
+  log, not the API (the UI shows its category). No command provisions a pilot (non-demo)
+  tenant.
+- Receiving: a rejection still only in the purchasing system does not stop a dispatch within
+  the source age limit; any evidence change, material or not, makes an approval stale. No
+  policy names a disposition owner or a hold scope, so the demo tenant sends rejected goods
+  to manual review. Only the furniture pack maps receiving events, and the agent's tools do
+  not see them (docs/receiving-disposition.md, section 11).
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
 - Processes need synchronized clocks. Each comparison takes both its times from one clock: the
   database's for recorded events, leases, the pilot cut-off and the duration metrics; the
@@ -72,13 +89,55 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 ## Next executable task
 
 1. Owner: push `v0.1.0-alpha.1` on `main`'s head when ready (`53e6c5a` qualifies now).
-2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
-   and start the protocol.
+2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
+   reviewer and written authorization. Then follow docs/pilot/quickstart.md, section 6
+   (pre-registration first).
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
-4. Locally, while waiting: nothing in the brief can advance without these inputs except
+4. Owner, for receiving: who resolves rejected goods with the supplier (a `disposition`
+   route) and whether a disputed quantity holds the whole invoice or only the disputed
+   portion. Each is published as a new policy version; until then the split is shown and the
+   payment recommendation left unresolved.
+5. Locally, while waiting: nothing in the brief can advance without these inputs except
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-18: receiving and disposition (PR #48, draft, after #47)
+- Baseline on `344225d`: a short delivery and a rejection with the same 18 accepted asked
+  receiving the same question. A rejection recorded after the receipt was ignored (the case
+  matched). A return of rejected units subtracted them twice. The rejection reason was
+  dropped, and a receipt with no status was read as accepted. 26 new rule tests failed
+  there; the 4 controls passed.
+- Rules `opsbridge-rules/1.4.0`, workflow `investigation/1.5.0`, migration 0025
+  (`receiving_events`, `receipt_lines.reason`): receiving events with their own occurrence
+  time; disposition questions with an owner from policy, or a statement that none is set;
+  the matched and disputed split, with no amount and no payment action.
+- After approval: a late rejection stops the pending follow-up at the worker and the casework
+  tool; an identical reimport keeps the approval. After execution the action is kept, an audit
+  event records the change, and the Receiving tab asks for reconciliation.
+- Every frozen recording replays case by case. The canary changed only its rules version and
+  a `hold_unconfigured` note on 18 cases. The rehearsal's scenario A was relabelled
+  (inspection record), with the reason in the fixture.
+- Unit 885 (frontend 17), integration 311, canary 64/64, 33 receipts verify, every recording
+  replays case by case. The two 18-unit cases and the late-rejection demo were walked in a
+  browser against `make dev`.
+
+### 2026-11-17: pilot preparation (PR #47, draft)
+- Scenario A: 20 billed, 18 accepted, 2 rejected, and the supplier says all 20 arrived. The
+  finding said "only 18 were received", cited no rejected row, and called the supplier's
+  statement a conflict. Rules `opsbridge-rules/1.3.0` count and cite the rejected units
+  and note that the claim agrees with receiving. New runs use `investigation/1.4.0`;
+  recorded runs keep rules 1.2.0 and replay case by case.
+- Scenario B passes on the existing checks: a follow-up approved on 8 of 10 is not sent
+  once a corrected receipt is read, and the case returns for review.
+- `OPSBRIDGE_OUTBOUND_WRITES=disabled` refuses writes outside OpsBridge in the worker and
+  Casework MCP, with its own category so approvals stand. `/readyz` reports it.
+- `export-check` says per invoice whether a case can be evaluated reliably;
+  `pilot-rehearsal-export` writes five synthetic cases as an export.
+- 36/40: both modes missed the same four held-out cases in every repeat; no discordant case
+  (`scripts/bench_pairing.py`).
+- Unit 770, integration 295, canary 64/64, replay check reproduces every recording; the
+  quickstart passed from a clean clone, with a browser walk-through.
 
 ### 2026-11-17: PR #45 merged and qualified
 - PR #45 merged as `53e6c5a`. Its push CI run on `main`, 44078427478, passed all four jobs on

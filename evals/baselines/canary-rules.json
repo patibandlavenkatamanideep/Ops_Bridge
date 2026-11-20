@@ -2,6 +2,7 @@
  "cases": {
   "fur-dev-001": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -20,6 +21,7 @@
   },
   "fur-dev-003": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -38,6 +40,7 @@
   },
   "fur-dev-005": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -122,6 +125,7 @@
   },
   "fur-dev-014": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received",
     "price_above_po_beyond_tolerance"
    ],
@@ -146,6 +150,7 @@
   },
   "fur-dev-016": {
    "finding_codes": [
+    "hold_unconfigured",
     "receipt_quantity_already_allocated"
    ],
    "matches_label": true,
@@ -206,6 +211,7 @@
   "fur-dev-023": {
    "finding_codes": [
     "conflict_resolved_by_precedence",
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -242,6 +248,7 @@
   },
   "fur-security-302": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -271,6 +278,7 @@
   },
   "fur-security-305": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -282,6 +290,7 @@
   },
   "fur-validation-101": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -336,6 +345,7 @@
   },
   "fur-validation-107": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_ordered",
     "receipt_quantity_already_allocated"
    ],
@@ -360,6 +370,7 @@
   },
   "fur-validation-109": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -403,6 +414,7 @@
   },
   "it-dev-002": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -450,6 +462,7 @@
   },
   "it-dev-007": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received",
     "source_precedence_undefined"
    ],
@@ -476,6 +489,7 @@
   },
   "it-dev-010": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -506,6 +520,7 @@
   },
   "it-security-301": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -517,6 +532,7 @@
   },
   "it-security-302": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -560,6 +576,7 @@
   },
   "it-validation-105": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -591,6 +608,7 @@
   },
   "it-validation-108": {
    "finding_codes": [
+    "hold_unconfigured",
     "invoiced_exceeds_received"
    ],
    "matches_label": true,
@@ -601,7 +619,7 @@
    ]
   }
  },
- "rules_version": "opsbridge-rules/1.2.0",
+ "rules_version": "opsbridge-rules/1.4.0",
  "schema": "opsbridge-canary/1",
  "splits": [
   "dev",

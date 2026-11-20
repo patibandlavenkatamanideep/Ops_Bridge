@@ -929,12 +929,75 @@ def _export_check(args: argparse.Namespace) -> int:
         out.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     problems = result["problems"]
     print(
-        f"{args.export}: {result['records']} records checked with {result['pack']}; "
-        f"{len(problems)} problem(s) to review before the first case"
+        f"{args.export}: {result['records']} records checked with {result['pack']} "
+        f"(extracted_at {result['extracted_at']}, "
+        f"{'complete' if result['complete'] else 'partial'})"
     )
+    print(
+        f"This installation: outbound writes {settings.outbound_writes}; investigations read "
+        f"{settings.purchasing_export_dir or 'the simulator (no export directory is set)'}"
+    )
+    loaded = ", ".join(f"{c} {n}" for c, n in result["loaded"].items()) or "nothing"
+    print(f"  loaded: {loaded}")
+    cases = result["cases"]
+    blocked = [c for c in cases if not c["evaluable"]]
+    print(
+        f"  cases: {len(cases) - len(blocked)} of {len(cases)} invoice(s) can be evaluated; "
+        f"{len(blocked)} cannot be evaluated reliably"
+    )
+    for c in blocked:
+        print(_shown(f"    {c['invoice']} ({c['purchase_order']}): " + "; ".join(c["blocking"])))
+    for c in cases:
+        for note in c["notes"]:
+            print(_shown(f"    note, {c['invoice']}: {note}"))
+    for u in result["unlinked"]:
+        print(_shown(f"  unlinked: {u['collection']} {u['key']}: {u['reason']}"))
+    print(f"  {len(problems)} problem(s) to review before the first case")
     for p in problems:
-        print(_shown(f"  {p['collection']} {p['key']}: {p['problem']}"))
-    return 1 if problems else 0
+        print(_shown(f"    {p['collection']} {p['key']}: {p['problem']}"))
+    return 1 if problems or blocked else 0
+
+
+def _pilot_rehearsal_export(args: argparse.Namespace) -> int:
+    from datetime import UTC, datetime
+
+    from opsbridge.pilot.rehearsal import REHEARSAL, ExportExists, write_rehearsal_export
+    from opsbridge.simulator.scenarios import load_corpus
+
+    try:
+        root = write_rehearsal_export(load_corpus(REHEARSAL), Path(args.out), datetime.now(UTC))
+    except ExportExists as exc:
+        print(f"Refusing: {exc}")
+        return 2
+    print(f"wrote the synthetic rehearsal export to {root} (extracted_at now; not customer data)")
+    return 0
+
+
+def _receiving_pack(args: argparse.Namespace) -> int:
+    """The synthetic receiving and disposition pack (docs/receiving-disposition.md), into the
+    local simulator's store or written as an export. Never customer data."""
+    import os
+    from datetime import UTC, datetime
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.pilot.receiving_pack import load_pack, seed_simulator, write_receiving_export
+    from opsbridge.pilot.rehearsal import ExportExists
+    from opsbridge.simulator.store import SimStore
+
+    pack = load_pack()
+    if args.export_to:
+        try:
+            root = write_receiving_export(pack, Path(args.export_to), datetime.now(UTC))
+        except ExportExists as exc:
+            print(f"Refusing: {exc}")
+            return 2
+        print(f"wrote {len(pack.cases)} synthetic receiving cases as an export to {root}")
+        return 0
+    db = Path(os.environ.get("OPSBRIDGE_SIM_DB", str(REPO_ROOT / "var" / "simulator.sqlite3")))
+    count = seed_simulator(SimStore(db), pack, late=args.late_events)
+    what = "events recorded after approval" if args.late_events else "receiving cases"
+    print(f"simulator records written: {count} for the {what} ({db})")
+    return 0
 
 
 def _shown(text: str) -> str:
@@ -1025,6 +1088,7 @@ def _mcp(args: argparse.Namespace, which: str) -> int:
             settings.oidc_issuer,
             connector_for,
             timeout_seconds=settings.connector_timeout_seconds,
+            outbound_writes_enabled=settings.outbound_writes == "enabled",
         )
     # DNS-rebinding protection stays on; the allowed Host values are this service's configured
     # address (a container name under Compose) and its loopback forms.
@@ -1221,6 +1285,29 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pack", required=True, help="the pack that maps its records")
     p.add_argument("--out", help="where to write the report (JSON)")
     p.set_defaults(func=_export_check)
+
+    p = sub.add_parser(
+        "pilot-rehearsal-export",
+        help="write the synthetic pilot rehearsal cases as an export (docs/pilot/quickstart.md)",
+    )
+    p.add_argument("--out", required=True, help="the export directory (one folder per tenant)")
+    p.set_defaults(func=_pilot_rehearsal_export)
+
+    p = sub.add_parser(
+        "receiving-pack",
+        help="load the synthetic receiving and disposition cases (docs/receiving-disposition.md)",
+    )
+    where = p.add_mutually_exclusive_group(required=True)
+    where.add_argument(
+        "--seed-simulator", action="store_true", help="into the local simulator's store"
+    )
+    where.add_argument("--export-to", help="as an export in this directory (one folder per tenant)")
+    p.add_argument(
+        "--late-events",
+        action="store_true",
+        help="with --seed-simulator: write only the events recorded after approval",
+    )
+    p.set_defaults(func=_receiving_pack)
 
     p = sub.add_parser(
         "end-sessions", help="end a person's live sessions now (back-channel logout missed)"

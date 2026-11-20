@@ -14,9 +14,11 @@ prices are left to the matcher's own `negative_value` rule (credit notes are not
 
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
+from datetime import date, datetime
 from decimal import Decimal
 from functools import cache
 from typing import Any, get_args, get_type_hints
@@ -31,6 +33,7 @@ from .records import (
     POLine,
     PurchaseOrder,
     ReceiptLine,
+    ReceivingEvent,
     SourceRef,
 )
 
@@ -39,6 +42,8 @@ from .records import (
 LINE_ID_MAX = 32
 DOCUMENT_ID_MAX = 100
 UNIT_MAX = 32
+REASON_MAX = 500
+_OCCURRED = re.compile(r"^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}:\d{2}(\.\d{1,6})?(Z|[+-]\d{2}:\d{2}))?$")
 
 
 @dataclass(frozen=True)
@@ -243,6 +248,8 @@ def _receipt_line(c: _Checks, gr: GoodsReceipt, line: ReceiptLine) -> None:
     c.member(f"{what} kind", line.kind, ReceiptLine, "kind", evidence)
     c.member(f"{what} status", line.status, ReceiptLine, "status", evidence)
     c.amount(f"{what} quantity", line.quantity, evidence)
+    if line.reason is not None and len(line.reason) > REASON_MAX:
+        c.add("value_unsupported", f"{what} reason is longer than {REASON_MAX} characters")
 
 
 def receipt_problems(gr: GoodsReceipt) -> list[Problem]:
@@ -254,6 +261,71 @@ def receipt_problems(gr: GoodsReceipt) -> list[Problem]:
     for line in gr.lines:
         _receipt_line(c, gr, line)
     return c.found
+
+
+def _occurred(c: _Checks, what: str, value: str | None, evidence: tuple[SourceRef, ...]) -> None:
+    """A date (`YYYY-MM-DD`) or an RFC 3339 time with a zone, or absent (unknown)."""
+    if value is None:
+        return
+    shown = ascii(value)[:40]
+    try:
+        if not isinstance(value, str) or not _OCCURRED.match(value):
+            raise ValueError
+        if len(value) == 10:
+            date.fromisoformat(value)
+        else:
+            datetime.fromisoformat(value)
+    except ValueError:
+        c.add(
+            "value_unsupported",
+            f"{what} occurred {shown}, which is not a date or a time with a zone",
+            evidence,
+        )
+
+
+def receiving_event_problems(ev: ReceivingEvent) -> list[Problem]:
+    c = _Checks()
+    what = f"receiving event {ev.event_id}"
+    evidence = _ref(ev.refs, "receiving_event.quantity") or tuple(ev.refs.values())[:1]
+    c.identifier("receiving event id", ev.event_id, DOCUMENT_ID_MAX)
+    c.member(f"{what} type", ev.event_type, ReceivingEvent, "event_type", evidence)
+    c.identifier(f"{what} PO number", ev.po_number, DOCUMENT_ID_MAX)
+    c.identifier(f"{what} PO line", ev.po_line_number, LINE_ID_MAX)
+    if ev.quantity is not None:
+        c.amount(f"{what} quantity", ev.quantity, evidence)
+    c.optional_identifier(f"{what} unit", ev.unit, UNIT_MAX, _ref(ev.refs, "receiving_event.unit"))
+    for name in ("receipt_number", "follows", "invoice_number", "document_number"):
+        c.optional_identifier(
+            f"{what} {name.replace('_', ' ')}",
+            getattr(ev, name),
+            DOCUMENT_ID_MAX,
+            _ref(ev.refs, f"receiving_event.{name}"),
+        )
+    if ev.reason is not None and (not isinstance(ev.reason, str) or len(ev.reason) > REASON_MAX):
+        c.add("value_unsupported", f"{what} reason is longer than {REASON_MAX} characters")
+    _occurred(c, what, ev.occurred, _ref(ev.refs, "receiving_event.occurred"))
+    return c.found
+
+
+def receiving_events_problems(events: Iterable[ReceivingEvent]) -> list[Problem]:
+    """Each event's own problems, and an event identity given twice (counted twice)."""
+    found: list[Problem] = []
+    by_id: dict[str, list[ReceivingEvent]] = defaultdict(list)
+    for ev in events:
+        found += receiving_event_problems(ev)
+        key = norm_id(ev.event_id) if isinstance(ev.event_id, str) else None
+        if key is not None:
+            by_id[key].append(ev)
+    for key, same in by_id.items():
+        if len(same) > 1:
+            found.append(
+                Problem(
+                    "record_identity_duplicate",
+                    f"receiving event {key} appears {len(same)} times in the input",
+                    tuple(r for ev in same for r in ev.refs.values()),
+                )
+            )
+    return found
 
 
 def allocation_problems(a: InvoiceAllocation) -> list[Problem]:
