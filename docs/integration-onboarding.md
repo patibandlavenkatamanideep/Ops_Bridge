@@ -111,10 +111,23 @@ run the live test only with the owner's authorization.
 
 ## 6. Tenant, identity and access
 
-Add the tenant to the seed fixture or provision it through an admin process: slug, tier,
-pack, policies, members with roles and approval scopes. Connect the customer's OIDC
-provider (issuer, client, redirect URIs); OpsBridge derives tenant and roles from its own
-membership records, never from token claims or headers.
+Provision the organization's tenant with `tenant-provision --spec FILE` (template
+`fixtures/pilot/tenant.example.yaml`, code `backend/src/opsbridge/provision.py`). Never add it
+to the demo seed fixture: demo tenants are flagged synthetic, and their accounts share a
+password.
+
+The spec gives:
+- the slug, tier, pack and model mode;
+- the policy files, each validated for the pack and published as an immutable version;
+- the identity provider's issuer and the first administrators' subjects.
+
+It creates only that, and the first task connection, in one audited transaction.
+Re-running it publishes policy versions added to the spec, and changes nothing else.
+The administrators invite everyone else from the app's settings, with roles and approval
+scopes.
+
+Connect the customer's OIDC provider (issuer, client, redirect URIs). OpsBridge derives
+tenant and roles from its own membership records, never from token claims or headers.
 
 ## 7. Prove it before go-live
 
