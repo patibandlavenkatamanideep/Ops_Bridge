@@ -60,6 +60,141 @@ class InvestigationOut(BaseModel):
     source_read_at: str | None = None  # when it read the purchasing system
 
 
+class EvidenceRefOut(BaseModel):
+    document_id: str
+    version_id: str
+    sha256: str
+    locator: str
+    field: str
+
+
+class RejectionOut(BaseModel):
+    source: str  # the receipt number, or the rejection event's id
+    receipt_number: str | None
+    quantity: str | None
+    reason: str | None
+    occurred: str | None  # as the source states it
+    occurred_precision: Literal["date", "time", "unknown"]
+    late: bool  # recorded as its own event after the receipt
+    evidence: list[EvidenceRefOut]
+
+
+class PositionProblemOut(BaseModel):
+    status: str
+    code: str
+    detail: str
+
+
+class ReceivingLineOut(BaseModel):
+    """One PO line, in its unit. A null quantity is unknown, never zero."""
+
+    po_line_number: str
+    unit: str
+    ordered: str | None
+    delivered: str | None
+    accepted: str | None
+    rejected: str | None
+    undelivered: str | None
+    returned_after_acceptance: str | None
+    returned: str | None
+    replacement_promised: str | None
+    replacement_delivered: str | None
+    replacement_accepted: str | None
+    credit_promised: str | None
+    credit_posted: str | None
+    credits_elsewhere: list[str]
+    covered: str | None
+    open_rejected: str | None
+    disposition: str
+    invoiced: str | None
+    matched: str | None
+    disputed: str | None
+    rejections: list[RejectionOut]
+    problems: list[PositionProblemOut]
+    evidence: list[EvidenceRefOut]
+
+
+class SplitOut(BaseModel):
+    hold: str | None  # whole_invoice | disputed_portion | unconfigured
+    matched_quantity: str | None
+    disputed_quantity: str | None
+    unit: str | None
+    summary: str
+
+
+class BasisOut(BaseModel):
+    finding_id: str
+    reason_code: str
+    summary: str
+
+
+class QuestionOut(BaseModel):
+    decision: str | None
+    action_type: str | None
+    owner: str | None
+    owner_configured: bool
+    title: str | None
+    basis: list[BasisOut]
+
+
+class TimelineEntryOut(BaseModel):
+    kind: Literal["receipt", "event", "approval", "execution"]
+    id: str
+    event_type: str | None = None
+    summary: str
+    occurred: str | None
+    occurred_precision: Literal["date", "time", "unknown"]
+    recorded_at: str
+    current: bool
+    superseded_at: str | None = None
+    after_approval: bool
+    document_id: str | None = None
+    document_title: str | None = None
+    version_id: str | None = None
+    version_no: int | None = None
+    withdrawn: bool | None = None
+
+
+class ChangeOut(BaseModel):
+    change: str
+    document_title: str
+    kind: str
+    version_no: int
+    recorded_at: str
+
+
+class SinceApprovalOut(BaseModel):
+    proposal_id: str
+    action_type: str
+    proposal_status: str
+    approved_at: str
+    operation_status: str | None
+    changes: list[ChangeOut]
+    requires: str
+
+
+class UnattachedEventOut(BaseModel):
+    event_id: str
+    po_line_number: str
+
+
+class ReceivingOut(BaseModel):
+    """docs/receiving-disposition.md: positions from the current records, the split the
+    latest investigation concluded, and what changed since each approval."""
+
+    invoice_number: str
+    po_number: str | None
+    investigation_version: int
+    rules_version: str
+    policy_ref: str
+    lines: list[ReceivingLineOut]
+    unattached_events: list[UnattachedEventOut]
+    split: SplitOut | None
+    question: QuestionOut
+    timeline: list[TimelineEntryOut]
+    since_approval: list[SinceApprovalOut]
+
+
 class DocumentVersionOut(BaseModel):
     version_id: str
     version_no: int
@@ -263,6 +398,16 @@ def latest(
         stale_reason=view.stale_reason,
         source_read_at=view.source_read_at,
     )
+
+
+@router.get("/receiving", response_model=ReceivingOut)
+def receiving(case_id: uuid.UUID, principal: CurrentPrincipal, state: State) -> dict[str, Any]:
+    from opsbridge.services.receiving import receiving_view
+
+    try:
+        return receiving_view(state.db, principal, case_id)
+    except svc.NotFound as exc:
+        raise _map_errors(exc) from exc
 
 
 @router.get("/documents", response_model=DocumentList)

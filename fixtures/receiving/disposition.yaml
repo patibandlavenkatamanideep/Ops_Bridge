@@ -1,0 +1,859 @@
+# Synthetic receiving and disposition cases (docs/receiving-disposition.md). Nothing here comes
+# from a customer, and no benchmark or canary reads this file. Each case is a scenario in the
+# frozen scenario format plus receiving records with rejection reasons and receiving events
+# (backend/src/opsbridge/pilot/receiving_pack.py). The `expected` labels were written by hand
+# from packs/furniture/policies/furniture-ap-v2.yaml, the demo tenant's policy, before the
+# rules were run on them; that policy names no owner for rejected goods. Organization:
+# demo-furniture.
+schema_version: 1
+corpus_id: opsbridge-receiving-disposition-v1
+cases:
+- id: rcv-a-short-delivery
+  description: 'A: 20 chairs ordered and billed; 18 arrive and receiving accepts the 18.'
+  scenario:
+    id: rcv-a-short-delivery
+    pack: furniture
+    family: RCV-SHORT-DELIVERY
+    template: acme-pdf-v1
+    split: dev
+    description: 20 ordered and billed; 18 delivered and accepted.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4601
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8601
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4601
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: discrepancies_found
+      types:
+      - quantity_mismatch
+      next_action: propose_action:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6601
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+  events: []
+  expected:
+    outcome: discrepancies_found
+    next_action: propose_action:create_follow_up_task
+    owner: receiving
+    codes:
+    - hold_unconfigured
+    - invoiced_exceeds_received
+    note: '2 undelivered: ask receiving about delivery'
+- id: rcv-b-rejected-damaged
+  description: 'B: 20 chairs arrive; receiving accepts 18 and rejects 2 as damaged; the supplier says
+    all 20 were delivered.'
+  scenario:
+    id: rcv-b-rejected-damaged
+    pack: furniture
+    family: RCV-REJECTED
+    template: acme-pdf-v1
+    split: dev
+    description: 20 delivered; 18 accepted, 2 rejected as damaged.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4602
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8602
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4602
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages:
+    - id: MSG-4602
+      text: 'Hello AP team,
+
+        We delivered all 20 chairs for PO-4602 on 20 October. Please pay the full invoice.
+
+        Regards, Acme billing'
+    expected:
+      outcome: discrepancies_found
+      types:
+      - quantity_mismatch
+      next_action: propose_action:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6602
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events: []
+  expected:
+    outcome: manual_review
+    next_action: escalate:assign_case
+    owner: ap-review
+    codes:
+    - disposition_owner_unconfigured
+    - disposition_unrecorded
+    - hold_unconfigured
+    - supplier_claim_includes_rejected
+    note: 2 rejected, no remedy recorded; furniture-ap@v2 names no disposition owner
+- id: rcv-c-returned-credit-promised
+  description: The 2 rejected chairs were returned and the supplier promised a credit; none is posted.
+  scenario:
+    id: rcv-c-returned-credit-promised
+    pack: furniture
+    family: RCV-CREDIT-PENDING
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected, returned, credit promised.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4603
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8603
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4603
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: discrepancies_found
+      types:
+      - quantity_mismatch
+      next_action: propose_action:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6603
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RTV-4603
+    event: RETURNED
+    qty: '2'
+    receipt: GR-6603
+    occurred: '2026-10-24'
+    document: RMA-4603
+  - id: CP-4603
+    event: CREDIT_PROMISED
+    qty: '2'
+    follows: RTV-4603
+    occurred: '2026-10-25'
+  expected:
+    outcome: manual_review
+    next_action: escalate:assign_case
+    owner: ap-review
+    codes:
+    - credit_pending
+    - disposition_owner_unconfigured
+    - hold_unconfigured
+    note: a promise is not a credit
+- id: rcv-c-credited
+  description: As above, and a credit note for the 2 chairs is posted against this invoice.
+  scenario:
+    id: rcv-c-credited
+    pack: furniture
+    family: RCV-CREDITED
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected, returned, credited on this invoice.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4604
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8604
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4604
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: matched
+      types: []
+      next_action: no_discrepancy:record_review_note
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6604
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RTV-4604
+    event: RETURNED
+    qty: '2'
+    receipt: GR-6604
+    occurred: '2026-10-24'
+    document: RMA-4604
+  - id: CP-4604
+    event: CREDIT_PROMISED
+    qty: '2'
+    follows: RTV-4604
+    occurred: '2026-10-25'
+  - id: CR-4604
+    event: CREDIT_POSTED
+    qty: '2'
+    follows: RTV-4604
+    invoice: INV-8604
+    document: CN-77
+    occurred: '2026-10-30'
+  expected:
+    outcome: matched
+    next_action: no_discrepancy:record_review_note
+    owner: null
+    codes:
+    - rejected_units_credited
+    note: 18 accepted plus a posted credit for 2 cover the 20 billed
+- id: rcv-d-replacement-unaccepted
+  description: Two replacement chairs arrived; their acceptance is not recorded.
+  scenario:
+    id: rcv-d-replacement-unaccepted
+    pack: furniture
+    family: RCV-REPLACEMENT-PENDING
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected; 2 replacements delivered, not yet accepted.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4605
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8605
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4605
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: needs_information
+      types: []
+      next_action: request_information:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6605
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RD-4605
+    event: REPLACEMENT_DELIVERED
+    qty: '2'
+    receipt: GR-6605
+    occurred: '2026-10-27'
+  expected:
+    outcome: needs_information
+    next_action: request_information:create_follow_up_task
+    owner: receiving
+    codes:
+    - hold_unconfigured
+    - replacement_acceptance_unrecorded
+    note: ask receiving whether the replacements were accepted
+- id: rcv-d-replaced
+  description: As above, and receiving accepted the 2 replacements.
+  scenario:
+    id: rcv-d-replaced
+    pack: furniture
+    family: RCV-REPLACED
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected; 2 replacements delivered and accepted.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4606
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8606
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4606
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: matched
+      types: []
+      next_action: no_discrepancy:record_review_note
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6606
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RD-4606
+    event: REPLACEMENT_DELIVERED
+    qty: '2'
+    receipt: GR-6606
+    occurred: '2026-10-27'
+  - id: RA-4606
+    event: REPLACEMENT_ACCEPTED
+    qty: '2'
+    follows: RD-4606
+    occurred: '2026-10-28'
+  expected:
+    outcome: matched
+    next_action: no_discrepancy:record_review_note
+    owner: null
+    codes:
+    - rejected_units_replaced
+    note: the order stays at 20; the rejection stays in the record
+- id: rcv-e-replacement-billed-again
+  description: The replacements were accepted, the first invoice billed all 20, and a second invoice bills
+    2 more chairs on the same line.
+  scenario:
+    id: rcv-e-replacement-billed-again
+    pack: furniture
+    family: RCV-DUPLICATE-CHARGE
+    template: acme-pdf-v1
+    split: dev
+    description: A second invoice for the replaced units.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4607
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8617
+      date: '2026-11-05'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4607
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '2'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations:
+    - invoice: INV-8607
+      line: 1
+      qty: '20'
+      state: active
+    messages: []
+    expected:
+      outcome: manual_review
+      types:
+      - quantity_mismatch
+      next_action: escalate:assign_case
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6607
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RD-4607
+    event: REPLACEMENT_DELIVERED
+    qty: '2'
+    receipt: GR-6607
+    occurred: '2026-10-27'
+  - id: RA-4607
+    event: REPLACEMENT_ACCEPTED
+    qty: '2'
+    follows: RD-4607
+    occurred: '2026-10-28'
+  expected:
+    outcome: manual_review
+    next_action: escalate:assign_case
+    owner: ap-review
+    codes:
+    - hold_unconfigured
+    - invoiced_exceeds_ordered
+    - possible_duplicate_replacement_charge
+    - receipt_quantity_already_allocated
+    note: possible duplicate billing for AP review
+- id: rcv-e-new-order-same-item
+  description: 'Negative control: a new order for 2 of the same chair, delivered, accepted and billed.'
+  scenario:
+    id: rcv-e-new-order-same-item
+    pack: furniture
+    family: RCV-NEW-ORDER
+    template: acme-pdf-v1
+    split: dev
+    description: A legitimate new order for the same item and quantity.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4608
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '2'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8618
+      date: '2026-11-05'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4608
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '2'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: matched
+      types: []
+      next_action: no_discrepancy:record_review_note
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6608
+    date: '2026-11-03'
+    lines:
+    - line: 1
+      qty: '2'
+  events: []
+  expected:
+    outcome: matched
+    next_action: no_discrepancy:record_review_note
+    owner: null
+    codes: []
+    note: 'same item and quantity, no replacement linkage: not a duplicate'
+- id: rcv-f-late-rejection
+  description: A receipt for 20 was posted; a rejection of 2, dated the delivery day, is recorded later.
+  scenario:
+    id: rcv-f-late-rejection
+    pack: furniture
+    family: RCV-LATE-REJECTION
+    template: acme-pdf-v1
+    split: dev
+    description: 20 posted as accepted; 2 rejected later.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4609
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8609
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4609
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: manual_review
+      types: []
+      next_action: escalate:assign_case
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6609
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '20'
+  events:
+  - id: REJ-4609
+    event: REJECTED
+    qty: '2'
+    receipt: GR-6609
+    occurred: '2026-10-20'
+    reason: damaged in transit
+    file: PO-4609-EVT-1
+    after_approval: true
+  expected:
+    outcome: manual_review
+    next_action: escalate:assign_case
+    owner: ap-review
+    codes:
+    - disposition_owner_unconfigured
+    - disposition_unrecorded
+    - hold_unconfigured
+    note: 18 accepted, 2 rejected; the receipt stays as posted
+- id: rcv-g-rejection-before-its-receipt
+  description: A rejection arrives before the receiving record it refers to.
+  scenario:
+    id: rcv-g-rejection-before-its-receipt
+    pack: furniture
+    family: RCV-OUT-OF-ORDER
+    template: acme-pdf-v1
+    split: dev
+    description: The rejection names GR-6610, which has not arrived.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4610
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8610
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4610
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: needs_information
+      types: []
+      next_action: request_information:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts: []
+  events:
+  - id: REJ-4610
+    event: REJECTED
+    qty: '2'
+    receipt: GR-6610
+    occurred: '2026-10-20'
+    reason: damaged in transit
+  expected:
+    outcome: needs_information
+    next_action: request_information:create_follow_up_task
+    owner: receiving
+    codes:
+    - event_reference_unresolved
+    note: not applied until GR-6610 arrives; never attached to another receipt
+- id: rcv-h-rejection-without-reason
+  description: Receiving rejected 2 chairs and recorded no reason.
+  scenario:
+    id: rcv-h-rejection-without-reason
+    pack: furniture
+    family: RCV-NO-INSPECTION
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected without a reason.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4612
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8612
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4612
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: needs_information
+      types: []
+      next_action: request_information:create_follow_up_task
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6612
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+  events: []
+  expected:
+    outcome: needs_information
+    next_action: request_information:create_follow_up_task
+    owner: receiving
+    codes:
+    - hold_unconfigured
+    - rejection_reason_missing
+    note: ask receiving for the inspection record
+- id: rcv-i-replacement-promised
+  description: The supplier promised replacements for the 2 rejected chairs; none has arrived.
+  scenario:
+    id: rcv-i-replacement-promised
+    pack: furniture
+    family: RCV-REPLACEMENT-PROMISED
+    template: acme-pdf-v1
+    split: dev
+    description: 2 rejected; replacement promised.
+    supplier:
+      id: SUP-ACME
+      name: Acme Office Furniture Inc
+    po:
+      number: PO-4613
+      currency: USD
+      date: '2026-10-01'
+      lines:
+      - line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+    invoice:
+      number: INV-8613
+      date: '2026-10-28'
+      supplier_id: SUP-ACME
+      supplier_name: Acme Office Furniture Inc
+      po_number: PO-4613
+      currency: USD
+      lines:
+      - line: 1
+        po_line: 1
+        item: CH-100
+        desc: Task chair, mesh back
+        qty: '20'
+        unit: EA
+        price: '185.00'
+        kind: goods
+    allocations: []
+    messages: []
+    expected:
+      outcome: manual_review
+      types: []
+      next_action: escalate:assign_case
+      note: the case's own label is authoritative
+  receipts:
+  - id: GR-6613
+    date: '2026-10-20'
+    lines:
+    - line: 1
+      qty: '18'
+    - line: 1
+      qty: '2'
+      status: REJECTED
+      reason: damaged in transit
+  events:
+  - id: RP-4613
+    event: REPLACEMENT_PROMISED
+    qty: '2'
+    receipt: GR-6613
+    occurred: '2026-10-23'
+  expected:
+    outcome: manual_review
+    next_action: escalate:assign_case
+    owner: ap-review
+    codes:
+    - disposition_owner_unconfigured
+    - hold_unconfigured
+    - replacement_pending
+    note: a promise resolves nothing

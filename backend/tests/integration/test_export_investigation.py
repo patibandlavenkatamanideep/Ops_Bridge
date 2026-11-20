@@ -161,3 +161,76 @@ def test_an_export_a_little_ahead_is_taken_as_read_now(stack, tmp_path: Path) ->
     read = datetime.fromisoformat(result["source_read_at"])
     assert before <= read <= datetime.now(UTC)  # not the export's claim, two minutes ahead
     assert result["stale_reason"] is None
+
+
+def test_the_pilot_dry_run_reads_the_rehearsal_export_and_sends_nothing(
+    stack, tmp_path: Path
+) -> None:  # type: ignore[no-untyped-def]
+    """docs/pilot/quickstart.md, end to end: the synthetic rehearsal export, rules only,
+    outbound writes disabled. One case is investigated with its evidence, one stops for the
+    receipt it lacks, and an approved follow-up reaches no task system."""
+    from dataclasses import replace
+
+    from opsbridge.pilot.rehearsal import REHEARSAL, write_rehearsal_export
+    from opsbridge.simulator.scenarios import load_corpus
+
+    from .test_approvals_execution import approve, drain, operations, remote_tasks
+
+    st = stack
+    extracted = datetime.now(UTC) - timedelta(minutes=5)
+    write_rehearsal_export(load_corpus(REHEARSAL), tmp_path, extracted)
+    t = "/api/v1/tenants/demo-furniture"
+    who = st["actors"]["furn-investigator"]
+    deps, executor = st["deps"], st["exec"]["exec"]
+    original = deps.purchasing_for
+    deps.purchasing_for = lambda org: ExportSource(tmp_path / org)
+    st["exec"]["exec"] = replace(executor, outbound_writes_enabled=False)
+    try:
+        cases = {}
+        for invoice in ("INV-8401", "INV-8403"):
+            case_id = open_case(st, "furn-investigator", "demo-furniture", invoice)
+            r = call(
+                st["client"],
+                who,
+                "POST",
+                f"{t}/cases/{case_id}/investigations",
+                json={"model_mode": "rules_only"},
+            )
+            assert r.status_code in (200, 202), r.text
+            drain(st)
+            cases[invoice] = case_id
+        found = get(st, "furn-investigator", f"{t}/cases/{cases['INV-8401']}/investigation").json()
+        stops = get(st, "furn-investigator", f"{t}/cases/{cases['INV-8403']}/investigation").json()
+        assert datetime.fromisoformat(found["source_read_at"]) == extracted
+        # Rules 1.4.0: 2 of the 20 were rejected with no reason recorded, so receiving is asked
+        # for the inspection record (docs/receiving-disposition.md).
+        assert found["outcome"] == "needs_information"
+        assert {f["reason_code"] for f in found["findings"]} == {
+            "rejection_reason_missing",
+            "hold_unconfigured",
+            "supplier_claim_includes_rejected",
+        }
+        # Missing evidence stops the case and asks for it; it is never read as zero received.
+        assert stops["outcome"] == "needs_information"
+        [missing] = stops["findings"]
+        assert missing["reason_code"] == "receiving_record_unavailable"
+        assert "does not establish whether the goods were delivered" in missing["summary"]
+        assert (stops["recommendation"]["decision"], stops["recommendation"]["assignee_group"]) == (
+            "request_information",
+            "receiving",
+        )
+
+        # Approving the follow-up records the decision and sends nothing.
+        r = call(st["client"], who, "POST", f"{t}/cases/{cases['INV-8401']}/proposals", json={})
+        assert r.status_code == 201, r.text
+        assert approve(st, cases["INV-8401"], r.json()).status_code == 200
+        drain(st)
+        [op] = operations(st, cases["INV-8401"])
+        assert (op["status"], op["failure_category"]) == (
+            "cancelled_before_dispatch",
+            "outbound_writes_disabled",
+        )
+        assert remote_tasks(st, op) == []
+    finally:
+        deps.purchasing_for = original
+        st["exec"]["exec"] = executor

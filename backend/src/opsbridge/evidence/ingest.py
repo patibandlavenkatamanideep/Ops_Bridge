@@ -42,6 +42,7 @@ from ..persistence.models import (
     POLineRecord,
     PurchaseOrderRecord,
     ReceiptLineRecord,
+    ReceivingEventRecord,
     SourceDocument,
     SupplierAssertionRecord,
     SupplierRecord,
@@ -58,6 +59,7 @@ KIND_FOR_RECORD: dict[str, str] = {
     "goods_receipt": "goods_receipt",
     "allocation_history": "allocation_history",
     "supplier_message": "supplier_message",
+    "receiving_event": "receiving_event",
 }
 
 
@@ -305,6 +307,7 @@ SOURCE_RECORD_MODELS = (
     GoodsReceiptRecord,
     InvoiceAllocationRecord,
     SupplierAssertionRecord,
+    ReceivingEventRecord,
 )
 
 
@@ -457,6 +460,7 @@ def _store_records(
                     unit=rl.unit,
                     kind=rl.kind,
                     status=rl.status,
+                    reason=rl.reason,
                     refs=_refs_json(rl.refs),
                 )
             )
@@ -487,10 +491,41 @@ def _store_records(
                 refs=_refs_json(sa.refs),
             )
         )
+    for ev in m.events:
+        # One current record per event id: a newer document holding it supersedes the older
+        # record (a correction is a new revision); the history keeps both.
+        session.execute(
+            update(ReceivingEventRecord)
+            .where(
+                ReceivingEventRecord.event_id == ev.event_id,
+                ReceivingEventRecord.superseded_at.is_(None),
+            )
+            .values(superseded_at=datetime.now(UTC))
+        )
+        session.add(
+            ReceivingEventRecord(
+                tenant_id=tenant_id,
+                source_version_id=version_id,
+                event_id=ev.event_id,
+                event_type=ev.event_type,
+                po_number=ev.po_number,
+                po_line_number=ev.po_line_number,
+                quantity=ev.quantity,
+                unit=ev.unit,
+                occurred=ev.occurred,
+                receipt_number=ev.receipt_number,
+                follows=ev.follows,
+                invoice_number=ev.invoice_number,
+                document_number=ev.document_number,
+                reason=ev.reason,
+                refs=_refs_json(ev.refs),
+            )
+        )
     return {
         "purchase_orders": len(m.purchase_orders),
         "invoices": len(m.invoices),
         "goods_receipts": len(m.receipts),
         "allocations": len(m.allocations),
         "supplier_assertions": len(m.assertions),
+        **({"receiving_events": len(m.events)} if m.events else {}),
     }

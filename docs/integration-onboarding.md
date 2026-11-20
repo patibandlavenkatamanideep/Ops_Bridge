@@ -54,6 +54,11 @@ system's API, implement the same two operations with a read-only service account
   returns the keys it holds, the keys it reports deleted, voided or reversed (`withdrawn`),
   and whether the listing is complete. A failed page fails the listing; a cursor that does
   not advance is refused; reaching the adapter's page bound returns `complete=False`.
+- `reads_live = True` only if every call reads what the system holds at that moment (no
+  cache, no snapshot). Before a new external write the executor asks such an adapter whether
+  the approved records are unchanged, by their bytes, and whether anything is new under the
+  order. An adapter that is not live, an export among them, cannot answer, so external writes
+  stay in review.
 
 OpsBridge acts on those answers: a record the source no longer holds (reported withdrawn, a
 404, or missing from a complete listing for its PO) stops being current and is marked "No

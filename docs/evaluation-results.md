@@ -60,6 +60,47 @@ distinguish the two modes; by design the next action is rule-selected and model 
 must agree with it, so agent assistance did not change any decision and did not introduce
 errors, invalid citations or rejected outputs on this split.
 
+### Which cases each mode missed (read from the recording, 17 November 2026)
+
+Equal totals (36/40 each) do not show that the two modes missed the same cases. `python3
+scripts/bench_pairing.py` reads the held-out recording's trial logs and model cassette
+(`evals/runs/opsbridge-bench-v1/heldout-record-20261015T022744Z`), writes nothing, and pairs
+the modes by case ID:
+- **Both right:** 36.
+- **Both wrong:** 4, the same four cases (`fur-heldout-218` to `221`), in all 3 repeats of
+  each mode, with the same finding code.
+- **Discordant:** 0. No case differs between the modes in next action or finding codes.
+
+| Case | Expected next action | Both modes, every repeat | Evidence at decision time |
+|---|---|---|---|
+| fur-heldout-218 | `propose_action:create_follow_up_task` (16 ordered, 14 received, 16 billed) | `escalate:assign_case` | Order and receipt read; the invoice (supplier layout `har-pdf-v2`) yielded no fields; finding `invoice_extraction_needs_review`; 0 citations |
+| fur-heldout-219 | `no_discrepancy:record_review_note` (8 ordered, received, billed) | `escalate:assign_case` | The same |
+| fur-heldout-220 | `propose_action:create_supplier_message_draft` (billed 610.00 against 600.00) | `escalate:assign_case` | The same |
+| fur-heldout-221 | `request_information:create_follow_up_task` (no receiving record) | `escalate:assign_case` | Order read, no receipt exists; the invoice yielded no fields; the same finding |
+
+What the recording itself keeps:
+- the finding code and the empty citation list;
+- the mock model's answers: no statements, then the rules' escalation, "The invoice document
+  could not be read reliably (). Its values were not used; a person must review or supply a
+  structured copy." The empty parentheses are workflow 1.1.0's lost reason: it named only
+  the current read's problems, and these bytes had already been read. New runs keep the
+  reason from 1.2.0 on.
+
+What the documents said comes from the frozen corpus (`fixtures/scenarios/heldout.yaml`). Read
+with today's code over the same bytes, the invoice's mapping reports a missing invoice number,
+date, supplier name, currency and total, and no lines: the furniture pack has no layout for
+`har-pdf-v2`. The mapping and parsers have been hardened since `a98f669`; the recorded finding
+code is that code's own account and agrees.
+
+This comparison cannot establish:
+- **Operator usefulness:** no person worked a case in either mode; the next action is scored
+  against labels written by the rules' author.
+- **Performance on a new organization:** the cases are synthetic, in two packs written with
+  the rules, and the only unseen supplier layout defeated both modes equally.
+- **Benefit from a live model:** the agent-assisted mode used a deterministic mock whose
+  proposals must follow the rules' route. By design it could not differ from rules-only here,
+  so equal results say nothing about a live model.
+
 ### Acceptance (evals/acceptance-policy.json, frozen before the run)
 
 | Gate | Status | Evidence |

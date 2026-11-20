@@ -19,8 +19,9 @@ from sqlalchemy import Engine, select, text
 
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import Case, ExtractedField, FieldCorrection
+from opsbridge.simulator.scenarios import Scenario
 
-from .stack import get, investigate, open_case
+from .stack import get, investigate, open_case, put_scenario, rehearsal
 from .test_api_cases import call
 from .test_approvals_execution import (
     _publish_policy_v3,
@@ -195,3 +196,81 @@ def test_a_correction_committed_while_dispatch_waits_for_the_case_is_seen(
     assert op["status"] == "cancelled_before_dispatch" and remote_tasks(st, op) == []
     with app_db.session(DbContext(tenant_id=tid)) as s:
         assert s.execute(text("SELECT count(*) FROM field_corrections")).scalar_one() == 1
+
+
+def test_pilot_scenario_b_a_receipt_corrected_after_approval_is_not_acted_on(
+    stack, worker_db: Database
+) -> None:  # type: ignore[no-untyped-def]
+    """A follow-up approved on the original receipt (8 of 10 desks) is not sent once a
+    corrected receipt (10) arrives from the purchasing system and is read: the approval no
+    longer stands, and the action returns for review on evidence the approver has not seen.
+    Local simulator only; nothing reaches a live destination."""
+    st = stack
+    original = rehearsal("pilot-b")
+    put_scenario(st, original)
+    case_id = open_case(st, "furn-investigator", ORG, "INV-8402")
+    rules_only = {"model_mode": "rules_only"}
+    who = st["actors"]["furn-investigator"]
+    r = call(st["client"], who, "POST", f"{T}/cases/{case_id}/investigations", json=rules_only)
+    assert r.status_code in (200, 202), r.text
+    drain(st)
+    first = get(st, "furn-investigator", f"{T}/cases/{case_id}/investigation").json()
+    assert first["outcome"] == "discrepancies_found"
+    r = call(st["client"], who, "POST", f"{T}/cases/{case_id}/proposals", json={})
+    assert r.status_code == 201, r.text
+    prop = r.json()
+    assert prop["action_type"] == "create_follow_up_task"
+    assert approve(st, case_id, prop).status_code == 200
+    with worker_db.session(DbContext()) as s:  # execution has not happened yet
+        s.execute(
+            text(
+                "UPDATE jobs SET run_after = now() + interval '1 hour' "
+                "WHERE kind = 'dispatch_operation' AND status = 'queued'"
+            )
+        )
+
+    # The purchasing system now holds a corrected receipt, and the case is read again.
+    corrected = original.model_dump()
+    corrected["receipts"][0]["lines"][0]["qty"] = "10"
+    put_scenario(st, Scenario.model_validate(corrected))
+    r = call(st["client"], who, "POST", f"{T}/cases/{case_id}/investigations", json=rules_only)
+    assert r.status_code in (200, 202), r.text
+    drain(st)
+    with worker_db.session(DbContext()) as s:
+        s.execute(
+            text(
+                "UPDATE jobs SET run_after = now() WHERE kind = 'dispatch_operation' "
+                "AND status = 'queued'"
+            )
+        )
+    drain(st)
+
+    # Nothing was sent, and the approval no longer stands.
+    [op] = operations(st, case_id)
+    assert (op["status"], op["failure_category"]) == (
+        "cancelled_before_dispatch",
+        "precondition_failed",
+    )
+    assert op["attempts"] == [] and remote_tasks(st, op) == []
+    proposals = get(st, "furn-investigator", f"{T}/cases/{case_id}/proposals").json()["items"]
+    assert [p["status"] for p in proposals if p["id"] == prop["id"]] == ["superseded"]
+
+    # The action returns for review on the corrected receipt: 10 of 10, a review note now.
+    latest = get(st, "furn-investigator", f"{T}/cases/{case_id}/investigation").json()
+    assert latest["version"] == first["version"] + 1
+    assert latest["outcome"] == "matched" and latest["stale_reason"] is None
+    assert latest["recommendation"]["action_type"] == "record_review_note"
+    # What changed is reachable, not shown as a diff: the receipt's two versions, each with
+    # its own quantity, and the investigation history (discrepancy, then matched).
+    assert [h["outcome"] for h in latest["history"]] == ["matched", "discrepancies_found"]
+    docs = get(st, "furn-investigator", f"{T}/cases/{case_id}/documents").json()["items"]
+    [receipt] = [d for d in docs if d["kind"] == "goods_receipt"]
+    quantities = {}
+    for v in receipt["versions"]:
+        url = f"{T}/cases/{case_id}/documents/versions/{v['version_id']}"
+        fields = get(st, "furn-investigator", url).json()["fields"]
+        [qty] = [f["current_value"] for f in fields if f["field_path"] == "receipt_line.quantity"]
+        quantities[v["version_no"]] = qty
+    assert quantities == {1: "8", 2: "10"}
+    case = get(st, "furn-investigator", f"{T}/cases/{case_id}").json()
+    assert case["status"] == "awaiting_review"
