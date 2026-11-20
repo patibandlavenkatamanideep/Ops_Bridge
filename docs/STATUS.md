@@ -41,6 +41,9 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   a follow-up task is sent, the executor asks the purchasing system whether it still holds
   what was approved. If it changed or cannot say, nothing is sent and the action returns to
   review. With an export, follow-up tasks stay in review.
+- **PR #52** (draft, pilot tenant provisioning; its branch starts at PR #49's head):
+  `tenant-provision` creates one organization's tenant, never a demo tenant, from a spec file,
+  in one audited transaction. Members join by invitation in the app.
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
   passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
   0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
@@ -112,7 +115,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Recent entries
 
-### 2026-11-19: pilot tenant provisioning (draft PR after #49)
+### 2026-11-19: pilot tenant provisioning (PR #52, draft, after #49)
 - Before: only the synthetic demo tenants could be created (`seed-demo`), and their accounts
   share one password. The quickstart left a pilot tenant to the owner, with no command.
 - `tenant-provision --spec FILE [--dry-run]` (`provision.py`, template
