@@ -1,8 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-16. `main` is at `2cd06dc`, PR #39's merge (CI run 42468377115 green,
-its image job re-run after a failed download). Work continues on `feat/opsbridge-foundation`
-in PR #45.
+Last updated 2026-11-17. `main` is at `53e6c5a`, PR #45's merge (CI run 44078427478 green on
+the first attempt). This record's update is PR #46.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -19,7 +18,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Protocol `opsbridge-pilot/2` is prepared and tested on synthetic data |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `2cd06dc` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `53e6c5a` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
@@ -27,9 +26,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   outbound deadline; proposal status changes and attempt leases on the database's clock) and
   **PR #38** (the approval-wait and execution-time metrics measured between two database
   times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
-  3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days).
-- **PR #45**, waiting for the owner to merge: OpenTelemetry's API, SDK and OTLP exporter
-  raised together to 1.45.2, which Dependabot cannot do; this record names `2cd06dc`.
+  3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days) and **PR #45**
+  (OpenTelemetry's API, SDK and OTLP exporter raised together to 1.45.2).
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
   passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
   0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
@@ -73,8 +71,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #45, and push `v0.1.0-alpha.1` on `main`'s head when ready (`2cd06dc`
-   qualifies now; after #45 merges, its merge commit is the head to check and name).
+1. Owner: push `v0.1.0-alpha.1` on `main`'s head when ready (`53e6c5a` qualifies now).
 2. Owner: the pilot's inputs above. Then run `export-check` on the export, freeze the cohort,
    and start the protocol.
 3. Owner: a cloud account. Then run `parser-sandbox-check` in one Fargate task first.
@@ -82,6 +79,11 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-17: PR #45 merged and qualified
+- PR #45 merged as `53e6c5a`. Its push CI run on `main`, 44078427478, passed all four jobs on
+  the first attempt, and `release_check.py versions` and `ci` pass on that SHA (checked in a
+  clean worktree of it). README, this page and the readiness record name it.
 
 ### 2026-11-16: PR #39 merged; OpenTelemetry raised by hand (PR #45)
 - PR #39 merged on 8 November as `2cd06dc`. `main`'s CI failed there: GitHub answered 504 to
