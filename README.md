@@ -39,7 +39,9 @@ only after a different person approves the exact version they reviewed.
 - **Approval and execution**: immutable proposals with canonical payload digests;
   approvals bound to version, policy, sources and expiry with separation of duties;
   transactional outbox; attempt ledger; read-back confirmation; reconciliation by declared
-  connector capability; `outcome_unknown` for human review instead of blind retries.
+  connector capability; `outcome_unknown` for human review instead of blind retries. Before
+  a follow-up task is sent, the purchasing system itself is asked whether it still holds what
+  was approved; if it changed or cannot say, nothing is sent and the action returns to review.
 - **Isolation and privacy**: OIDC sessions, PostgreSQL row-level security with non-bypass
   roles, tenant-scoped artifacts and retrieval, upload defences, retention and deletion,
   redacted logs and telemetry.

@@ -11,7 +11,9 @@ while matching runs also makes it stale (a false alarm at worst, never a missed 
 This is local freshness only: it cannot show that the source system has not changed since
 the records were fetched. For that, an investigation also records when it read the purchasing
 system and until when its result may be acted on (`source_max_age_hours`); after that, or
-when the time was not recorded, the result is stale too. Purchasing data is never newer than
+when the time was not recorded, the result is stale too. Within that window, the executor
+asks the purchasing system itself before every new external write
+(`workflow/source_check.py`). Purchasing data is never newer than
 the investigation that read it: a read time later than when the investigation was stored (a
 source clock ahead, recorded before review N03 refused that) moves the window back by as
 much.

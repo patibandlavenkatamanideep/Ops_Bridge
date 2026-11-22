@@ -20,6 +20,11 @@ leaves implicit:
    complete listing no longer includes as withdrawn (deleted outright, or moved to another
    PO). Withdrawn records stop being current; their history is kept.
 
+4. Liveness is declared. `reads_live` is True only when every call reads what the system of
+   record holds at that moment. Before a new external write, the executor asks such a source
+   whether it still holds the records the approval rests on (`workflow/source_check.py`). A
+   source that is not live (an export) cannot answer that, so the write is held for review.
+
 Keys are the source's stable record identifiers. Credentials are scoped to one organization
 and the base URL comes from configuration, never from documents or model output.
 
@@ -68,6 +73,7 @@ class Listing:
 
 class PurchasingSource(Protocol):
     connector_version: str
+    reads_live: bool
 
     def fetch(self, collection: str, key: str) -> FetchedRecord | None: ...
 

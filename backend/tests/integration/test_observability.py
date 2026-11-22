@@ -98,6 +98,10 @@ def test_one_trace_from_request_through_worker_steps_and_connector(stack) -> Non
     everything = " ".join(
         str(v) for s in EXPORTER.get_finished_spans() for v in (s.attributes or {}).values()
     )
+    # Dispatch asks the purchasing system first (source_check.py), so the simulator's spans
+    # name the collections it lists. A collection name in a route is an identifier; the word
+    # as content (the follow-up's assignee group) must still not appear.
+    everything = everything.replace("/receiving_events", "/<collection>")
     for content in ("Task chair", "CH-100", "185.00", "receiving"):
         assert content not in everything
 

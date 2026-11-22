@@ -34,6 +34,7 @@ from opsbridge.evidence.records import load_match_input
 from opsbridge.persistence.db import Database
 from opsbridge.persistence.models import (
     ApprovalDecision,
+    AuditEvent,
     DocumentVersion,
     GoodsReceiptRecord,
     InvestigationVersion,
@@ -45,10 +46,27 @@ from opsbridge.persistence.models import (
     SourceDocument,
 )
 
+from .execution_admission import SOURCE_CHANGED, SOURCE_UNVERIFIED
 from .investigations import NotFound, _case, _ctx
 
 _ACTED = ("confirmed", "outcome_unknown")
 _PENDING = ("pending_dispatch", "executing")
+_SOURCE_REFUSALS = (SOURCE_CHANGED, SOURCE_UNVERIFIED)
+
+
+def _refusal_detail(s: Session, op: Operation) -> str:
+    """Why the executor did not send `op`, as it recorded it."""
+    details = s.execute(
+        select(AuditEvent.details)
+        .where(
+            AuditEvent.resource_type == "operation",
+            AuditEvent.resource_id == str(op.id),
+            AuditEvent.action == "operation.cancelled_before_dispatch",
+        )
+        .order_by(AuditEvent.seq.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return str((details or {}).get("detail") or "")
 
 
 def _d(x: Decimal | None) -> str | None:
@@ -292,7 +310,10 @@ def _since_approval(
             if vid in docs
         ]
         op = by_approval.get(ad.id)
-        if not changes:
+        if not changes and op is not None and op.failure_category in _SOURCE_REFUSALS:
+            # OpsBridge's records are what was approved, but the purchasing system was not.
+            requires = "review: " + (_refusal_detail(s, op) or "nothing was sent")
+        elif not changes:
             requires = "nothing: the evidence is what was approved"
         elif op is not None and op.status in _ACTED:
             requires = (

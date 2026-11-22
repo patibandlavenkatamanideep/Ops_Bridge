@@ -43,6 +43,10 @@ Turn the dry run on in `.env`. Relative paths there are relative to the checkout
     OPSBRIDGE_PURCHASING_EXPORT_DIR=var/pilot/export
     OPSBRIDGE_OUTBOUND_WRITES=disabled
 
+Keep outbound writes disabled with an export. An export cannot show what the purchasing
+system holds now, so even with writes enabled every follow-up task would be held for review
+(`source_unverified`) and none would be sent.
+
 Then run the preflight:
 
     uv --directory backend run --frozen python -m opsbridge.cli export-check \

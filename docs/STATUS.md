@@ -11,7 +11,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 885 passed (5 Linux-only skipped, and the live tests), integration 311 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 904 passed (5 Linux-only skipped, and the live tests), integration 318 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
@@ -35,6 +35,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
   workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
   rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
+- **PR #49** (draft, source freshness at dispatch; its branch starts at PR #48's head): before
+  a follow-up task is sent, the executor asks the purchasing system whether it still holds
+  what was approved. If it changed or cannot say, nothing is sent and the action returns to
+  review. With an export, follow-up tasks stay in review.
 - **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
   passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
   0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
@@ -76,8 +80,9 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   evidence, but there is no field-by-field diff, and the refusal's reasons are in the audit
   log, not the API (the UI shows its category). No command provisions a pilot (non-demo)
   tenant.
-- Receiving: a rejection still only in the purchasing system does not stop a dispatch within
-  the source age limit; any evidence change, material or not, makes an approval stale. No
+- Receiving: any evidence change, material or not, makes an approval stale. (A rejection
+  only in the purchasing system now stops the dispatch: the executor asks the source first.
+  With an export it cannot, so external writes stay in review.) No
   policy names a disposition owner or a hold scope, so the demo tenant sends rejected goods
   to manual review. Only the furniture pack maps receiving events, and the agent's tools do
   not see them (docs/receiving-disposition.md, section 11).
@@ -101,6 +106,20 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-18: source freshness at dispatch (PR #49, draft, after #48)
+- Reproduced on #48's head: a follow-up approved on 20 accepted was sent after a rejection of
+  2 was recorded in the purchasing system only (case not re-run). Local freshness could not
+  see it, and the 24-hour window was open.
+- Before every new external write the executor now asks the purchasing system whether it
+  still holds what the approval rests on (`workflow/source_check.py`). Changed: the operation
+  is `source_changed`. Cannot tell (an export, an outage, an incomplete listing): it is
+  `source_unverified`. Either way the connector is never called and the proposal is
+  superseded.
+- Tests: 6 on the stack, 14 unit. The regression test fails with the check switched off.
+  Unit 904 (frontend 17), integration 318, canary 64/64, every recording replays.
+- Exports cannot establish freshness, so with an export follow-up tasks stay in review (the
+  pilot keeps outbound writes disabled anyway).
 
 ### 2026-11-18: receiving and disposition (PR #48, draft, after #47)
 - Baseline on `344225d`: a short delivery and a rejection with the same 18 accepted asked

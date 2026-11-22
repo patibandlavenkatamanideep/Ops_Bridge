@@ -13,6 +13,10 @@ Algorithm for one `dispatch_operation` job (delivery is at-least-once):
    settings still resolve to the approved destination, the approved text is still what
    would be sent), failure → cancelled_before_dispatch. Recovering a write that may have landed (read-back,
    reconciliation) is not a new write and is not refused: it was authorized when made.
+4. Before every NEW external write, also ask the purchasing system whether it still holds what
+   was approved (`source_check.py`), outside any transaction; then admit again under the lock.
+   Changed or unverifiable → cancelled_before_dispatch (`source_changed` / `source_unverified`)
+   and the connector is never called.
 5. Reconciliation by connector capability:
    - strong lookup: exactly one marker match → confirmed; none → safe to create;
      more than one → outcome_unknown (duplicates exist; human review);
@@ -41,6 +45,11 @@ from sqlalchemy.orm import Session
 
 from opsbridge.audit import events as audit
 from opsbridge.canonical import canonical_json, digest
+from opsbridge.connectors.source_contract import (
+    PurchasingSource,
+    SourceRecordInvalid,
+    SourceUnavailable,
+)
 from opsbridge.connectors.tasks import (
     AmbiguousFailure,
     ConnectorUnavailable,
@@ -53,6 +62,7 @@ from opsbridge.connectors.tasks import (
 )
 from opsbridge.evidence.blobs import store_bytes
 from opsbridge.evidence.storage import ArtifactStore
+from opsbridge.mapping import PackSpec
 from opsbridge.persistence.db import Database, DbContext
 from opsbridge.persistence.models import (
     Artifact,
@@ -67,13 +77,16 @@ from opsbridge.services import execution_admission as admission
 from opsbridge.services.cases import transition
 from opsbridge.telemetry import metrics, tracing
 
-from . import jobs
+from . import jobs, source_check
 from .investigation import StepFailed
 from .jobs import LeaseLost as LeaseLost  # re-exported
 
 EXECUTOR = "service:opsbridge-worker"
 LOCAL_CONNECTOR = "opsbridge-local/1"
 TERMINAL = frozenset({"confirmed", "failed", "outcome_unknown", "cancelled_before_dispatch"})
+# Refusals after which the approval cannot be used as it is: the proposal is superseded and the
+# case is back in review. A dry run's refusal (outbound_writes_disabled) leaves it standing.
+SUPERSEDES = frozenset({"precondition_failed", source_check.CHANGED, source_check.UNVERIFIED})
 
 
 @dataclass
@@ -88,6 +101,11 @@ class ExecutionDeps:
     store: ArtifactStore | None = None
     # The installation's OPSBRIDGE_OUTBOUND_WRITES: off, no write outside OpsBridge is admitted.
     outbound_writes_enabled: bool = True
+    # The tenant's purchasing source (by organization) and pack, asked before every new external
+    # write whether it still holds what was approved. Without them nothing can be verified, so
+    # every external write is held (source_check.py).
+    source_for: Callable[[str], PurchasingSource] | None = None
+    pack_for: Callable[[str], PackSpec] | None = None
 
 
 def _ctx(tenant_id: uuid.UUID) -> DbContext:
@@ -107,7 +125,7 @@ def _guard(s: Session, job: jobs.ClaimedJob) -> None:
         raise LeaseLost(f"job {job.id} lease lost (token {job.fencing_token})")
 
 
-def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
+def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob, *, source_checked: bool = False) -> None:
     op_id = uuid.UUID(job.payload["operation_id"])
     tid = job.tenant_id
     with deps.db.session(_ctx(tid)) as s:
@@ -137,12 +155,23 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
         succeeded = [
             a for a in attempts if a.status == "succeeded" and a.kind == "dispatch" and a.remote_ref
         ]
-        if not succeeded and not needs_reconcile and _refused(deps, s, op):
+        new_write = not succeeded and not needs_reconcile
+        if new_write and _refused(deps, s, op):
             return  # nothing can have landed, so what follows would be a new write
-        op.status = "executing"
-        op.executed_by = EXECUTOR
-        op.row_version += 1
+        check_source = (
+            new_write and not source_checked and op.action_type == "create_follow_up_task"
+        )
+        if not check_source:
+            op.status = "executing"
+            op.executed_by = EXECUTOR
+            op.row_version += 1
         snapshot = _snapshot(op, attempts)
+    if check_source:
+        # The operation stays pending while the purchasing system is asked; then it is
+        # admitted again under the lock, since the question took time.
+        if not _source_refused(deps, job, snapshot):
+            dispatch(deps, job, source_checked=True)
+        return
     if snapshot["action_type"] != "create_follow_up_task":
         _execute_local(deps, job, snapshot)
         return
@@ -170,7 +199,8 @@ def dispatch(deps: ExecutionDeps, job: jobs.ClaimedJob) -> None:
                 return
             if outcome == "pending":  # no new write while an earlier one may still land
                 raise StepFailed(_PENDING, retryable=True)
-            if _refused_now(deps, job, snapshot):  # proved absent: creating is a new write
+            # Proved absent: creating is a new write, so it needs the same checks.
+            if _source_refused(deps, job, snapshot) or _refused_now(deps, job, snapshot):
                 return
         _create(deps, job, snapshot, connector)
     finally:
@@ -203,6 +233,61 @@ def _refused(deps: ExecutionDeps, s: Session, op: Operation) -> bool:
             detail=refused.detail,
         )
     return True
+
+
+def _source_refused(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> bool:
+    """Ask the purchasing system whether it still holds what was approved (source_check.py),
+    outside any transaction. True when the operation was finished instead: nothing is sent."""
+    tid = snap["tenant_id"]
+    with deps.db.session(_ctx(tid)) as s:
+        op = s.get(Operation, snap["operation_id"])
+        assert op is not None
+        expected = (
+            source_check.expected_for(s, op.proposal_id, deps.pack_for)
+            if deps.pack_for is not None
+            else "no purchasing source is configured for checking before a write"
+        )
+    if isinstance(expected, str):
+        result = source_check.SourceCheck("unverified", (expected,))
+    elif deps.source_for is None:
+        result = source_check.SourceCheck(
+            "unverified", ("no purchasing source is configured for checking before a write",)
+        )
+    else:
+        try:
+            source = deps.source_for(expected.org)
+        except (SourceUnavailable, SourceRecordInvalid) as exc:
+            result = source_check.SourceCheck(
+                "unverified", (f"the purchasing source could not be opened ({exc})",)
+            )
+        else:
+            # Well inside the job's lease, which this check does not renew.
+            result = source_check.verify(source, expected, budget_seconds=deps.lease_seconds / 2)
+    with deps.db.session(_ctx(tid)) as s:
+        _guard(s, job)
+        op = s.execute(
+            select(Operation).where(Operation.id == snap["operation_id"]).with_for_update()
+        ).scalar_one()
+        if op.status in TERMINAL:
+            return True
+        if result.status == "unchanged":
+            audit.record(
+                s,
+                tenant_id=op.tenant_id,
+                actor_kind="service",
+                actor_id=EXECUTOR,
+                on_behalf_of=op.approved_by,
+                action="operation.source_verified",
+                resource_type="operation",
+                resource_id=str(op.id),
+                outcome="ok",
+                details=result.checked,
+            )
+            return False
+        finish_operation(
+            s, op, "cancelled_before_dispatch", category=result.category, detail=result.detail
+        )
+        return True
 
 
 def _refused_now(deps: ExecutionDeps, job: jobs.ClaimedJob, snap: dict[str, Any]) -> bool:
@@ -284,7 +369,7 @@ def finish_operation(
         and case.status == "awaiting_review"
     ):
         transition(case, "follow_up_pending")  # follow-up done; the business exception stays open
-    if status == "cancelled_before_dispatch" and category == "precondition_failed":
+    if status == "cancelled_before_dispatch" and category in SUPERSEDES:
         pr = s.get(Proposal, op.proposal_id)
         if pr is not None and pr.status == "approved":
             pr.status = "superseded"

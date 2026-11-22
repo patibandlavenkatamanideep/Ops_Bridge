@@ -46,13 +46,12 @@ log = logging.getLogger("opsbridge.worker")
 Handler = Callable[[jobs.ClaimedJob], None]
 
 
-def build_investigation_deps(settings: Settings, db: Database) -> InvestigationDeps:
-    packs = PackRegistry(settings.packs_dir)
+def purchasing_source(settings: Settings) -> Callable[[str], PurchasingSource]:
+    """The organization's purchasing source: its export when the deployment reads exports,
+    otherwise the simulator. Investigations read it; dispatch asks it before a new write."""
     secret = settings.sim_master_secret.get_secret_value()
 
     def purchasing_for(org: str) -> PurchasingSource:
-        """The organization's purchasing source: its export when the deployment reads
-        exports, otherwise the simulator."""
         if settings.purchasing_export_dir is not None:
             return ExportSource(
                 settings.purchasing_export_dir / org,
@@ -62,11 +61,17 @@ def build_investigation_deps(settings: Settings, db: Database) -> InvestigationD
             settings.simulator_url, secret, org, timeout=settings.connector_timeout_seconds
         )
 
+    return purchasing_for
+
+
+def build_investigation_deps(settings: Settings, db: Database) -> InvestigationDeps:
+    packs = PackRegistry(settings.packs_dir)
+
     return InvestigationDeps(
         db=db,
         store=artifact_store(settings),
         pack_for=packs.get,
-        purchasing_for=purchasing_for,
+        purchasing_for=purchasing_source(settings),
         settings=settings,
         records_mcp=_records_client(settings),
         signer=_signer(settings),
@@ -272,6 +277,8 @@ def build_execution_deps(settings: Settings, db: Database) -> ExecutionDeps:
         lease_seconds=settings.worker_lease_seconds,
         store=artifact_store(settings),
         outbound_writes_enabled=settings.outbound_writes == "enabled",
+        source_for=purchasing_source(settings),
+        pack_for=PackRegistry(settings.packs_dir).get,
     )
 
 
