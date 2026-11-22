@@ -174,6 +174,7 @@ def r_line(
     kind: str = "receipt",
     status: str = "accepted",
     doc: str = "GR-5001",
+    row: int = 2,
 ) -> ReceiptLine:
     return ReceiptLine(
         po_line_number=po_line_number,
@@ -183,8 +184,11 @@ def r_line(
         status=status,  # type: ignore[arg-type]
         refs={
             "receipt_line.quantity": ref(
-                doc, "receipt_line.quantity", f"csv:row=2;col=qty_accepted;line={po_line_number}"
+                doc,
+                "receipt_line.quantity",
+                f"csv:row={row};col=qty_accepted;line={po_line_number}",
             ),
+            "receipt_line.status": ref(doc, "receipt_line.status", f"csv:row={row};col=status"),
             "receipt_line.unit": ref(doc, "receipt_line.unit"),
         },
     )

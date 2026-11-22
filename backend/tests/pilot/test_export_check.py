@@ -240,3 +240,138 @@ def test_a_document_cannot_hide_or_reorder_its_problem_on_the_terminal(
     printed = capsys.readouterr().out
     assert [c for c in printed if not (c.isprintable() or c == "\n")] == []
     assert "INV-7001\\x1b[2K\\x1b]0;RETITLED\\x07\\u202e" in printed
+
+
+# --- Which cases the export can support (pilot preflight) ------------------------------
+
+
+def cases(report: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    return {c["invoice"]: c for c in report["cases"]}
+
+
+def test_a_consistent_export_supports_its_case_and_says_what_was_loaded(tmp_path: Path) -> None:
+    report = check(write_export(tmp_path, consistent()))
+    assert report["schema"] == "opsbridge-export-check/2"
+    assert report["cases"] == [
+        {
+            "invoice": "INV-7001",
+            "purchase_order": "PO-2001",
+            "evaluable": True,
+            "blocking": [],
+            "notes": [],
+        }
+    ]
+    assert report["loaded"] == {"invoices": 1, "purchase_orders": 1, "receipts": 1}
+    assert report["unlinked"] == []
+
+
+def test_a_case_whose_purchase_order_is_missing_cannot_be_evaluated(tmp_path: Path) -> None:
+    case = cases(check(write_export(tmp_path, consistent()[1:2])))["INV-7001"]  # invoice only
+    assert case["evaluable"] is False
+    assert case["blocking"] == [
+        "purchase order PO-2001 is not in this export, so an investigation will find no "
+        "purchase order"
+    ]
+    assert case["notes"] == []  # no receipt note for an order that is not there at all
+
+
+def test_a_record_the_case_reads_that_cannot_be_read_blocks_the_case(tmp_path: Path) -> None:
+    receipt = copy.deepcopy(RECEIPT)
+    receipt["items"][0]["qtyReceived"] = ""  # blank: never read as zero received
+    records = consistent()
+    records[2] = ("receipts", "GRN-6001A", "PO-2001", body(receipt))
+    report = check(write_export(tmp_path, records))
+    case = cases(report)["INV-7001"]
+    assert case["evaluable"] is False
+    [blocking] = case["blocking"]
+    assert blocking.startswith("receipts GRN-6001A: ") and "receipt_line.quantity" in blocking
+    assert report["loaded"] == {"invoices": 1, "purchase_orders": 1}
+
+
+def test_no_exported_receipt_is_a_note_that_the_case_will_ask_for_it(tmp_path: Path) -> None:
+    case = cases(check(write_export(tmp_path, consistent()[:2])))["INV-7001"]
+    assert case["evaluable"] is True  # missing evidence is a finding, not a defect
+    assert case["notes"] == [
+        "no receipt is exported for PO-2001: the investigation will report the receiving "
+        "record as missing (needs information), never as zero received"
+    ]
+
+
+def test_a_partial_export_supports_no_case_reliably(tmp_path: Path) -> None:
+    case = cases(check(write_export(tmp_path, consistent(), complete=False)))["INV-7001"]
+    assert case["evaluable"] is False
+    assert case["blocking"] == [
+        "the export is partial (complete: false), so a record it lacks cannot be told from one "
+        "the source lacks; the investigation will send the case to manual review"
+    ]
+
+
+def test_records_no_case_can_reach_are_listed_as_unlinked(tmp_path: Path) -> None:
+    stray = {**RECEIPT, "grnNumber": "GRN-6009A", "poRef": "PO-2009"}
+    records = [
+        *consistent(),
+        ("receipts", "GRN-6009A", "PO-2009", body(stray)),  # its PO is not in the export
+        ("receipts", "GRN-6010A", None, body({**RECEIPT, "grnNumber": "GRN-6010A"})),
+    ]
+    report = check(write_export(tmp_path, records))
+    assert report["unlinked"] == [
+        {"collection": "receipts", "key": "GRN-6009A",
+         "reason": "listed under PO-2009, which is not in this export"},
+        {"collection": "receipts", "key": "GRN-6010A",
+         "reason": "listed under no purchase order, so no case reads it"},
+    ]  # fmt: skip
+    assert cases(report)["INV-7001"]["evaluable"] is True
+
+
+def test_the_command_prints_the_cases_and_this_installation_s_write_mode(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = write_export(tmp_path / "short", consistent()[1:])
+    assert cli.main(["export-check", "--export", str(root), "--pack", "it_hardware"]) == 1
+    printed = capsys.readouterr().out
+    assert "0 of 1 invoice(s) can be evaluated; 1 cannot be evaluated reliably" in printed
+    assert "INV-7001 (PO-2001): purchase order PO-2001 is not in this export" in printed
+    assert "loaded: invoices 1" in printed
+    assert "outbound writes enabled" in printed  # the default; a dry run says disabled
+
+
+# --- The synthetic rehearsal export (docs/pilot/quickstart.md) -------------------------
+
+
+def test_the_rehearsal_export_supports_four_cases_and_names_the_fifth(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from opsbridge.pilot.rehearsal import REHEARSAL, write_rehearsal_export
+    from opsbridge.simulator.scenarios import load_corpus
+
+    root = write_rehearsal_export(load_corpus(REHEARSAL), tmp_path, datetime.now(UTC))
+    assert root == tmp_path / "demo-furniture"
+    manifest = json.loads((root / "manifest.json").read_text())
+    assert manifest["complete"] is True and "not a customer export" in manifest["source_system"]
+    report = check_export(ExportSource(root), PackRegistry(REPO_ROOT / "packs").get("furniture"))
+    by_invoice = {c["invoice"]: c for c in report["cases"]}
+    assert sorted(by_invoice) == ["INV-8401", "INV-8402", "INV-8403", "INV-8404", "INV-8405"]
+    assert [i for i, c in by_invoice.items() if not c["evaluable"]] == ["INV-8405"]
+    assert by_invoice["INV-8405"]["blocking"] == [
+        "purchase order PO-4005 is not in this export, so an investigation will find no "
+        "purchase order"
+    ]
+    assert by_invoice["INV-8403"]["notes"][0].startswith("no receipt is exported for PO-4003")
+    assert report["loaded"] == {
+        "invoices": 5,
+        "messages": 1,
+        "purchase_orders": 4,
+        "receipts": 3,
+    }
+
+
+def test_the_rehearsal_export_never_writes_over_an_export(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    (tmp_path / "demo-furniture").mkdir()
+    (tmp_path / "demo-furniture" / "manifest.json").write_text("{}")
+    assert cli.main(["pilot-rehearsal-export", "--out", str(tmp_path)]) == 2
+    assert "Refusing" in capsys.readouterr().out
+    assert (tmp_path / "demo-furniture" / "manifest.json").read_text() == "{}"
+    assert cli.main(["pilot-rehearsal-export", "--out", str(tmp_path / "fresh")]) == 0
+    assert (tmp_path / "fresh" / "demo-furniture" / "manifest.json").is_file()

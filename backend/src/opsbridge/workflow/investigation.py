@@ -29,7 +29,13 @@ from opsbridge.canonical import digest
 from opsbridge.connectors.purchasing import CollectionBudgetExhausted, PurchasingClient
 from opsbridge.connectors.source_contract import CONTRACT, Listing, PurchasingSource
 from opsbridge.domain.decision import recommend
-from opsbridge.domain.matching import Finding, MatchResult, reconcile
+from opsbridge.domain.matching import (
+    RULES_VERSION,
+    SILENT_REJECTIONS_RULES_VERSION,
+    Finding,
+    MatchResult,
+    reconcile,
+)
 from opsbridge.domain.policy import ReconciliationPolicy
 from opsbridge.evidence.citations import resolve_all
 from opsbridge.evidence.ingest import IngestRejected, ingest, withdraw
@@ -64,20 +70,37 @@ from opsbridge.telemetry import metrics, tracing
 
 from . import jobs
 
-# The behaviour a run follows, recorded on the run when it is created. 1.3.0: a record's
-# problems are the reason stored with the document version read, whether its bytes are new
-# or unchanged; 1.2.0 listed the current read's problems, none for unchanged bytes, so a
-# repeated investigation's uncertainty lost why a document needed review and a benchmark's
+# The behaviour a run follows, recorded on the run when it is created. 1.4.0: matching
+# follows rules opsbridge-rules/1.3.0, which counts and cites receipt lines rejected at
+# receiving; earlier versions follow 1.2.0, which skipped them without a word. 1.3.0: a
+# record's problems are the reason stored with the document version read, whether its bytes
+# are new or unchanged; 1.2.0 listed the current read's problems, none for unchanged bytes, so
+# a repeated investigation's uncertainty lost why a document needed review and a benchmark's
 # trials depended on their order (kept to replay opsbridge-bench-v1-rerun). 1.2.0: an invoice
 # that could not be read is named with the reason stored on its document version, on every
 # run. 1.1.0 took that reason from the current read's problems only, so a repeated
 # investigation of unchanged bytes said "()"; it is kept to replay opsbridge-bench-v1.
-WORKFLOW_VERSION = "investigation/1.3.0"
+WORKFLOW_VERSION = "investigation/1.4.0"
+STORED_PROBLEMS_VERSION = "investigation/1.3.0"
 STORED_REASON_VERSION = "investigation/1.2.0"
 LEGACY_WORKFLOW_VERSION = "investigation/1.1.0"
-WORKFLOW_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION, WORKFLOW_VERSION)
+WORKFLOW_VERSIONS = (
+    LEGACY_WORKFLOW_VERSION,
+    STORED_REASON_VERSION,
+    STORED_PROBLEMS_VERSION,
+    WORKFLOW_VERSION,
+)
 # Versions that list a record's problems from the current read only.
 _READ_PROBLEMS_VERSIONS = (LEGACY_WORKFLOW_VERSION, STORED_REASON_VERSION)
+
+
+def rules_version_for(workflow_version: str) -> str:
+    """The matching rules a run of this workflow version follows."""
+    return (
+        RULES_VERSION if workflow_version == WORKFLOW_VERSION else SILENT_REJECTIONS_RULES_VERSION
+    )
+
+
 SERVICE_IDENTITY = "service:opsbridge-worker"
 
 
@@ -844,7 +867,7 @@ def _match(
             "corrections": [],
             "policy_ref": policy.ref,
         }
-    result: MatchResult = reconcile(loaded.match_input, policy)
+    result: MatchResult = reconcile(loaded.match_input, policy, rules_version_for(workflow_version))
     rec = recommend(result, policy, case["case_number"])
     uncertainty += [
         f"supplier claim unconfirmed: {f.summary}"

@@ -80,8 +80,16 @@ without a row yet.
 export through pack P, the way an investigation does, and stores nothing. It lists each
 problem by collection and key: an unreadable file, a collection the pack doesn't read, a
 mapping problem, a number or listing that disagrees with the document, or an invoice whose
-purchase order isn't in the export. It exits 1 when there is anything to review, and 2 when
-the export or pack can't be opened.
+purchase order isn't in the export. It also says what was loaded, which invoices can be
+evaluated reliably and why the others cannot, records no case can reach, and this
+installation's write mode (`opsbridge-export-check/2`, docs/pilot/export-contract.md). It
+exits 1 when there is anything to review, and 2 when the export or pack can't be opened.
+`pilot-rehearsal-export --out DIR` writes the synthetic rehearsal cases
+(`fixtures/pilot/rehearsal.yaml`) as an export under `DIR/demo-furniture`, dated now, and never
+writes over an existing export. The worker's `/readyz` (port 9101) reports `outbound_writes`
+and `purchasing_source`: a dry run is confirmed there (docs/pilot/quickstart.md).
+`python3 scripts/bench_pairing.py [--run DIR]` pairs a recorded run's rules-only and mock
+verdicts case by case and writes nothing.
 
 Linux with Docker (ubuntu-24.04) is exercised by hosted CI, which runs `setup`, `lint`,
 `typecheck`, `test`, `eval-canary`, `build`, `infra-up`, `migrate`, `seed-demo`,

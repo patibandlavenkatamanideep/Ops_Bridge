@@ -34,13 +34,13 @@ Nothing here has reached sandbox, staging or pilot.
 | A05 | Casework MCP admission weaker than the executor's; rebuilds outgoing text from parameters | Fixed, verified locally (real MCP, PostgreSQL, Keycloak) | 2 | See "Package 2" below | — |
 | A06 | Verifiers load the private signing key; credential references not tenant-owned | Partly fixed, verified locally: public-only verifiers with key rotation, tenant-registered credentials; parser subprocesses get none of the service's secrets and are confined with Landlock (no other files, no TCP) and a seccomp filter (no new sockets: no UDP, DNS or Unix sockets), required when deployed; each container is given only its own secrets, and in the compose stack only bootstrap and the worker mount the delegation signing key. Not done: keys from a secret store mounted per role (staging work); the staging platform's kernel must offer Landlock, or the sandbox is waived there by setting `OPSBRIDGE_PARSER_SANDBOX=best_effort` | 3 | See "Package 3, keys and credentials" below | Staging (A11) for per-role secret mounts |
 | A07 | Important fixes only in open PR #17 | Fixed: the owner merged PR #17 on 30 October (`4d2f1f6`) | 0 | CI on `main` green at `4d2f1f6` (run 41085903247, all four jobs) | — |
-| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/2`, from /1 on 5 November, review N05; `pilot-report`), with `export-check` to read a pilot export through its pack before the first case | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
+| A08 | No actual purchasing source | Blocked for live proof. Done locally: an export-file source held to the contract (hand-written exports only), and the single-source pilot's measures defined and implemented before any data (protocol `opsbridge-pilot/2`, from /1 on 5 November, review N05; `pilot-report`), with `export-check` to read a pilot export through its pack before the first case. On 17 November: the pilot's dry run (an export, rules only, outbound writes disabled) passes end to end on a synthetic rehearsal export, and `export-check` says per invoice whether a case can be evaluated reliably ("Pilot preparation" below) | 5 | See "Package 5, export source" and "Package 5, pilot measurement" below | Owner chooses a system or export, provides a real (sanitized) export or sandbox, and authorizes access |
 | A09 | AI usefulness not measured on its actual task | Blocked for real-model evidence. Protocol prepared (`docs/evaluation-plan-v2.md`: measures, model identity, failures in denominators) | 6 | Mock-only results; no paid calls made | Model credential, budget and authorization |
 | A10 | Labels by the same author; held-out set public | Blocked. Protocol prepared (`docs/evaluation-plan-v2.md`: independent labelling, adjudication records, family-sequestered split, sample sizes chosen in advance) | 6, 9 | — | Independent labellers and new data |
 | A11 | Staging is a plan only | Blocked | 8 | `docs/deployment.md` plan | Cloud account, choice and spending authorization |
 | A12 | `main` unprotected; no release promotion | Ruleset applied by the owner (5 November; its required checks are tested against CI's job names). Release workflow prepared, not run (tag equals every declared version; CI evidence read from the Actions API; the digest published is the digest qualified; SBOM, provenance attestation, verification; a pre-release tag is accepted and its image labelled experimental, and the packages declare `0.1.0-alpha.1`) | 8 | See "Package 8, governance and releases" below | Owner pushes the first tag, `v0.1.0-alpha.1`, on `main`'s head, `53e6c5a` (PR #45; `53e6c5ad6c36962db4234139553bf4497ea0f376`, CI run https://github.com/patibandlavenkatamanideep/Ops_Bridge/actions/runs/44078427478), where all three release checks pass, the release refuses fixable HIGH findings, and it builds, verifies and attests the evidence bundle |
 | A13 | Replay compares next actions only; mock replay depends on rules-only trials running first | Fixed, verified locally: behavioural replay comparison; the cause (a finding-text defect) fixed as workflow `investigation/1.2.0`, and its remainder (a re-read's uncertainty lost the reason) as `investigation/1.3.0` on 6 November; v1 recordings replay with `investigation/1.1.0` in their declared order and v1-rerun's with 1.2.0, and other orders fail closed | 4 | See "Package 4, behavioural replay" below | — |
-| A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus | 7, 9 | Browser tests | Operator sessions |
+| A14 | Operator workflow unvalidated | Partly: PR #17 ownership, views, settings sections, keyboard focus. On 17 November the pilot dry run was walked in a browser from a clean checkout on synthetic data; a reviewer sheet and a results template (pre-registration, first pass, adaptation kept apart) are ready | 7, 9 | Browser tests; docs/pilot/ | Operator sessions |
 | A15 | Capacity and spend bounds unmeasured | Partly: one time budget for reading the source per investigation. Load figures, SLOs and spend accounting need staging | 3, 8 | See "Package 3, collection budget" below | Staging and the owner's expected load |
 | A16 | Identity and privacy lifecycle incomplete | Partly: ended sessions and their ID tokens are now pruned, and a sign-out at the identity provider ends OpsBridge's sessions at once (back-channel logout, verified against Keycloak 26.8.1). Profile deletion, backups and object versions are not done | 3, 8 | See "Package 3, session lifecycle" below | The owner's deprovisioning policy |
 | A17 | Image lacks the evaluation evidence the repository verifies | Done, verified in CI: summary-only in the image, full verification from the repository or from a reproducible evidence bundle that a release builds, verifies with its image and attests; the image check and bundle round trip pass on `main` at `53e6c5a` (CI run 44078427478) | 8 | See "Package 8, evidence packaging" below | — |
@@ -941,6 +941,79 @@ one case.
 **Not done.** No pilot: there is no export, reviewer or authorization. The report and the
 export check have run only on synthetic data. One reviewer gives one person's judgement,
 and blindness is shown only by the recorded time.
+
+## Pilot preparation: a rules-only dry run (17 November 2026)
+
+For one read-only, rules-only pilot with one AP or procurement reviewer on an authorized,
+sanitized export. Nothing external was used: the rehearsal is synthetic
+(`fixtures/pilot/rehearsal.yaml`), and the scenarios run against the local simulator. Handoff:
+docs/pilot/.
+
+- **Delivered is not accepted (scenario A).**
+  - *Reproduced:* 20 chairs billed, 18 accepted and 2 rejected as damaged, and the supplier
+    says all 20 arrived. The finding said "only 18 were received". Its values and citations
+    left out the rejected row. The supplier's statement was reported as a conflict that
+    receiving "controls", or, under a policy with no precedence, sent the case to manual
+    review. All three statements were true.
+  - *Fix:* rules `opsbridge-rules/1.3.0` (`domain/matching.py`) count the units rejected at
+    receiving, say so, and cite their quantity and status. A delivery claim equal to accepted
+    plus rejected is noted as agreeing with receiving.
+  - *Version gating:* new runs follow workflow `investigation/1.4.0`. Runs pinned to 1.1.0
+    to 1.3.0 keep rules 1.2.0, so `make eval-replay-check` still reproduces every frozen
+    recording case by case, including the rerun's findings and citations digests.
+  - *Canary and owner:* the canary's baseline changed only its `rules_version`. The next
+    owner stays the policy's route (`receiving`); no credit, replacement or payment is
+    proposed.
+  - *Tests:* `tests/domain/test_matching.py` (6, failing first) and
+    `tests/integration/test_investigation_stack.py::test_pilot_scenario_a_delivered_is_not_accepted`
+    (fails under rules 1.2.0).
+- **Evidence changes after approval (scenario B).** The existing checks hold.
+  - A follow-up approved on 8 of 10 desks is not sent once a corrected receipt (10) is read
+    from the simulator. The proposal is superseded, and the case returns for review with a
+    review note (`tests/integration/test_evidence_freshness.py`, no code change).
+  - Not available: a diff of what changed. The operator sees the receipt's two versions
+    (8, then 10) and the investigation history, side by side only by opening each.
+  - The reasons for a refused dispatch are in the audit log, which no API exposes; the
+    operator sees the category.
+  - A correction in the source that OpsBridge has not read yet does not stop a dispatch
+    within the age limit (`services/freshness.py` says so); in the pilot nothing is sent.
+- **Outbound writes off (`OPSBRIDGE_OUTBOUND_WRITES=disabled`).**
+  - *Where it is enforced:* every new write outside OpsBridge is refused at admission
+    (`services/execution_admission.py`), by the worker and the Casework MCP tool alike;
+    local actions still run.
+  - *Found while building it:* reusing `precondition_failed` would have superseded each
+    approved proposal, and the pilot report would have counted those approvals as
+    undecided. The refusal has its own category, `outbound_writes_disabled`, and the
+    approval stands.
+  - *Visible to the operator:* the worker's `/readyz` reports the value it runs with.
+  - *Tests:* `tests/integration/test_approvals_execution.py`,
+    `tests/integration/test_mcp.py`, `tests/integration/test_observability.py`.
+- **Preflight (`export-check`, report `opsbridge-export-check/2`).**
+  - *What it adds:* what was loaded by collection; per invoice, whether a case can be
+    evaluated reliably and why not; and records no case can reach.
+  - *What it does not do:* a blank quantity is a problem, not zero; a missing receipt is a
+    note that the case will ask for it; a partial export blocks every case.
+  - *Tests:* `tests/pilot/test_export_check.py` (18; the new ones failed first).
+- **Rehearsal export (`pilot-rehearsal-export`).**
+  - *What it writes:* the five rehearsal cases as an `opsbridge-export/1` export, dated now,
+    never over an existing export.
+  - *A safeguard that fired:* a first version added a `rehearsal` split to the scenario
+    model. The frozen benchmarks bind `simulator/scenarios.py` by digest, and their freeze
+    check refused. The change was reverted, and the cases carry the format's `dev` label.
+- **The 36/40 question.** Both modes missed the same four cases (`fur-heldout-218` to
+  `221`), every repeat, with no discordant case (`scripts/bench_pairing.py`;
+  docs/evaluation-results.md).
+- **Dry run end to end:**
+  - `tests/integration/test_export_investigation.py::test_the_pilot_dry_run_reads_the_rehearsal_export_and_sends_nothing`;
+  - and once in a browser from a clean clone (docs/pilot/quickstart.md): two approvals
+    sent nothing, and the simulator's task tracker held 0 tasks.
+
+**Not done.**
+- The external pilot is BLOCKED: no authorized export, reviewer, cohort or written
+  authorization exists.
+- No command provisions a pilot (non-demo) tenant.
+- The partial-export finding speaks of pages (written for paged sources).
+- There is no diff view.
 
 ## Work plan
 
