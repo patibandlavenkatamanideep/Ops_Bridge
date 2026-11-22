@@ -22,7 +22,7 @@ from opsbridge.domain.records import MatchInput, Supplier
 from opsbridge.evidence.parsers import parse
 from opsbridge.mapping import DocRef, MappingResult, PackSpec, RecordType, map_document
 from opsbridge.packs import PackRegistry, load_policy_file
-from opsbridge.simulator.scenarios import Scenario, render
+from opsbridge.simulator.scenarios import Record, Scenario, render
 
 DISCREPANCY_TYPES = ("missing_receipt", "quantity_mismatch", "price_mismatch")
 
@@ -101,10 +101,14 @@ def _record_type(pack: PackSpec, collection: str) -> RecordType | None:
     return None
 
 
-def build_input(s: Scenario, pack: PackSpec) -> tuple[MatchInput | None, list[str], MappingResult]:
+def build_input(
+    s: Scenario, pack: PackSpec, records: list[Record] | None = None
+) -> tuple[MatchInput | None, list[str], MappingResult]:
+    """The match input a scenario's records map to; `records` replaces the scenario's own
+    rendering (the receiving pack adds records the scenario format cannot hold)."""
     combined = MappingResult()
     problems: list[str] = []
-    for collection, key, body, ctype, _po in render(s):
+    for collection, key, body, ctype, _po in render(s) if records is None else records:
         rtype = _record_type(pack, collection)
         if rtype is None:
             continue
@@ -125,6 +129,7 @@ def build_input(s: Scenario, pack: PackSpec) -> tuple[MatchInput | None, list[st
         combined.receipts += m.receipts
         combined.allocations += m.allocations
         combined.assertions += m.assertions
+        combined.events += m.events
     invoices = [i for i in combined.invoices if i.invoice_number == s.invoice.number.upper()]
     if not invoices:
         return None, problems, combined
@@ -143,6 +148,7 @@ def build_input(s: Scenario, pack: PackSpec) -> tuple[MatchInput | None, list[st
             prior_allocations=tuple(combined.allocations),
             supplier_assertions=tuple(combined.assertions),
             suppliers=suppliers,
+            receiving_events=tuple(combined.events),
         ),
         problems,
         combined,

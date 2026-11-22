@@ -248,6 +248,29 @@
         "title": "AttemptStat",
         "type": "object"
       },
+      "BasisOut": {
+        "properties": {
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "reason_code": {
+            "title": "Reason Code",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id",
+          "reason_code",
+          "summary"
+        ],
+        "title": "BasisOut",
+        "type": "object"
+      },
       "Body_upload_api_v1_tenants__tenant__cases__case_id__documents_post": {
         "properties": {
           "file": {
@@ -477,6 +500,39 @@
           "row_version"
         ],
         "title": "CaseOut",
+        "type": "object"
+      },
+      "ChangeOut": {
+        "properties": {
+          "change": {
+            "title": "Change",
+            "type": "string"
+          },
+          "document_title": {
+            "title": "Document Title",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "version_no": {
+            "title": "Version No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "change",
+          "document_title",
+          "kind",
+          "version_no",
+          "recorded_at"
+        ],
+        "title": "ChangeOut",
         "type": "object"
       },
       "ChunkOut": {
@@ -1012,6 +1068,39 @@
           "max_model_calls_per_run"
         ],
         "title": "Entitlements",
+        "type": "object"
+      },
+      "EvidenceRefOut": {
+        "properties": {
+          "document_id": {
+            "title": "Document Id",
+            "type": "string"
+          },
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "locator": {
+            "title": "Locator",
+            "type": "string"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          },
+          "version_id": {
+            "title": "Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "document_id",
+          "version_id",
+          "sha256",
+          "locator",
+          "field"
+        ],
+        "title": "EvidenceRefOut",
         "type": "object"
       },
       "FieldOut": {
@@ -2057,6 +2146,29 @@
         "title": "PolicyOut",
         "type": "object"
       },
+      "PositionProblemOut": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "code",
+          "detail"
+        ],
+        "title": "PositionProblemOut",
+        "type": "object"
+      },
       "ProposalCreateIn": {
         "properties": {
           "body": {
@@ -2307,6 +2419,75 @@
         "title": "ProposalOut",
         "type": "object"
       },
+      "QuestionOut": {
+        "properties": {
+          "action_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Action Type"
+          },
+          "basis": {
+            "items": {
+              "$ref": "#/components/schemas/BasisOut"
+            },
+            "title": "Basis",
+            "type": "array"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "owner": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Owner"
+          },
+          "owner_configured": {
+            "title": "Owner Configured",
+            "type": "boolean"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "decision",
+          "action_type",
+          "owner",
+          "owner_configured",
+          "title",
+          "basis"
+        ],
+        "title": "QuestionOut",
+        "type": "object"
+      },
       "QueueItemOut": {
         "properties": {
           "age_seconds": {
@@ -2462,6 +2643,438 @@
           "needs_review"
         ],
         "title": "QueueViewCounts",
+        "type": "object"
+      },
+      "ReceivingLineOut": {
+        "description": "One PO line, in its unit. A null quantity is unknown, never zero.",
+        "properties": {
+          "accepted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Accepted"
+          },
+          "covered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered"
+          },
+          "credit_posted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Posted"
+          },
+          "credit_promised": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit Promised"
+          },
+          "credits_elsewhere": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Credits Elsewhere",
+            "type": "array"
+          },
+          "delivered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered"
+          },
+          "disposition": {
+            "title": "Disposition",
+            "type": "string"
+          },
+          "disputed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disputed"
+          },
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRefOut"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "invoiced": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Invoiced"
+          },
+          "matched": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched"
+          },
+          "open_rejected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Rejected"
+          },
+          "ordered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordered"
+          },
+          "po_line_number": {
+            "title": "Po Line Number",
+            "type": "string"
+          },
+          "problems": {
+            "items": {
+              "$ref": "#/components/schemas/PositionProblemOut"
+            },
+            "title": "Problems",
+            "type": "array"
+          },
+          "rejected": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rejected"
+          },
+          "rejections": {
+            "items": {
+              "$ref": "#/components/schemas/RejectionOut"
+            },
+            "title": "Rejections",
+            "type": "array"
+          },
+          "replacement_accepted": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Accepted"
+          },
+          "replacement_delivered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Delivered"
+          },
+          "replacement_promised": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replacement Promised"
+          },
+          "returned": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned"
+          },
+          "returned_after_acceptance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned After Acceptance"
+          },
+          "undelivered": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Undelivered"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "po_line_number",
+          "unit",
+          "ordered",
+          "delivered",
+          "accepted",
+          "rejected",
+          "undelivered",
+          "returned_after_acceptance",
+          "returned",
+          "replacement_promised",
+          "replacement_delivered",
+          "replacement_accepted",
+          "credit_promised",
+          "credit_posted",
+          "credits_elsewhere",
+          "covered",
+          "open_rejected",
+          "disposition",
+          "invoiced",
+          "matched",
+          "disputed",
+          "rejections",
+          "problems",
+          "evidence"
+        ],
+        "title": "ReceivingLineOut",
+        "type": "object"
+      },
+      "ReceivingOut": {
+        "description": "docs/receiving-disposition.md: positions from the current records, the split the\nlatest investigation concluded, and what changed since each approval.",
+        "properties": {
+          "investigation_version": {
+            "title": "Investigation Version",
+            "type": "integer"
+          },
+          "invoice_number": {
+            "title": "Invoice Number",
+            "type": "string"
+          },
+          "lines": {
+            "items": {
+              "$ref": "#/components/schemas/ReceivingLineOut"
+            },
+            "title": "Lines",
+            "type": "array"
+          },
+          "po_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Po Number"
+          },
+          "policy_ref": {
+            "title": "Policy Ref",
+            "type": "string"
+          },
+          "question": {
+            "$ref": "#/components/schemas/QuestionOut"
+          },
+          "rules_version": {
+            "title": "Rules Version",
+            "type": "string"
+          },
+          "since_approval": {
+            "items": {
+              "$ref": "#/components/schemas/SinceApprovalOut"
+            },
+            "title": "Since Approval",
+            "type": "array"
+          },
+          "split": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SplitOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "timeline": {
+            "items": {
+              "$ref": "#/components/schemas/TimelineEntryOut"
+            },
+            "title": "Timeline",
+            "type": "array"
+          },
+          "unattached_events": {
+            "items": {
+              "$ref": "#/components/schemas/UnattachedEventOut"
+            },
+            "title": "Unattached Events",
+            "type": "array"
+          }
+        },
+        "required": [
+          "invoice_number",
+          "po_number",
+          "investigation_version",
+          "rules_version",
+          "policy_ref",
+          "lines",
+          "unattached_events",
+          "split",
+          "question",
+          "timeline",
+          "since_approval"
+        ],
+        "title": "ReceivingOut",
+        "type": "object"
+      },
+      "RejectionOut": {
+        "properties": {
+          "evidence": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceRefOut"
+            },
+            "title": "Evidence",
+            "type": "array"
+          },
+          "late": {
+            "title": "Late",
+            "type": "boolean"
+          },
+          "occurred": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred"
+          },
+          "occurred_precision": {
+            "enum": [
+              "date",
+              "time",
+              "unknown"
+            ],
+            "title": "Occurred Precision",
+            "type": "string"
+          },
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "receipt_number": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Receipt Number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "receipt_number",
+          "quantity",
+          "reason",
+          "occurred",
+          "occurred_precision",
+          "late",
+          "evidence"
+        ],
+        "title": "RejectionOut",
         "type": "object"
       },
       "ResolveIn": {
@@ -2719,6 +3332,120 @@
           "retention"
         ],
         "title": "SettingsValues",
+        "type": "object"
+      },
+      "SinceApprovalOut": {
+        "properties": {
+          "action_type": {
+            "title": "Action Type",
+            "type": "string"
+          },
+          "approved_at": {
+            "title": "Approved At",
+            "type": "string"
+          },
+          "changes": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeOut"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "operation_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operation Status"
+          },
+          "proposal_id": {
+            "title": "Proposal Id",
+            "type": "string"
+          },
+          "proposal_status": {
+            "title": "Proposal Status",
+            "type": "string"
+          },
+          "requires": {
+            "title": "Requires",
+            "type": "string"
+          }
+        },
+        "required": [
+          "proposal_id",
+          "action_type",
+          "proposal_status",
+          "approved_at",
+          "operation_status",
+          "changes",
+          "requires"
+        ],
+        "title": "SinceApprovalOut",
+        "type": "object"
+      },
+      "SplitOut": {
+        "properties": {
+          "disputed_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disputed Quantity"
+          },
+          "hold": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold"
+          },
+          "matched_quantity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matched Quantity"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "hold",
+          "matched_quantity",
+          "disputed_quantity",
+          "unit",
+          "summary"
+        ],
+        "title": "SplitOut",
         "type": "object"
       },
       "StartIn": {
@@ -2987,6 +3714,167 @@
           "synthetic_demo"
         ],
         "title": "TenantInfo",
+        "type": "object"
+      },
+      "TimelineEntryOut": {
+        "properties": {
+          "after_approval": {
+            "title": "After Approval",
+            "type": "boolean"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "document_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Id"
+          },
+          "document_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Document Title"
+          },
+          "event_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Event Type"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "receipt",
+              "event",
+              "approval",
+              "execution"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "occurred": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Occurred"
+          },
+          "occurred_precision": {
+            "enum": [
+              "date",
+              "time",
+              "unknown"
+            ],
+            "title": "Occurred Precision",
+            "type": "string"
+          },
+          "recorded_at": {
+            "title": "Recorded At",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "superseded_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Superseded At"
+          },
+          "version_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version Id"
+          },
+          "version_no": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version No"
+          },
+          "withdrawn": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Withdrawn"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "summary",
+          "occurred",
+          "occurred_precision",
+          "recorded_at",
+          "current",
+          "after_approval"
+        ],
+        "title": "TimelineEntryOut",
+        "type": "object"
+      },
+      "UnattachedEventOut": {
+        "properties": {
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "po_line_number": {
+            "title": "Po Line Number",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "po_line_number"
+        ],
+        "title": "UnattachedEventOut",
         "type": "object"
       },
       "UploadOut": {
@@ -4730,6 +5618,61 @@
         "summary": "Decide",
         "tags": [
           "proposals"
+        ]
+      }
+    },
+    "/api/v1/tenants/{tenant}/cases/{case_id}/receiving": {
+      "get": {
+        "operationId": "receiving_api_v1_tenants__tenant__cases__case_id__receiving_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "case_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Case Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[a-z0-9-]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceivingOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Receiving",
+        "tags": [
+          "investigations"
         ]
       }
     },

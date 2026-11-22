@@ -973,6 +973,33 @@ def _pilot_rehearsal_export(args: argparse.Namespace) -> int:
     return 0
 
 
+def _receiving_pack(args: argparse.Namespace) -> int:
+    """The synthetic receiving and disposition pack (docs/receiving-disposition.md), into the
+    local simulator's store or written as an export. Never customer data."""
+    import os
+    from datetime import UTC, datetime
+
+    from opsbridge.config import REPO_ROOT
+    from opsbridge.pilot.receiving_pack import load_pack, seed_simulator, write_receiving_export
+    from opsbridge.pilot.rehearsal import ExportExists
+    from opsbridge.simulator.store import SimStore
+
+    pack = load_pack()
+    if args.export_to:
+        try:
+            root = write_receiving_export(pack, Path(args.export_to), datetime.now(UTC))
+        except ExportExists as exc:
+            print(f"Refusing: {exc}")
+            return 2
+        print(f"wrote {len(pack.cases)} synthetic receiving cases as an export to {root}")
+        return 0
+    db = Path(os.environ.get("OPSBRIDGE_SIM_DB", str(REPO_ROOT / "var" / "simulator.sqlite3")))
+    count = seed_simulator(SimStore(db), pack, late=args.late_events)
+    what = "events recorded after approval" if args.late_events else "receiving cases"
+    print(f"simulator records written: {count} for the {what} ({db})")
+    return 0
+
+
 def _shown(text: str) -> str:
     """Text from an export as the terminal should show it. A problem can quote a document's
     own value, so control and format characters (escape sequences, bidirectional overrides)
@@ -1265,6 +1292,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p.add_argument("--out", required=True, help="the export directory (one folder per tenant)")
     p.set_defaults(func=_pilot_rehearsal_export)
+
+    p = sub.add_parser(
+        "receiving-pack",
+        help="load the synthetic receiving and disposition cases (docs/receiving-disposition.md)",
+    )
+    where = p.add_mutually_exclusive_group(required=True)
+    where.add_argument(
+        "--seed-simulator", action="store_true", help="into the local simulator's store"
+    )
+    where.add_argument("--export-to", help="as an export in this directory (one folder per tenant)")
+    p.add_argument(
+        "--late-events",
+        action="store_true",
+        help="with --seed-simulator: write only the events recorded after approval",
+    )
+    p.set_defaults(func=_receiving_pack)
 
     p = sub.add_parser(
         "end-sessions", help="end a person's live sessions now (back-channel logout missed)"

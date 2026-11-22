@@ -90,11 +90,17 @@ def test_rejected_receipt_lines_are_a_record_but_not_received_quantity() -> None
         purchase_orders=(po(),),
         receipts=(receipt((r_line("1", "20", status="rejected"),)),),
     )
-    result = run(data)
+    result = reconcile(data, FURNITURE, rules_version=REJECTION_RULES)
     assert not result.of_type("missing_receipt")
     [qty] = result.of_type("quantity_mismatch")
     assert qty.values["received_accepted"] == "0"
     assert qty.values["excess"] == "20"
+    # From rules 1.4.0 the 20 are delivered and rejected: a disposition, not a delivery gap.
+    current = run(data)
+    assert not current.of_type("missing_receipt") and not current.of_type("quantity_mismatch")
+    [rejected] = current.of_type("disposition")
+    assert (rejected.values["delivered"], rejected.values["received_accepted"]) == ("20", "0")
+    assert rejected.values["received_rejected"] == "20"
 
 
 # --- Delivered is not accepted (pilot scenario A) --------------------------------------
@@ -102,6 +108,7 @@ def test_rejected_receipt_lines_are_a_record_but_not_received_quantity() -> None
 # says all 20 were delivered. All three can be true: 20 arrived and 18 count.
 
 PRIOR_RULES = "opsbridge-rules/1.2.0"
+REJECTION_RULES = "opsbridge-rules/1.3.0"  # pilot scenario A as rules 1.3.0 read it
 
 
 def delivered_twenty_accepted_eighteen(claim: str = "20", currency: str = "USD") -> MatchInput:
@@ -114,7 +121,7 @@ def delivered_twenty_accepted_eighteen(claim: str = "20", currency: str = "USD")
 
 
 def test_rejected_units_are_counted_and_cited_not_called_undelivered() -> None:
-    result = run(delivered_twenty_accepted_eighteen())
+    result = reconcile(delivered_twenty_accepted_eighteen(), FURNITURE, REJECTION_RULES)
     assert result.outcome == "discrepancies_found"
     [qty] = result.of_type("quantity_mismatch")
     assert qty.reason_code == "invoiced_exceeds_received"
@@ -148,7 +155,7 @@ def test_rejected_units_are_counted_and_cited_not_called_undelivered() -> None:
 
 
 def test_without_a_precedence_rule_a_claim_counting_rejected_units_is_no_conflict() -> None:
-    result = reconcile(delivered_twenty_accepted_eighteen(currency="EUR"), IT)
+    result = reconcile(delivered_twenty_accepted_eighteen(currency="EUR"), IT, REJECTION_RULES)
     assert not result.of_type("source_conflict")
     assert result.outcome == "discrepancies_found"  # the quantity mismatch, not a review
     assert (
@@ -181,14 +188,15 @@ def test_runs_under_rules_1_2_0_keep_the_rejected_lines_silent() -> None:
     assert conflict.reason_code == "conflict_resolved_by_precedence"
 
 
-def test_without_rejected_lines_both_rules_versions_agree() -> None:
+def test_without_rejected_lines_rules_1_2_0_and_1_3_0_agree() -> None:
     data = MatchInput(
         invoice=invoice((inv_line("1", "1", "20", "185.00"),)),
         purchase_orders=(po(),),
         receipts=(receipt((r_line("1", "18"),)),),
         supplier_assertions=(assertion("20"),),
     )
-    new, old = run(data), reconcile(data, FURNITURE, rules_version=PRIOR_RULES)
+    new = reconcile(data, FURNITURE, rules_version=REJECTION_RULES)
+    old = reconcile(data, FURNITURE, rules_version=PRIOR_RULES)
     assert (new.outcome, new.findings) == (old.outcome, old.findings)
 
 

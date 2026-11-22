@@ -202,9 +202,12 @@ def test_the_pilot_dry_run_reads_the_rehearsal_export_and_sends_nothing(
         found = get(st, "furn-investigator", f"{t}/cases/{cases['INV-8401']}/investigation").json()
         stops = get(st, "furn-investigator", f"{t}/cases/{cases['INV-8403']}/investigation").json()
         assert datetime.fromisoformat(found["source_read_at"]) == extracted
-        assert found["outcome"] == "discrepancies_found"
+        # Rules 1.4.0: 2 of the 20 were rejected with no reason recorded, so receiving is asked
+        # for the inspection record (docs/receiving-disposition.md).
+        assert found["outcome"] == "needs_information"
         assert {f["reason_code"] for f in found["findings"]} == {
-            "invoiced_exceeds_received",
+            "rejection_reason_missing",
+            "hold_unconfigured",
             "supplier_claim_includes_rejected",
         }
         # Missing evidence stops the case and asks for it; it is never read as zero received.

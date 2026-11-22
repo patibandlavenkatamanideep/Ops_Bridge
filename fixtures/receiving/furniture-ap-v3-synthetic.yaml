@@ -1,0 +1,40 @@
+# SYNTHETIC EXAMPLE. Not a default, and not any organization's policy.
+#
+# This is furniture-ap@v2 with exactly two additions, written the way an organization would
+# publish them as a new version once it has decided both:
+#   - who resolves rejected goods with the supplier (here: procurement), and
+#   - what a disputed quantity holds (here: only the disputed portion).
+# Those choices are illustrative. Nothing here establishes that procurement owns disposition
+# or how much of an invoice to hold for any organization.
+#
+# It exists to show routing to a named owner in tests (docs/receiving-disposition.md,
+# section 5). It lives outside packs/ on purpose: `make seed-demo` never loads it, and the
+# demo tenant keeps furniture-ap@v2, which names neither, so its rejected goods go to manual
+# review. backend/tests/domain/test_receiving.py checks that it differs from v2 only as stated.
+schema_version: 1
+policy_id: furniture-ap
+version: 3
+effective_from: 2026-01-01
+description: "SYNTHETIC EXAMPLE, not a default: furniture-ap@v2 plus a disposition owner (procurement) and a disputed-portion hold."
+supported_currencies: [USD]
+price_tolerance: {absolute: "0.50", percent: "1.0", mode: either, direction: both}
+quantity_tolerance: {absolute: "0", percent: "0"}
+price_rounding: {places: 4, mode: ROUND_HALF_EVEN}
+unit_aliases:
+  EA: [each, ea, unit, units, pc, pcs, piece, pieces, chair, chairs]
+  SET: [set, sets]
+  BX10: [box of 10, bx10, box10]
+unit_conversions:
+  - {from_unit: BX10, to_unit: EA, factor: "10"}
+source_precedence: [goods_receipt, supplier_message]
+action_routes:
+  manual_review: {action_type: assign_case, assignee_group: ap-review, title_template: "Review {case}: {count} condition(s) need manual review"}
+  missing_receipt: {action_type: create_follow_up_task, assignee_group: receiving, title_template: "Provide receiving record for {po} ({case})"}
+  quantity_mismatch: {action_type: create_follow_up_task, assignee_group: receiving, title_template: "Confirm delivered quantity for {po} ({case})"}
+  disposition: {action_type: create_follow_up_task, assignee_group: procurement, title_template: "Resolve rejected units with the supplier for {po} ({case})"}
+  price_mismatch: {action_type: create_supplier_message_draft, assignee_group: supplier-relations, title_template: "Request corrected invoice or credit note for {po} ({case})"}
+  matched: {action_type: record_review_note, title_template: "No discrepancy found for {case}"}
+allowed_actions: [create_follow_up_task, assign_case, create_supplier_message_draft, record_review_note]
+approval: {lifetime_minutes: 30, separation_of_duties: true}
+data_routing: hosted_permitted
+disputed_quantity_hold: disputed_portion

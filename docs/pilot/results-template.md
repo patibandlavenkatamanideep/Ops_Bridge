@@ -26,7 +26,7 @@ evidence of accuracy on anyone's data.
 
 | Case | Importable or blocked | Evidence correctly cited | Proposed owner and action | Reviewer decision | Correction required | Reason |
 |---|---|---|---|---|---|---|
-| INV-8401 (scenario A) | importable | yes: order 20, invoice 20, receipt rows 18 accepted and 2 rejected with their status, the supplier's sentence; all valid | receiving, follow-up "Confirm delivered quantity for PO-4001" (policy route for a quantity mismatch) | none; label agrees | none | 20 arrived and 18 count; the 2 rejected chairs are billed. Before rules 1.3.0 the finding said "only 18 were received", left the rejected row uncited and called the supplier's statement a conflict |
+| INV-8401 (scenario A) | importable | yes: order 20, invoice 20, receipt rows 18 accepted and 2 rejected with their status, the supplier's sentence; all valid | receiving, asked for the inspection record (`request_information`): the rejection records no reason | none; label agrees (relabelled for rules 1.4.0) | none | 20 arrived and 18 count; the 2 rejected chairs are billed. Before rules 1.3.0 the finding said "only 18 were received"; under 1.3.0 it proposed a delivery follow-up; from 1.4.0 the rejected units are a disposition question, and receiving is asked why they were rejected before the supplier is asked for a remedy |
 | INV-8402 (scenario B) | importable | yes: order 10, invoice 10, receipt 8, then the corrected receipt's 10 | receiving, then a review note once the corrected receipt is read | none; label agrees for the first reading | none | The follow-up approved on 8 of 10 was not sent once the corrected receipt was read; the proposal was superseded and the case came back for review |
 | INV-8403 | importable, with a note | yes: order and invoice lines; no receipt exists to cite | receiving, asked for the receiving record (`request_information`) | none; label agrees | none | Stops for missing evidence; never read as zero received |
 | INV-8404 | importable | no discrepancy, so no finding to cite | none: review note | none; label agrees | none | Matched |
@@ -48,7 +48,7 @@ None exists.
 |---|---|
 | Recorded at, by | |
 | OpsBridge commit | |
-| Workflow and rules version | `investigation/1.4.0`, `opsbridge-rules/1.3.0` (shown on every investigation) |
+| Workflow and rules version | `investigation/1.5.0`, `opsbridge-rules/1.4.0` (shown on every investigation) |
 | Pack and its SHA-256 | e.g. `furniture@v1`, `shasum -a 256 packs/furniture/pack.yaml` |
 | Field mapping changes made for this export | none / list them (format only; a rule change is not a mapping change) |
 | Policy and version | e.g. `furniture-ap@v2` |

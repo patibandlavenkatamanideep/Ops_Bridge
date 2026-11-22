@@ -25,6 +25,9 @@ test("tabs support arrow-key navigation", async ({ page }) => {
   const inv = page.getByRole("tab", { name: "Investigation" });
   await inv.focus();
   await page.keyboard.press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Receiving" })).toBeFocused();
+  await expect(page.getByRole("tab", { name: "Receiving" })).toHaveAttribute("aria-selected", "true");
+  await page.keyboard.press("ArrowRight");
   await expect(page.getByRole("tab", { name: "Evidence" })).toBeFocused();
   await expect(page.getByRole("tab", { name: "Evidence" })).toHaveAttribute("aria-selected", "true");
 });

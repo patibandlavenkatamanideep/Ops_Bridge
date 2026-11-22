@@ -21,6 +21,7 @@ from opsbridge.domain.records import (
     POLine,
     PurchaseOrder,
     ReceiptLine,
+    ReceivingEvent,
     SourceRef,
     SupplierAssertion,
 )
@@ -175,22 +176,27 @@ def r_line(
     status: str = "accepted",
     doc: str = "GR-5001",
     row: int = 2,
+    reason: str | None = None,
 ) -> ReceiptLine:
+    refs = {
+        "receipt_line.quantity": ref(
+            doc,
+            "receipt_line.quantity",
+            f"csv:row={row};col=qty_accepted;line={po_line_number}",
+        ),
+        "receipt_line.status": ref(doc, "receipt_line.status", f"csv:row={row};col=status"),
+        "receipt_line.unit": ref(doc, "receipt_line.unit"),
+    }
+    if reason is not None:
+        refs["receipt_line.reason"] = ref(doc, "receipt_line.reason", f"csv:row={row};col=reason")
     return ReceiptLine(
         po_line_number=po_line_number,
         quantity=D(qty),
         unit=unit,
-        kind=kind,
+        kind=kind,  # type: ignore[arg-type]
         status=status,  # type: ignore[arg-type]
-        refs={
-            "receipt_line.quantity": ref(
-                doc,
-                "receipt_line.quantity",
-                f"csv:row={row};col=qty_accepted;line={po_line_number}",
-            ),
-            "receipt_line.status": ref(doc, "receipt_line.status", f"csv:row={row};col=status"),
-            "receipt_line.unit": ref(doc, "receipt_line.unit"),
-        },
+        reason=reason,
+        refs=refs,
     )
 
 
@@ -218,5 +224,65 @@ def assertion(qty: str, po_line_number: str | None = "1") -> SupplierAssertion:
             "supplier_message.claim": ref(
                 "MSG-77", "supplier_message.delivered_quantity", "text:line=4"
             )
+        },
+    )
+
+
+def event(
+    event_id: str,
+    event_type: str,
+    qty: str | None,
+    po_line_number: str = "1",
+    unit: str | None = "EA",
+    occurred: str | None = "2026-09-22",
+    receipt_number: str | None = None,
+    follows: str | None = None,
+    invoice_number: str | None = None,
+    document_number: str | None = None,
+    reason: str | None = None,
+    po_number: str = "PO-1001",
+    row: int = 2,
+) -> ReceivingEvent:
+    """A receiving event as one row of a receiving-events export."""
+    doc = "EVENTS-1"
+    fields = {
+        "receiving_event.event_type": "event",
+        "receiving_event.quantity": "qty",
+        "receiving_event.unit": "uom",
+        "receiving_event.occurred": "occurred_on",
+        "receiving_event.receipt_number": "receipt_id",
+        "receiving_event.follows": "follows",
+        "receiving_event.invoice_number": "invoice",
+        "receiving_event.document_number": "document",
+        "receiving_event.reason": "reason",
+    }
+    values = {
+        "receiving_event.event_type": event_type,
+        "receiving_event.quantity": qty,
+        "receiving_event.unit": unit,
+        "receiving_event.occurred": occurred,
+        "receiving_event.receipt_number": receipt_number,
+        "receiving_event.follows": follows,
+        "receiving_event.invoice_number": invoice_number,
+        "receiving_event.document_number": document_number,
+        "receiving_event.reason": reason,
+    }
+    return ReceivingEvent(
+        event_id=event_id,
+        event_type=event_type,  # type: ignore[arg-type]
+        po_number=po_number,
+        po_line_number=po_line_number,
+        quantity=D(qty) if qty is not None else None,
+        unit=unit,
+        occurred=occurred,
+        receipt_number=receipt_number,
+        follows=follows,
+        invoice_number=invoice_number,
+        document_number=document_number,
+        reason=reason,
+        refs={  # only the values the row holds are cited, as the pack mapping does
+            name: ref(doc, name, f"csv:row={row};col={column}")
+            for name, column in fields.items()
+            if values[name] is not None
         },
     )

@@ -32,11 +32,17 @@ from typing import Any
 
 from opsbridge.connectors.exports import ExportSource
 from opsbridge.connectors.source_contract import SourceRecordInvalid
+from opsbridge.domain.records import ReceivingEvent
 from opsbridge.evidence.parsers import OcrSettings, parse
 from opsbridge.mapping import DocRef, MappingResult, PackSpec, RecordType, map_document
 
 SCHEMA = "opsbridge-export-check/2"
-_BY_PO: tuple[RecordType, ...] = ("goods_receipt", "allocation_history", "supplier_message")
+_BY_PO: tuple[RecordType, ...] = (
+    "goods_receipt",
+    "allocation_history",
+    "supplier_message",
+    "receiving_event",
+)
 
 
 def _by_po(record_type: RecordType, mapped: MappingResult) -> list[Any]:
@@ -45,6 +51,7 @@ def _by_po(record_type: RecordType, mapped: MappingResult) -> list[Any]:
         "goods_receipt": mapped.receipts,
         "allocation_history": mapped.allocations,
         "supplier_message": mapped.assertions,
+        "receiving_event": mapped.events,
     }
     return by_type.get(record_type, [])
 
@@ -85,6 +92,8 @@ def check_export(
     named: list[tuple[str, str, str]] = []  # invoice collection, key, the PO it names
     invoices: dict[tuple[str, str], str | None] = {}  # invoice -> the PO its case reads
     own: dict[tuple[str, str], list[str]] = defaultdict(list)  # a record's own problems
+    receipt_numbers: dict[str, set[str]] = defaultdict(set)  # PO -> receipts mapped for it
+    events: dict[str, list[ReceivingEvent]] = defaultdict(list)  # PO -> events mapped for it
 
     def problem(collection: str, key: str, text: str) -> None:
         problems.append({"collection": collection, "key": key, "problem": text})
@@ -134,6 +143,10 @@ def check_export(
         for text in _disagreements(record_type, key, listed_po, mapped):
             problem(collection, key, text)
         named += [(collection, key, i.po_number) for i in mapped.invoices if i.po_number]
+        for gr in mapped.receipts:
+            receipt_numbers[gr.po_number].add(gr.receipt_number)
+        for ev in mapped.events:
+            events[ev.po_number].append(ev)
 
     if po_spec is not None and po_spec.collection is not None:
         for collection, key, po in named:
@@ -161,7 +174,7 @@ def check_export(
         "status": dict(status),
         "loaded": dict(sorted(loaded.items())),
         "problems": problems,
-        "cases": _cases(source, pack, listed, invoices, own),
+        "cases": _cases(source, pack, listed, invoices, own, _unresolved(receipt_numbers, events)),
         "unlinked": _unlinked(source, pack, listed),
     }
 
@@ -172,6 +185,7 @@ def _cases(
     listed: list[tuple[str, str, str | None]],
     invoices: dict[tuple[str, str], str | None],
     own: dict[tuple[str, str], list[str]],
+    unresolved: dict[str, list[str]],
 ) -> list[dict[str, Any]]:
     """Whether a case for each invoice can be evaluated reliably from this export."""
     po_collection = _collection(pack, "purchase_order")
@@ -202,6 +216,7 @@ def _cases(
                     f"no receipt is exported for {po}: the investigation will report the "
                     "receiving record as missing (needs information), never as zero received"
                 )
+            notes += unresolved.get(po, [])
         out.append(
             {
                 "invoice": key,
@@ -211,6 +226,33 @@ def _cases(
                 "notes": notes,
             }
         )
+    return out
+
+
+def _unresolved(
+    receipt_numbers: dict[str, set[str]], events: dict[str, list[ReceivingEvent]]
+) -> dict[str, list[str]]:
+    """Per PO, receiving events whose receipt or preceding event this export does not hold:
+    an investigation leaves them unapplied and asks for the record (domain/receiving.py)."""
+    out: dict[str, list[str]] = defaultdict(list)
+    for po, evs in events.items():
+        ids = {ev.event_id for ev in evs}
+        for ev in evs:
+            what = ev.event_type.replace("_", " ")
+            if ev.follows is not None and ev.follows not in ids:
+                missing = f"event {ev.follows}"
+            elif (
+                ev.follows is None
+                and ev.receipt_number is not None
+                and (ev.receipt_number not in receipt_numbers.get(po, set()))
+            ):
+                missing = f"receipt {ev.receipt_number}"
+            else:
+                continue
+            out[po].append(
+                f"{what} {ev.event_id} refers to {missing}, which is not in this export: it will "
+                "not be applied, and the investigation will ask for it (needs information)"
+            )
     return out
 
 

@@ -16,7 +16,7 @@ from pathlib import Path
 
 from opsbridge.config import REPO_ROOT
 from opsbridge.connectors.exports import EXPORT_SCHEMA
-from opsbridge.simulator.scenarios import ORG_FOR_PACK, Corpus, render
+from opsbridge.simulator.scenarios import ORG_FOR_PACK, Corpus, Record, render
 
 REHEARSAL = REPO_ROOT / "fixtures" / "pilot" / "rehearsal.yaml"
 SOURCE_SYSTEM = "OpsBridge synthetic pilot rehearsal (not a customer export)"
@@ -35,28 +35,35 @@ class ExportExists(Exception):
 def write_rehearsal_export(corpus: Corpus, out: Path, extracted_at: datetime) -> Path:
     """Write the corpus as an export under `out`/<organization>; returns that directory."""
     [org] = {ORG_FOR_PACK[s.pack] for s in corpus.scenarios}
-    root = out / org
+    records = [r for s in corpus.scenarios for r in render(s)]
+    return write_export(records, out / org, SOURCE_SYSTEM, extracted_at)
+
+
+def write_export(
+    records: list[Record], root: Path, source_system: str, extracted_at: datetime
+) -> Path:
+    """Write rendered records as a complete export in `root`, which must be empty or absent:
+    one file per record, each listed in the manifest with its digest."""
     if root.exists() and any(root.iterdir()):
         raise ExportExists(f"{root} is not empty; an export is never written over")
     entries = []
-    for s in corpus.scenarios:
-        for collection, key, body, content_type, po in render(s):
-            name = f"{collection}/{key}{_SUFFIX[content_type]}"
-            (root / name).parent.mkdir(parents=True, exist_ok=True)
-            (root / name).write_bytes(body)
-            entries.append(
-                {
-                    "collection": collection,
-                    "key": key,
-                    "po_number": po,
-                    "file": name,
-                    "content_type": content_type,
-                    "sha256": hashlib.sha256(body).hexdigest(),
-                }
-            )
+    for collection, key, body, content_type, po in records:
+        name = f"{collection}/{key}{_SUFFIX[content_type]}"
+        (root / name).parent.mkdir(parents=True, exist_ok=True)
+        (root / name).write_bytes(body)
+        entries.append(
+            {
+                "collection": collection,
+                "key": key,
+                "po_number": po,
+                "file": name,
+                "content_type": content_type,
+                "sha256": hashlib.sha256(body).hexdigest(),
+            }
+        )
     manifest = {
         "schema": EXPORT_SCHEMA,
-        "source_system": SOURCE_SYSTEM,
+        "source_system": source_system,
         "extracted_at": extracted_at.isoformat(),
         "complete": True,
         "records": entries,

@@ -375,3 +375,37 @@ def test_the_rehearsal_export_never_writes_over_an_export(
     assert (tmp_path / "demo-furniture" / "manifest.json").read_text() == "{}"
     assert cli.main(["pilot-rehearsal-export", "--out", str(tmp_path / "fresh")]) == 0
     assert (tmp_path / "fresh" / "demo-furniture" / "manifest.json").is_file()
+
+
+def test_the_receiving_pack_exports_its_events_and_names_an_unlinked_rejection(
+    tmp_path: Path,
+) -> None:
+    """The receiving pack as an export (docs/receiving-disposition.md): every receiving event
+    is read, and a rejection naming a receipt the export lacks is a case note before any case
+    is opened: it will wait for that receipt, never be attached to another."""
+    from datetime import UTC, datetime
+
+    from opsbridge.pilot.receiving_pack import load_pack, write_receiving_export
+
+    root = write_receiving_export(load_pack(), tmp_path, datetime.now(UTC))
+    report = check_export(ExportSource(root), PackRegistry(REPO_ROOT / "packs").get("furniture"))
+    assert report["problems"] == []
+    assert report["loaded"]["receiving_events"] == 8
+    cases = {c["invoice"]: c for c in report["cases"]}
+    assert all(c["evaluable"] for c in cases.values())
+    assert any(
+        "rejection REJ-4610 refers to receipt GR-6610, which is not in this export" in n
+        for n in cases["INV-8610"]["notes"]
+    )
+    assert not [n for k, c in cases.items() if k != "INV-8610" for n in c["notes"]]
+
+
+def test_the_receiving_pack_never_writes_over_an_export(tmp_path: Path) -> None:
+    from datetime import UTC, datetime
+
+    from opsbridge.pilot.receiving_pack import load_pack, write_receiving_export
+    from opsbridge.pilot.rehearsal import ExportExists
+
+    write_receiving_export(load_pack(), tmp_path, datetime.now(UTC))
+    with pytest.raises(ExportExists):
+        write_receiving_export(load_pack(), tmp_path, datetime.now(UTC))

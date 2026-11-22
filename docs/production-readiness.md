@@ -1015,6 +1015,78 @@ docs/pilot/.
 - The partial-export finding speaks of pages (written for paged sources).
 - There is no diff view.
 
+## Receiving and disposition (18 November 2026)
+
+What was delivered, accepted, rejected and remedied, and what an approval may still do once
+receiving evidence changes. Details, the baseline table and the demo:
+docs/receiving-disposition.md.
+
+**Defects found and fixed.** Each was reproduced first: 26 of the new rule tests failed on
+`344225d` and 4 controls passed.
+
+- **The two 18-unit cases.**
+  - *Before:* a short delivery (18 of 20 arrived) and a rejection (20 arrived, 2 rejected)
+    asked receiving the same question, "Confirm delivered quantity".
+  - *Now:* the first asks receiving about the 2 undelivered units. The second is a
+    disposition question for the policy's disposition owner, or for receiving when no
+    inspection reason is recorded.
+- **A rejection recorded after the receipt.** It was ignored, and the case matched. Now it
+  moves units from accepted to rejected on the receipt it names.
+- **A return of rejected units.** It subtracted them a second time. Now each unit is counted
+  once.
+- **The rejection reason.** It had no field and was dropped at import. It is now stored and
+  cited (`receipt_lines.reason`, migration 0025).
+- **A receipt line with no status.** The mapping defaulted it to accepted. It is now
+  `unstated`, and the case asks for the acceptance. This changes new imports for a pack that
+  marks the status optional or maps none. Both shipped packs require it, so they are
+  unchanged. The full table is in docs/pilot/export-contract.md.
+- **An action carried out on evidence that later changed.** Nothing said so. An audit event
+  now records it, and the case's Receiving tab asks for reconciliation; nothing is resent or
+  undone.
+
+**Implemented.**
+- Receiving events: rejection, return, replacement promised, delivered and accepted, credit
+  promised and posted. They are imported per row with citations, stored with their source
+  version, and applied only when what they refer to is present.
+- Occurrence kept apart from recording.
+- Workflow `investigation/1.5.0` and rules `opsbridge-rules/1.4.0`.
+- An optional disposition route and hold scope in the policy model. Existing policy
+  documents keep their digests.
+- `export-check` notes for events it cannot link.
+- The `receiving-pack` command.
+- The case API `/receiving` and the Receiving tab.
+
+**Tested on synthetic data.**
+- 12 pack cases meet labels written by hand before the rules ran.
+- The checks of model text accept every new summary.
+- On the stack:
+  - **Late rejection after approval:** blocked at the worker and at the casework MCP
+    boundary;
+  - **Identical reimport:** keeps the approval;
+  - **Corrected event row:** a new revision, counted once;
+  - **Out of order:** an event waits for its receipt;
+  - **Tenant isolation:** never attached to another tenant's receipt;
+  - **After a confirmed or uncertain outcome:** the execution is kept;
+  - **Migration 0025:** infers nothing, and its downgrade withdraws what it drops.
+- Every frozen recording still replays case by case.
+- The canary changed only its rules version and an added `hold_unconfigured` note on 18
+  quantity-mismatch cases.
+
+**Changed behaviour the pilot inherits.**
+- **The rehearsal's scenario A (INV-8401)** rejects 2 chairs with no reason recorded, so it now
+  asks receiving for the inspection record. Its label was changed with that reason given
+  (`fixtures/pilot/rehearsal.yaml`).
+- **A pilot pack with an optional receipt status:** a blank status is no longer read as
+  accepted (see above).
+
+**Externally unvalidated.**
+- No receiving data from any organization has been read.
+- No reviewer has judged the disposition questions or owners.
+- No shipped policy names a disposition owner or a hold scope; the demo tenant's policy sends
+  rejected goods to manual review. A labelled synthetic version names both, for tests only.
+- A rejection still only in the source system does not stop a dispatch within the age limit.
+- Any evidence change, material or not, makes an approval stale.
+
 ## Work plan
 
 1. Done locally, each with failing-first regressions and a passing full gate: A01, A02,
