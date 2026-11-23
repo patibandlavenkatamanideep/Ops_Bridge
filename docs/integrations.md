@@ -108,7 +108,10 @@ a `manifest.json`, `opsbridge-export/1`) through the same `purchasing-source/1` 
 simulator connector. Files are checked against their SHA-256 digests; untrusted exports
 (paths outside the export, repeated identities, mixed snapshots, unknown schema) are refused;
 the investigation's read time is the export's `extracted_at`. Format and rules:
-docs/integration-onboarding.md, "Exports". Tested only with hand-written exports.
+docs/integration-onboarding.md, "Exports". Tested only with hand-written exports. An export
+shows the system as it was when taken, so it cannot confirm before a write that nothing
+changed since: with an export, external writes (follow-up tasks) are held for review
+(`source_unverified`), and the pilot runs with outbound writes disabled anyway.
 
 ## Purchasing simulator
 

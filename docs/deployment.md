@@ -263,6 +263,11 @@ these itself, so they hold if the edge's configuration drifts:
   against its current documentation when the edge is built.
 - **JSON from outside.** Uploads, source records and listings, export manifests, model answers
   and tracker replies are refused when an object names a member twice.
+- **Outbound writes.** `OPSBRIDGE_OUTBOUND_WRITES=disabled` refuses every write outside
+  OpsBridge (a follow-up task in a task tracker) where it would be made, in the worker and the
+  Casework MCP service; set it on both. Proposals, approvals and local actions still run. The
+  worker's `/readyz` reports the value it runs with. Default `enabled`. A read-only pilot or a
+  dry run sets it (docs/pilot/quickstart.md).
 - **Source clocks.** An export dated ahead of the host's clock by more than
   `OPSBRIDGE_SOURCE_CLOCK_SKEW_SECONDS` (300) is not read. Within that, its data is taken as
   read now, never later, so a source clock cannot lengthen the window for acting on a result.

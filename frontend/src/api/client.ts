@@ -33,6 +33,7 @@ export type InvitationAccepted = components["schemas"]["AcceptOut"];
 export type UploadResult = components["schemas"]["UploadOut"];
 export type Message = components["schemas"]["MessageOut"];
 export type MessageList = components["schemas"]["MessageList"];
+export type Receiving = components["schemas"]["ReceivingOut"];
 
 /** A finding as stored in an investigation version (fields omitted for requesters). */
 export interface Finding {

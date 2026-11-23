@@ -51,7 +51,7 @@ def test_a_repeated_investigation_keeps_the_reason_an_invoice_could_not_be_read(
             findings.append(_finding(st, case_id))
     finally:
         store.put_record(ORG, "invoices", "INV-7001", original[0], original[1], "PO-2001")
-    assert WORKFLOW_VERSION == "investigation/1.3.0"
+    assert WORKFLOW_VERSION == "investigation/1.5.0"
     assert [r["workflow_version"] for r in runs] == [WORKFLOW_VERSION] * 2
     first, second = (f["summary"] for f in findings)
     assert second == first

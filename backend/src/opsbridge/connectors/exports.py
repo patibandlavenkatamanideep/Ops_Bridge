@@ -93,6 +93,9 @@ def _now() -> datetime:
 
 class ExportSource:
     connector_version = CONNECTOR_VERSION
+    # An export shows the system as it was when taken (`as_of`), not now: it cannot confirm
+    # before a write that nothing changed since, so external writes stay in review.
+    reads_live = False
 
     def __init__(
         self,

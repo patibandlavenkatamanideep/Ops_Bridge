@@ -65,7 +65,8 @@ def _lines(db: Database, tenant: object) -> int:
 def test_0019_stops_on_existing_duplicates_then_guards_new_ones(
     alembic_cfg: Config, migrator_engine: Engine, tmp_path: Path
 ) -> None:
-    command.downgrade(alembic_cfg, "0018")
+    # The PO is stored by the current code, at head (it writes tables later migrations add);
+    # the duplicate line is inserted below, after the downgrade, before the guard existed.
     tenant = make_tenant(migrator_engine, "migration-0019", pack="it_hardware")
     db = Database(migrator_engine)
     with db.session(DbContext(tenant_id=tenant)) as s:
@@ -82,6 +83,7 @@ def test_0019_stops_on_existing_duplicates_then_guards_new_ones(
             content_type="application/json",
             filename=None,
         )
+    command.downgrade(alembic_cfg, "0018")
     _copy_line(db, tenant, " 1")  # stored before the guard existed
 
     with pytest.raises(RuntimeError, match=r"po_lines: tenant .* line '1' x2"):

@@ -29,7 +29,13 @@ decided by `proposal.decide` with the action type in the approver's scope.
 `failed` | `outcome_unknown`; or `pending_dispatch` / `executing` →
 `cancelled_before_dispatch` when no write has landed and the next one is refused (an
 `executing` operation gets there after a definite failure or an ambiguous one proved
-absent).
+absent). Its `failure_category` says why: `cancelled_by_user`, `precondition_failed` (which
+supersedes the proposal), `source_changed` or `source_unverified` (the purchasing system, asked
+before a new external write, no longer holds what was approved, or could not say; both
+supersede the proposal), or `outbound_writes_disabled`. The last is a dry run's: with
+`OPSBRIDGE_OUTBOUND_WRITES=disabled` no write outside OpsBridge (a follow-up task) is admitted
+by the worker or the Casework MCP tool. The approval stands, and local actions still run
+(docs/pilot/quickstart.md).
 `operations.cancellation` is separate: `none` | `requested` | `confirmed` | `unknown`.
 
 **Attempt** (`attempts.status`): `started` → `succeeded` | `definite_failure` |
@@ -71,6 +77,31 @@ acted on for `source_max_age_hours` (24) after that; later, or when the read tim
 recorded (investigations before this change), it is stale and must be re-run. The case's
 investigation view shows the read time and, when stale, why.
 
+Source freshness at dispatch (`workflow/source_check.py`, 18 November 2026). Within those 24
+hours the purchasing system can change without OpsBridge reading it: a rejection recorded
+upstream after the approval was invisible, and the follow-up went out. So before every new
+**external** write the executor also asks the purchasing system itself (step 3a below):
+- **What it compares:** every source record in the approved proposal's manifest, by its raw
+  digest, together with the invoice and the order by key. It also takes a complete listing,
+  under the order, of each record type the investigation lists there (receipts, allocations,
+  supplier messages, receiving events).
+- **Changed** (a record changed, is new, or is gone): `cancelled_before_dispatch` /
+  `source_changed`. Nothing is read into OpsBridge; re-running the investigation reads the
+  change.
+- **Cannot tell**: `cancelled_before_dispatch` / `source_unverified`. Causes:
+  - an export, which shows the system as it was when taken (`reads_live` false);
+  - an unreachable source, or an unusable answer;
+  - a listing longer than the connector reads;
+  - no answer within half the job's lease.
+- **In both cases** the outbound connector is never called, the proposal is superseded, and
+  the case's Receiving tab says why under "since approval". The audit event
+  `operation.cancelled_before_dispatch` records the reason.
+- **Unchanged:** `operation.source_verified` is audited with the counts, and the write goes on
+  to step 3's checks, run again under the lock.
+- **Not checked:** local actions (review notes, drafts, assignments) and recovery of a write
+  that may have landed. A dry run (`OPSBRIDGE_OUTBOUND_WRITES=disabled`) is refused before
+  the source is asked.
+
 Source reads (`connectors/source_contract.py`, contract `purchasing-source/1`). Listings
 follow the source's pages to the end; a failed page fails the step (retried), and a listing
 longer than the connector's bound (50 pages of 100) sends the case to manual review instead
@@ -104,6 +135,11 @@ not used again, not even to recover: such an operation goes to review
    destination and outgoing text unchanged. Any failure → cancelled, no call. (Until
    2026-10-22 this ran only while the operation was `pending_dispatch`, so a retry from
    `executing` skipped it; review finding F01.)
+3a. For an external write, once step 3 passes: ask the purchasing system whether it still
+   holds what was approved, outside any transaction, while the operation stays
+   `pending_dispatch`. Changed → `source_changed`; cannot tell → `source_unverified`. Either
+   way the operation is cancelled and the connector is never called. Unchanged → step 3 runs
+   again under the lock, because the question took time.
 4. Commit a `started` attempt, call the connector outside any transaction, record the
    result, then read the task back before marking `confirmed`.
 5. Local actions (review note, supplier draft, case assignment) apply the effect, record a
@@ -190,6 +226,7 @@ create the tracker committed after the client gave up then landed next to the re
 | Settings change after drafting cannot redirect the approval | `test_a_settings_change_after_drafting_cannot_redirect_the_approval` |
 | Destination or outgoing text changed after approval → no dispatch | `test_dispatch_refuses_when_destination_or_outgoing_text_changed_after_approval[connector/redaction]` |
 | Correction, upload or another case's new source version → stale until re-run; correction during dispatch is seen | `tests/integration/test_evidence_freshness.py` (7) |
+| A rejection recorded only upstream after approval, case not re-run → connector never called; an edited receipt, an unreachable source and an export likewise; unchanged → sent once; dry runs and local actions do not ask | `tests/integration/test_dispatch_source_check.py` (6), `tests/workflow/test_source_check.py` (14) |
 | Remote stops honouring idempotency keys, no lookup → review, one task | `test_remote_that_stops_honouring_idempotency_goes_to_review_not_a_duplicate`, `test_unreliable_remote_behind_the_mcp_hop_goes_to_review_not_a_duplicate` |
 | Capability discovery; failed discovery means weakest | `test_capabilities_are_discovered_and_unknown_means_weakest` |
 | UI: reconcile after timeout; unknown outcome recorded by a person | `frontend/e2e/demo.spec.ts` |
@@ -198,7 +235,10 @@ create the tracker committed after the client gave up then landed next to the re
 
 - Delivery is at-least-once; there is no universal exactly-once guarantee.
 - After revalidation, a remote call is in flight; revocation or a correction during that
-  window cannot stop it. Leases must exceed connector timeouts (enforced: lease ≥ 2 × timeout) so a slow
+  window cannot stop it. The same holds upstream: a change the purchasing system commits
+  after the dispatch-time source check is too late for that write. The Casework MCP tool
+  re-checks local admission only; it has no purchasing access, so it relies on the
+  executor's check made just before the call. Leases must exceed connector timeouts (enforced: lease ≥ 2 × timeout) so a slow
   worker is not mistaken for a crashed one; idempotency keys cover the remaining window
   for the simulator connector.
 - Read-back confirms the task exists with our marker; it does not confirm anyone acted on it.

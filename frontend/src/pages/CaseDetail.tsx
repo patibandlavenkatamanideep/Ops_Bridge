@@ -10,10 +10,12 @@ import { ConversationPanel } from "./case/ConversationPanel";
 import { EvidencePanel } from "./case/EvidencePanel";
 import { InvestigationPanel } from "./case/InvestigationPanel";
 import { ProposalsPanel } from "./case/ProposalsPanel";
+import { ReceivingPanel } from "./case/ReceivingPanel";
 
-type Tab = "investigation" | "evidence" | "proposals" | "conversation";
+type Tab = "investigation" | "receiving" | "evidence" | "proposals" | "conversation";
 const TABS: { id: Tab; label: string; permission?: string }[] = [
   { id: "investigation", label: "Investigation" },
+  { id: "receiving", label: "Receiving", permission: "evidence.read" },
   { id: "evidence", label: "Evidence", permission: "evidence.read" },
   { id: "proposals", label: "Proposals & execution", permission: "proposal.read" },
   { id: "conversation", label: "Conversation" },
@@ -104,6 +106,8 @@ export function CaseDetail() {
         {tab === "investigation" ? (
           <InvestigationPanel tenant={tenant} caseId={caseId}
                               onCite={(cite) => { setFocus(cite); if (can(tenant, "evidence.read")) setTab("evidence"); }} />
+        ) : tab === "receiving" ? (
+          <ReceivingPanel tenant={tenant} caseId={caseId} />
         ) : tab === "evidence" ? (
           <EvidencePanel tenant={tenant} caseId={caseId} focus={focus} />
         ) : tab === "proposals" ? (

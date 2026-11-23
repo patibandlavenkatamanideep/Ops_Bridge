@@ -78,3 +78,23 @@ def test_a_deployed_api_refuses_a_short_session_secret(secret: str) -> None:
     s = settings(env="staging", session_secret=secret)  # loads: other processes need none
     with pytest.raises(ConfigurationError, match="session_secret must be at least 32"):
         create_app(settings=s)
+
+
+def test_outbound_writes_are_on_unless_an_installation_turns_them_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A dry run or read-only pilot sets OPSBRIDGE_OUTBOUND_WRITES=disabled; the demo needs
+    nothing. The worker's execution deps carry the setting to the write boundary."""
+    from pydantic import ValidationError
+
+    from opsbridge.workflow.worker import build_execution_deps
+
+    assert Settings(_env_file=None).outbound_writes == "enabled"  # type: ignore[call-arg]
+    assert build_execution_deps(Settings(_env_file=None), db=None).outbound_writes_enabled  # type: ignore[arg-type, call-arg]
+    monkeypatch.setenv("OPSBRIDGE_OUTBOUND_WRITES", "disabled")
+    off = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert off.outbound_writes == "disabled"
+    assert build_execution_deps(off, db=None).outbound_writes_enabled is False  # type: ignore[arg-type]
+    monkeypatch.setenv("OPSBRIDGE_OUTBOUND_WRITES", "off")
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None)  # type: ignore[call-arg]
