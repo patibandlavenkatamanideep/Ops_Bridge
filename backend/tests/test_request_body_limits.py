@@ -33,12 +33,16 @@ from opsbridge.evaluation.local_server import serve
 from opsbridge.persistence.db import Database
 
 LIMIT = 1000
-SECONDS = 0.3
+SECONDS = 0.3  # the time limit, in the tests about time
+# Everywhere else the time limit is far away, so only the size limit can decide. With 0.3 s
+# there too, a slow CI runner timed a size test out before the body passed the size limit:
+# 408 instead of 413 (main, run 45010393703).
+UNHURRIED = 30.0
 
 
 def make_app(**changes: Any) -> tuple[FastAPI, list[int]]:
     """The real middleware stack, with two routes that read a body and record each call."""
-    limits = {"max_request_bytes": LIMIT, "max_request_body_seconds": SECONDS} | changes
+    limits = {"max_request_bytes": LIMIT, "max_request_body_seconds": UNHURRIED} | changes
     settings = Settings(_env_file=None, rate_limit_shared=False, **limits)
     app = create_app(settings=settings, db=Database(sqlalchemy.create_engine("sqlite://")))
     calls: list[int] = []
@@ -173,6 +177,15 @@ def test_a_body_over_the_limit_is_refused_as_soon_as_it_passes_it(
     assert r.taken == LIMIT // 50 + 1  # the chunk that passed the limit, and none after it
 
 
+def test_a_slow_body_over_the_limit_is_refused_for_its_size_not_its_time() -> None:
+    """21 chunks 20 ms apart take about 0.4 s: past `SECONDS`, well within the limit set."""
+    app, calls = make_app()
+    body = json_body(5 * LIMIT)
+    r = call(app, "/api/v1/test/json", pieces(body, 50), gap=0.02)
+    refused(r, 413, "payload_too_large")
+    assert calls == [] and r.taken == LIMIT // 50 + 1
+
+
 def test_the_limit_itself_is_accepted_and_one_byte_more_is_not() -> None:
     app, calls = make_app()
     r = call(app, "/api/v1/test/json", pieces(json_body(LIMIT), 7))  # many small chunks
@@ -230,7 +243,7 @@ def test_an_ordinary_upload_is_read_exactly_and_a_malformed_one_is_a_client_erro
 def test_a_body_that_does_not_arrive_in_time_is_refused(
     chunks: list[bytes], gap: float, then: str
 ) -> None:
-    app, calls = make_app()
+    app, calls = make_app(max_request_body_seconds=SECONDS)
     started = time.monotonic()
     r = call(app, "/api/v1/test/json", chunks, gap=gap, then=then)
     elapsed = time.monotonic() - started
@@ -278,7 +291,7 @@ def test_waiting_for_a_disconnect_after_the_body_is_not_limited_in_time() -> Non
 
 
 def test_over_a_socket_the_refusal_arrives_while_the_client_is_still_sending() -> None:
-    app, calls = make_app(max_request_body_seconds=30.0)
+    app, calls = make_app()
     with serve(app) as base:
         port = int(base.rsplit(":", 1)[1])
         with socket.create_connection(("127.0.0.1", port), timeout=5) as sock:
