@@ -50,11 +50,11 @@ only after a different person approves the exact version they reviewed.
 - **Evaluation**: frozen benchmark with hand-labelled held-out cases, strict offline replay,
   EvalSeal receipts with tamper detection.
 
-## Status (2026-11-17)
+## Status (2026-11-23)
 
 | Level | State |
 |---|---|
-| Local application | All build phases and the production-review fixes verified locally (unit 885, integration 311, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
+| Local application | All build phases and the production-review fixes verified locally (unit 927, integration 325, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
 | Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A12 (the `main` ruleset is applied; the release is prepared), A14, A15, A16; the rest need access or decisions. A later review (5 November, N01–N09): N01–N08 fixed and on `main` (PR #36), N09 not defined in its brief. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
@@ -62,7 +62,7 @@ only after a different person approves the exact version they reviewed.
 | Release | **Not published** — the first, explicitly experimental tag `v0.1.0-alpha.1` qualifies on `main`'s head, `53da540`, whose release also builds, verifies and attests the evidence bundle; the owner pushes it |
 | Staging deployed | **No** — AWS plan in docs/deployment.md, not provisioned |
 | Receiving and disposition | Implemented and tested on synthetic data only (rules `opsbridge-rules/1.4.0`); no organization's receiving data or reviewer yet |
-| Operator pilot measured | **No** — protocol, measures (`pilot-report`), a per-case export check and a rules-only dry run with outbound writes disabled are ready and checked on synthetic data ([docs/pilot/quickstart.md](docs/pilot/quickstart.md)); no export, reviewer or authorization yet |
+| Operator pilot measured | **No** — protocol, measures (`pilot-report`), a per-case export check, a rules-only dry run with outbound writes disabled and the pilot tenant's provisioning (`tenant-provision`) are ready and checked on synthetic data ([docs/pilot/quickstart.md](docs/pilot/quickstart.md)); no export, reviewer or authorization yet |
 
 Held-out benchmark (40 synthetic cases, mocked responses): correct next action 36/40 = 0.90
 (Wilson 95% 0.77–0.96) for both rules-only and agent-assisted modes; all four misses are an
