@@ -1,7 +1,7 @@
 # OpsBridge status
 
-Last updated 2026-11-17. `main` is at `53e6c5a`, PR #45's merge (CI run 44078427478 green on
-the first attempt). This record's update is PR #46.
+Last updated 2026-11-23. `main` is at `53da540`, PR #50's merge (CI run 45127820253 green on
+the first attempt), after PRs #47, #48 and #49 merged on 22 November.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -19,7 +19,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Receiving and disposition | Implemented and tested on synthetic data (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md): delivered, accepted and rejected kept apart; late rejections, returns, replacements and credits; a stale approval refused at both write boundaries. No organization's receiving data read; no reviewer has judged the questions or owners; no shipped policy names a disposition owner (a labelled synthetic version does, for tests only) |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Prepared and checked on synthetic data: protocol `opsbridge-pilot/2`, a per-case export check, and a rules-only dry run with outbound writes disabled (docs/pilot/quickstart.md). The external first pass is blocked: no authorized export, reviewer or authorization |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `53e6c5a` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `v0.1.0-alpha.1` qualifies on `53da540` (`release_check.py versions`, `describe` and `ci` pass); pushing the tag is the owner's |
 
 ## Open work in the repository
 
@@ -29,25 +29,22 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
   3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days) and **PR #45**
   (OpenTelemetry's API, SDK and OTLP exporter raised together to 1.45.2).
-- **PR #47** (draft): the pilot's preparation. A rules-only dry run with outbound writes
-  disabled, a per-case preflight, scenario A fixed (rules 1.3.0), scenario B checked, and the
-  36/40 question answered case by case. Handoff in docs/pilot/.
-- **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
-  workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
-  rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
-- **PR #49** (draft, source freshness at dispatch; its branch starts at PR #48's head): before
-  a follow-up task is sent, the executor asks the purchasing system whether it still holds
-  what was approved. If it changed or cannot say, nothing is sent and the action returns to
-  review. With an export, follow-up tasks stay in review.
-- **PR #52** (draft, pilot tenant provisioning; its branch starts at PR #49's head):
-  `tenant-provision` creates one organization's tenant, never a demo tenant, from a spec file,
-  in one audited transaction. Members join by invitation in the app.
-- **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
-  passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
-  0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
-  `main`'s and was re-run. #32 moves the UI build stage to Node 26, a major version; #12, #10
-  and #9 are older frontend majors. The ruleset requires a branch up to date before it merges
-  ("Update branch"). Dependabot closed #31 itself on 7 November ("up-to-date now").
+- **Merged on 22 November:**
+  - **PR #47**, the pilot's preparation (a rules-only dry run with outbound writes disabled,
+    a per-case preflight, scenarios A and B);
+  - **PR #48**, receiving and disposition (migration 0025, rules 1.4.0, workflow 1.5.0, the
+    Receiving tab);
+  - **PR #49**, the source check at dispatch;
+  - **PR #50**, Dependabot's Node 26 for the UI build stage.
+- **PR #52** (pilot tenant provisioning): `tenant-provision` creates one organization's
+  tenant, never a demo tenant, from a spec file, in one audited transaction. Members join by
+  invitation in the app.
+- **PR #53** (a unit test's timing): `main`'s run on `8aef184` (#49's merge) failed one
+  body-limit test. The size test ran with the 0.3 s time limit meant for the time tests, so a
+  slow runner got 408 before 413. Test-only fix, reproduced deterministically.
+- **Dependabot:** #51 (npm minor and patch), #43 (actions), #42 (14 Python updates), and the
+  older frontend majors #12, #10 and #9. The ruleset requires a branch up to date before it
+  merges ("Update branch").
 
 ## Blockers (each affects only the work that depends on it)
 
@@ -98,7 +95,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: push `v0.1.0-alpha.1` on `main`'s head when ready (`53e6c5a` qualifies now).
+1. Owner: merge PR #53 and PR #52, and push `v0.1.0-alpha.1` on `main`'s head when ready
+   (`53da540` qualifies now; after more merges, their merge commit is the head to check).
 2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
    reviewer and written authorization. Then follow docs/pilot/quickstart.md, section 6
    (pre-registration first).
@@ -112,7 +110,20 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Recent entries
 
-### 2026-11-19: pilot tenant provisioning (PR #52, draft, after #49)
+### 2026-11-23: PRs #47 to #50 merged; a timing flake on `main` (PR #53)
+- PRs #47, #48 and #49 merged on 22 November as `eef3ab1`, `bd36c7a` and `8aef184`, and
+  Dependabot's #50 as `53da540`. `main`'s push CI passed on each, except `8aef184`.
+- On `8aef184` one unit test failed:
+  `test_a_body_over_the_limit_is_refused_as_soon_as_it_passes_it[chunked]` got 408 instead
+  of 413.
+  - Cause: every test in the file used the 0.3 s time limit meant for the time tests, and a
+    slow runner took longer than that to send the 21 chunks.
+  - PR #53 gives the size tests 30 s. Its new test sends the same body slowly and expects
+    413; with the old default it fails with 408, as on CI. No product code changed.
+- On `53da540`, run 45127820253 passed all four jobs on the first attempt, and
+  `release_check.py versions`, `describe` and `ci` pass, checked in a clean worktree of it.
+
+### 2026-11-19: pilot tenant provisioning (PR #52, after #49)
 - Before: only the synthetic demo tenants could be created (`seed-demo`), and their accounts
   share one password. The quickstart left a pilot tenant to the owner, with no command.
 - `tenant-provision --spec FILE [--dry-run]` (`provision.py`, template
