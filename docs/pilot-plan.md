@@ -134,7 +134,8 @@ lacks).
    headline accuracy, because the reviewer may have seen OpsBridge's output. An `opsbridge`
    row names the invoice as it will be entered at intake, since the case and its number
    don't exist yet.
-3. `opsbridge` cases are opened in the pilot tenant and worked and approved as usual.
+3. `opsbridge` cases are opened in the pilot tenant (provisioned with `tenant-provision`,
+   docs/pilot/quickstart.md, section 6) and worked and approved as usual.
 4. `manual` invoices are worked with the existing process. Their start, decision and
    resolution times come from that process's own records where they exist. What the process
    decided is recorded in the reviewer's vocabulary.

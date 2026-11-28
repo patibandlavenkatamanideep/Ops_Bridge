@@ -1,0 +1,32 @@
+# Template: one organization's pilot tenant (`opsbridge-tenant/1`). Blank on purpose: fill in
+# every <<FILL>> value in a copy kept outside Git (for example var/pilot/tenant.yaml), then:
+#
+#   uv --directory backend run --frozen python -m opsbridge.cli tenant-provision \
+#     --spec ../var/pilot/tenant.yaml --dry-run      # validate and report; nothing kept
+#   uv --directory backend run --frozen python -m opsbridge.cli tenant-provision \
+#     --spec ../var/pilot/tenant.yaml
+#
+# What it creates and refuses: backend/src/opsbridge/provision.py. Everyone other than the
+# administrators below joins through the app's invitations (docs/pilot/quickstart.md, section 6).
+schema: opsbridge-tenant/1
+# Lower-case letters, digits and hyphens. Also the export folder:
+# <OPSBRIDGE_PURCHASING_EXPORT_DIR>/<slug>/. Never a demo tenant's slug.
+slug: "<<FILL: the organization's slug>>"
+name: "<<FILL: the organization's name>>"
+tier: standard          # standard or enhanced (docs: auth/permissions.py, TIERS)
+pack: furniture         # the pack that maps this organization's export
+model_mode: rules_only  # the pilot's dry run is rules only
+# The OIDC issuer the administrators sign in with (the deployment's identity provider).
+issuer: "<<FILL: the issuer URL>>"
+# The organization's agreed policy, as files relative to this one. Each is published as an
+# immutable version; publish a change as a new version. The demo's policy is NOT the
+# organization's: write theirs (docs/integration-onboarding.md).
+policies:
+  - "<<FILL: the organization's policy file>>"
+# The first tenant administrators, by the subject (`sub`) their identity provider gives them.
+# Never a demo account: those share a password.
+admins:
+  - subject: "<<FILL: the admin's subject>>"
+    username: "<<FILL: the admin's username>>"
+    display: "<<FILL: the admin's name>>"
+    email: "<<FILL: the admin's email>>"
