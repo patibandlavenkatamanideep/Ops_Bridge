@@ -19,7 +19,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Receiving and disposition | Implemented and tested on synthetic data (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md): delivered, accepted and rejected kept apart; late rejections, returns, replacements and credits; a stale approval refused at both write boundaries. No organization's receiving data read; no reviewer has judged the questions or owners; no shipped policy names a disposition owner (a labelled synthetic version does, for tests only) |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Prepared and checked on synthetic data: protocol `opsbridge-pilot/2`, a per-case export check, and a rules-only dry run with outbound writes disabled (docs/pilot/quickstart.md). The external first pass is blocked: no authorized export, reviewer or authorization |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `53da540` (`release_check.py versions`, `describe` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `release_check.py versions`, `describe` and `ci` pass on `53da540`, but since 28 November its image fails the release's vulnerability scan (two new Debian advisories; PR #56 pins the fixes). The tag `v0.1.0-alpha.1` goes on a head that carries #56, checked again; pushing it is the owner's |
 
 ## Open work in the repository
 
@@ -46,6 +46,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   `get_receiving_events`, and receipt lines carry their reason and a count of the PO's later
   events. Scoped to the case like every Records tool; the explanation model's tools are
   unchanged.
+- **PR #56** (from `main`): since 28 November every new run's image gate fails on two HIGH
+  Debian advisories, CVE-2025-6020 (linux-pam) and CVE-2026-124851 (zstd). The base image
+  carries neither fix yet, so the runtime image pins the fixed packages, as it once pinned
+  `apt`. It merges first.
 - **Dependabot:** #54 (15 Python updates; it replaced #42), #51 (npm minor and patch), #43
   (actions), and the older frontend majors #12, #10 and #9. The ruleset requires a branch up to date before it
   merges ("Update branch").
@@ -100,8 +104,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #53 and PR #52, and push `v0.1.0-alpha.1` on `main`'s head when ready
-   (`53da540` qualifies now; after more merges, their merge commit is the head to check).
+1. Owner: merge PR #56 first (the image gate), then #53, #52 and #55, each after "Update
+   branch" and a green run. Then push `v0.1.0-alpha.1` on `main`'s head when ready. `53da540`
+   passed every release check, but a release built from it now fails the image scan, so the
+   tag goes on a head that carries #56, checked again (`release_check.py`).
 2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
    reviewer and written authorization. Then follow docs/pilot/quickstart.md, section 6
    (pre-registration first).
