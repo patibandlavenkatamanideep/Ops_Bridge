@@ -118,7 +118,8 @@ API, SDK and OTLP exporter, which pin one another's version: its weekly update f
 three, and they were raised together to 1.45.2 by hand (PR #45).
 
 On 28 November two HIGH advisories in Debian packages stopped the image gate on every new CI
-run. The first was PR #55's run 46123103281; no code had changed. The advisories:
+run, starting with `main`'s push run on PR #53's merge, `623b928` (46121914396), whose other
+jobs passed. The Dockerfile had not changed. The advisories:
 CVE-2025-6020 (linux-pam, fixed in 1.5.2-6+deb12u3) and CVE-2026-124851 (zstd, fixed in
 1.5.4+dfsg2-5+deb12u1). The base's newer build of 24 November still carries 1.5.2-6+deb12u2
 and 1.5.4+dfsg2-5, so a digest update does not help. The runtime image pins the four PAM
