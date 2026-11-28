@@ -381,14 +381,19 @@ applies:
 One import behaviour changed: a receipt row with no status is `unstated`, no longer
 `accepted` (section 3). Both shipped packs require a status, so their exports are unaffected.
 
-Two pilot rehearsal artifacts changed:
-- **The rehearsal's scenario A (INV-8401)** records 2 rejected chairs with no reason (its format
-  has no column for one). It now asks receiving for the inspection record instead of proposing
-  a delivery follow-up. Its label in `fixtures/pilot/rehearsal.yaml` was changed accordingly
-  and says so.
-- **The Records MCP tool** returns receipt lines as before, without reasons or events, because
-  the frozen tool cassettes bind its output. The agent reads the rules' findings, not the
-  events themselves.
+One pilot rehearsal artifact changed. **The rehearsal's scenario A (INV-8401)** records 2
+rejected chairs with no reason (its format has no column for one). It now asks receiving for
+the inspection record instead of proposing a delivery follow-up. Its label in
+`fixtures/pilot/rehearsal.yaml` was changed accordingly and says so.
+
+**Records MCP** (`records/2`, 28 November 2026; it was still `records/1` when this work
+merged). Receipt lines carry their rejection reason and `receiving_event_count`, and
+`get_receiving_events` returns the PO's events with citations (docs/integrations.md), each
+only once an investigation of the case has read it. The frozen cassettes record only
+`search_case_evidence`, whose output did not change, and every recording still reproduces.
+The explanation model is still given only that search. It reads the evidence the findings
+cite, which includes the events they applied. Test: `tests/integration/test_mcp.py`,
+`test_a_later_rejection_reaches_records_mcp_once_the_case_has_read_it`.
 
 ## 11. Known gaps
 
@@ -402,8 +407,8 @@ Two pilot rehearsal artifacts changed:
   synthetic example version names one only to test routing (section 5).
 - **Inspection evidence:** this is a recorded rejection reason. Inspection reports as
   documents are not modelled.
-- **Coverage:** the IT hardware pack has no receiving-event mapping, and the agent tools don't
-  see events.
+- **Coverage:** the IT hardware pack has no receiving-event mapping. Records MCP returns
+  events since `records/2` (section 10), but the explanation model is not given that tool.
 - **Executed on changed evidence:** the flag is an audit event, and the tab reports it.
   Clearing it is the case's ordinary review; there is no separate reconciliation queue.
 - **Accuracy:** nothing here is evidence of accuracy on any organization's receiving data.
