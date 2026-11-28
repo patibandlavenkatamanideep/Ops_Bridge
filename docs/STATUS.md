@@ -1,6 +1,6 @@
 # OpsBridge status
 
-Last updated 2026-11-23. `main` is at `53da540`, PR #50's merge (CI run 45127820253 green on
+Last updated 2026-11-28. `main` is at `53da540`, PR #50's merge (CI run 45127820253 green on
 the first attempt), after PRs #47, #48 and #49 merged on 22 November.
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
@@ -11,7 +11,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 927 passed (5 Linux-only skipped, and the live tests), integration 325 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Local | Built and verified on macOS: unit 927 passed (5 Linux-only skipped, and the live tests), integration 326 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
 | Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
@@ -42,8 +42,12 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - **PR #53** (a unit test's timing): `main`'s run on `8aef184` (#49's merge) failed one
   body-limit test. The size test ran with the 0.3 s time limit meant for the time tests, so a
   slow runner got 408 before 413. Test-only fix, reproduced deterministically.
-- **Dependabot:** #51 (npm minor and patch), #43 (actions), #42 (14 Python updates), and the
-  older frontend majors #12, #10 and #9. The ruleset requires a branch up to date before it
+- **PR #55** (receiving events through Records MCP, stacked on #52): `records/2` adds
+  `get_receiving_events`, and receipt lines carry their reason and a count of the PO's later
+  events. Scoped to the case like every Records tool; the explanation model's tools are
+  unchanged.
+- **Dependabot:** #54 (15 Python updates; it replaced #42), #51 (npm minor and patch), #43
+  (actions), and the older frontend majors #12, #10 and #9. The ruleset requires a branch up to date before it
   merges ("Update branch").
 
 ## Blockers (each affects only the work that depends on it)
@@ -86,8 +90,9 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   only in the purchasing system now stops the dispatch: the executor asks the source first.
   With an export it cannot, so external writes stay in review.) No
   policy names a disposition owner or a hold scope, so the demo tenant sends rejected goods
-  to manual review. Only the furniture pack maps receiving events, and the agent's tools do
-  not see them (docs/receiving-disposition.md, section 11).
+  to manual review. Only the furniture pack maps receiving events. Records MCP returns them
+  since `records/2`, but the explanation model is given only its search tool
+  (docs/receiving-disposition.md, sections 10 and 11).
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
 - Processes need synchronized clocks. Each comparison takes both its times from one clock: the
   database's for recorded events, leases, the pilot cut-off and the duration metrics; the
@@ -109,6 +114,27 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-28: receiving events through Records MCP (PR #55, after #52)
+- Before: `get_receipt_lines` returned what was posted on a receipt and nothing recorded
+  after it. A receipt posted as 20 accepted and rejected by 2 later read as 20 accepted, and
+  no Records tool listed the event.
+- `records/2` (`mcp_services/records.py`):
+  - **`get_receiving_events(po_number)`** returns the PO's current events with citations,
+    the source's `occurred` and OpsBridge's `recorded_at`.
+  - **`get_receipt_lines`** adds each line's rejection reason and `receiving_event_count`.
+  - **Scope:** only records whose document an investigation of the delegated case has read,
+    as for every Records tool.
+- **Not changed:**
+  - **The explanation model's tools:** still only `search_case_evidence`. It reads the
+    evidence the findings cite, which includes the events they applied.
+  - **The recordings:** the cassettes record only that search, and every one still replays
+    case by case.
+- docs/receiving-disposition.md, section 10, had said the cassettes bind the receipt-lines
+  output; it now says what they record.
+- Test: `test_a_later_rejection_reaches_records_mcp_once_the_case_has_read_it`. It and the
+  discovery test fail without the change ("Unknown tool").
+- Unit 927, integration 326, `make eval-replay-check` reproduces every recording.
 
 ### 2026-11-23: PRs #47 to #50 merged; a timing flake on `main` (PR #53)
 - PRs #47, #48 and #49 merged on 22 November as `eef3ab1`, `bd36c7a` and `8aef184`, and
