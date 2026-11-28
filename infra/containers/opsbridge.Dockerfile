@@ -29,8 +29,14 @@ FROM docker.io/library/python:3.12.16-slim-bookworm@sha256:935c3c5b12357a7e10caa
 # The base image carries the fixes for CVE-2026-84782 (OpenSSL 3.0.22-1~deb12u2) and
 # CVE-2026-109518 (apt 2.6.2), both HIGH; the CI gate stops fixable HIGH findings. To raise a
 # package past the base image's, pin it here, and drop the pin once the base carries it.
+# Pinned until then (both HIGH, neither in the base's build of 24 November either):
+# CVE-2025-6020, linux-pam, fixed in 1.5.2-6+deb12u3; CVE-2026-124851, zstd, fixed in
+# 1.5.4+dfsg2-5+deb12u1.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends tesseract-ocr=5.3.0-2 tesseract-ocr-eng=1:4.1.0-2 \
+      libpam-modules=1.5.2-6+deb12u3 libpam-modules-bin=1.5.2-6+deb12u3 \
+      libpam-runtime=1.5.2-6+deb12u3 libpam0g=1.5.2-6+deb12u3 \
+      libzstd1=1.5.4+dfsg2-5+deb12u1 \
  && rm -rf /var/lib/apt/lists/*
 RUN groupadd --system --gid 10001 opsbridge \
  && useradd --system --uid 10001 --gid 10001 --home-dir /app --shell /usr/sbin/nologin opsbridge
