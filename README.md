@@ -50,11 +50,11 @@ only after a different person approves the exact version they reviewed.
 - **Evaluation**: frozen benchmark with hand-labelled held-out cases, strict offline replay,
   EvalSeal receipts with tamper detection.
 
-## Status (2026-11-23)
+## Status (2026-11-28)
 
 | Level | State |
 |---|---|
-| Local application | All build phases and the production-review fixes verified locally (unit 927, integration 325, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
+| Local application | All build phases and the production-review fixes verified locally (unit 927, integration 326, including real Keycloak, PostgreSQL and MCP); browser tests run in hosted CI |
 | Production readiness | **Not ready.** The production review listed 18 findings (A01–A18). Done: A01–A05, A07, A13, A17; in part A06, A08, A12 (the `main` ruleset is applied; the release is prepared), A14, A15, A16; the rest need access or decisions. A later review (5 November, N01–N09): N01–N08 fixed and on `main` (PR #36), N09 not defined in its brief. Status and evidence per finding: [docs/production-readiness.md](docs/production-readiness.md) |
 | Real model validated | **No** — no credentials or local model; agent path verified with a deterministic mock only |
 | External connector validated | **No** — GitHub Issues connector contract-tested against a fake of the documented API; live run needs a sandbox repo, token and authorization |
