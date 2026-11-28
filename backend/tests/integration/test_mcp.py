@@ -35,6 +35,15 @@ from .servers import serve
 from .stack import MASTER, get, open_case
 from .test_api_cases import call
 from .test_approvals_execution import approve, drain, fault, operations, prepared, remote_tasks
+from .test_receiving_disposition import (
+    investigate,
+    late,
+    opened,
+    posted_for_twenty,
+    put,
+    tenant_id,
+    variant,
+)
 
 pytestmark = [pytest.mark.integration, pytest.mark.keycloak]
 T = "/api/v1/tenants/demo-furniture"
@@ -147,6 +156,7 @@ def test_discovery_requires_a_valid_service_token(mcp) -> None:  # type: ignore[
             "get_purchase_order",
             "get_invoice",
             "get_receipt_lines",
+            "get_receiving_events",
             "search_policy",
             "get_evidence_excerpt",
             "search_case_evidence",
@@ -220,6 +230,81 @@ def test_permitted_records_calls_return_case_scoped_evidence(stack, mcp) -> None
     assert hits and all("version_id" in h for h in hits)
     pol = mcp["records"].call("search_policy", {"topic": "price tolerance"}, d)
     assert pol["policy_ref"].startswith("furniture-ap@") and "price_tolerance" in pol["matches"]
+
+
+def test_a_later_rejection_reaches_records_mcp_once_the_case_has_read_it(
+    stack, mcp, migrator_engine
+) -> None:  # type: ignore[no-untyped-def]
+    """A receipt was posted as 20 accepted, and the purchasing system later records a rejection
+    of 2 in a file of its own (docs/receiving-disposition.md). The receipt line still reads 20
+    accepted, so it reports how many later events the case holds for the PO, and
+    get_receiving_events returns the rejection with its citations. An event the case has not
+    read is not returned, and neither are another case's events or receipt lines."""
+    st = stack
+    tid = tenant_id(migrator_engine)
+    tools = ["get_receipt_lines", "get_receiving_events"]
+    a = posted_for_twenty("4740")
+    a_id, _ = opened(st, a)
+    d = _deleg(mcp, tid, "furn-investigator", uuid.UUID(a_id), tools)
+
+    def read(po_number: str, delegation: str) -> tuple[dict[str, Any], dict[str, Any]]:
+        args = {"po_number": po_number}
+        return (
+            mcp["records"].call("get_receipt_lines", args, delegation),
+            mcp["records"].call("get_receiving_events", args, delegation),
+        )
+
+    def rows(lines: dict[str, Any]) -> list[tuple[str, str, str | None]]:
+        return sorted((ln["quantity"], ln["status"], ln["reason"]) for ln in lines["lines"])
+
+    # Recorded upstream but not yet read by the case: not part of its evidence.
+    put(st, late(a))
+    lines, events = read(a.po_number, d)
+    assert rows(lines) == [("20", "accepted", None)]
+    assert (lines["receiving_event_count"], events["events"]) == (0, [])
+
+    investigate(st, a_id)
+    lines, events = read(a.po_number, d)
+    assert rows(lines) == [("20", "accepted", None)]
+    assert lines["receiving_event_count"] == 1
+    [ev] = events["events"]
+    assert {k: ev[k] for k in ("event_id", "event_type", "po_line_number", "quantity")} == {
+        "event_id": "REJ-4740",
+        "event_type": "rejection",
+        "po_line_number": "1",
+        "quantity": "2",
+    }
+    assert (ev["receipt_number"], ev["occurred"], ev["reason"]) == (
+        "GR-4740",
+        "2026-10-20",
+        "damaged in transit",
+    )
+    assert ev["recorded_at"] and events["record_count"] == 1
+    quantity_ref = ev["refs"]["receiving_event.quantity"]
+    assert quantity_ref["version_id"] == ev["source_version_id"]
+    excerpt = mcp["records"].call(
+        "get_evidence_excerpt",
+        {
+            "version_id": quantity_ref["version_id"],
+            "locator": quantity_ref["locator"],
+            "field": quantity_ref["field"],
+        },
+        _deleg(mcp, tid, "furn-investigator", uuid.UUID(a_id), ["get_evidence_excerpt"]),
+    )
+    assert excerpt["status"] == "valid" and excerpt["value"] == "2"
+
+    # Another case: its receipt rejected 2 on arrival and a later event rejects 2 more. Its own
+    # delegation sees both; the first case's delegation sees neither.
+    b = variant("rcv-b-rejected-damaged", "4741")
+    put(st, late(b))
+    b_id, _ = opened(st, b)
+    own = _deleg(mcp, tid, "furn-investigator", uuid.UUID(b_id), tools)
+    lines, events = read(b.po_number, own)
+    assert rows(lines) == [("18", "accepted", None), ("2", "rejected", "damaged in transit")]
+    assert lines["receiving_event_count"] == 1
+    assert [e["event_id"] for e in events["events"]] == ["REJ-4741"]
+    lines, events = read(b.po_number, d)
+    assert (lines["lines"], lines["receiving_event_count"], events["events"]) == ([], 0, [])
 
 
 @pytest.mark.parametrize(

@@ -1,7 +1,9 @@
 # OpsBridge status
 
-Last updated 2026-11-17. `main` is at `53e6c5a`, PR #45's merge (CI run 44078427478 green on
-the first attempt). This record's update is PR #46.
+Last updated 2026-11-28. `main` is at `623b928`, PR #53's merge of 28 November. Its CI run
+(46121914396) passed every job but the image gate, which two new Debian advisories now fail
+on every run (PR #56 pins the fixes). The last fully green run on `main` is 45127820253, on
+`53da540` (PR #50's merge, after PRs #47, #48 and #49 merged on 22 November).
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -11,15 +13,15 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 | Level | State |
 |---|---|
-| Local | Built and verified on macOS: unit 904 passed (5 Linux-only skipped, and the live tests), integration 318 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
-| Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
+| Local | Built and verified on macOS: unit 927 passed (5 Linux-only skipped, and the live tests), integration 326 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
+| Hosted CI | Passing on `main` up to `53da540`. On `623b928` every job passed but the image gate (two new Debian advisories; PR #56). CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
 | Receiving and disposition | Implemented and tested on synthetic data (rules `opsbridge-rules/1.4.0`, docs/receiving-disposition.md): delivered, accepted and rejected kept apart; late rejections, returns, replacements and credits; a stale approval refused at both write boundaries. No organization's receiving data read; no reviewer has judged the questions or owners; no shipped policy names a disposition owner (a labelled synthetic version does, for tests only) |
 | Staging | Not provisioned. The runtime depends on a parser-sandbox check on AWS (docs/deployment.md) |
 | Pilot | Not started. Prepared and checked on synthetic data: protocol `opsbridge-pilot/2`, a per-case export check, and a rules-only dry run with outbound writes disabled (docs/pilot/quickstart.md). The external first pass is blocked: no authorized export, reviewer or authorization |
-| Release | None published. `v0.1.0-alpha.1` qualifies on `53e6c5a` (`release_check.py versions` and `ci` pass); pushing the tag is the owner's |
+| Release | None published. `release_check.py versions`, `describe` and `ci` pass on `53da540`, but since 28 November its image fails the release's vulnerability scan (two new Debian advisories; PR #56 pins the fixes). The tag `v0.1.0-alpha.1` goes on a head that carries #56, checked again; pushing it is the owner's |
 
 ## Open work in the repository
 
@@ -29,22 +31,31 @@ This page says what is true now. The journal of how it got here, 14 October to 5
   times; the clock claims corrected) are merged, and so is **PR #39** (the image on Python
   3.12.16 without the OpenSSL and `apt` pins; action updates held 14 days) and **PR #45**
   (OpenTelemetry's API, SDK and OTLP exporter raised together to 1.45.2).
-- **PR #47** (draft): the pilot's preparation. A rules-only dry run with outbound writes
-  disabled, a per-case preflight, scenario A fixed (rules 1.3.0), scenario B checked, and the
-  36/40 question answered case by case. Handoff in docs/pilot/.
-- **PR #48** (draft, receiving and disposition; its branch starts at PR #47's head): receiving events and rejection reasons (migration 0025), rules 1.4.0 and
-  workflow 1.5.0, the Receiving tab, and the synthetic receiving pack. It changes the
-  rehearsal's scenario A (now asks receiving for the inspection record), so it follows #47.
-- **PR #49** (draft, source freshness at dispatch; its branch starts at PR #48's head): before
-  a follow-up task is sent, the executor asks the purchasing system whether it still holds
-  what was approved. If it changed or cannot say, nothing is sent and the action returns to
-  review. With an export, follow-up tasks stay in review.
-- **Dependabot:** seven pull requests. #43 (actions, both now past two weeks) and #44 (npm)
-  passed CI. #42 (14 Python updates, among them `anthropic` 2.1.0 to 2.5.0 and `fastapi`
-  0.143.1 to 0.162.0) passed every test; its image job failed on the same download as
-  `main`'s and was re-run. #32 moves the UI build stage to Node 26, a major version; #12, #10
-  and #9 are older frontend majors. The ruleset requires a branch up to date before it merges
-  ("Update branch"). Dependabot closed #31 itself on 7 November ("up-to-date now").
+- **Merged on 22 November:**
+  - **PR #47**, the pilot's preparation (a rules-only dry run with outbound writes disabled,
+    a per-case preflight, scenarios A and B);
+  - **PR #48**, receiving and disposition (migration 0025, rules 1.4.0, workflow 1.5.0, the
+    Receiving tab);
+  - **PR #49**, the source check at dispatch;
+  - **PR #50**, Dependabot's Node 26 for the UI build stage.
+- **PR #52** (pilot tenant provisioning): `tenant-provision` creates one organization's
+  tenant, never a demo tenant, from a spec file, in one audited transaction. Members join by
+  invitation in the app.
+- **PR #53** (a unit test's timing), merged on 28 November as `623b928`: `main`'s run on
+  `8aef184` (#49's merge) had failed one body-limit test. The size test ran with the 0.3 s
+  time limit meant for the time tests, so a slow runner got 408 before 413. Test-only fix,
+  reproduced deterministically.
+- **PR #55** (receiving events through Records MCP, stacked on #52): `records/2` adds
+  `get_receiving_events`, and receipt lines carry their reason and a count of the PO's later
+  events. Scoped to the case like every Records tool; the explanation model's tools are
+  unchanged.
+- **PR #56** (from `main`): since 28 November every new run's image gate fails on two HIGH
+  Debian advisories, CVE-2025-6020 (linux-pam) and CVE-2026-124851 (zstd). The base image
+  carries neither fix yet, so the runtime image pins the fixed packages, as it once pinned
+  `apt`. It merges first.
+- **Dependabot:** #54 (15 Python updates; it replaced #42), #51 (npm minor and patch), #43
+  (actions), and the older frontend majors #12, #10 and #9. The ruleset requires a branch up to date before it
+  merges ("Update branch").
 
 ## Blockers (each affects only the work that depends on it)
 
@@ -78,14 +89,17 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - Evidence that changes after approval stops the dispatch. The Receiving tab lists the
   documents added or no longer current since each approval and a timeline of receiving
   evidence, but there is no field-by-field diff, and the refusal's reasons are in the audit
-  log, not the API (the UI shows its category). No command provisions a pilot (non-demo)
-  tenant.
+  log, not the API (the UI shows its category).
+- A pilot tenant is provisioned with `tenant-provision` from a spec file. It has been run only
+  against the local database and synthetic specs, never against an organization's identity
+  provider.
 - Receiving: any evidence change, material or not, makes an approval stale. (A rejection
   only in the purchasing system now stops the dispatch: the executor asks the source first.
   With an export it cannot, so external writes stay in review.) No
   policy names a disposition owner or a hold scope, so the demo tenant sends rejected goods
-  to manual review. Only the furniture pack maps receiving events, and the agent's tools do
-  not see them (docs/receiving-disposition.md, section 11).
+  to manual review. Only the furniture pack maps receiving events. Records MCP returns them
+  since `records/2`, but the explanation model is given only its search tool
+  (docs/receiving-disposition.md, sections 10 and 11).
 - The S3 store is tested against SeaweedFS only, and alerts reach a local sink only.
 - Processes need synchronized clocks. Each comparison takes both its times from one clock: the
   database's for recorded events, leases, the pilot cut-off and the duration metrics; the
@@ -93,7 +107,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: push `v0.1.0-alpha.1` on `main`'s head when ready (`53e6c5a` qualifies now).
+1. Owner: merge PR #56 first (the image gate), then #52 and #55, each after "Update branch"
+   and a green run. Then push `v0.1.0-alpha.1` on `main`'s head when ready. `53da540`
+   passed every release check, but a release built from it now fails the image scan, so the
+   tag goes on a head that carries #56, checked again (`release_check.py`).
 2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
    reviewer and written authorization. Then follow docs/pilot/quickstart.md, section 6
    (pre-registration first).
@@ -106,6 +123,64 @@ This page says what is true now. The journal of how it got here, 14 October to 5
    preparation already done. New findings get a regression test first, as before.
 
 ## Recent entries
+
+### 2026-11-28: receiving events through Records MCP (PR #55, after #52)
+- Before: `get_receipt_lines` returned what was posted on a receipt and nothing recorded
+  after it. A receipt posted as 20 accepted and rejected by 2 later read as 20 accepted, and
+  no Records tool listed the event.
+- `records/2` (`mcp_services/records.py`):
+  - **`get_receiving_events(po_number)`** returns the PO's current events with citations,
+    the source's `occurred` and OpsBridge's `recorded_at`.
+  - **`get_receipt_lines`** adds each line's rejection reason and `receiving_event_count`.
+  - **Scope:** only records whose document an investigation of the delegated case has read,
+    as for every Records tool.
+- **Not changed:**
+  - **The explanation model's tools:** still only `search_case_evidence`. It reads the
+    evidence the findings cite, which includes the events they applied.
+  - **The recordings:** the cassettes record only that search, and every one still replays
+    case by case.
+- docs/receiving-disposition.md, section 10, had said the cassettes bind the receipt-lines
+  output; it now says what they record.
+- Test: `test_a_later_rejection_reaches_records_mcp_once_the_case_has_read_it`. It and the
+  discovery test fail without the change ("Unknown tool").
+- Unit 927, integration 326, `make eval-replay-check` reproduces every recording.
+
+### 2026-11-23: PRs #47 to #50 merged; a timing flake on `main` (PR #53)
+- PRs #47, #48 and #49 merged on 22 November as `eef3ab1`, `bd36c7a` and `8aef184`, and
+  Dependabot's #50 as `53da540`. `main`'s push CI passed on each, except `8aef184`.
+- On `8aef184` one unit test failed:
+  `test_a_body_over_the_limit_is_refused_as_soon_as_it_passes_it[chunked]` got 408 instead
+  of 413.
+  - Cause: every test in the file used the 0.3 s time limit meant for the time tests, and a
+    slow runner took longer than that to send the 21 chunks.
+  - PR #53 gives the size tests 30 s. Its new test sends the same body slowly and expects
+    413; with the old default it fails with 408, as on CI. No product code changed.
+- On `53da540`, run 45127820253 passed all four jobs on the first attempt, and
+  `release_check.py versions`, `describe` and `ci` pass, checked in a clean worktree of it.
+
+### 2026-11-19: pilot tenant provisioning (PR #52, after #49)
+- Before: only the synthetic demo tenants could be created (`seed-demo`), and their accounts
+  share one password. The quickstart left a pilot tenant to the owner, with no command.
+- `tenant-provision --spec FILE [--dry-run]` (`provision.py`, template
+  `fixtures/pilot/tenant.example.yaml`) creates one organization's tenant in one audited
+  transaction:
+  - the tenant, not flagged as a demo;
+  - settings, rules only by default;
+  - the first task connection;
+  - its policy versions, validated for the pack;
+  - its first administrators, by identity-provider subject.
+- Everyone else joins by invitation in the app. A re-run publishes added policy versions and
+  changes nothing else.
+- Refused, with nothing written: a demo slug or tenant, a demo account's subject, another
+  pack, a policy for another pack, a changed policy under the same version, a model mode the
+  tier lacks, and unfilled template values.
+- Tests: 23 unit (the spec), 7 on the stack:
+  - what is written and audited;
+  - the administrator invites through the app, and a demo administrator has no access;
+  - re-runs, atomic refusals and dry runs;
+  - `seed-demo` leaves the tenant alone.
+  - A mutation flagging the tenant as a demo fails 5 of them.
+- Unit 927 (frontend 17), integration 325.
 
 ### 2026-11-18: source freshness at dispatch (PR #49, draft, after #48)
 - Reproduced on #48's head: a follow-up approved on 20 accepted was sent after a rejection of

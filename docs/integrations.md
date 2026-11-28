@@ -34,10 +34,21 @@ PostgreSQL (role `opsbridge_mcp`, RLS with the delegated tenant). Denials are SD
 `ToolError`s (caller sees `is_error` with a safe reason) and are audited with the caller
 service, the principal and the delegation id.
 
-**Records MCP tools** (permission `evidence.read`, case-scoped: results must be linked to
-the delegated case): `get_purchase_order(po_number)`, `get_invoice(invoice_number)`,
-`get_receipt_lines(po_number)`, `search_policy(topic)`,
+**Records MCP tools** (`records/2`; permission `evidence.read`, case-scoped: results must be
+linked to the delegated case): `get_purchase_order(po_number)`, `get_invoice(invoice_number)`,
+`get_receipt_lines(po_number)`, `get_receiving_events(po_number)`, `search_policy(topic)`,
 `get_evidence_excerpt(version_id, locator, field)`, `search_case_evidence(query)`.
+
+A receipt line keeps what was posted, so a rejection, return, replacement or credit recorded
+later is not on it (docs/receiving-disposition.md). `get_receipt_lines` gives each line's
+status and rejection reason, and `receiving_event_count`: how many of the PO's current events
+the case holds. `get_receiving_events` returns them as the source states them, with citations,
+the source's `occurred` and OpsBridge's `recorded_at`. An event counts only once an
+investigation of the case has read its document, as for every other record.
+
+The explanation model is given none of these except `search_case_evidence`. It reads the
+evidence that the rules' findings cite, which includes the receiving events they applied
+(docs/agents-and-models.md).
 
 **Casework MCP tools** (caller must be `opsbridge-worker`; principal must be the operation's
 approver and still hold `proposal.decide` with the action in scope):

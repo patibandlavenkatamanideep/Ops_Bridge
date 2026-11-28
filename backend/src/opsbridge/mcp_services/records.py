@@ -34,16 +34,20 @@ from opsbridge.persistence.models import (
     POLineRecord,
     PurchaseOrderRecord,
     ReceiptLineRecord,
+    ReceivingEventRecord,
 )
 
 from .auth import DelegationVerifier
 from .common import CallContext, Guard, ToolDenied, as_uuid, jsonable_dict
 
-TOOL_VERSION = "records/1"
+# records/2: get_receiving_events; receipt lines carry their rejection reason and the count of
+# the PO's later receiving events in the case.
+TOOL_VERSION = "records/2"
 TOOLS = (
     "get_purchase_order",
     "get_invoice",
     "get_receipt_lines",
+    "get_receiving_events",
     "search_policy",
     "get_evidence_excerpt",
     "search_case_evidence",
@@ -62,6 +66,24 @@ def _case_versions(s: Session, case_id: uuid.UUID) -> set[uuid.UUID]:
 
 def _require_case(cc: CallContext) -> str | None:
     return None if cc.delegation.case_id else "delegation does not name a case"
+
+
+def _po(po_number: str) -> str:
+    return po_number.strip().upper()[:100]
+
+
+def _events(s: Session, versions: set[uuid.UUID], po_number: str) -> list[ReceivingEventRecord]:
+    """The PO's current receiving events whose document is linked to the case. An event the
+    purchasing system holds but no investigation of this case has read is not included."""
+    rows = s.execute(
+        select(ReceivingEventRecord)
+        .where(
+            ReceivingEventRecord.po_number == _po(po_number),
+            ReceivingEventRecord.superseded_at.is_(None),
+        )
+        .order_by(ReceivingEventRecord.created_at, ReceivingEventRecord.event_id)
+    ).scalars()
+    return [e for e in rows if e.source_version_id in versions]
 
 
 def build_records_server(
@@ -191,7 +213,13 @@ def build_records_server(
         guard.audit_ok(cc, "get_invoice", invoice_number[:100])
         return dict(out)
 
-    @server.tool(description="Goods-receipt lines for a PO that are linked to the delegated case.")
+    @server.tool(
+        description=(
+            "Goods-receipt lines for a PO that are linked to the delegated case. Rejections, "
+            "returns, replacements and credits recorded after a receipt are not on its lines: "
+            "receiving_event_count says how many the case holds (get_receiving_events)."
+        )
+    )
     async def get_receipt_lines(po_number: str, ctx: Context) -> dict[str, Any]:
         cc = guard.authorize(ctx, "get_receipt_lines", "evidence.read", _require_case)
 
@@ -200,7 +228,7 @@ def build_records_server(
                 r
                 for r in s.execute(
                     select(GoodsReceiptRecord).where(
-                        GoodsReceiptRecord.po_number == po_number.strip().upper()[:100],
+                        GoodsReceiptRecord.po_number == _po(po_number),
                         GoodsReceiptRecord.superseded_at.is_(None),
                     )
                 ).scalars()
@@ -219,15 +247,64 @@ def build_records_server(
                             "unit": ln.unit,
                             "kind": ln.kind,
                             "status": ln.status,
+                            "reason": ln.reason,
                             "refs": ln.refs,
                         }
                     )
             return jsonable_dict(
-                {"po_number": po_number, "lines": out, "record_count": len(receipts)}
+                {
+                    "po_number": po_number,
+                    "lines": out,
+                    "record_count": len(receipts),
+                    "receiving_event_count": len(_events(s, versions, po_number)),
+                }
             )
 
         out = await run(lambda: scoped(cc, q))
         guard.audit_ok(cc, "get_receipt_lines", po_number[:100])
+        return dict(out)
+
+    @server.tool(
+        description=(
+            "Receiving and disposition events for a PO that are linked to the delegated case: "
+            "rejections, returns, replacements and credits, each as the source states it, with "
+            "citations. `occurred` is the source's own time; `recorded_at` is when OpsBridge "
+            "read it."
+        )
+    )
+    async def get_receiving_events(po_number: str, ctx: Context) -> dict[str, Any]:
+        cc = guard.authorize(ctx, "get_receiving_events", "evidence.read", _require_case)
+
+        def q(s: Session, versions: set[uuid.UUID]) -> dict[str, Any]:
+            events = _events(s, versions, po_number)
+            return jsonable_dict(
+                {
+                    "po_number": po_number,
+                    "events": [
+                        {
+                            "event_id": e.event_id,
+                            "event_type": e.event_type,
+                            "po_line_number": e.po_line_number,
+                            "quantity": e.quantity,
+                            "unit": e.unit,
+                            "occurred": e.occurred,
+                            "recorded_at": e.created_at,
+                            "receipt_number": e.receipt_number,
+                            "follows": e.follows,
+                            "invoice_number": e.invoice_number,
+                            "document_number": e.document_number,
+                            "reason": e.reason,
+                            "source_version_id": e.source_version_id,
+                            "refs": e.refs,
+                        }
+                        for e in events
+                    ],
+                    "record_count": len(events),
+                }
+            )
+
+        out = await run(lambda: scoped(cc, q))
+        guard.audit_ok(cc, "get_receiving_events", po_number[:100])
         return dict(out)
 
     @server.tool(

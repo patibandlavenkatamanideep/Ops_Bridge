@@ -92,6 +92,10 @@ holding back the events recorded after approval; `--late-events` adds those late
 `--export-to DIR` writes all of them as an export (docs/receiving-disposition.md, section 8).
 The worker's `/readyz` (port 9101) reports `outbound_writes`
 and `purchasing_source`: a dry run is confirmed there (docs/pilot/quickstart.md).
+`tenant-provision --spec FILE [--dry-run]` provisions one organization's tenant, never a
+demo tenant, from an `opsbridge-tenant/1` file (template `fixtures/pilot/tenant.example.yaml`;
+docs/pilot/quickstart.md, section 6). It uses the migrator role and runs in one transaction.
+It prints what it created and what it kept; a refusal exits 2 and writes nothing.
 `python3 scripts/bench_pairing.py [--run DIR]` pairs a recorded run's rules-only and mock
 verdicts case by case and writes nothing.
 

@@ -122,9 +122,24 @@ empty: on the checked run, `var/simulator.sqlite3` held 0 tasks after two approv
 2. Put the export outside the repository, or under `var/`, as `<dir>/<tenant slug>/`. Run
    `export-check` on it in the image with the network off (docs/pilot-plan.md), and resolve or
    accept every problem it lists.
-3. The pilot needs a tenant for the organization and the reviewer's sign-in. Only the
-   synthetic demo tenants can be seeded today; provisioning a pilot tenant is a step for the
-   owner (docs/integration-onboarding.md, section 6).
+3. The pilot needs its own tenant. Never use a demo tenant: demo accounts share one password.
+   - Copy `fixtures/pilot/tenant.example.yaml` outside Git (for example
+     `var/pilot/tenant.yaml`) and fill in every `<<FILL…>>` value:
+     - the slug, which also names the export folder (`<dir>/<slug>/`);
+     - the identity provider's issuer, and the first administrator's subject;
+     - the organization's agreed policy file. The demo's policy is not theirs.
+   - Check it, then provision. The dry run writes nothing; any refusal writes nothing:
+
+         uv --directory backend run --frozen python -m opsbridge.cli tenant-provision --spec ../var/pilot/tenant.yaml --dry-run
+         uv --directory backend run --frozen python -m opsbridge.cli tenant-provision --spec ../var/pilot/tenant.yaml
+
+   - The report's `tenant_id` is what `pilot-report --tenant-id` takes (docs/pilot-plan.md).
+   - The administrator signs in and invites the reviewer from **Settings** (an invitation
+     link, accepted with the address their identity provider verified). Members, roles and
+     the model mode are managed there, and each change is audited.
+   - Re-running publishes policy versions added to the spec, and leaves everything else as it
+     is. A changed policy is published as a new version.
+   - `make reset-demo` deletes the whole local database, a provisioned tenant included.
 4. If the export is older than `OPSBRIDGE_SOURCE_MAX_AGE_HOURS` (24), its results cannot be
    proposed or approved. Raise the limit to cover the export's age and the session, and record
    the value.
