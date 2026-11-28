@@ -1,7 +1,9 @@
 # OpsBridge status
 
-Last updated 2026-11-28. `main` is at `53da540`, PR #50's merge (CI run 45127820253 green on
-the first attempt), after PRs #47, #48 and #49 merged on 22 November.
+Last updated 2026-11-28. `main` is at `623b928`, PR #53's merge of 28 November. Its CI run
+(46121914396) passed every job but the image gate, which two new Debian advisories now fail
+on every run (PR #56 pins the fixes). The last fully green run on `main` is 45127820253, on
+`53da540` (PR #50's merge, after PRs #47, #48 and #49 merged on 22 November).
 
 This page says what is true now. The journal of how it got here, 14 October to 5 November, is
 [docs/status-history.md](status-history.md); findings, evidence and blockers per review are in
@@ -12,7 +14,7 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 | Level | State |
 |---|---|
 | Local | Built and verified on macOS: unit 927 passed (5 Linux-only skipped, and the live tests), integration 326 on real PostgreSQL, Keycloak and MCP, canary 64/64, 34 receipts verify, every recorded run replays case by case |
-| Hosted CI | Passing on `main`. CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
+| Hosted CI | Passing on `main` up to `53da540`. On `623b928` every job passed but the image gate (two new Debian advisories; PR #56). CI also runs what this host cannot: the image build and scan, the parser sandbox (Landlock and seccomp), OCR, and the browser tests |
 | Real model | Not evaluated: no credential, budget or labellers; the deterministic mock only |
 | Task tracker | Contract-tested against a fake of GitHub's API; no live write |
 | Purchasing source | The simulator and hand-written exports only; no customer system or export has been read |
@@ -39,9 +41,10 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 - **PR #52** (pilot tenant provisioning): `tenant-provision` creates one organization's
   tenant, never a demo tenant, from a spec file, in one audited transaction. Members join by
   invitation in the app.
-- **PR #53** (a unit test's timing): `main`'s run on `8aef184` (#49's merge) failed one
-  body-limit test. The size test ran with the 0.3 s time limit meant for the time tests, so a
-  slow runner got 408 before 413. Test-only fix, reproduced deterministically.
+- **PR #53** (a unit test's timing), merged on 28 November as `623b928`: `main`'s run on
+  `8aef184` (#49's merge) had failed one body-limit test. The size test ran with the 0.3 s
+  time limit meant for the time tests, so a slow runner got 408 before 413. Test-only fix,
+  reproduced deterministically.
 - **PR #55** (receiving events through Records MCP, stacked on #52): `records/2` adds
   `get_receiving_events`, and receipt lines carry their reason and a count of the PO's later
   events. Scoped to the case like every Records tool; the explanation model's tools are
@@ -104,8 +107,8 @@ This page says what is true now. The journal of how it got here, 14 October to 5
 
 ## Next executable task
 
-1. Owner: merge PR #56 first (the image gate), then #53, #52 and #55, each after "Update
-   branch" and a green run. Then push `v0.1.0-alpha.1` on `main`'s head when ready. `53da540`
+1. Owner: merge PR #56 first (the image gate), then #52 and #55, each after "Update branch"
+   and a green run. Then push `v0.1.0-alpha.1` on `main`'s head when ready. `53da540`
    passed every release check, but a release built from it now fails the image scan, so the
    tag goes on a head that carries #56, checked again (`release_check.py`).
 2. Owner: the pilot's inputs above: an authorized, sanitized export, one AP or procurement
